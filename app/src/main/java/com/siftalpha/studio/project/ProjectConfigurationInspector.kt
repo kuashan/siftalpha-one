@@ -348,8 +348,7 @@ class ProjectConfigurationInspector(context: Context) {
         }
 
         private fun lineNumberAt(source: String, offset: Int): Int =
-            source.substring(0, offset.coerceIn(0, source.length)).count { it == '
-' } + 1
+            source.substring(0, offset.coerceIn(0, source.length)).count { it == '\n' } + 1
 
         private fun extractNamedArray(text: String, key: String): String? {
             val keyIndex = text.indexOf("\"$key\"")
