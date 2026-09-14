@@ -69,4 +69,28 @@
     <string name="home_no_launchable_termux">起動可能な Termux が見つかりません</string>
     <string name="home_permission_granted_toast">Termux RUN_COMMAND 権限を許可しました</string>
     <string name="home_permission_denied">権限が許可されていません。システムのアプリ権限から手動で有効にできます。</string>
+
+    <string name="home_action_settings">設定</string>
+    <string name="home_nav_home">ホーム</string>
+    <string name="home_nav_runtime">ランタイム</string>
+    <string name="home_nav_environment">環境</string>
+    <string name="home_nav_home_icon">⌂</string>
+    <string name="home_nav_runtime_icon">▶</string>
+    <string name="home_nav_environment_icon">⚙</string>
+    <string name="home_w1c_summary">1 つの入口からプロジェクト、ランタイム、環境を管理します。</string>
+    <string name="home_quick_actions">クイックアクセス</string>
+    <string name="home_project_search_hint">プロジェクト名、説明、ソース、実行コマンドを検索</string>
+    <string name="home_filter_all">すべて</string>
+    <string name="home_filter_python">Python</string>
+    <string name="home_filter_node">Node.js</string>
+    <string name="home_project_count_filtered">%1$d / %2$d 件のプロジェクトを表示</string>
+    <string name="home_no_matching_projects">現在の検索またはフィルターに一致するプロジェクトはありません。</string>
+    <string name="home_project_type_python">Python プロジェクト</string>
+    <string name="home_project_type_node">Node.js プロジェクト</string>
+    <string name="home_project_type_unknown">種類不明</string>
+    <string name="home_project_configured">実行コマンド設定済み</string>
+    <string name="home_project_not_configured">実行コマンド未設定</string>
+    <string name="home_copy_output">出力をコピー</string>
+    <string name="home_output_copied">コマンド出力をコピーしました</string>
+
 </resources>

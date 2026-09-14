@@ -7,65 +7,70 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.provider.DocumentsContract
 import android.provider.Settings
-import android.view.Gravity
-import android.view.View
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.mutableStateOf
 import com.siftalpha.studio.project.ProjectStore
 import com.siftalpha.studio.runtime.RuntimeCommand
 import com.siftalpha.studio.runtime.RuntimeResult
 import com.siftalpha.studio.runtime.TermuxBackend
 import com.siftalpha.studio.runtime.TermuxContract
 import com.siftalpha.studio.runtime.TermuxResultBus
+import com.siftalpha.studio.ui.theme.StudioTheme
 
-class MainActivity : StudioActivity() {
+/**
+ * The single product entry point.
+ *
+ * W1C moves the home surface to Compose while keeping the already-tested runtime, editor and
+ * storage activities as stable destinations. Runtime commands and SAF identity remain owned here
+ * until the project workspace is introduced in W2.
+ */
+class MainActivity : StudioComposeActivity() {
 
     private lateinit var backend: TermuxBackend
     private lateinit var projectStore: ProjectStore
-    private lateinit var permissionStateText: TextView
-    private lateinit var bridgeStateText: TextView
-    private lateinit var permissionButton: Button
-    private lateinit var projectRootText: TextView
-    private lateinit var projectListContainer: LinearLayout
-    private lateinit var outputText: TextView
+    private val homeState = mutableStateOf(HomeState())
     private var autoBridgeProbeStarted = false
 
     private val resultListener: (RuntimeResult) -> Unit = { result ->
         runOnUiThread {
-            outputText.text = buildString {
-                appendLine("executionId = ${result.executionId}")
-                appendLine("exitCode = ${result.exitCode}")
-                appendLine("termuxError = ${result.internalErrorCode}")
-                if (result.internalErrorMessage.isNotBlank()) appendLine("errmsg = ${result.internalErrorMessage}")
+            val output = buildString {
+                appendLine("executionId = " + result.executionId)
+                appendLine("exitCode = " + result.exitCode)
+                appendLine("termuxError = " + result.internalErrorCode)
+                if (result.internalErrorMessage.isNotBlank()) {
+                    appendLine("errmsg = " + result.internalErrorMessage)
+                }
                 if (result.stdout.isNotBlank()) {
-                    appendLine("\n--- stdout ---")
+                    appendLine()
+                    appendLine("--- stdout ---")
                     append(result.stdout.trimEnd())
                 }
                 if (result.stderr.isNotBlank()) {
-                    appendLine("\n\n--- stderr ---")
+                    appendLine()
+                    appendLine()
+                    appendLine("--- stderr ---")
                     append(result.stderr.trimEnd())
                 }
             }
             val bridgeOk = result.internalErrorMessage.isBlank() &&
                 (result.exitCode == 0 || result.internalErrorCode == Activity.RESULT_OK)
-            bridgeStateText.text = getString(
-                if (bridgeOk) R.string.home_bridge_connected else R.string.home_bridge_abnormal,
+            homeState.value = homeState.value.copy(
+                commandOutput = output.take(MAX_OUTPUT_CHARS),
+                bridgeState = if (bridgeOk) {
+                    HomeBridgeState.CONNECTED
+                } else {
+                    HomeBridgeState.ABNORMAL
+                },
             )
-            bridgeStateText.setTextColor(
-                if (bridgeOk) Color.rgb(170, 224, 190) else Color.rgb(240, 184, 120),
-            )
-            refreshPermissionState()
+            refreshTermuxState()
         }
     }
 
@@ -73,21 +78,58 @@ class MainActivity : StudioActivity() {
         super.onCreate(savedInstanceState)
         backend = TermuxBackend(this)
         projectStore = ProjectStore(this)
-        setContentView(buildUi())
-        refreshPermissionState()
+        enableEdgeToEdge()
+        setContent {
+            StudioTheme {
+                HomeScreen(
+                    state = homeState.value,
+                    versionName = appVersionName(),
+                    onSettings = {
+                        startActivity(Intent(this, SettingsActivity::class.java))
+                    },
+                    onConnectAcode = { chooseProjectRoot(preferAcodeProjects = true) },
+                    onChooseRoot = { chooseProjectRoot(preferAcodeProjects = false) },
+                    onNewProject = { showCreateProjectDialog() },
+                    onRefreshProjects = { refreshProjects() },
+                    onOpenProject = { openProject(it) },
+                    onShowDetails = { showProjectDetails(it) },
+                    onDeleteProject = { confirmDeleteProject(it) },
+                    onRuntimeCenter = {
+                        startActivity(Intent(this, V04Activity::class.java))
+                    },
+                    onEnvironment = {
+                        startActivity(Intent(this, RuntimeStorageActivity::class.java))
+                    },
+                    onTerminal = {
+                        startActivity(Intent(this, V05Activity::class.java))
+                    },
+                    onProbeEnvironment = {
+                        runCommand(TermuxBackend.ENVIRONMENT_PROBE)
+                    },
+                    onTestTermux = {
+                        runCommand(TermuxBackend.CONNECTION_TEST)
+                    },
+                    onRequestPermission = { requestRunCommandPermission() },
+                    onCopySetup = { copyTermuxSetup() },
+                    onOpenTermux = { openTermux() },
+                    onCopyOutput = { copyOutput() },
+                )
+            }
+        }
+        refreshTermuxState()
         refreshProjects()
     }
 
     override fun onStart() {
         super.onStart()
         TermuxResultBus.addListener(resultListener)
-        refreshPermissionState()
+        refreshTermuxState()
         maybeAutoProbeBridge()
     }
 
     override fun onResume() {
         super.onResume()
-        if (::projectListContainer.isInitialized) refreshProjects()
+        if (::projectStore.isInitialized) refreshProjects()
     }
 
     override fun onStop() {
@@ -95,104 +137,16 @@ class MainActivity : StudioActivity() {
         super.onStop()
     }
 
-    private fun buildUi(): View {
-        val scroll = ScrollView(this).apply { setBackgroundColor(Color.rgb(16, 19, 24)) }
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(30))
-        }
-        scroll.addView(root)
-
-        root.addView(text(getString(R.string.app_name), 28f, true).apply { setTextColor(Color.WHITE) })
-        root.addView(text(getString(R.string.home_subtitle, appVersionName()), 13f, false).apply {
-            setTextColor(Color.rgb(165, 170, 180))
-            setPadding(0, dp(2), 0, dp(8))
-        })
-        root.addView(button(getString(R.string.settings_title)) {
-            startActivity(Intent(this, SettingsActivity::class.java))
-        })
-
-        permissionStateText = text(getString(R.string.home_checking_termux_permission), 17f, true).apply {
-            setTextColor(Color.rgb(170, 224, 190))
-            setPadding(0, dp(4), 0, dp(4))
-        }
-        root.addView(permissionStateText)
-
-        bridgeStateText = text(getString(R.string.home_bridge_ready_probe), 14f, false).apply {
-            setTextColor(Color.rgb(165, 170, 180))
-            setPadding(0, 0, 0, dp(8))
-        }
-        root.addView(bridgeStateText)
-
-        root.addView(section(getString(R.string.home_section_project_management)))
-        projectRootText = text(getString(R.string.home_project_root_unselected), 14f, false).apply {
-            setTextColor(Color.rgb(190, 194, 204))
-            setPadding(0, 0, 0, dp(8))
-        }
-        root.addView(projectRootText)
-        root.addView(button(getString(R.string.home_connect_acode)) { chooseProjectRoot(preferAcodeProjects = true) })
-        root.addView(button(getString(R.string.home_choose_other_root)) { chooseProjectRoot(preferAcodeProjects = false) })
-        root.addView(button(getString(R.string.home_new_python_project)) { showCreateProjectDialog() })
-        root.addView(button(getString(R.string.home_runtime_center)) { startActivity(Intent(this, V04Activity::class.java)) })
-        root.addView(button(getString(R.string.home_runtime_storage_manager)) { startActivity(Intent(this, RuntimeStorageActivity::class.java)) })
-        root.addView(button(getString(R.string.home_terminal)) { startActivity(Intent(this, V05Activity::class.java)) })
-        root.addView(button(getString(R.string.home_refresh_projects)) { refreshProjects() })
-
-        projectListContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(6), 0, 0)
-        }
-        root.addView(projectListContainer)
-
-        root.addView(section(getString(R.string.home_section_runtime_bridge)))
-        root.addView(button(getString(R.string.home_probe_environment)) { runCommand(TermuxBackend.ENVIRONMENT_PROBE) })
-        root.addView(button(getString(R.string.home_test_termux)) { runCommand(TermuxBackend.CONNECTION_TEST) })
-        permissionButton = button(getString(R.string.home_request_permission)) { requestRunCommandPermission() }
-        root.addView(permissionButton)
-        root.addView(button(getString(R.string.home_copy_termux_setup)) {
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboard.setPrimaryClip(
-                ClipData.newPlainText("SiftAlpha Studio Termux setup", TermuxBackend.FIRST_RUN_SETUP_COMMAND),
-            )
-            toast(getString(R.string.home_setup_copied))
-        })
-        root.addView(button(getString(R.string.home_open_termux)) { openTermux() })
-
-        root.addView(section(getString(R.string.home_section_command_output)))
-        outputText = TextView(this).apply {
-            text = getString(R.string.home_no_command)
-            textSize = 13f
-            setTextColor(Color.rgb(220, 224, 232))
-            setBackgroundColor(Color.rgb(24, 28, 35))
-            typeface = Typeface.MONOSPACE
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-            setTextIsSelectable(true)
-        }
-        root.addView(
-            outputText,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(6) },
-        )
-
-        root.addView(section(getString(R.string.home_section_stage)))
-        root.addView(text(getString(R.string.home_stage_text, appVersionName()), 14f, false).apply {
-            setTextColor(Color.rgb(190, 194, 204))
-        })
-
-        return scroll
-    }
-
     private fun requestRunCommandPermission() {
         if (!backend.isTermuxInstalled()) {
             toast(getString(R.string.home_termux_not_found))
-            refreshPermissionState()
+            refreshTermuxState()
             return
         }
         if (backend.hasRunCommandPermission()) {
             toast(getString(R.string.home_run_command_granted))
-            refreshPermissionState()
+            refreshTermuxState()
+            autoBridgeProbeStarted = false
             maybeAutoProbeBridge()
             return
         }
@@ -202,18 +156,15 @@ class MainActivity : StudioActivity() {
     private fun maybeAutoProbeBridge() {
         if (autoBridgeProbeStarted) return
         if (!backend.isTermuxInstalled()) {
-            bridgeStateText.text = getString(R.string.home_bridge_unavailable)
-            bridgeStateText.setTextColor(Color.rgb(240, 184, 120))
+            homeState.value = homeState.value.copy(bridgeState = HomeBridgeState.UNAVAILABLE)
             return
         }
         if (!backend.hasRunCommandPermission()) {
-            bridgeStateText.text = getString(R.string.home_bridge_wait_permission)
-            bridgeStateText.setTextColor(Color.rgb(165, 170, 180))
+            homeState.value = homeState.value.copy(bridgeState = HomeBridgeState.WAITING_PERMISSION)
             return
         }
         autoBridgeProbeStarted = true
-        bridgeStateText.text = getString(R.string.home_bridge_detecting)
-        bridgeStateText.setTextColor(Color.rgb(165, 170, 180))
+        homeState.value = homeState.value.copy(bridgeState = HomeBridgeState.DETECTING)
         runCommand(TermuxBackend.CONNECTION_TEST)
     }
 
@@ -235,6 +186,7 @@ class MainActivity : StudioActivity() {
         startActivityForResult(intent, REQUEST_PROJECT_ROOT)
     }
 
+    @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != REQUEST_PROJECT_ROOT || resultCode != RESULT_OK) return
@@ -252,86 +204,33 @@ class MainActivity : StudioActivity() {
     }
 
     private fun refreshProjects() {
-        if (!::projectListContainer.isInitialized) return
-        projectListContainer.removeAllViews()
-        val rootUri = projectStore.rootUri()
-        if (rootUri == null) {
-            projectRootText.text = getString(R.string.home_project_root_unselected)
-            projectListContainer.addView(emptyHint(getString(R.string.home_root_help)))
+        if (!::projectStore.isInitialized) return
+        val treeUri = projectStore.rootUri()
+        if (treeUri == null) {
+            homeState.value = homeState.value.copy(
+                rootSelected = false,
+                rootName = null,
+                projects = emptyList(),
+                projectError = null,
+            )
             return
         }
+
         try {
-            projectRootText.text = getString(R.string.home_root_selected, projectStore.rootDisplayName())
-            val projects = projectStore.listProjects()
-            if (projects.isEmpty()) {
-                projectListContainer.addView(emptyHint(getString(R.string.home_projects_empty)))
-                return
-            }
-            projectListContainer.addView(text(getString(R.string.home_all_projects, projects.size), 14f, true).apply {
-                setTextColor(Color.rgb(170, 224, 190))
-                setPadding(0, dp(4), 0, dp(8))
-            })
-            projects.forEach { projectListContainer.addView(projectCard(it)) }
+            homeState.value = homeState.value.copy(
+                rootSelected = true,
+                rootName = projectStore.rootDisplayName(),
+                projects = projectStore.listProjects(),
+                projectError = null,
+            )
         } catch (error: Throwable) {
-            projectRootText.text = getString(R.string.home_root_access_failed)
-            projectListContainer.addView(
-                emptyHint(
-                    getString(R.string.home_root_read_failed, error.message ?: error.javaClass.simpleName),
-                ),
+            homeState.value = homeState.value.copy(
+                rootSelected = true,
+                rootName = null,
+                projects = emptyList(),
+                projectError = error.message ?: error.javaClass.simpleName,
             )
         }
-    }
-
-    private fun projectCard(project: ProjectStore.ProjectSummary): View {
-        val box = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(13), dp(12), dp(13), dp(10))
-            background = GradientDrawable().apply {
-                setColor(Color.rgb(24, 28, 35))
-                cornerRadius = dp(10).toFloat()
-                setStroke(dp(1), Color.rgb(48, 54, 64))
-            }
-        }
-        box.layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-        ).apply { bottomMargin = dp(10) }
-        box.addView(text("📁 ${project.name}", 17f, true).apply { setTextColor(Color.WHITE) })
-        if (project.description.isNotBlank()) {
-            box.addView(text(project.description, 13f, false).apply {
-                setTextColor(Color.rgb(190, 194, 204))
-                setPadding(0, dp(3), 0, 0)
-            })
-        }
-        box.addView(text(getString(R.string.home_source, project.source), 12f, false).apply {
-            setTextColor(Color.rgb(150, 157, 169))
-            setPadding(0, dp(5), 0, 0)
-        })
-        box.addView(text("▶ ${project.run}", 12f, false).apply {
-            setTextColor(Color.rgb(150, 157, 169))
-            typeface = Typeface.MONOSPACE
-            setPadding(0, dp(2), 0, dp(6))
-        })
-
-        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        actions.addView(smallButton(getString(R.string.home_open)) { openProject(project) }, weightParams())
-        actions.addView(
-            smallButton(getString(R.string.home_details)) { showProjectDetails(project) },
-            weightParams().apply { marginStart = dp(5) },
-        )
-        actions.addView(
-            smallButton(getString(R.string.home_delete)) { confirmDeleteProject(project) },
-            weightParams().apply { marginStart = dp(5) },
-        )
-        box.addView(actions)
-        return box
-    }
-
-    private fun openProject(project: ProjectStore.ProjectSummary) {
-        startActivity(Intent(this, ProjectEditorActivity::class.java).apply {
-            putExtra(ProjectEditorActivity.EXTRA_PROJECT_NAME, project.name)
-            putExtra(ProjectEditorActivity.EXTRA_PROJECT_DOCUMENT_ID, project.documentId)
-        })
     }
 
     private fun showCreateProjectDialog() {
@@ -371,6 +270,13 @@ class MainActivity : StudioActivity() {
             .show()
     }
 
+    private fun openProject(project: ProjectStore.ProjectSummary) {
+        startActivity(Intent(this, ProjectEditorActivity::class.java).apply {
+            putExtra(ProjectEditorActivity.EXTRA_PROJECT_NAME, project.name)
+            putExtra(ProjectEditorActivity.EXTRA_PROJECT_DOCUMENT_ID, project.documentId)
+        })
+    }
+
     private fun showProjectDetails(project: ProjectStore.ProjectSummary) {
         AlertDialog.Builder(this)
             .setTitle(project.name)
@@ -378,8 +284,8 @@ class MainActivity : StudioActivity() {
                 getString(
                     R.string.home_project_details,
                     project.description.ifBlank { getString(R.string.home_none) },
-                    project.entry,
-                    project.run,
+                    project.entry.ifBlank { getString(R.string.home_none) },
+                    project.run.ifBlank { getString(R.string.home_none) },
                     project.source,
                 ),
             )
@@ -406,51 +312,74 @@ class MainActivity : StudioActivity() {
 
     private fun runCommand(command: RuntimeCommand) {
         if (!backend.isTermuxInstalled()) {
-            outputText.text = getString(R.string.home_termux_not_installed)
-            bridgeStateText.text = getString(R.string.home_bridge_unavailable)
-            refreshPermissionState()
+            homeState.value = homeState.value.copy(
+                commandOutput = getString(R.string.home_termux_not_installed),
+                bridgeState = HomeBridgeState.UNAVAILABLE,
+            )
+            refreshTermuxState()
             return
         }
         if (!backend.hasRunCommandPermission()) {
-            outputText.text = getString(R.string.home_permission_missing_output)
-            bridgeStateText.text = getString(R.string.home_bridge_wait_permission)
-            refreshPermissionState()
+            homeState.value = homeState.value.copy(
+                commandOutput = getString(R.string.home_permission_missing_output),
+                bridgeState = HomeBridgeState.WAITING_PERMISSION,
+            )
+            refreshTermuxState()
             return
         }
         try {
-            val id = backend.execute(command)
-            outputText.text = getString(R.string.home_command_sent, id)
-            bridgeStateText.text = getString(R.string.home_bridge_command_running)
-            bridgeStateText.setTextColor(Color.rgb(165, 170, 180))
+            val executionId = backend.execute(command)
+            homeState.value = homeState.value.copy(
+                commandOutput = getString(R.string.home_command_sent, executionId),
+                bridgeState = HomeBridgeState.RUNNING,
+            )
         } catch (error: Throwable) {
-            outputText.text = getString(R.string.home_send_failed, error.message ?: error.javaClass.simpleName)
-            bridgeStateText.text = getString(R.string.home_bridge_send_failed)
-            bridgeStateText.setTextColor(Color.rgb(240, 184, 120))
-        }
-    }
-
-    private fun refreshPermissionState() {
-        if (!::permissionStateText.isInitialized) return
-        val termux = backend.isTermuxInstalled()
-        val permission = termux && backend.hasRunCommandPermission()
-        permissionStateText.text = when {
-            !termux -> getString(R.string.home_termux_permission_missing)
-            !permission -> getString(R.string.home_termux_installed_permission_missing)
-            else -> getString(R.string.home_termux_installed_permission_granted)
-        }
-        permissionStateText.setTextColor(
-            if (!termux || !permission) Color.rgb(240, 184, 120) else Color.rgb(170, 224, 190),
-        )
-        if (::permissionButton.isInitialized) {
-            permissionButton.text = getString(
-                if (permission) R.string.home_permission_granted_button else R.string.home_request_permission,
+            homeState.value = homeState.value.copy(
+                commandOutput = getString(R.string.home_send_failed, error.message ?: error.javaClass.simpleName),
+                bridgeState = HomeBridgeState.SEND_FAILED,
             )
         }
     }
 
+    private fun refreshTermuxState() {
+        if (!::backend.isInitialized) return
+        val installed = runCatching { backend.isTermuxInstalled() }.getOrDefault(false)
+        val permissionGranted = installed &&
+            runCatching { backend.hasRunCommandPermission() }.getOrDefault(false)
+        homeState.value = homeState.value.copy(
+            termuxInstalled = installed,
+            permissionGranted = permissionGranted,
+        )
+    }
+
+    private fun copyTermuxSetup() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(
+            ClipData.newPlainText(
+                getString(R.string.home_copy_termux_setup),
+                TermuxBackend.FIRST_RUN_SETUP_COMMAND,
+            ),
+        )
+        toast(getString(R.string.home_setup_copied))
+    }
+
+    private fun copyOutput() {
+        val output = homeState.value.commandOutput
+        if (output.isBlank()) return
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(
+            ClipData.newPlainText(getString(R.string.home_section_command_output), output),
+        )
+        toast(getString(R.string.home_output_copied))
+    }
+
     private fun openTermux() {
         val launch = packageManager.getLaunchIntentForPackage(TermuxContract.PACKAGE_NAME)
-        if (launch != null) startActivity(launch) else toast(getString(R.string.home_no_launchable_termux))
+        if (launch != null) {
+            startActivity(launch)
+        } else {
+            toast(getString(R.string.home_no_launchable_termux))
+        }
     }
 
     private fun appVersionName(): String =
@@ -458,45 +387,6 @@ class MainActivity : StudioActivity() {
             .getOrNull()
             .orEmpty()
             .ifBlank { "?" }
-
-    private fun section(title: String): TextView = text(title, 16f, true).apply {
-        setTextColor(Color.WHITE)
-        setPadding(0, dp(22), 0, dp(8))
-    }
-
-    private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
-        text = label
-        isAllCaps = false
-        setOnClickListener { action() }
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-        ).apply { bottomMargin = dp(7) }
-    }
-
-    private fun smallButton(label: String, action: () -> Unit): Button = Button(this).apply {
-        text = label
-        textSize = 12f
-        isAllCaps = false
-        minHeight = 0
-        minimumHeight = 0
-        setPadding(dp(8), dp(6), dp(8), dp(6))
-        setOnClickListener { action() }
-    }
-
-    private fun weightParams() = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-
-    private fun emptyHint(value: String): TextView = text(value, 13f, false).apply {
-        setTextColor(Color.rgb(165, 170, 180))
-        setPadding(0, dp(8), 0, dp(8))
-    }
-
-    private fun text(value: String, size: Float, bold: Boolean): TextView = TextView(this).apply {
-        text = value
-        textSize = size
-        gravity = Gravity.START
-        typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-    }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
     private fun toast(value: String) = Toast.makeText(this, value, Toast.LENGTH_SHORT).show()
@@ -507,25 +397,31 @@ class MainActivity : StudioActivity() {
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_RUN_COMMAND) {
-            refreshPermissionState()
-            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-                toast(getString(R.string.home_permission_granted_toast))
-                autoBridgeProbeStarted = false
-                maybeAutoProbeBridge()
-            } else {
-                toast(getString(R.string.home_permission_denied))
-                openAppPermissionSettings()
-            }
+        if (requestCode != REQUEST_RUN_COMMAND) return
+
+        refreshTermuxState()
+        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            toast(getString(R.string.home_permission_granted_toast))
+            autoBridgeProbeStarted = false
+            maybeAutoProbeBridge()
+        } else {
+            toast(getString(R.string.home_permission_denied))
+            openAppPermissionSettings()
         }
     }
 
     private fun openAppPermissionSettings() {
-        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+        startActivity(
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + packageName),
+            ),
+        )
     }
 
     companion object {
         private const val REQUEST_RUN_COMMAND = 501
         private const val REQUEST_PROJECT_ROOT = 601
+        private const val MAX_OUTPUT_CHARS = 12_000
     }
 }

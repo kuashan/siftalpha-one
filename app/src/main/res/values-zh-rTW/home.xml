@@ -69,4 +69,28 @@
     <string name="home_no_launchable_termux">未檢測到可啟動的 Termux</string>
     <string name="home_permission_granted_toast">Termux RUN_COMMAND 權限已授權</string>
     <string name="home_permission_denied">權限未授權，可在系統應用程式權限中手動開啟</string>
+
+    <string name="home_action_settings">設定</string>
+    <string name="home_nav_home">首頁</string>
+    <string name="home_nav_runtime">執行中心</string>
+    <string name="home_nav_environment">環境</string>
+    <string name="home_nav_home_icon">⌂</string>
+    <string name="home_nav_runtime_icon">▶</string>
+    <string name="home_nav_environment_icon">⚙</string>
+    <string name="home_w1c_summary">從單一入口管理專案、執行時與環境。</string>
+    <string name="home_quick_actions">快速入口</string>
+    <string name="home_project_search_hint">搜尋專案名稱、說明、來源或執行命令</string>
+    <string name="home_filter_all">全部</string>
+    <string name="home_filter_python">Python</string>
+    <string name="home_filter_node">Node.js</string>
+    <string name="home_project_count_filtered">顯示 %1$d / %2$d 個專案</string>
+    <string name="home_no_matching_projects">沒有符合目前搜尋或篩選條件的專案。</string>
+    <string name="home_project_type_python">Python 專案</string>
+    <string name="home_project_type_node">Node.js 專案</string>
+    <string name="home_project_type_unknown">未識別類型</string>
+    <string name="home_project_configured">已設定執行命令</string>
+    <string name="home_project_not_configured">尚未設定執行命令</string>
+    <string name="home_copy_output">複製輸出</string>
+    <string name="home_output_copied">命令輸出已複製</string>
+
 </resources>
