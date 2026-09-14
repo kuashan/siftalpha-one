@@ -126,16 +126,16 @@ jobs:
           "$build_tools/apksigner" verify --verbose --print-certs "$apk" | tee w0-evidence/apk-certificates.txt
           "$build_tools/aapt2" dump badging "$apk" | tee w0-evidence/apk-badging.txt
 
-      - name: Publish W1C test APK
-        if: ${{ github.event.head_commit.message == 'Publish W1C test APK' }}
+      - name: Publish W2 test APK
+        if: ${{ github.event.head_commit.message == 'Publish W2 test APK' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "w1c-test-${GITHUB_SHA::7}" \
-            "app/build/outputs/apk/debug/app-debug.apk#SiftAlpha-Studio-W1C-debug.apk" \
+          gh release create "w2-test-${GITHUB_SHA::7}" \
+            "app/build/outputs/apk/debug/app-debug.apk#SiftAlpha-Studio-W2-debug.apk" \
             --target "$GITHUB_SHA" \
-            --title "SiftAlpha Studio W1C test" \
-            --notes "Debug APK for W1C device acceptance. Commit: $GITHUB_SHA" \
+            --title "SiftAlpha Studio W2 test" \
+            --notes "Debug APK for W2 device acceptance. Commit: $GITHUB_SHA" \
             --prerelease
 
       - name: Upload APK and W0 evidence
