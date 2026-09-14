@@ -22,6 +22,11 @@ object LegacyProjectConfigurationBridge {
                 secret = true,
                 required = true,
                 description = "Binance API Key",
+                source = ConfigurationSource.PROJECT_DECLARED,
+                evidence = ConfigurationEvidence(
+                    filePath = ".project.json",
+                    detail = "secrets.binanceApi",
+                ),
             )
         }
         if (BINANCE_API_SECRET_ENV !in declared) {
@@ -30,6 +35,11 @@ object LegacyProjectConfigurationBridge {
                 secret = true,
                 required = true,
                 description = "Binance API Secret",
+                source = ConfigurationSource.PROJECT_DECLARED,
+                evidence = ConfigurationEvidence(
+                    filePath = ".project.json",
+                    detail = "secrets.binanceApi",
+                ),
             )
         }
         return profile.copy(requirements = requirements)

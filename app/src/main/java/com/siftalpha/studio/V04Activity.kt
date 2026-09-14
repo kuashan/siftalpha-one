@@ -467,7 +467,7 @@ open class V04Activity : StudioActivity() {
             item.documentId == summary.documentId ||
                 (item.documentId == null && item.folderName == project.folderName)
         }
-        val configurationRequired = configurationSnapshot.runtimeConfigurationDiscovered &&
+        val configurationRequired =
             configurationSnapshot.preflight.missingRequired.isNotEmpty()
         val lifecycleState = RuntimeLifecycleResolver.resolve(
             environmentReady = environmentStates[stateKey],
@@ -503,8 +503,10 @@ open class V04Activity : StudioActivity() {
                 requiredCount = configurationSnapshot.preflight.requiredCount,
                 configuredRequiredCount = configurationSnapshot.preflight.configuredRequiredCount,
                 missingRequiredNames = configurationSnapshot.preflight.missingRequired.map { it.name },
-                credentialCandidateCount = configurationSnapshot.allCandidateNames.size,
+                credentialCandidateCount = configurationSnapshot.preflight.credentialCandidateCount,
                 runtimeConfigurationDiscovered = configurationSnapshot.runtimeConfigurationDiscovered,
+                optionalMissingCount = configurationSnapshot.preflight.optionalMissingCount,
+                optionalConfiguredCount = configurationSnapshot.preflight.optionalConfiguredCount,
             ),
             lifecycle = typedState,
             web = web,
@@ -586,12 +588,12 @@ open class V04Activity : StudioActivity() {
             setPadding(0, dp(2), 0, 0)
         })
 
-        box.addView(text(configurationUi.statusText(configurationSnapshot), 12f, false).apply {
+        box.addView(text(configurationUi.summaryText(configurationSnapshot), 12f, false).apply {
             setTextColor(
                 when {
                     configurationUi.statusIsWarning(configurationSnapshot) -> Color.rgb(240, 184, 120)
+                    configurationUi.hasOptionalReminders(configurationSnapshot) -> Color.rgb(170, 204, 235)
                     configurationSnapshot.preflight.requiredCount > 0 -> Color.rgb(170, 224, 190)
-                    configurationSnapshot.allCandidateNames.isNotEmpty() -> Color.rgb(170, 204, 235)
                     else -> Color.rgb(150, 157, 169)
                 },
             )
@@ -920,9 +922,7 @@ open class V04Activity : StudioActivity() {
             if (environmentStates[stateKey] != true) return false
             if (currentState in ACTIVE_RUNTIME_STATES) return false
             val configuration = configurationUi.snapshot(stateKey, project.folderName)
-            if (configuration.runtimeConfigurationDiscovered &&
-                configuration.preflight.missingRequired.isNotEmpty()
-            ) {
+            if (configuration.preflight.missingRequired.isNotEmpty()) {
                 refresh()
                 return false
             }
@@ -1086,7 +1086,7 @@ open class V04Activity : StudioActivity() {
         if (!ensureRuntime()) return
         val webProfile = runCatching { webInspector.inspect(project.summary.documentId) }.getOrNull()
 
-        val configurationNote = "\n\n${configurationUi.statusText(configurationUi.snapshot(project.summary.documentId, project.folderName))}"
+        val configurationNote = "\n\n${configurationUi.summaryText(configurationUi.snapshot(project.summary.documentId, project.folderName))}"
         val webNote = if (webProfile?.enabled == true) {
             getString(R.string.runtime_run_web_detected)
         } else {

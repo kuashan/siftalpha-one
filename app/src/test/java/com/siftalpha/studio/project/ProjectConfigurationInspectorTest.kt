@@ -41,6 +41,8 @@ class ProjectConfigurationInspectorTest {
         assertTrue(result[0].secret)
         assertTrue(result[0].required)
         assertEquals("Gemini credential", result[0].description)
+        assertEquals(ConfigurationSource.PROJECT_DECLARED, result[0].source)
+        assertEquals(".project.json", result[0].evidence?.filePath)
         assertEquals("DATABASE_PATH", result[1].name)
         assertFalse(result[1].secret)
         assertTrue(result[1].required)
@@ -109,6 +111,9 @@ class ProjectConfigurationInspectorTest {
         )
 
         assertEquals(listOf("GEMINI_API_KEY", "TUSHARE_TOKEN", "OPENAI_API_KEY", "PORT"), result)
+        val detailed = ProjectConfigurationInspector.parseEnvCandidateRequirements("PORT=8000")
+        assertEquals(ConfigurationSource.ENV_EXAMPLE, detailed.single().source)
+        assertEquals(1, detailed.single().evidence?.lineNumber)
         assertTrue(ProjectConfigurationInspector.looksSensitive("GEMINI_API_KEY"))
         assertTrue(ProjectConfigurationInspector.looksSensitive("TUSHARE_TOKEN"))
         assertFalse(ProjectConfigurationInspector.looksSensitive("PORT"))
@@ -135,6 +140,10 @@ class ProjectConfigurationInspectorTest {
         assertEquals(listOf("DATABASE_PATH"), result.candidates.map { it.name })
         assertTrue(result.required.single().secret)
         assertFalse(result.candidates.single().secret)
+        assertEquals(ConfigurationSource.STATIC_REQUIRED_READ, result.required.single().source)
+        assertEquals(ConfigurationSource.STATIC_OPTIONAL_READ, result.candidates.single().source)
+        assertEquals(2, result.required.single().evidence?.lineNumber)
+        assertEquals(3, result.candidates.single().evidence?.lineNumber)
     }
 
     @Test

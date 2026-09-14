@@ -1,5 +1,6 @@
 package com.siftalpha.studio.runtime
 
+import com.siftalpha.studio.project.ConfigurationSource
 import com.siftalpha.studio.project.ProjectConfigurationInspector
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -54,6 +55,8 @@ class ProjectConfigurationPreflightTest {
         assertTrue(result.ready)
         assertEquals(0, result.requiredCount)
         assertEquals(2, result.credentialCandidateCount)
+        assertEquals(2, result.optionalMissingCount)
+        assertEquals(2, result.optionalCount)
     }
 
     @Test
@@ -102,6 +105,7 @@ class ProjectConfigurationPreflightTest {
         assertFalse(result.ready)
         assertEquals(1, result.requiredCount)
         assertEquals(listOf("DYNAMIC_API_KEY"), result.missingRequired.map { it.name })
+        assertEquals(ConfigurationSource.RUNTIME_DIAGNOSTIC, result.missingRequired.single().source)
     }
 
     @Test

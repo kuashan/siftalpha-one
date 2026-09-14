@@ -12,12 +12,12 @@
     <string name="runtime_configuration_title">Project configuration · %1$s</string>
     <string name="runtime_configuration_summary">Required items come from .project.json. Studio also inspects Python environment-variable reads. .env.example and optional reads remain suggestions and never block a run by guessing.</string>
     <string name="runtime_configuration_required_section">Required configuration</string>
-    <string name="runtime_configuration_candidate_section">Configuration candidates (optional)</string>
+    <string name="runtime_configuration_candidate_section">Suggested configuration</string>
     <string name="runtime_configuration_none">This project needs no configuration and no configurable items were found.</string>
     <string name="runtime_configuration_item_protected">Securely configured in Studio</string>
     <string name="runtime_configuration_item_project_env">Configured in project .env</string>
     <string name="runtime_configuration_item_missing">Not configured</string>
-    <string name="runtime_configuration_item_optional">Optional candidate</string>
+    <string name="runtime_configuration_item_optional">Suggested configuration</string>
     <string name="runtime_configuration_edit_title">Configure %1$s</string>
     <string name="runtime_configuration_edit_secret_message">This value is encrypted with Android Keystore in app-private storage and injected as an environment variable at runtime. It is not written to project source or GitHub.</string>
     <string name="runtime_configuration_edit_value_message">This value is stored locally and injected at runtime. Studio does not automatically rewrite the project .env file.</string>
@@ -43,4 +43,23 @@
     <string name="runtime_configuration_runtime_missing_message">The project explicitly reported these environment variables as missing:\n\n%1$s\n\nOpen Configuration to save them securely, then run again.</string>
     <string name="runtime_configuration_runtime_unnamed_title">Runtime credential required</string>
     <string name="runtime_configuration_runtime_unnamed_message">The project explicitly reported that an API key or credential is required, but it did not provide a reliable environment-variable name. Studio will not guess a name; open Configuration to review declared items and credential candidates.</string>
+
+    <string name="runtime_configuration_summary_required_complete">✓ Required configuration complete</string>
+    <string name="runtime_configuration_summary_required_none">✓ No required configuration declared</string>
+    <string name="runtime_configuration_summary_required_missing">❌ %1$d required item(s) missing</string>
+    <string name="runtime_configuration_summary_optional_missing">⚠ %1$d suggested item(s) not filled (does not block run)</string>
+    <string name="runtime_configuration_summary_optional_complete">✓ Suggested configuration complete</string>
+    <string name="runtime_configuration_optional_title">Suggested configuration: %1$s</string>
+    <string name="runtime_configuration_optional_message">This is suggested configuration. Filling it may improve the project experience; postponing it will not block a run.</string>
+    <string name="runtime_configuration_optional_fill">Fill</string>
+    <string name="runtime_configuration_optional_later">Later</string>
+    <string name="runtime_configuration_source_label">Detection source</string>
+    <string name="runtime_configuration_evidence_label">Evidence</string>
+    <string name="runtime_configuration_evidence_file_line">%1$s line %2$d</string>
+    <string name="runtime_configuration_evidence_file">%1$s</string>
+    <string name="runtime_configuration_source_project_declared">Project declaration</string>
+    <string name="runtime_configuration_source_static_required">Direct code read (required signal)</string>
+    <string name="runtime_configuration_source_static_optional">Optional code read</string>
+    <string name="runtime_configuration_source_env_example">.env.example example</string>
+    <string name="runtime_configuration_source_runtime_diagnostic">Runtime diagnostic</string>
 </resources>

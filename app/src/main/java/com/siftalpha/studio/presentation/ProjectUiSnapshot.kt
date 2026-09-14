@@ -171,8 +171,10 @@ data class ProjectUiSnapshot(
         val configuredRequiredCount: Int,
         val missingRequiredNames: List<String> = emptyList(),
         val credentialCandidateCount: Int = 0,
-        /** True only after a running project has reported an actionable configuration finding. */
+        /** Retained as discovery evidence for diagnostics and recovery persistence. */
         val runtimeConfigurationDiscovered: Boolean = false,
+        val optionalMissingCount: Int = 0,
+        val optionalConfiguredCount: Int = 0,
     ) {
         init {
             require(requiredCount >= 0) { "requiredCount must not be negative" }
@@ -181,6 +183,8 @@ data class ProjectUiSnapshot(
                 "configuredRequiredCount must not exceed requiredCount"
             }
             require(credentialCandidateCount >= 0) { "credentialCandidateCount must not be negative" }
+            require(optionalMissingCount >= 0) { "optionalMissingCount must not be negative" }
+            require(optionalConfiguredCount >= 0) { "optionalConfiguredCount must not be negative" }
         }
 
         val missingRequiredCount: Int
@@ -192,13 +196,36 @@ data class ProjectUiSnapshot(
         val ready: Boolean
             get() = missingRequiredCount == 0
 
-        val hasOnlyOptionalCandidates: Boolean
-            get() = ready && credentialCandidateCount > 0
+        val canRun: Boolean
+            get() = ready
 
-        /** Runtime discovery has made the missing values actionable for the next run. */
+        val optionalCount: Int
+            get() = optionalMissingCount + optionalConfiguredCount
+
+        val hasOnlyOptionalCandidates: Boolean
+            get() = canRun && (optionalCount > 0 || credentialCandidateCount > 0)
+
+        /** A missing REQUIRED value is actionable before the first run as well as after diagnostics. */
         val needsConfiguration: Boolean
-            get() = runtimeConfigurationDiscovered && missingRequiredCount > 0
+            get() = !canRun
     }
+
+    data class ConfigurationSummary(
+        val requiredMissingCount: Int,
+        val requiredConfiguredCount: Int,
+        val optionalMissingCount: Int,
+        val optionalConfiguredCount: Int,
+        val canRun: Boolean,
+    )
+
+    val configurationSummary: ConfigurationSummary
+        get() = ConfigurationSummary(
+            requiredMissingCount = configuration.missingRequiredCount,
+            requiredConfiguredCount = configuration.configuredRequiredCount,
+            optionalMissingCount = configuration.optionalMissingCount,
+            optionalConfiguredCount = configuration.optionalConfiguredCount,
+            canRun = configuration.canRun,
+        )
 
     data class Web(
         val expected: Boolean,

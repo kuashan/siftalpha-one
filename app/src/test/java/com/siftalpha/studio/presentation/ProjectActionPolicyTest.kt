@@ -136,7 +136,7 @@ class ProjectActionPolicyTest {
     }
 
     @Test
-    fun `static missing configuration does not block the first run`() {
+    fun `static missing required configuration blocks the first run`() {
         val policy = ProjectActionPolicy.resolve(
             snapshot(
                 lifecycle = RuntimeState.UNKNOWN,
@@ -149,10 +149,14 @@ class ProjectActionPolicyTest {
             ),
         )
 
-        assertEquals(ProjectActionPolicy.Action.START, policy.primaryAction)
-        assertTrue(policy.isEnabled(ProjectActionPolicy.Action.START))
+        assertEquals(ProjectActionPolicy.Action.CONFIGURE, policy.primaryAction)
+        assertFalse(policy.isEnabled(ProjectActionPolicy.Action.START))
         assertTrue(policy.isEnabled(ProjectActionPolicy.Action.CONFIGURE))
-        assertEquals(ProjectActionPolicy.DetailEntry.RUNTIME, policy.detailEntry)
+        assertEquals(ProjectActionPolicy.DetailEntry.CONFIGURATION, policy.detailEntry)
+        assertEquals(
+            ProjectActionPolicy.DisableReason.REQUIRED_CONFIGURATION_MISSING,
+            policy.reasonFor(ProjectActionPolicy.Action.START),
+        )
     }
 
     @Test

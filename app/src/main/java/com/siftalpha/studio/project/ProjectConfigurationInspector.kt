@@ -21,7 +21,12 @@ class ProjectConfigurationInspector(context: Context) {
         val secret: Boolean,
         val required: Boolean,
         val description: String,
-    )
+        val source: ConfigurationSource = ConfigurationSource.PROJECT_DECLARED,
+        val evidence: ConfigurationEvidence? = null,
+    ) {
+        val severity: ConfigurationSeverity
+            get() = if (required) ConfigurationSeverity.REQUIRED else ConfigurationSeverity.OPTIONAL
+    }
 
     data class Profile(
         val requirements: List<Requirement>,
@@ -31,6 +36,25 @@ class ProjectConfigurationInspector(context: Context) {
     ) {
         val required: List<Requirement>
             get() = requirements.filter { it.required }
+
+        val optional: List<Requirement>
+            get() {
+                val result = linkedMapOf<String, Requirement>()
+                requirements.filterNot { it.required }.forEach { result.putIfAbsent(it.name, it) }
+                configurationCandidates.filterNot { it.required }.forEach { result.putIfAbsent(it.name, it) }
+                credentialCandidates.forEach { name ->
+                    if (name !in result) {
+                        result[name] = Requirement(
+                            name = name,
+                            secret = ProjectConfigurationInspector.looksSensitive(name),
+                            required = false,
+                            description = "",
+                            source = ConfigurationSource.STATIC_OPTIONAL_READ,
+                        )
+                    }
+                }
+                return result.values.toList()
+            }
 
         val declaredNames: Set<String>
             get() = requirements.mapTo(linkedSetOf()) { it.name }
@@ -70,14 +94,7 @@ class ProjectConfigurationInspector(context: Context) {
             python.required,
         )
         val configuredKeys = parseConfiguredEnvKeys(env)
-        val templateCandidates = parseEnvCandidateKeys(envExample).map { name ->
-            Requirement(
-                name = name,
-                secret = looksSensitive(name),
-                required = false,
-                description = "",
-            )
-        }
+        val templateCandidates = parseEnvCandidateRequirements(envExample, ".env.example")
         val configurationCandidates = mergeRequirements(
             python.candidates,
             templateCandidates,
@@ -126,7 +143,10 @@ class ProjectConfigurationInspector(context: Context) {
          * getenv/get reads remain optional candidates until metadata or runtime preflight confirms
          * that the project requires them.
          */
-        fun parsePythonConfiguration(source: String): PythonConfiguration {
+        fun parsePythonConfiguration(
+            source: String,
+            filePath: String? = null,
+        ): PythonConfiguration {
             val required = linkedMapOf<String, Requirement>()
             PYTHON_DIRECT_ENV.findAll(source).forEach { match ->
                 val name = match.groupValues[1]
@@ -135,9 +155,15 @@ class ProjectConfigurationInspector(context: Context) {
                         name,
                         Requirement(
                             name = name,
-                            secret = looksSensitive(name),
+                            secret = ProjectConfigurationInspector.looksSensitive(name),
                             required = true,
                             description = "",
+                            source = ConfigurationSource.STATIC_REQUIRED_READ,
+                            evidence = ConfigurationEvidence(
+                                filePath = filePath,
+                                lineNumber = lineNumberAt(source, match.range.first),
+                                detail = "direct environment read",
+                            ),
                         ),
                     )
                 }
@@ -155,9 +181,15 @@ class ProjectConfigurationInspector(context: Context) {
                         name,
                         Requirement(
                             name = name,
-                            secret = looksSensitive(name),
+                            secret = ProjectConfigurationInspector.looksSensitive(name),
                             required = false,
                             description = "",
+                            source = ConfigurationSource.STATIC_OPTIONAL_READ,
+                            evidence = ConfigurationEvidence(
+                                filePath = filePath,
+                                lineNumber = lineNumberAt(source, match.range.first),
+                                detail = "os.getenv()/os.environ.get()",
+                            ),
                         ),
                     )
                 }
@@ -173,7 +205,10 @@ class ProjectConfigurationInspector(context: Context) {
             val result = linkedMapOf<String, Requirement>()
             groups.forEach { group ->
                 group.forEach { requirement ->
-                    result.putIfAbsent(requirement.name, requirement)
+                    val existing = result[requirement.name]
+                    if (existing == null || (!existing.required && requirement.required)) {
+                        result[requirement.name] = requirement
+                    }
                 }
             }
             return result.values.toList()
@@ -205,7 +240,17 @@ class ProjectConfigurationInspector(context: Context) {
                     trimmed.startsWith('"') -> {
                         val name = decodeJsonString(trimmed) ?: continue
                         if (!ENV_NAME.matches(name)) continue
-                        Requirement(name, secret = false, required = true, description = "")
+                        Requirement(
+                            name = name,
+                            secret = false,
+                            required = true,
+                            description = "",
+                            source = ConfigurationSource.PROJECT_DECLARED,
+                            evidence = ConfigurationEvidence(
+                                filePath = ".project.json",
+                                detail = "requiredEnv",
+                            ),
+                        )
                     }
                     trimmed.startsWith('{') -> {
                         val name = readJsonStringField(trimmed, "name")?.trim().orEmpty()
@@ -215,6 +260,11 @@ class ProjectConfigurationInspector(context: Context) {
                             secret = readJsonBooleanField(trimmed, "secret") ?: looksSensitive(name),
                             required = readJsonBooleanField(trimmed, "required") ?: true,
                             description = readJsonStringField(trimmed, "description").orEmpty().trim(),
+                            source = ConfigurationSource.PROJECT_DECLARED,
+                            evidence = ConfigurationEvidence(
+                                filePath = ".project.json",
+                                detail = "requiredEnv",
+                            ),
                         )
                     }
                     else -> null
@@ -246,20 +296,41 @@ class ProjectConfigurationInspector(context: Context) {
          * Extract candidate variable names from .env.example. Commented examples are intentionally
          * included, but callers must treat them as suggestions only, never as required configuration.
          */
-        fun parseEnvCandidateKeys(text: String): List<String> {
-            val result = linkedSetOf<String>()
-            text.lineSequence().forEach { raw ->
+        fun parseEnvCandidateRequirements(
+            text: String,
+            filePath: String? = ".env.example",
+        ): List<Requirement> {
+            val result = linkedMapOf<String, Requirement>()
+            text.lineSequence().forEachIndexed { lineIndex, raw ->
                 var line = raw.trim()
-                if (line.isBlank()) return@forEach
+                if (line.isBlank()) return@forEachIndexed
                 while (line.startsWith('#')) line = line.drop(1).trimStart()
                 line = line.removePrefix("export ").trimStart()
                 val equals = line.indexOf('=')
-                if (equals <= 0) return@forEach
+                if (equals <= 0) return@forEachIndexed
                 val name = line.substring(0, equals).trim()
-                if (ENV_NAME.matches(name)) result += name
+                if (!ENV_NAME.matches(name)) return@forEachIndexed
+                result.putIfAbsent(
+                    name,
+                    Requirement(
+                        name = name,
+                        secret = ProjectConfigurationInspector.looksSensitive(name),
+                        required = false,
+                        description = "",
+                        source = ConfigurationSource.ENV_EXAMPLE,
+                        evidence = ConfigurationEvidence(
+                            filePath = filePath,
+                            lineNumber = lineIndex + 1,
+                            detail = ".env.example candidate",
+                        ),
+                    ),
+                )
             }
-            return result.toList()
+            return result.values.toList()
         }
+
+        fun parseEnvCandidateKeys(text: String): List<String> =
+            parseEnvCandidateRequirements(text).map { it.name }
 
         fun looksSensitive(name: String): Boolean {
             val upper = name.uppercase()
@@ -275,6 +346,10 @@ class ProjectConfigurationInspector(context: Context) {
                 upper.endsWith("_PASS") ||
                 upper.contains("CREDENTIAL")
         }
+
+        private fun lineNumberAt(source: String, offset: Int): Int =
+            source.substring(0, offset.coerceIn(0, source.length)).count { it == '
+' } + 1
 
         private fun extractNamedArray(text: String, key: String): String? {
             val keyIndex = text.indexOf("\"$key\"")
@@ -466,7 +541,7 @@ class ProjectConfigurationInspector(context: Context) {
         val candidates = linkedMapOf<String, Requirement>()
         files.forEach { file ->
             val source = runCatching { projectStore.readProjectTextFile(file) }.getOrNull() ?: return@forEach
-            val detected = parsePythonConfiguration(source)
+            val detected = parsePythonConfiguration(source, file.relativePath)
             detected.required.forEach { requirement ->
                 required.putIfAbsent(requirement.name, requirement)
                 candidates.remove(requirement.name)

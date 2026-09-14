@@ -12,12 +12,12 @@
     <string name="runtime_configuration_title">프로젝트 구성 · %1$s</string>
     <string name="runtime_configuration_summary">필수 설정은 .project.json에서 가져옵니다. Studio는 Python의 환경 변수 읽기도 검사합니다. .env.example과 선택 항목은 제안으로만 취급하며 추측으로 실행을 차단하지 않습니다.</string>
     <string name="runtime_configuration_required_section">필수 구성</string>
-    <string name="runtime_configuration_candidate_section">구성 후보(선택 사항)</string>
+    <string name="runtime_configuration_candidate_section">권장 구성</string>
     <string name="runtime_configuration_none">이 프로젝트에는 구성이 필요하지 않으며 구성 가능한 항목도 발견되지 않았습니다.</string>
     <string name="runtime_configuration_item_protected">Studio에 안전하게 설정됨</string>
     <string name="runtime_configuration_item_project_env">프로젝트 .env에 설정됨</string>
     <string name="runtime_configuration_item_missing">설정되지 않음</string>
-    <string name="runtime_configuration_item_optional">선택 후보</string>
+    <string name="runtime_configuration_item_optional">권장 구성</string>
     <string name="runtime_configuration_edit_title">%1$s 설정</string>
     <string name="runtime_configuration_edit_secret_message">이 값은 Android Keystore로 암호화되어 앱 전용 저장소에 보관되고 실행 시 환경 변수로 주입됩니다. 프로젝트 소스나 GitHub에는 기록되지 않습니다.</string>
     <string name="runtime_configuration_edit_value_message">이 값은 로컬에 안전하게 저장되고 실행 시 주입됩니다. Studio는 프로젝트의 .env 파일을 자동으로 수정하지 않습니다.</string>
@@ -43,4 +43,23 @@
     <string name="runtime_configuration_runtime_missing_message">프로젝트 실행 결과에서 다음 환경 변수가 누락되었다고 명확히 보고했습니다:\n\n%1$s\n\n“구성”에서 안전하게 저장한 뒤 다시 실행할 수 있습니다.</string>
     <string name="runtime_configuration_runtime_unnamed_title">실행 자격 증명이 필요합니다</string>
     <string name="runtime_configuration_runtime_unnamed_message">프로젝트가 API 키 또는 자격 증명이 필요하다고 명확히 보고했지만 신뢰할 수 있는 환경 변수 이름은 제공하지 않았습니다. Studio는 이름을 추측하지 않습니다. “구성”을 열어 프로젝트 선언과 자격 증명 후보를 확인하세요.</string>
+
+    <string name="runtime_configuration_summary_required_complete">✓ 필수 구성이 완료됨</string>
+    <string name="runtime_configuration_summary_required_none">✓ 선언된 필수 구성이 없음</string>
+    <string name="runtime_configuration_summary_required_missing">❌ 필수 항목 %1$d개가 설정되지 않음</string>
+    <string name="runtime_configuration_summary_optional_missing">⚠ 권장 항목 %1$d개가 입력되지 않음(실행을 차단하지 않음)</string>
+    <string name="runtime_configuration_summary_optional_complete">✓ 권장 구성이 입력됨</string>
+    <string name="runtime_configuration_optional_title">권장 구성: %1$s</string>
+    <string name="runtime_configuration_optional_message">권장 구성입니다. 입력하면 프로젝트 경험이 좋아질 수 있으며 나중에 입력해도 실행을 차단하지 않습니다.</string>
+    <string name="runtime_configuration_optional_fill">입력</string>
+    <string name="runtime_configuration_optional_later">나중에</string>
+    <string name="runtime_configuration_source_label">감지 출처</string>
+    <string name="runtime_configuration_evidence_label">근거</string>
+    <string name="runtime_configuration_evidence_file_line">%1$s %2$d번째 줄</string>
+    <string name="runtime_configuration_evidence_file">%1$s</string>
+    <string name="runtime_configuration_source_project_declared">프로젝트 선언</string>
+    <string name="runtime_configuration_source_static_required">코드 직접 읽기(필수 신호)</string>
+    <string name="runtime_configuration_source_static_optional">코드 선택 읽기</string>
+    <string name="runtime_configuration_source_env_example">.env.example 예시</string>
+    <string name="runtime_configuration_source_runtime_diagnostic">실행 진단</string>
 </resources>

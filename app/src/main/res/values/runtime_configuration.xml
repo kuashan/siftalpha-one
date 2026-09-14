@@ -12,12 +12,12 @@
     <string name="runtime_configuration_title">项目配置 · %1$s</string>
     <string name="runtime_configuration_summary">必需配置来自 .project.json；Studio 也会检测 Python 脚本中的环境变量读取。.env.example 和非必需读取只提供候选提示，不会擅自阻止运行。</string>
     <string name="runtime_configuration_required_section">必需配置</string>
-    <string name="runtime_configuration_candidate_section">配置候选（可选）</string>
+    <string name="runtime_configuration_candidate_section">建议配置</string>
     <string name="runtime_configuration_none">当前项目不需要配置，也没有发现可配置项。</string>
     <string name="runtime_configuration_item_protected">已由 Studio 安全配置</string>
     <string name="runtime_configuration_item_project_env">项目 .env 已配置</string>
     <string name="runtime_configuration_item_missing">未配置</string>
-    <string name="runtime_configuration_item_optional">可选候选</string>
+    <string name="runtime_configuration_item_optional">建议配置</string>
     <string name="runtime_configuration_edit_title">配置 %1$s</string>
     <string name="runtime_configuration_edit_secret_message">该值会由 Android Keystore 加密保存在本机 App 私有存储，运行时作为环境变量注入，不会写入项目源码或 GitHub。</string>
     <string name="runtime_configuration_edit_value_message">该值会安全保存在本机并在运行时注入。项目自己的 .env 内容不会被 Studio 自动改写。</string>
@@ -43,4 +43,23 @@
     <string name="runtime_configuration_runtime_missing_message">项目运行结果明确报告缺少以下环境变量：\n\n%1$s\n\n可以进入“配置”安全保存，然后重新运行。</string>
     <string name="runtime_configuration_runtime_unnamed_title">运行需要凭证</string>
     <string name="runtime_configuration_runtime_unnamed_message">项目明确报告需要 API 密钥或凭证，但没有给出可靠的环境变量名称。Studio 不会猜测名称；请打开“配置”查看项目声明和候选凭证。</string>
+
+    <string name="runtime_configuration_summary_required_complete">✓ 必需配置完成</string>
+    <string name="runtime_configuration_summary_required_none">✓ 没有必需配置</string>
+    <string name="runtime_configuration_summary_required_missing">❌ %1$d 个必需项未配置</string>
+    <string name="runtime_configuration_summary_optional_missing">⚠ %1$d 个建议项未填写（不阻止运行）</string>
+    <string name="runtime_configuration_summary_optional_complete">✓ 建议配置已填写</string>
+    <string name="runtime_configuration_optional_title">建议配置：%1$s</string>
+    <string name="runtime_configuration_optional_message">这是建议配置，填写后可能改善项目体验；稍后填写也不会阻止运行。</string>
+    <string name="runtime_configuration_optional_fill">填写</string>
+    <string name="runtime_configuration_optional_later">稍后</string>
+    <string name="runtime_configuration_source_label">检测来源</string>
+    <string name="runtime_configuration_evidence_label">检测依据</string>
+    <string name="runtime_configuration_evidence_file_line">%1$s 第 %2$d 行</string>
+    <string name="runtime_configuration_evidence_file">%1$s</string>
+    <string name="runtime_configuration_source_project_declared">项目声明</string>
+    <string name="runtime_configuration_source_static_required">代码直接读取（必需信号）</string>
+    <string name="runtime_configuration_source_static_optional">代码可选读取</string>
+    <string name="runtime_configuration_source_env_example">.env.example 示例</string>
+    <string name="runtime_configuration_source_runtime_diagnostic">运行诊断</string>
 </resources>

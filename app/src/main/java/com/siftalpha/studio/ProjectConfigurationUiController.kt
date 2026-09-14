@@ -6,6 +6,10 @@ import android.content.Context
 import android.text.InputType
 import android.widget.EditText
 import android.widget.Toast
+import com.siftalpha.studio.project.ConfigurationEvidence
+import com.siftalpha.studio.project.ConfigurationItem
+import com.siftalpha.studio.project.ConfigurationSeverity
+import com.siftalpha.studio.project.ConfigurationSource
 import com.siftalpha.studio.project.LegacyProjectConfigurationBridge
 import com.siftalpha.studio.project.ProjectConfigurationInspector
 import com.siftalpha.studio.project.ProjectSecretPolicyInspector
@@ -39,21 +43,14 @@ class ProjectConfigurationUiController(
     ) {
         val allCandidateNames: List<String>
             get() = (
-                profile.credentialCandidates +
-                    profile.configurationCandidates.map { it.name } +
-                    runtimeHints
+                profile.optional
+                    .filterNot { it.name in runtimeHints }
+                    .map { it.name } +
+                    profile.credentialCandidates
             )
-                .filterNot { it in profile.declaredNames }
                 .distinct()
                 .sorted()
     }
-
-    private data class DisplayItem(
-        val name: String,
-        val secret: Boolean,
-        val required: Boolean,
-        val description: String,
-    )
 
     private val runtimeHints = mutableMapOf<String, LinkedHashSet<String>>()
     private val runtimeDiscoveryFolders = mutableSetOf<String>()
@@ -89,24 +86,44 @@ class ProjectConfigurationUiController(
         )
     }
 
-    fun statusText(snapshot: Snapshot): String = when {
-        !snapshot.runtimeConfigurationDiscovered && snapshot.preflight.missingRequired.isNotEmpty() ->
-            activity.getString(R.string.runtime_configuration_status_pending_discovery)
-        snapshot.preflight.missingRequired.isNotEmpty() -> activity.getString(
-            R.string.runtime_configuration_status_missing,
-            snapshot.preflight.missingRequired.size,
-        )
-        snapshot.preflight.requiredCount > 0 ->
-            activity.getString(R.string.runtime_configuration_status_ready)
-        snapshot.allCandidateNames.isNotEmpty() -> activity.getString(
-            R.string.runtime_configuration_status_candidates,
-            snapshot.allCandidateNames.size,
-        )
-        else -> activity.getString(R.string.runtime_configuration_status_none)
+    fun summaryText(snapshot: Snapshot): String = buildString {
+        if (snapshot.preflight.missingRequired.isNotEmpty()) {
+            append(
+                activity.getString(
+                    R.string.runtime_configuration_summary_required_missing,
+                    snapshot.preflight.missingRequired.size,
+                ),
+            )
+        } else if (snapshot.preflight.requiredCount > 0) {
+            append(activity.getString(R.string.runtime_configuration_summary_required_complete))
+        } else {
+            append(activity.getString(R.string.runtime_configuration_summary_required_none))
+        }
+
+        when {
+            snapshot.preflight.optionalMissingCount > 0 -> {
+                append('\n')
+                append(
+                    activity.getString(
+                        R.string.runtime_configuration_summary_optional_missing,
+                        snapshot.preflight.optionalMissingCount,
+                    ),
+                )
+            }
+            snapshot.preflight.optionalCount > 0 -> {
+                append('\n')
+                append(activity.getString(R.string.runtime_configuration_summary_optional_complete))
+            }
+        }
     }
 
+    fun statusText(snapshot: Snapshot): String = summaryText(snapshot)
+
     fun statusIsWarning(snapshot: Snapshot): Boolean =
-        snapshot.runtimeConfigurationDiscovered && snapshot.preflight.missingRequired.isNotEmpty()
+        snapshot.preflight.missingRequired.isNotEmpty()
+
+    fun hasOptionalReminders(snapshot: Snapshot): Boolean =
+        snapshot.preflight.optionalMissingCount > 0
 
     fun clearRuntimeDiscovery(folderName: String) {
         runtimeHints.remove(folderName)
@@ -129,7 +146,7 @@ class ProjectConfigurationUiController(
             AlertDialog.Builder(activity)
                 .setTitle(activity.getString(R.string.runtime_configuration_title, projectName))
                 .setMessage(
-                    activity.getString(R.string.runtime_configuration_summary) + "\n\n" +
+                    summaryText(snapshot) + "\n\n" +
                         activity.getString(R.string.runtime_configuration_none),
                 )
                 .setPositiveButton(R.string.common_close, null)
@@ -139,7 +156,9 @@ class ProjectConfigurationUiController(
 
         // Static candidates remain visible as reminders, but only required items enter the
         // blocking wizard. Optional candidates must never make the user fill a form just to run.
-        val pendingRequiredItems = items.filter { it.required && !isConfigured(snapshot, it.name) }
+        val pendingRequiredItems = items.filter {
+            it.severity == ConfigurationSeverity.REQUIRED && !it.isConfigured
+        }
         if (pendingRequiredItems.isNotEmpty()) {
             showConfigurationWizard(
                 projectName = projectName,
@@ -165,40 +184,67 @@ class ProjectConfigurationUiController(
         projectDocumentId: String,
         folderName: String,
         snapshot: Snapshot,
-        items: List<DisplayItem>,
+        items: List<ConfigurationItem>,
         onCompleted: () -> Unit,
     ) {
         val labels = items.map { item ->
-            val state = stateLabel(snapshot, item.name, item.required)
+            val state = stateLabel(snapshot, item.key, item.required)
             val requirement = if (item.required) {
                 activity.getString(R.string.runtime_configuration_required_section)
             } else {
                 activity.getString(R.string.runtime_configuration_item_optional)
             }
+            val source = sourceLabel(item.source)
+            val evidence = evidenceText(item.evidence)
             buildString {
-                append(item.name)
+                append(item.key)
                 append(" · ")
                 append(requirement)
                 append('\n')
                 append(state)
-                if (item.description.isNotBlank()) {
+                append(" · ")
+                append(source)
+                if (item.description.orEmpty().isNotBlank()) {
                     append(" · ")
-                    append(item.description)
+                    append(item.description.orEmpty())
+                }
+                if (evidence.isNotBlank()) {
+                    append(" · ")
+                    append(activity.getString(R.string.runtime_configuration_evidence_label))
+                    append(": ")
+                    append(evidence)
                 }
             }
         }.toTypedArray()
 
         AlertDialog.Builder(activity)
             .setTitle(activity.getString(R.string.runtime_configuration_title, projectName))
-            .setMessage(activity.getString(R.string.runtime_configuration_summary))
+            .setMessage(
+                summaryText(snapshot) + "\n\n" +
+                    activity.getString(R.string.runtime_configuration_summary),
+            )
             .setItems(labels) { _, which ->
-                showValueEditor(
-                    projectName = projectName,
-                    projectDocumentId = projectDocumentId,
-                    folderName = folderName,
-                    item = items[which],
-                    onSaved = onCompleted,
-                )
+                val selected = items[which]
+                if (
+                    selected.severity == ConfigurationSeverity.OPTIONAL &&
+                    !selected.isConfigured
+                ) {
+                    showOptionalPrompt(
+                        projectName = projectName,
+                        projectDocumentId = projectDocumentId,
+                        folderName = folderName,
+                        item = selected,
+                        onSaved = onCompleted,
+                    )
+                } else {
+                    showValueEditor(
+                        projectName = projectName,
+                        projectDocumentId = projectDocumentId,
+                        folderName = folderName,
+                        item = selected,
+                        onSaved = onCompleted,
+                    )
+                }
             }
             .setNegativeButton(R.string.common_close, null)
             .show()
@@ -207,7 +253,7 @@ class ProjectConfigurationUiController(
     private fun showConfigurationWizard(
         projectName: String,
         folderName: String,
-        items: List<DisplayItem>,
+        items: List<ConfigurationItem>,
         index: Int = 0,
         onCompleted: () -> Unit = {},
     ) {
@@ -220,7 +266,7 @@ class ProjectConfigurationUiController(
 
         val item = items[index]
         val input = EditText(activity).apply {
-            hint = activity.getString(R.string.runtime_configuration_value_hint, item.name)
+            hint = activity.getString(R.string.runtime_configuration_value_hint, item.key)
             setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT or if (item.secret) {
                 InputType.TYPE_TEXT_VARIATION_PASSWORD
@@ -229,7 +275,7 @@ class ProjectConfigurationUiController(
             }
         }
         val description = buildString {
-            if (item.description.isNotBlank()) append(item.description)
+            if (item.description.orEmpty().isNotBlank()) append(item.description)
             if (item.required) {
                 if (isNotEmpty()) append("\n\n")
                 append(activity.getString(R.string.runtime_configuration_required_section))
@@ -272,10 +318,10 @@ class ProjectConfigurationUiController(
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val value = input.text.toString()
                 if (value.isBlank()) {
-                    toast(activity.getString(R.string.runtime_configuration_blank_value, item.name))
+                    toast(activity.getString(R.string.runtime_configuration_blank_value, item.key))
                     return@setOnClickListener
                 }
-                runCatching { store.saveEnvironmentValue(folderName, item.name, value) }
+                runCatching { store.saveEnvironmentValue(folderName, item.key, value) }
                     .onSuccess {
                         dialog.dismiss()
                         showConfigurationWizard(
@@ -360,42 +406,60 @@ class ProjectConfigurationUiController(
         return true
     }
 
-    private fun buildItems(snapshot: Snapshot): List<DisplayItem> {
-        val result = linkedMapOf<String, DisplayItem>()
-        snapshot.profile.requirements.forEach { requirement ->
-            result.putIfAbsent(requirement.name, DisplayItem(
-                name = requirement.name,
-                secret = requirement.secret,
-                required = requirement.required,
-                description = requirement.description,
-            ))
+    private fun buildItems(snapshot: Snapshot): List<ConfigurationItem> {
+        val result = linkedMapOf<String, ConfigurationItem>()
+
+        fun add(requirement: ProjectConfigurationInspector.Requirement) {
+            result.putIfAbsent(
+                requirement.name,
+                ConfigurationItem(
+                    key = requirement.name,
+                    isConfigured = isConfigured(snapshot, requirement.name),
+                    severity = requirement.severity,
+                    source = requirement.source,
+                    description = requirement.description.takeIf { it.isNotBlank() },
+                    evidence = requirement.evidence,
+                    secret = requirement.secret,
+                ),
+            )
         }
-        snapshot.profile.configurationCandidates.forEach { requirement ->
-            result.putIfAbsent(requirement.name, DisplayItem(
-                name = requirement.name,
-                secret = requirement.secret,
-                required = requirement.required,
-                description = requirement.description,
-            ))
+
+        snapshot.profile.requirements.forEach(::add)
+        snapshot.profile.configurationCandidates.forEach(::add)
+        snapshot.profile.credentialCandidates.forEach { name ->
+            if (name !in result) {
+                add(
+                    ProjectConfigurationInspector.Requirement(
+                        name = name,
+                        secret = true,
+                        required = false,
+                        description = "",
+                        source = ConfigurationSource.STATIC_OPTIONAL_READ,
+                    ),
+                )
+            }
         }
-        snapshot.allCandidateNames.forEach { name ->
-            result.putIfAbsent(name, DisplayItem(
-                name = name,
-                secret = true,
-                required = false,
-                description = "",
-            ))
-        }
-        // A variable explicitly reported as missing by the running project is required for the
+
+        // A variable explicitly reported as missing by the running project is REQUIRED for the
         // current repair cycle, even if static inspection originally classified it as optional.
         snapshot.runtimeHints.forEach { name ->
             val existing = result[name]
-            result[name] = (existing ?: DisplayItem(
-                name = name,
-                secret = true,
-                required = true,
-                description = "",
-            )).copy(required = true)
+            result[name] = (existing ?: ConfigurationItem(
+                key = name,
+                isConfigured = isConfigured(snapshot, name),
+                severity = ConfigurationSeverity.REQUIRED,
+                source = ConfigurationSource.RUNTIME_DIAGNOSTIC,
+                description = null,
+                evidence = null,
+                secret = ProjectConfigurationInspector.looksSensitive(name),
+            )).copy(
+                isConfigured = isConfigured(snapshot, name),
+                severity = ConfigurationSeverity.REQUIRED,
+                source = ConfigurationSource.RUNTIME_DIAGNOSTIC,
+                evidence = ConfigurationEvidence(
+                    detail = "Runtime reported missing configuration",
+                ),
+            )
         }
         return result.values.toList()
     }
@@ -412,17 +476,78 @@ class ProjectConfigurationUiController(
         else -> activity.getString(R.string.runtime_configuration_item_optional)
     }
 
+    private fun sourceLabel(source: ConfigurationSource): String = activity.getString(
+        when (source) {
+            ConfigurationSource.PROJECT_DECLARED ->
+                R.string.runtime_configuration_source_project_declared
+            ConfigurationSource.STATIC_REQUIRED_READ ->
+                R.string.runtime_configuration_source_static_required
+            ConfigurationSource.STATIC_OPTIONAL_READ ->
+                R.string.runtime_configuration_source_static_optional
+            ConfigurationSource.ENV_EXAMPLE ->
+                R.string.runtime_configuration_source_env_example
+            ConfigurationSource.RUNTIME_DIAGNOSTIC ->
+                R.string.runtime_configuration_source_runtime_diagnostic
+        },
+    )
+
+    private fun evidenceText(evidence: ConfigurationEvidence?): String {
+        if (evidence == null) return ""
+        val location = when {
+            !evidence.filePath.isNullOrBlank() && evidence.lineNumber != null ->
+                activity.getString(
+                    R.string.runtime_configuration_evidence_file_line,
+                    evidence.filePath,
+                    evidence.lineNumber,
+                )
+            !evidence.filePath.isNullOrBlank() ->
+                activity.getString(R.string.runtime_configuration_evidence_file, evidence.filePath)
+            else -> ""
+        }
+        return listOf(location, evidence.detail.orEmpty())
+            .filter { it.isNotBlank() }
+            .joinToString(" · ")
+    }
+
+    private fun showOptionalPrompt(
+        projectName: String,
+        projectDocumentId: String,
+        folderName: String,
+        item: ConfigurationItem,
+        onSaved: () -> Unit,
+    ) {
+        AlertDialog.Builder(activity)
+            .setTitle(
+                activity.getString(
+                    R.string.runtime_configuration_optional_title,
+                    item.key,
+                ),
+            )
+            .setMessage(R.string.runtime_configuration_optional_message)
+            .setNegativeButton(R.string.runtime_configuration_optional_later, null)
+            .setPositiveButton(R.string.runtime_configuration_optional_fill) { _, _ ->
+                showValueEditor(
+                    projectName = projectName,
+                    projectDocumentId = projectDocumentId,
+                    folderName = folderName,
+                    item = item,
+                    onSaved = onSaved,
+                )
+            }
+            .show()
+    }
+
     private fun showValueEditor(
         projectName: String,
         projectDocumentId: String,
         folderName: String,
-        item: DisplayItem,
+        item: ConfigurationItem,
         onSaved: () -> Unit = {},
     ) {
-        val configuredInStudio = runCatching { store.hasEnvironmentValue(folderName, item.name) }
+        val configuredInStudio = runCatching { store.hasEnvironmentValue(folderName, item.key) }
             .getOrDefault(false)
         val input = EditText(activity).apply {
-            hint = activity.getString(R.string.runtime_configuration_value_hint, item.name)
+            hint = activity.getString(R.string.runtime_configuration_value_hint, item.key)
             setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT or if (item.secret) {
                 InputType.TYPE_TEXT_VARIATION_PASSWORD
@@ -431,7 +556,7 @@ class ProjectConfigurationUiController(
             }
         }
         val builder = AlertDialog.Builder(activity)
-            .setTitle(activity.getString(R.string.runtime_configuration_edit_title, item.name))
+            .setTitle(activity.getString(R.string.runtime_configuration_edit_title, item.key))
             .setMessage(
                 activity.getString(
                     if (item.secret) {
@@ -447,9 +572,9 @@ class ProjectConfigurationUiController(
 
         if (configuredInStudio) {
             builder.setNeutralButton(R.string.runtime_configuration_clear) { _, _ ->
-                runCatching { store.clearEnvironmentValue(folderName, item.name) }
+                runCatching { store.clearEnvironmentValue(folderName, item.key) }
                     .onSuccess {
-                        toast(activity.getString(R.string.runtime_configuration_cleared, item.name))
+                        toast(activity.getString(R.string.runtime_configuration_cleared, item.key))
                         onChanged()
                         showConfiguration(projectName, projectDocumentId, folderName)
                     }
@@ -467,12 +592,12 @@ class ProjectConfigurationUiController(
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val value = input.text.toString()
                 if (value.isBlank()) {
-                    toast(activity.getString(R.string.runtime_configuration_blank_value, item.name))
+                    toast(activity.getString(R.string.runtime_configuration_blank_value, item.key))
                     return@setOnClickListener
                 }
-                runCatching { store.saveEnvironmentValue(folderName, item.name, value) }
+                runCatching { store.saveEnvironmentValue(folderName, item.key, value) }
                     .onSuccess {
-                        toast(activity.getString(R.string.runtime_configuration_saved, item.name))
+                        toast(activity.getString(R.string.runtime_configuration_saved, item.key))
                         dialog.dismiss()
                         onChanged()
                         onSaved()
