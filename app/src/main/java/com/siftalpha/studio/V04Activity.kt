@@ -43,7 +43,7 @@ import com.siftalpha.studio.runtime.TermuxBackend
 import com.siftalpha.studio.runtime.TermuxResultBus
 
 /** Import/get project -> isolated venv -> dependencies -> run/stop/status/logs. */
-class V04Activity : StudioActivity() {
+open class V04Activity : StudioActivity() {
 
     private data class Pending(
         val action: ProjectRuntimeController.Action,
@@ -80,6 +80,9 @@ class V04Activity : StudioActivity() {
     private lateinit var rootState: TextView
     private lateinit var projectList: LinearLayout
     private lateinit var output: TextView
+
+    private val selectedProjectDocumentId: String?
+        get() = intent.getStringExtra(EXTRA_PROJECT_DOCUMENT_ID)
 
     private val pending: MutableMap<Int, Pending>
         get() = PENDING_TASKS
@@ -267,7 +270,11 @@ class V04Activity : StudioActivity() {
         )
         rootState.text = getString(R.string.runtime_center_root_connected, runtimeText)
         try {
-            val projects = gateway.projects()
+            val projects = gateway.projects().let { projects ->
+                selectedProjectDocumentId?.let { selectedId ->
+                    projects.filter { it.summary.documentId == selectedId }
+                } ?: projects
+            }
             projectOutputs.retainOnly(projects.map { it.folderName }.toSet())
             if (projects.isEmpty()) {
                 projectList.addView(hint(getString(R.string.runtime_center_projects_empty)))
@@ -1860,6 +1867,7 @@ class V04Activity : StudioActivity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     companion object {
+        const val EXTRA_PROJECT_DOCUMENT_ID = "project_document_id"
         private const val REQUEST_PY = 801
         private const val REQUEST_ZIP = 802
         private val PROJECT_NAME = Regex("^[A-Za-z0-9._-]+$")
