@@ -193,4 +193,8 @@
     <string name="runtime_open_source_failed">Could not open source</string>
     <string name="runtime_unknown_error">Unknown error</string>
     <string name="runtime_ui_action_failed">%1$s did not complete</string>
+    <string name="runtime_workspace_overview">Project overview</string>
+    <string name="runtime_workspace_environment">Environment and configuration</string>
+    <string name="runtime_workspace_controls">Run controls</string>
+    <string name="runtime_workspace_output">Project output</string>
 </resources>
