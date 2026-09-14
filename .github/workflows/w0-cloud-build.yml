@@ -45,6 +45,53 @@ jobs:
           gradle-version: '9.3.1'
           cache-provider: basic
 
+      - name: Prepare stable test signing
+        env:
+          SIFTALPHA_SIGNING_PASSPHRASE: ${{ secrets.SIFTALPHA_SIGNING_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          mkdir -p w0-evidence
+          encrypted_file="signing/siftalpha-test.keystore.enc.b64"
+          signing_file="$RUNNER_TEMP/siftalpha-test.keystore.jks"
+          signing_alias="siftalpha-test"
+          if [[ -z "${SIFTALPHA_SIGNING_PASSPHRASE:-}" ]]; then
+            echo "stable signing: not configured" | tee w0-evidence/signing-setup.txt
+            exit 0
+          fi
+
+          signing_password="$(printf '%s' "$SIFTALPHA_SIGNING_PASSPHRASE" | sha256sum | cut -c1-32)"
+          if [[ -f "$encrypted_file" ]]; then
+            base64 --decode "$encrypted_file" | openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+              -pass env:SIFTALPHA_SIGNING_PASSPHRASE -out "$signing_file"
+            echo "stable signing: restored encrypted certificate" | tee w0-evidence/signing-setup.txt
+          else
+            keytool -genkeypair -noprompt \
+              -keystore "$signing_file" \
+              -storepass "$signing_password" \
+              -alias "$signing_alias" \
+              -keypass "$signing_password" \
+              -dname "CN=SiftAlpha Studio Test, OU=Mobile, O=SiftAlpha, C=MY" \
+              -keyalg RSA -keysize 3072 -validity 3650
+            mkdir -p signing
+            openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+              -pass env:SIFTALPHA_SIGNING_PASSPHRASE -in "$signing_file" | base64 -w0 > "$encrypted_file"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "$encrypted_file"
+            git commit -m "Initialize encrypted test signing certificate"
+            git push
+            echo "stable signing: generated encrypted certificate" | tee w0-evidence/signing-setup.txt
+          fi
+
+          keytool -list -keystore "$signing_file" -storepass "$signing_password" \
+            -alias "$signing_alias" >/dev/null
+          {
+            echo "SIFTALPHA_DEBUG_KEYSTORE_FILE=$signing_file"
+            echo "SIFTALPHA_DEBUG_STORE_PASSWORD=$signing_password"
+            echo "SIFTALPHA_DEBUG_KEY_ALIAS=$signing_alias"
+            echo "SIFTALPHA_DEBUG_KEY_PASSWORD=$signing_password"
+          } >> "$GITHUB_ENV"
+
       - name: Record W0 source and toolchain
         run: |
           mkdir -p w0-evidence
