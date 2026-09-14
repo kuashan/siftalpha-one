@@ -524,6 +524,51 @@ open class V04Activity : StudioActivity() {
             setPadding(0, 0, 0, dp(5))
         })
 
+        // The single-project workspace presents the policy-selected next action first. The
+        // secondary controls below remain available for observation and recovery, but the user
+        // never needs to infer whether Prepare, Configure, Start, or Stop is appropriate.
+        if (selectedProjectDocumentId != null) {
+            when (policy.primaryAction) {
+                ProjectActionPolicy.Action.PREPARE -> {
+                    box.addView(button(getString(R.string.runtime_button_prepare)) {
+                        confirmPrepare(project)
+                    })
+                }
+                ProjectActionPolicy.Action.START -> {
+                    box.addView(button(getString(R.string.runtime_button_run)) {
+                        confirmRun(project)
+                    })
+                }
+                ProjectActionPolicy.Action.STOP -> {
+                    box.addView(button(getString(R.string.runtime_button_stop)) {
+                        dispatch(project, ProjectRuntimeController.Action.STOP)
+                    })
+                }
+                ProjectActionPolicy.Action.CONFIGURE -> {
+                    box.addView(button(getString(R.string.runtime_configuration_button)) {
+                        configurationUi.showConfiguration(
+                            projectName = summary.name,
+                            projectDocumentId = summary.documentId,
+                            folderName = project.folderName,
+                            onCompleted = { retryProjectAfterConfiguration(project, webProfile) },
+                        )
+                    })
+                }
+                ProjectActionPolicy.Action.STATUS -> {
+                    box.addView(button(getString(R.string.runtime_button_status)) {
+                        dispatch(project, ProjectRuntimeController.Action.STATUS)
+                    })
+                }
+                null,
+                ProjectActionPolicy.Action.EDIT,
+                ProjectActionPolicy.Action.OPEN_SOURCE,
+                ProjectActionPolicy.Action.LOGS,
+                ProjectActionPolicy.Action.CLEAN,
+                ProjectActionPolicy.Action.OPEN_BROWSER,
+                -> Unit
+            }
+        }
+
         val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         row1.addView(smallButton(getString(R.string.runtime_button_edit)) { openEditor(project) }, weight())
         val prepareButton = smallButton(getString(R.string.runtime_button_prepare)) { confirmPrepare(project) }
