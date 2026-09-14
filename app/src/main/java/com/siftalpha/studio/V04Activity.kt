@@ -1258,6 +1258,10 @@ open class V04Activity : StudioActivity() {
                 }
             }
             ProjectRuntimeController.Action.STOP -> {
+                // An explicit STOP result closes any stale foreground-recovery marker. Without
+                // this, the policy keeps every runtime action disabled even after the process has
+                // been stopped and the next START can never be dispatched.
+                recoveryProjects.remove(stateKey)
                 states[stateKey] = if (success) {
                     val stoppedState = if (runtimeState == RuntimeState.UNKNOWN) {
                         RuntimeState.STOPPED_BY_USER
