@@ -271,9 +271,8 @@ class MainActivity : StudioComposeActivity() {
     }
 
     private fun openProject(project: ProjectStore.ProjectSummary) {
-        startActivity(Intent(this, ProjectEditorActivity::class.java).apply {
-            putExtra(ProjectEditorActivity.EXTRA_PROJECT_NAME, project.name)
-            putExtra(ProjectEditorActivity.EXTRA_PROJECT_DOCUMENT_ID, project.documentId)
+        startActivity(Intent(this, ProjectWorkspaceActivity::class.java).apply {
+            putExtra(V04Activity.EXTRA_PROJECT_DOCUMENT_ID, project.documentId)
         })
     }
 
