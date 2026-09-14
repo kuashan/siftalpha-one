@@ -193,4 +193,8 @@
     <string name="runtime_open_source_failed">ソースを開けません</string>
     <string name="runtime_unknown_error">不明なエラー</string>
     <string name="runtime_ui_action_failed">%1$s が完了しませんでした</string>
+    <string name="runtime_workspace_overview">プロジェクト概要</string>
+    <string name="runtime_workspace_environment">環境と設定</string>
+    <string name="runtime_workspace_controls">実行操作</string>
+    <string name="runtime_workspace_output">プロジェクト出力</string>
 </resources>
