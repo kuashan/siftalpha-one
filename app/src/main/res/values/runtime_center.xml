@@ -193,4 +193,8 @@
     <string name="runtime_open_source_failed">无法打开来源</string>
     <string name="runtime_unknown_error">未知错误</string>
     <string name="runtime_ui_action_failed">%1$s 未完成</string>
+    <string name="runtime_workspace_overview">项目概览</string>
+    <string name="runtime_workspace_environment">环境与配置</string>
+    <string name="runtime_workspace_controls">运行控制</string>
+    <string name="runtime_workspace_output">项目输出</string>
 </resources>
