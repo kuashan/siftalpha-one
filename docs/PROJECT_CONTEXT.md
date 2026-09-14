@@ -3,7 +3,9 @@
 最后更新：2026-09-14  
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
 当前分支：`main`  
-当前版本：`0.8.0-alpha14` / `versionCode 90`  
+当前实现版本：0.8.0-alpha15 / versionCode 91
+当前实现提交：[0873f23](https://github.com/kuashan/siftalpha-one/commit/0873f23e4626757b4cf2bd0681adc24e98492ecb)
+上一版发布：[W2 test APK · w2-test-0ee299e](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-0ee299e)  
 最新发布：[W2 test APK · w2-test-0ee299e](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-0ee299e)
 
 ## 1. 项目目标
@@ -69,9 +71,10 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 - `V04Activity)：Runtime Center 的页面组装、用户动作入口和结果协调；正在持续拆分，避免继续膨胀。
 - `ProjectUiSnapshot`：单项目不可变 UI 事实快照。
 - `ProjectActionPolicy`：根据快照统一决定 PREPARE、START、STOP、STATUS、LOGS、CONFIGURE、Browser 等动作。
-- `ProjectConfigurationInspector`：读取项目元数据、`.env`、`.env.example` 和 Python 环境变量读取。
-- `ProjectConfigurationUiController`：配置列表、必填向导、安全保存和运行时配置提示。
-- `ProjectConfigurationPreflight`：纯配置就绪判断。
+- ConfigurationModels：统一表达配置严重程度、发现来源、检测证据和脱敏配置项。
+- ProjectConfigurationInspector：读取项目元数据、.env、.env.example 和 Python 环境变量读取，并附带来源证据。
+- ProjectConfigurationUiController：配置列表、必填向导、建议项提示、来源证据、安全保存和运行时配置提示。
+- ProjectConfigurationPreflight：纯配置就绪判断，同时计算 REQUIRED/OPTIONAL 的已配置和缺失数量。
 - `RuntimeConfigurationDiagnostic`：只从运行输出中识别高可信的缺失配置，不猜测变量名。
 - `ProjectSecretStore`：Android Keystore 保护的本地配置存储。
 - `ProjectStore` / `V04ProjectGateway`：SAF 项目树、文件和项目身份访问。
@@ -80,15 +83,16 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 
 ## 5. 配置语义
 
-配置检测分为“必需项”和“候选提醒”两层：
+配置检测分为“必需项”和“建议配置”两层：
 
-1. `.project.json.requiredEnv` 是项目显式声明的权威来源。
-2. Python 的 `os.environ["NAME"]` 属于高可信必需读取。
-3. `os.getenv("NAME")`、`os.environ.get("NAME")` 和 `.env.example` 只产生候选提醒，因为静态代码无法可靠判断它们是否真的影响运行。
-4. `NAME` 已在项目 `.env` 中有非空值，或已由 Studio 安全保存，则视为已配置。
-5. 运行结果明确报告缺失的环境变量时，该变量会成为当前修复周期的必需项，并影响下一次启动前预检。
-6. 普通硬编码 URL 不会自动判定为需要用户配置；只有通过项目声明、环境变量或运行结果明确要求时才进入配置流程。
-7. 候选项显示提醒但不阻止运行。只有真实必需项缺失时，才显示必填向导或在后续运行前阻止 START。
+1. .project.json.requiredEnv 是项目显式声明的权威来源，条目可以明确标记为 REQUIRED 或 OPTIONAL。
+2. Python 的 os.environ[NAME] 属于高可信必需读取（STATIC_REQUIRED_READ）。
+3. os.getenv(NAME)、os.environ.get(NAME) 和 .env.example 属于建议配置（STATIC_OPTIONAL_READ / ENV_EXAMPLE），因为静态代码无法可靠判断它们是否真的影响运行。
+4. NAME 已在项目 .env 中有非空值，或已由 Studio 安全保存，则视为已配置；配置页面不显示值本身。
+5. 运行结果明确报告缺失的环境变量时，该变量以 RUNTIME_DIAGNOSTIC 来源升级为当前修复周期的必需项，并影响下一次启动前预检。
+6. 每个配置项都保留来源和证据（项目文件、代码文件/行号或运行诊断），让用户知道为什么出现提醒。
+7. 普通硬编码 URL 不会自动判定为需要用户配置；只有通过项目声明、环境变量或运行结果明确要求时才进入配置流程。
+8. 建议配置显示提醒但不阻止运行。只有 REQUIRED 缺失时，才显示必填向导或在后续运行前阻止 START。
 
 ## 6. 构建与发布基线
 
@@ -109,21 +113,22 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 
 ## 7. 当前基线与下一步
 
-当前最新配置修正版：
+当前 W2 配置语义实现：
 
-- 实现提交：[788a235](https://github.com/kuashan/siftalpha-one/commit/788a235abc653df7eb6b479e03868ade9c1deaeb)
-- 发布触发提交：[0ee299e](https://github.com/kuashan/siftalpha-one/commit/0ee299e0635e5ad8fcb23098bb466b9677eba00e)
-- 云端构建：[Run #27](https://github.com/kuashan/siftalpha-one/actions/runs/34880577089)
-- APK：[直接下载](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-0ee299e/app-debug.apk)
-- APK SHA-256：`a1550c94aa8a6183f3705e8d3450591eeb5beac4ec9fbdf55965b7603ec3b6a7`
+- 实现提交：[0873f23](https://github.com/kuashan/siftalpha-one/commit/0873f23e4626757b4cf2bd0681adc24e98492ecb)
+- 云端构建：[Run #30](https://github.com/kuashan/siftalpha-one/actions/runs/34885104600)，成功
+- 版本：0.8.0-alpha15 / versionCode 91
+- Release：待发布；上一版 [w2-test-0ee299e](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-0ee299e)
+- 稳定测试签名证书摘要：3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928
 
 下一步按优先级：
 
-1. 用两个真实脚本验证候选项只提醒、不阻止运行。
-2. 验证可选项直接进入列表，不强制打开多步填写向导。
-3. 验证运行时明确缺失项会在下一次启动前变成必需项。
-4. 回归 STOP → START、Chrome 返回、配置保存和覆盖安装。
-5. 继续完善单项目工作区和 W2 的完整任务闭环。
+1. 触发新的 W2 测试 APK Release，并确认 versionCode 91 可覆盖安装 versionCode 90。
+2. 用两个真实脚本验证建议配置只提醒、不阻止运行。
+3. 验证配置列表能够显示检测来源和文件/行号证据。
+4. 验证运行时明确缺失项会在下一次启动前变成 REQUIRED。
+5. 回归 STOP → START、Chrome 返回、配置保存和覆盖安装。
+6. 继续完善单项目工作区和 W2 的完整任务闭环。
 
 ## 8. 记录维护约定
 

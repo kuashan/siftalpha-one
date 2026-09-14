@@ -130,3 +130,42 @@
 - 云端测试结果
 - 真机测试结果
 - 未完成事项和下一步
+
+
+## 2026-09-14 · W2 Configuration Semantics Refinement
+
+### 用户目标
+
+参考《SiftAlpha Studio W2 Configuration Semantics Refinement》重新定义配置语义：
+
+- 区分 REQUIRED（必需配置）与 OPTIONAL（建议配置）。
+- 建议配置只提醒，不阻止 START。
+- 只有可信的真实必需配置缺失才阻止 START。
+- 在界面展示配置来源和检测证据，避免把候选项误解为必填项。
+
+### 实现
+
+- 新增统一配置模型：ConfigurationSeverity、ConfigurationSource、ConfigurationEvidence 和 ConfigurationItem。
+- ProjectConfigurationInspector 为项目声明、Python 直接读取、Python 可选读取、.env.example 和运行时诊断记录不同来源。
+- Python 文件证据包含相对文件路径和行号；项目声明证据标记 .project.json.requiredEnv。
+- ProjectConfigurationPreflight 同时计算必需配置和建议配置的已配置/缺失数量。
+- ProjectUiSnapshot 暴露 canRun、必需/建议计数和 ConfigurationSummary。
+- ProjectActionPolicy 通过快照统一阻止真实必需缺失；建议配置不影响 START。
+- 配置页面只对未配置的必需项打开向导；建议项先显示“填写/稍后”说明，并在列表中显示来源和证据。
+- 保留 RuntimeController、Termux 执行、PREPARE/START 核心流程、SecretStore、SAF 和 Web 检测不变。
+- 增加解析器、preflight 和 action policy 测试，覆盖必需缺失、建议缺失、运行时诊断升级和来源证据。
+
+### 提交与云端验证
+
+- 初始实现提交：[a2763b8](https://github.com/kuashan/siftalpha-one/commit/a2763b8ee1247c5a4fc6e7197c2cc1783d5708f7)。
+- 首次构建 Run #29 因行号证据生成中的 Kotlin 换行字面量失败；仓库校验和环境准备通过。
+- 修复提交：[0873f23](https://github.com/kuashan/siftalpha-one/commit/0873f23e4626757b4cf2bd0681adc24e98492ecb)。
+- Run #30：[Actions](https://github.com/kuashan/siftalpha-one/actions/runs/34885104600) 成功：仓库校验、单元测试、APK 组装、签名和证据收集全部通过。
+- 当前待发布版本：0.8.0-alpha15 / versionCode 91。
+- 当前稳定测试证书摘要保持不变；APK Release 将在发布触发提交后记录。
+
+### 真机状态与下一步
+
+- 新 APK 尚未发布，等待生成可覆盖安装的 Release。
+- 发布后使用“直接覆盖安装，不卸载上一版”的方式测试配置页面与两个脚本。
+- 重点确认：只有建议项时不出现强制向导；建议项缺失不阻止 PREPARE → START；来源和证据显示清楚。
