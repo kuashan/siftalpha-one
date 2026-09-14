@@ -56,12 +56,15 @@ jobs:
 
       - name: Run repository validators
         run: |
+          set -o pipefail
           python3 tools/validate_launcher_icon.py | tee w0-evidence/validate-launcher.txt
           python3 tools/validate_localization_resources.py | tee w0-evidence/validate-localization.txt
           python3 tools/validate_localized_ui_sources.py | tee w0-evidence/validate-localized-ui.txt
 
       - name: Run unit tests and assemble debug APK
-        run: gradle --no-daemon --stacktrace --console=plain testDebugUnitTest assembleDebug | tee w0-evidence/gradle-build.txt
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace --console=plain testDebugUnitTest assembleDebug | tee w0-evidence/gradle-build.txt
 
       - name: Collect APK evidence
         run: |
