@@ -161,11 +161,16 @@
 - 首次构建 Run #29 因行号证据生成中的 Kotlin 换行字面量失败；仓库校验和环境准备通过。
 - 修复提交：[0873f23](https://github.com/kuashan/siftalpha-one/commit/0873f23e4626757b4cf2bd0681adc24e98492ecb)。
 - Run #30：[Actions](https://github.com/kuashan/siftalpha-one/actions/runs/34885104600) 成功：仓库校验、单元测试、APK 组装、签名和证据收集全部通过。
-- 当前待发布版本：0.8.0-alpha15 / versionCode 91。
-- 当前稳定测试证书摘要保持不变；APK Release 将在发布触发提交后记录。
+- 发布版本：0.8.0-alpha15 / versionCode 91。
+- 发布提交：[80efac5](https://github.com/kuashan/siftalpha-one/commit/80efac5f1324c91229cf53d884b90dd8bf2bcf4c)。
+- 发布构建：[Run #32](https://github.com/kuashan/siftalpha-one/actions/runs/34885615075)，成功。
+- Release：[w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)。
+- APK：[直接下载](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-80efac5/app-debug.apk)。
+- APK SHA-256：4da88d0d8d2bd757d5a0b29f6d83ab9d8b9fbe15bf2d844659b43c45a439d562。
+- 稳定测试证书 SHA-256：3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928。
 
 ### 真机状态与下一步
 
-- 新 APK 尚未发布，等待生成可覆盖安装的 Release。
-- 发布后使用“直接覆盖安装，不卸载上一版”的方式测试配置页面与两个脚本。
+- 新 APK 已发布，等待用户进行覆盖安装和真机验收。
+- 使用“直接覆盖安装，不卸载上一版”的方式测试配置页面与两个脚本。
 - 重点确认：只有建议项时不出现强制向导；建议项缺失不阻止 PREPARE → START；来源和证据显示清楚。
