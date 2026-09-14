@@ -1,6 +1,7 @@
 # W2: verify encrypted certificate restore
 # W2: verify repository signing secret
 # W2: publish device acceptance APK
+# W2: configuration candidates remain optional until runtime evidence
 name: SiftAlpha W0 Cloud Build
 
 on:
