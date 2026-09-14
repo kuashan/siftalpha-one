@@ -433,6 +433,9 @@ open class V04Activity : StudioActivity() {
             LinearLayout.LayoutParams.WRAP_CONTENT,
         ).apply { bottomMargin = dp(9) }
 
+        if (selectedProjectDocumentId != null) {
+            box.addView(section(getString(R.string.runtime_workspace_overview)))
+        }
         box.addView(text("📁 ${summary.name}", 16f, true).apply { setTextColor(Color.WHITE) })
         box.addView(text(getString(R.string.runtime_center_source, summary.source), 12f, false).apply {
             setTextColor(Color.rgb(150, 157, 169))
@@ -443,6 +446,9 @@ open class V04Activity : StudioActivity() {
             typeface = Typeface.MONOSPACE
         })
 
+        if (selectedProjectDocumentId != null) {
+            box.addView(section(getString(R.string.runtime_workspace_environment)))
+        }
         val environmentLabel = when (environmentStates[stateKey]) {
             true -> getString(R.string.runtime_state_env_ready)
             false -> getString(R.string.runtime_state_env_not_ready)
@@ -569,6 +575,9 @@ open class V04Activity : StudioActivity() {
             }
         }
 
+        if (selectedProjectDocumentId != null) {
+            box.addView(section(getString(R.string.runtime_workspace_controls)))
+        }
         val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         row1.addView(smallButton(getString(R.string.runtime_button_edit)) { openEditor(project) }, weight())
         val prepareButton = smallButton(getString(R.string.runtime_button_prepare)) { confirmPrepare(project) }
@@ -644,6 +653,9 @@ open class V04Activity : StudioActivity() {
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                 ).apply { topMargin = dp(5) }
             })
+        }
+        if (selectedProjectDocumentId != null) {
+            box.addView(section(getString(R.string.runtime_workspace_output)))
         }
         projectOutputs.attach(project.folderName, box)
         return box
