@@ -41,6 +41,7 @@ import com.siftalpha.studio.runtime.RuntimeWebUiStatus
 import com.siftalpha.studio.runtime.RuntimeWebUrl
 import com.siftalpha.studio.runtime.TermuxBackend
 import com.siftalpha.studio.runtime.TermuxResultBus
+import java.util.concurrent.Executors
 
 /** Import/get project -> isolated venv -> dependencies -> run/stop/status/logs. */
 open class V04Activity : StudioActivity() {
@@ -60,6 +61,19 @@ open class V04Activity : StudioActivity() {
         val packageName: String,
     )
 
+    private data class ProjectCardData(
+        val project: V04ProjectGateway.RuntimeProject,
+        val configurationSnapshot: ProjectConfigurationUiController.Snapshot,
+        val webProfile: WebProjectInspector.Profile,
+    )
+
+    private data class ProjectRefreshResult(
+        val rootSelected: Boolean,
+        val runtimeSupported: Boolean,
+        val cards: List<ProjectCardData> = emptyList(),
+        val errorMessage: String? = null,
+    )
+
     private lateinit var backend: TermuxBackend
     private lateinit var gateway: V04ProjectGateway
     private lateinit var runtime: ProjectRuntimeController
@@ -75,7 +89,11 @@ open class V04Activity : StudioActivity() {
     private lateinit var lifecycleStore: RuntimeLifecycleStore
     private val recoveryProjects = mutableSetOf<String>()
     private val failureReasons = mutableMapOf<String, String>()
-    private val recoveryHandler = Handler(Looper.getMainLooper())
+    private val refreshHandler = Handler(Looper.getMainLooper())
+    private val refreshExecutor = Executors.newSingleThreadExecutor()
+    private var refreshScheduled = false
+    private var refreshInFlight = false
+    private var refreshGeneration = 0L
     private var activityStarted = false
     private lateinit var rootState: TextView
     private lateinit var projectList: LinearLayout
@@ -183,11 +201,17 @@ open class V04Activity : StudioActivity() {
 
     override fun onStop() {
         activityStarted = false
-        recoveryHandler.removeCallbacksAndMessages(null)
+        refreshHandler.removeCallbacksAndMessages(null)
         if (::webAvailability.isInitialized) webAvailability.pause()
         if (::prepareLiveProgress.isInitialized) prepareLiveProgress.pause()
         TermuxResultBus.removeListener(resultListener)
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        refreshHandler.removeCallbacksAndMessages(null)
+        refreshExecutor.shutdownNow()
+        super.onDestroy()
     }
 
     private fun clearLocalizedStateCacheIfNeeded() {
@@ -256,61 +280,158 @@ open class V04Activity : StudioActivity() {
 
     private fun refresh() {
         if (!::projectList.isInitialized) return
+
+        // Coalesce onStart/onResume/result/probe callbacks and keep the currently rendered
+        // workspace visible while SAF/configuration reads happen off the main thread.
+        refreshGeneration += 1
+        if (refreshScheduled || refreshInFlight) return
+        refreshScheduled = true
+        val selectedId = selectedProjectDocumentId
+        refreshHandler.postDelayed({
+            refreshScheduled = false
+            val requestGeneration = refreshGeneration
+            refreshInFlight = true
+            refreshExecutor.execute {
+                val result = runCatching {
+                    loadRefreshResult(selectedId)
+                }.getOrElse { error ->
+                    ProjectRefreshResult(
+                        rootSelected = true,
+                        runtimeSupported = false,
+                        errorMessage = error.message ?: error.javaClass.simpleName,
+                    )
+                }
+                runOnUiThread {
+                    refreshInFlight = false
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    if (requestGeneration != refreshGeneration) {
+                        refresh()
+                        return@runOnUiThread
+                    }
+                    renderRefreshResult(result)
+                }
+            }
+        }, REFRESH_DEBOUNCE_MS)
+    }
+
+    private fun loadRefreshResult(selectedId: String?): ProjectRefreshResult {
+        val rootSelected = gateway.rootUri() != null
+        if (!rootSelected) {
+            return ProjectRefreshResult(
+                rootSelected = false,
+                runtimeSupported = false,
+            )
+        }
+
+        val runtimeSupported = runCatching { runtime.runtimeSupported() }.getOrDefault(false)
+        return try {
+            val projects = gateway.projects().let { allProjects ->
+                selectedId?.let { id ->
+                    allProjects.filter { it.summary.documentId == id }
+                } ?: allProjects
+            }
+            val cards = projects.map { project ->
+                ProjectCardData(
+                    project = project,
+                    configurationSnapshot = configurationUi.snapshot(
+                        project.summary.documentId,
+                        project.folderName,
+                    ),
+                    webProfile = runCatching {
+                        webInspector.inspect(project.summary.documentId)
+                    }.getOrElse {
+                        WebProjectInspector.Profile(false, null, "none", null, null)
+                    },
+                )
+            }
+            ProjectRefreshResult(
+                rootSelected = true,
+                runtimeSupported = runtimeSupported,
+                cards = cards,
+            )
+        } catch (error: Throwable) {
+            ProjectRefreshResult(
+                rootSelected = true,
+                runtimeSupported = runtimeSupported,
+                errorMessage = error.message ?: error.javaClass.simpleName,
+            )
+        }
+    }
+
+    private fun renderRefreshResult(result: ProjectRefreshResult) {
         projectOutputs.beginRefresh()
-        projectList.removeAllViews()
-        if (gateway.rootUri() == null) {
+        if (!result.rootSelected) {
             projectOutputs.retainOnly(emptySet())
             rootState.text = getString(R.string.runtime_center_root_unselected)
-            projectList.addView(hint(getString(R.string.runtime_center_root_required)))
+            replaceProjectViews(listOf(hint(getString(R.string.runtime_center_root_required))))
             return
         }
 
-        val runtimeText = getString(
-            if (runtime.runtimeSupported()) {
+        rootState.text = getString(
+            if (result.runtimeSupported) {
                 R.string.runtime_center_runtime_available
             } else {
                 R.string.runtime_center_runtime_files_only
             },
         )
-        rootState.text = getString(R.string.runtime_center_root_connected, runtimeText)
-        try {
-            val projects = gateway.projects().let { projects ->
-                selectedProjectDocumentId?.let { selectedId ->
-                    projects.filter { it.summary.documentId == selectedId }
-                } ?: projects
+        if (result.errorMessage != null) {
+            projectOutputs.retainOnly(emptySet())
+            replaceProjectViews(
+                listOf(
+                    hint(
+                        getString(
+                            R.string.runtime_center_read_projects_failed,
+                            result.errorMessage,
+                        ),
+                    ),
+                ),
+            )
+            return
+        }
+
+        val projects = result.cards.map { it.project }
+        projectOutputs.retainOnly(projects.map { it.folderName }.toSet())
+        if (result.cards.isEmpty()) {
+            replaceProjectViews(listOf(hint(getString(R.string.runtime_center_projects_empty))))
+            return
+        }
+
+        // Build detached card views first. The visible list is replaced only after all cards are
+        // ready, so a refresh never exposes an empty white/blank workspace.
+        val nextViews = mutableListOf<android.view.View>()
+        if (selectedProjectDocumentId == null) {
+            nextViews += text(
+                getString(R.string.runtime_center_all_projects, result.cards.size),
+                14f,
+                true,
+            ).apply {
+                setTextColor(Color.rgb(170, 224, 190))
+                setPadding(0, 0, 0, dp(8))
             }
-            projectOutputs.retainOnly(projects.map { it.folderName }.toSet())
-            if (projects.isEmpty()) {
-                projectList.addView(hint(getString(R.string.runtime_center_projects_empty)))
-                return
-            }
-            if (selectedProjectDocumentId == null) {
-                projectList.addView(text(getString(R.string.runtime_center_all_projects, projects.size), 14f, true).apply {
-                    setTextColor(Color.rgb(170, 224, 190))
-                    setPadding(0, 0, 0, dp(8))
-                })
-            }
-            projects.forEach { projectList.addView(card(it)) }
-        } catch (e: Throwable) {
-            projectList.addView(
-                hint(getString(R.string.runtime_center_read_projects_failed, e.message ?: e.javaClass.simpleName)),
+        }
+        result.cards.forEach { data ->
+            nextViews += card(
+                project = data.project,
+                configurationSnapshot = data.configurationSnapshot,
+                webProfile = data.webProfile,
+                runtimeSupported = result.runtimeSupported,
             )
         }
+        replaceProjectViews(nextViews)
     }
 
-    private fun card(project: V04ProjectGateway.RuntimeProject): android.view.View {
+    private fun replaceProjectViews(views: List<android.view.View>) {
+        projectList.removeAllViews()
+        views.forEach { projectList.addView(it) }
+    }
+
+    private fun card(
+        project: V04ProjectGateway.RuntimeProject,
+        configurationSnapshot: ProjectConfigurationUiController.Snapshot,
+        webProfile: WebProjectInspector.Profile,
+        runtimeSupported: Boolean,
+    ): android.view.View {
         val summary = project.summary
-        val secretPolicy = runCatching { secretPolicyInspector.inspect(summary.documentId) }
-            .getOrElse {
-                ProjectSecretPolicyInspector.Policy(ProjectSecretPolicyInspector.BinanceApiPolicy.UNSPECIFIED)
-            }
-        val secretsRequired = secretPolicy.binanceApi == ProjectSecretPolicyInspector.BinanceApiPolicy.REQUIRED
-        val secretsConfigured = secretsRequired && runCatching {
-            secretStore.hasBinanceSecrets(project.folderName)
-        }.getOrDefault(false)
-        val configurationSnapshot = configurationUi.snapshot(summary.documentId, project.folderName)
-        val webProfile = runCatching { webInspector.inspect(summary.documentId) }
-            .getOrElse { WebProjectInspector.Profile(false, null, "none", null, null) }
         val stateKey = summary.documentId
         restoreStoredState(stateKey)
         val webSnapshot = webStateStore.snapshot(stateKey)
@@ -370,7 +491,7 @@ open class V04Activity : StudioActivity() {
             ),
             runtime = ProjectUiSnapshot.Runtime.fromPlannerSelection(
                 selection = project.runtimeSelection,
-                supported = runtime.runtimeSupported(),
+                supported = runtimeSupported,
                 stopCapability = typedState in setOf(
                     RuntimeState.PREPARING,
                     RuntimeState.STARTING,
@@ -1947,6 +2068,7 @@ open class V04Activity : StudioActivity() {
             RuntimeState.STARTING,
             RuntimeState.RUNNING,
         )
+        private const val REFRESH_DEBOUNCE_MS = 120L
         private var RUNTIME_STATES_LANGUAGE_TAG: String? = null
     }
 }
