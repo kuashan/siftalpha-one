@@ -78,7 +78,11 @@ class ProjectConfigurationUiController(
         return Snapshot(
             profile = profile,
             protectedKeys = protected,
-            preflight = ProjectConfigurationPreflight.evaluate(profile, protected),
+            preflight = ProjectConfigurationPreflight.evaluate(
+                profile = profile,
+                protectedConfiguredKeys = protected,
+                runtimeRequiredNames = knownHints,
+            ),
             runtimeHints = knownHints,
             runtimeConfigurationDiscovered = folderName in runtimeDiscoveryFolders ||
                 discoveryPrefs.getBoolean(discoveredKey(folderName), false),
@@ -133,12 +137,14 @@ class ProjectConfigurationUiController(
             return
         }
 
-        val pendingItems = items.filterNot { isConfigured(snapshot, it.name) }
-        if (pendingItems.isNotEmpty()) {
+        // Static candidates remain visible as reminders, but only required items enter the
+        // blocking wizard. Optional candidates must never make the user fill a form just to run.
+        val pendingRequiredItems = items.filter { it.required && !isConfigured(snapshot, it.name) }
+        if (pendingRequiredItems.isNotEmpty()) {
             showConfigurationWizard(
                 projectName = projectName,
                 folderName = folderName,
-                items = pendingItems,
+                items = pendingRequiredItems,
                 onCompleted = onCompleted,
             )
             return

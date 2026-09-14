@@ -18,9 +18,27 @@ object ProjectConfigurationPreflight {
     fun evaluate(
         profile: ProjectConfigurationInspector.Profile,
         protectedConfiguredKeys: Set<String>,
+        runtimeRequiredNames: Set<String> = emptySet(),
     ): Result {
         val configured = profile.configuredProjectEnvKeys + protectedConfiguredKeys
-        val required = profile.required
+        val requiredByName = linkedMapOf<String, ProjectConfigurationInspector.Requirement>()
+        profile.required.forEach { requirement ->
+            requiredByName.putIfAbsent(requirement.name, requirement)
+        }
+        runtimeRequiredNames.forEach { name ->
+            val normalized = name.trim()
+            if (normalized.isBlank()) return@forEach
+            val declared = profile.requirements.firstOrNull { it.name == normalized }
+            val promoted = (declared ?: ProjectConfigurationInspector.Requirement(
+                name = normalized,
+                secret = ProjectConfigurationInspector.looksSensitive(normalized),
+                required = true,
+                description = "",
+            )).copy(required = true)
+            requiredByName[normalized] = promoted
+        }
+
+        val required = requiredByName.values.toList()
         val missing = required.filterNot { it.name in configured }
         return Result(
             requiredCount = required.size,

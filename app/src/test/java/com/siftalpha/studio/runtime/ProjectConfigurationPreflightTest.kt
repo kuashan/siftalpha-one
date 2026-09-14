@@ -76,4 +76,52 @@ class ProjectConfigurationPreflightTest {
         assertEquals(listOf(required), result.missingRequired)
         assertEquals(0, result.configuredRequiredCount)
     }
+
+    @Test
+    fun `runtime reported names become blocking requirements after discovery`() {
+        val profile = ProjectConfigurationInspector.Profile(
+            requirements = emptyList(),
+            configuredProjectEnvKeys = emptySet(),
+            credentialCandidates = listOf("DYNAMIC_API_KEY"),
+            configurationCandidates = listOf(
+                ProjectConfigurationInspector.Requirement(
+                    name = "DYNAMIC_API_KEY",
+                    secret = true,
+                    required = false,
+                    description = "",
+                ),
+            ),
+        )
+
+        val result = ProjectConfigurationPreflight.evaluate(
+            profile = profile,
+            protectedConfiguredKeys = emptySet(),
+            runtimeRequiredNames = setOf("DYNAMIC_API_KEY"),
+        )
+
+        assertFalse(result.ready)
+        assertEquals(1, result.requiredCount)
+        assertEquals(listOf("DYNAMIC_API_KEY"), result.missingRequired.map { it.name })
+    }
+
+    @Test
+    fun `runtime reported name is satisfied by protected configuration`() {
+        val profile = ProjectConfigurationInspector.Profile(
+            requirements = emptyList(),
+            configuredProjectEnvKeys = emptySet(),
+            credentialCandidates = emptyList(),
+        )
+
+        val result = ProjectConfigurationPreflight.evaluate(
+            profile = profile,
+            protectedConfiguredKeys = setOf("DYNAMIC_API_KEY"),
+            runtimeRequiredNames = setOf("DYNAMIC_API_KEY"),
+        )
+
+        assertTrue(result.ready)
+        assertEquals(1, result.requiredCount)
+        assertEquals(1, result.configuredRequiredCount)
+        assertTrue(result.missingRequired.isEmpty())
+    }
+
 }
