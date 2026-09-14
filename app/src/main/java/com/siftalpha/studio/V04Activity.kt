@@ -219,18 +219,22 @@ open class V04Activity : StudioActivity() {
         }
         root.addView(rootState)
 
-        root.addView(section(getString(R.string.runtime_center_section_import)))
-        val importRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        importRow.addView(smallButton(getString(R.string.runtime_center_import_py)) { chooseFile(false) }, weight())
-        importRow.addView(
-            smallButton(getString(R.string.runtime_center_import_zip)) { chooseFile(true) },
-            weight().apply { marginStart = dp(5) },
-        )
-        importRow.addView(smallButton("GitHub") { showGitHubDialog() }, weight().apply { marginStart = dp(5) })
-        root.addView(importRow)
-        root.addView(button(getString(R.string.runtime_center_refresh)) { refresh() }.apply {
-            (layoutParams as LinearLayout.LayoutParams).topMargin = dp(7)
-        })
+        // Import belongs to the collection-level Runtime Center. A single-project workspace
+        // keeps attention on the selected project and never offers unrelated import actions.
+        if (selectedProjectDocumentId == null) {
+            root.addView(section(getString(R.string.runtime_center_section_import)))
+            val importRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            importRow.addView(smallButton(getString(R.string.runtime_center_import_py)) { chooseFile(false) }, weight())
+            importRow.addView(
+                smallButton(getString(R.string.runtime_center_import_zip)) { chooseFile(true) },
+                weight().apply { marginStart = dp(5) },
+            )
+            importRow.addView(smallButton("GitHub") { showGitHubDialog() }, weight().apply { marginStart = dp(5) })
+            root.addView(importRow)
+            root.addView(button(getString(R.string.runtime_center_refresh)) { refresh() }.apply {
+                (layoutParams as LinearLayout.LayoutParams).topMargin = dp(7)
+            })
+        }
 
         root.addView(section(getString(R.string.runtime_center_section_system_output)))
         output = TextView(this).apply {
@@ -280,10 +284,12 @@ open class V04Activity : StudioActivity() {
                 projectList.addView(hint(getString(R.string.runtime_center_projects_empty)))
                 return
             }
-            projectList.addView(text(getString(R.string.runtime_center_all_projects, projects.size), 14f, true).apply {
-                setTextColor(Color.rgb(170, 224, 190))
-                setPadding(0, 0, 0, dp(8))
-            })
+            if (selectedProjectDocumentId == null) {
+                projectList.addView(text(getString(R.string.runtime_center_all_projects, projects.size), 14f, true).apply {
+                    setTextColor(Color.rgb(170, 224, 190))
+                    setPadding(0, 0, 0, dp(8))
+                })
+            }
             projects.forEach { projectList.addView(card(it)) }
         } catch (e: Throwable) {
             projectList.addView(
