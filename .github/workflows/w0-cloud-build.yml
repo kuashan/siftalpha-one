@@ -1,5 +1,6 @@
 # W2: verify encrypted certificate restore
 # W2: verify repository signing secret
+# W2: publish device acceptance APK
 name: SiftAlpha W0 Cloud Build
 
 on:
