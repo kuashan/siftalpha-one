@@ -1,0 +1,86 @@
+name: SiftAlpha W0 Cloud Build
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: siftalpha-w0-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and verify APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: tools platform-tools
+
+      - name: Install Android SDK platform and build tools
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.3.1'
+          cache-provider: basic
+
+      - name: Record W0 source and toolchain
+        run: |
+          mkdir -p w0-evidence
+          git rev-parse HEAD > w0-evidence/source-commit.txt
+          git status --short > w0-evidence/source-status.txt
+          gradle --version > w0-evidence/gradle-version.txt
+          java -version > w0-evidence/java-version.txt 2>&1
+          sdkmanager --list_installed > w0-evidence/android-sdk-packages.txt
+
+      - name: Run repository validators
+        run: |
+          python3 tools/validate_launcher_icon.py | tee w0-evidence/validate-launcher.txt
+          python3 tools/validate_localization_resources.py | tee w0-evidence/validate-localization.txt
+          python3 tools/validate_localized_ui_sources.py | tee w0-evidence/validate-localized-ui.txt
+
+      - name: Run unit tests and assemble debug APK
+        run: gradle --no-daemon --stacktrace --console=plain testDebugUnitTest assembleDebug | tee w0-evidence/gradle-build.txt
+
+      - name: Collect APK evidence
+        run: |
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          sdk_root="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          build_tools="$sdk_root/build-tools/36.0.0"
+          cp "$apk" w0-evidence/siftalpha-studio-debug.apk
+          sha256sum "$apk" | tee w0-evidence/apk-sha256.txt
+          "$build_tools/apksigner" verify --verbose --print-certs "$apk" | tee w0-evidence/apk-certificates.txt
+          "$build_tools/aapt2" dump badging "$apk" | tee w0-evidence/apk-badging.txt
+
+      - name: Upload APK and W0 evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: siftalpha-w0-${{ github.run_number }}
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            w0-evidence
+          if-no-files-found: warn
+          retention-days: 14
