@@ -2,6 +2,8 @@
 
 本日志按时间顺序追加。每条记录包含目标、变更、验证和后续事项。公开日志不记录密码、密钥值、用户项目配置值或其他敏感内容。
 
+历史条目中的 W2、W3、W4、W5 仅按当时命名记录已发生的工作、构建或发布，不表示当前 Roadmap 阶段。
+
 ## 2026-09-14 · 项目记录初始化
 
 ### 目标
@@ -339,7 +341,7 @@ App 进入运行中心时，`RuntimeLifecycleStore.read()` 在读取历史 Share
 - 云端 artifact：[下载 siftalpha-w0-49](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920/artifacts/10379489647)；Release 发布步骤已跳过。
 - 已推送当前范围验证提交 `14733f7`，未增加额外功能；等待用户进行真机覆盖安装测试。
 
-## 2026-09-15 · W2 Completion Audit 与项目文档同步
+## 2026-09-15 · W2 Completion Audit 与项目文档同步（历史审计记录）
 
 ### 审计基线
 
@@ -367,16 +369,16 @@ App 进入运行中心时，`RuntimeLifecycleStore.read()` 在读取历史 Share
 - **real-device verified**：alpha25 smoke 已完成。Test 04B 明确 loopback Web discovery 和 Browser 打开项目页面 PASS；Test 04C 无 HTTP server 时拒绝裸 `PORT`、模糊端口和 external URL PASS；Test 04D Start → Browser available → Logs/Runtime remains RUNNING → Stop → Restart PASS。
 - **user-confirmed**：上述 04B、04C、04D PASS 由用户提供并确认。导入、配置编辑全流程、Node 主运行时和 App 重启后 recovery 没有被这些结果覆盖。
 
-### W2 完成度审计摘要
+### 原阶段完成度审计摘要（历史记录）
 
 - 已完成：Runtime Identity、Python Runtime、Prepare/Start/Status/Logs/Stop、Web candidate/probe/browser contract、配置 REQUIRED/OPTIONAL 语义和基本单项目入口。
 - 部分完成：Import/SAF 全链路当前版本真机覆盖、Workspace 独立协调层、Output 全链路、App 重启 recovery、Node Runtime 真机验收、Failure UI 结构化程度。
 - 已识别首要风险：Project identity 已可信，Runtime Identity 也已可信，但 `Project Identity → Runtime Identity / Runtime Generation → Runtime Lifecycle → Web Candidate Ownership → Recovery` ownership chain 尚未完全闭合。`RuntimeWebStateStore.clear()` 尚未在 STOP/CLEAN 结果路径统一调用，持久 candidate 的跨 Runtime 生命周期 ownership 需要加固。
-- 当前结论：**W2 NOT COMPLETE**。这不是 Web 04B/04C/04D 功能失败，而是 `Project → Runtime Session → Web Candidate` 的 ownership chain、恢复边界和覆盖范围尚未达到可关闭的完成度。
+- 当时审计结论：**W2 NOT COMPLETE**；这不是 Web 04B/04C/04D 功能失败，而是 `Project → Runtime Session → Web Candidate` 的 ownership chain、恢复边界和覆盖范围当时尚未达到关闭标准。该结论仅保留为历史审计记录，不代表当前 Roadmap 状态。
 
-### 后续事项（Runtime Session Ownership 修正）
+### 原审计后续事项（现归入产品 backlog / hardening）
 
-**P0 — Runtime Session Ownership Boundary**：建立最小 project-scoped runtime session ownership 模型，把 project identity、runtime identity/runtime generation、lifecycle state、current runtime candidate URL 和 recovery state 明确绑定。P0 首先解决 correctness/ownership，不把“Activity 太大”本身作为第一理由。
+**历史审计中的 P0：Runtime Session Ownership Boundary（现归入产品硬化 backlog）**：建立最小 project-scoped runtime session ownership 模型，把 project identity、runtime identity/runtime generation、lifecycle state、current runtime candidate URL 和 recovery state 明确绑定。P0 首先解决 correctness/ownership，不把“Activity 太大”本身作为第一理由。
 
 最低生命周期合同：
 
@@ -386,12 +388,28 @@ App 进入运行中心时，`RuntimeLifecycleStore.read()` 在读取历史 Share
 - `STOP` 结束当前 session，并 invalidated/cleared 当前 candidate；`CLEAN` 使项目相关 session/candidate state 失效。
 - `RESTART` 创建新的 session/generation；`RECOVERY` 只能恢复仍匹配当前 identity 的 session 信息，相同 `projectKey` 不能单独恢复旧 candidate。
 
-**P1**：把 Web candidate 绑定 runtime identity/generation，在 STOP/CLEAN 明确清理；完成 App restart recovery、Import、Configuration、Node Runtime 真机验证，并按需要逐步抽取 coordinator。
+**产品硬化与验证 backlog**：把 Web candidate 绑定 runtime identity/generation，在 STOP/CLEAN 明确清理；完成 App restart recovery、Import、Configuration、Node Runtime 真机验证，并按需要逐步抽取 coordinator。
 
-**P2**：Workspace Compose 化、更完整结构化 Failure UI、Node 能力扩展、进一步 Activity cleanup、默认 debug 日志 cleanup 和签名流程进一步加固。
+**后续体验与基础设施增强 backlog**：Workspace Compose 化、更完整结构化 Failure UI、Node 能力扩展、进一步 Activity cleanup、默认 debug 日志 cleanup 和签名流程进一步加固。
 
 Coordinator 是渐进式结构手段：先建立最小 `RuntimeSession`/`RuntimeSessionState`/`RuntimeGeneration` 等价 abstraction，不要求一次性重写 `V04Activity`；再逐步迁移 refresh、dispatch、recovery、Web invalidation，最后减少 Activity orchestration 职责。
 
-若 W2 只能再做一个开发任务，优先完成 **Runtime Session Ownership Boundary**，因为它直接补齐当前最重要的 ownership 缺口，并为 Web candidate 清理、Recovery、Restart 和 coordinator 抽取提供统一边界。
+如果当前只允许再做一个开发任务，优先完成 **Runtime Session Ownership Boundary**，因为它直接补齐当前最重要的 ownership 缺口，并为 Web candidate 清理、Recovery、Restart 和 coordinator 抽取提供统一边界。
 
 本次仅同步 `PROJECT_CONTEXT.md`、`DEV_LOG.md`、`TEST_MATRIX.md`；没有修改 Production Code、Test Code、workflow、版本号或签名配置。
+
+## 2026-09-15 · Roadmap Simplification / Planning Model Cleanup
+
+### 正式项目决策
+
+- 原 W2、W3、W4、W5 规划阶段概念自本记录起退役；它们不再表示当前阶段、未来阶段、完成度门槛、阻塞容器或开发顺序。
+- 原规划覆盖的 Runtime、Configuration、Web、Environment、Tools、Cache、Editor、Settings、Language、Diagnostics 等能力已经进入当前产品基线；本次决策不删除任何源码、测试、架构能力或验证证据。
+- 当前正式基线为 `main@38fb60af8e4c7a4b09eafb1cad0e305ae56fc353`、`versionCode 101`、`versionName 0.8.0-alpha25`。
+- 历史提交、Release/tag、artifact 名称、测试记录和旧审计结论继续保留，因为它们记录真实发生过的工作；它们不再充当当前 Roadmap 状态。
+- TEST_MATRIX 的职责是 Regression / Verification Evidence（回归与验证证据），不再作为 W2–W5 completion checklist。
+- Runtime Session Ownership Boundary 仍是有价值的技术问题，但现在归类为普通产品 backlog / hardening，不再称为 W2 P0 或 W2 blocker。
+- 不创建 W2 COMPLETE、W3 COMPLETE、W4 COMPLETE 或 W5 COMPLETE 等新的阶段状态；未来 Roadmap 尚待重新定义，也不在本次创建 W6。
+
+### 变更边界
+
+本次只同步文档；没有修改 Production Code、Test Code、版本号、GitHub Actions workflow 或 Runtime/Web 行为。
