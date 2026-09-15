@@ -230,19 +230,7 @@ class RuntimeIdentityTest {
     fun `guest writer reports the runner root identity and publication failure`() {
         val script = RuntimeIdentityStore.guestIdentityWriterShell()
 
-        assertTrue(script.contains("runtime_identity_guest_pid=\"${'
-        assertTrue(script.contains("SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=RUNNER"))
-        assertTrue(script.contains("SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT_PID=%s"))
-        assertTrue(script.contains("SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=NOT_PUBLISHED"))
-    }
-}
-}${'
-        assertTrue(script.contains("SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=RUNNER"))
-        assertTrue(script.contains("SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT_PID=%s"))
-        assertTrue(script.contains("SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=NOT_PUBLISHED"))
-    }
-}
-}\""))
+        assertTrue(script.contains("runtime_identity_guest_pid=\"${'$'}${'$'}\""))
         assertTrue(script.contains("SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=RUNNER"))
         assertTrue(script.contains("SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT_PID=%s"))
         assertTrue(script.contains("SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=NOT_PUBLISHED"))
