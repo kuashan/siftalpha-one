@@ -12,9 +12,9 @@
 - 版本：`0.8.0-alpha17`
 - versionCode：`93`
 - 包名：`com.siftalpha.studio`
-- APK：待 GitHub Actions 构建发布
-- Release：待发布
-- APK SHA-256：待构建后记录
+- 构建产物：[Run #41 artifact ZIP](https://github.com/kuashan/siftalpha-one/actions/runs/34914830358/artifacts/10374759918)
+- Release：本次提交触发发布，待 Actions 完成
+- APK SHA-256：b1ed2c060af2804bae611a543852f8e2afc8d70650de00c661acb9aefbfc17da
 
 ## B. 云端验证矩阵
 
@@ -26,6 +26,7 @@
 | C-04 | 稳定测试签名 | 包签名证书与既有测试版本一致 | PASS | Run #35 evidence / certificate digest |
 | C-05 | APK 元数据 | 包名、版本名和 versionCode 正确 | PASS | `com.siftalpha.studio`, alpha16, 92 |
 | C-06 | 发布资产 | 新版本 Release 中存在可下载 APK | PASS | [w2-test-8a91895](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-8a91895) |
+| C-07 | W2 编辑器云端构建 | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #41](https://github.com/kuashan/siftalpha-one/actions/runs/34914830358) |
 
 ## C. 安装与升级矩阵
 

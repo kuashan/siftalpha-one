@@ -233,6 +233,10 @@ OPTIONAL（建议配置）已经能够被检测和展示，但点击配置后会
 ### 构建与真机
 
 - 版本提升为 `0.8.0-alpha17 / versionCode 93`，用于从 alpha16 直接覆盖安装。
-- 云端构建结果：提交后由 GitHub Actions 验证。
-- APK、SHA-256 和真机结果：云端构建完成后补录。
+- GitHub Actions Run #41 成功：仓库校验、单元测试、APK 组装、签名和证据收集全部通过。
+- Run #41：[Actions](https://github.com/kuashan/siftalpha-one/actions/runs/34914830358)。
+- Run #41 构建产物：[artifact ZIP](https://github.com/kuashan/siftalpha-one/actions/runs/34914830358/artifacts/10374759918)。
+- APK SHA-256：b1ed2c060af2804bae611a543852f8e2afc8d70650de00c661acb9aefbfc17da。
+- 稳定测试证书 SHA-256：3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928。
+- 正式 W2 测试 APK：本次提交将按工作流规则发布为预发布 Release。
 
