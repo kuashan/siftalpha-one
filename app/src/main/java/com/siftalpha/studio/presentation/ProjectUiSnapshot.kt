@@ -33,15 +33,11 @@ data class ProjectUiSnapshot(
 ) {
 
     /**
-     * Web readiness is a presentation overlay only. Terminal Runtime states remain terminal even
-     * when a stale URL or a late Web probe is present.
+     * Runtime lifecycle is process-backed. Web availability is an independent fact shown through
+     * [web] and must never rewrite this value.
      */
     val displayedLifecycle: RuntimeState
-        get() = RuntimePresentationState.resolve(
-            runtimeState = lifecycle,
-            webExpected = web.expected,
-            endpointReachable = web.endpointReachable == true,
-        )
+        get() = RuntimePresentationState.resolve(runtimeState = lifecycle)
 
     val processMayBeActive: Boolean
         get() = runtime.stopCapability || (
@@ -237,19 +233,20 @@ data class ProjectUiSnapshot(
         companion object {
             fun resolve(
                 profileEnabled: Boolean,
-                hasKnownRuntimeUrl: Boolean,
+                hasCandidateRuntimeUrl: Boolean,
                 hasConfiguredLocalUrl: Boolean,
                 runtimeState: RuntimeState,
                 endpointReachable: Boolean?,
                 reachableUrl: String? = null,
                 framework: String? = null,
             ): Web {
-                val expected = profileEnabled || hasKnownRuntimeUrl || hasConfiguredLocalUrl
+                // A discovered URL is only a candidate until Android verifies the endpoint.
+                val expected = profileEnabled || hasConfiguredLocalUrl || endpointReachable == true
                 return Web(
                     expected = expected,
                     status = RuntimeWebUiStatus.resolve(
                         profileEnabled = profileEnabled,
-                        hasKnownRuntimeUrl = hasKnownRuntimeUrl,
+                        hasCandidateRuntimeUrl = hasCandidateRuntimeUrl,
                         hasConfiguredLocalUrl = hasConfiguredLocalUrl,
                         runtimeState = runtimeState,
                         endpointReachable = endpointReachable,

@@ -437,7 +437,7 @@ open class V04Activity : StudioActivity() {
         val webSnapshot = webStateStore.snapshot(stateKey)
         val typedState = typedStates[stateKey] ?: RuntimeState.UNKNOWN
         val configuredWebUrl = webProfile.configuredLocalUrl()
-        val candidateWebUrls = listOfNotNull(webSnapshot.url, configuredWebUrl).distinct()
+        val candidateWebUrls = listOfNotNull(webSnapshot.candidateUrl, configuredWebUrl).distinct()
         val endpointReachable = if (::webAvailability.isInitialized) {
             webAvailability.endpointReachable(stateKey, typedState, candidateWebUrls)
         } else {
@@ -449,13 +449,13 @@ open class V04Activity : StudioActivity() {
             null
         }
         val reachableWebFramework = when (reachableWebUrl) {
-            webSnapshot.url -> webSnapshot.framework ?: webProfile.framework
+            webSnapshot.candidateUrl -> webSnapshot.framework ?: webProfile.framework
             configuredWebUrl -> webProfile.framework ?: webSnapshot.framework
             else -> webProfile.framework ?: webSnapshot.framework
         }
         val web = ProjectUiSnapshot.Web.resolve(
             profileEnabled = webProfile.enabled,
-            hasKnownRuntimeUrl = !webSnapshot.url.isNullOrBlank(),
+            hasCandidateRuntimeUrl = !webSnapshot.candidateUrl.isNullOrBlank(),
             hasConfiguredLocalUrl = configuredWebUrl != null,
             runtimeState = typedState,
             endpointReachable = endpointReachable,
@@ -627,7 +627,7 @@ open class V04Activity : StudioActivity() {
         }
         box.addView(text(webProfileLabel(webUiStatus), 12f, false).apply {
             setTextColor(
-                if (webProfile.enabled || !webSnapshot.url.isNullOrBlank()) {
+                if (webProfile.enabled || !webSnapshot.candidateUrl.isNullOrBlank()) {
                     Color.rgb(170, 204, 235)
                 } else {
                     Color.rgb(150, 157, 169)
@@ -1296,7 +1296,7 @@ open class V04Activity : StudioActivity() {
         }
         val runtimeUrl = RuntimeWebUrl.extractLocalHttpUrl(stdout)
         runtimeUrl?.let { url ->
-            webStateStore.rememberUrl(item.documentId ?: item.folderName, url, item.browserFramework)
+            webStateStore.rememberCandidateUrl(item.documentId ?: item.folderName, url, item.browserFramework)
         }
         updateEnvironmentState(stateKey, stdout)
 
@@ -1347,7 +1347,7 @@ open class V04Activity : StudioActivity() {
 
                 val sourceOrConfiguredUrl = item.browserConfiguredUrl
                 if (success && runtimeState == RuntimeState.RUNNING && sourceOrConfiguredUrl != null) {
-                    webStateStore.rememberUrl(
+                    webStateStore.rememberCandidateUrl(
                         item.documentId ?: item.folderName,
                         sourceOrConfiguredUrl,
                         item.browserFramework,
@@ -1496,7 +1496,7 @@ open class V04Activity : StudioActivity() {
         val logUrl = RuntimeWebUrl.extractLocalHttpUrl(stdout)
         val projectKey = item.documentId ?: item.folderName
         val stored = webStateStore.snapshot(projectKey)
-        val url = logUrl ?: stored.url ?: item.browserConfiguredUrl
+        val url = logUrl ?: stored.candidateUrl ?: item.browserConfiguredUrl
         if (url == null) {
             errorDialog(
                 getString(R.string.runtime_web_not_found_title),
@@ -1522,7 +1522,7 @@ open class V04Activity : StudioActivity() {
             )
             return
         }
-        webStateStore.rememberUrl(projectKey, validatedUrl, framework)
+        webStateStore.rememberCandidateUrl(projectKey, validatedUrl, framework)
 
         val uri = Uri.parse(validatedUrl)
         val browsers = discoverInstalledBrowsers(uri)

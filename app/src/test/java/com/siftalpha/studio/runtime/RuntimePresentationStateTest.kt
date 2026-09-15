@@ -4,27 +4,20 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class RuntimePresentationStateTest {
+
     @Test
-    fun webProcessRemainsStartingUntilEndpointIsReachable() {
+    fun webReadinessCannotRewriteRunningProcess() {
         assertEquals(
-            RuntimeState.STARTING,
-            RuntimePresentationState.resolve(
-                runtimeState = RuntimeState.RUNNING,
-                webExpected = true,
-                endpointReachable = false,
-            ),
+            RuntimeState.RUNNING,
+            RuntimePresentationState.resolve(runtimeState = RuntimeState.RUNNING),
         )
     }
 
     @Test
-    fun webProcessBecomesRunningAfterEndpointIsReachable() {
+    fun verifiedWebProcessKeepsRunningState() {
         assertEquals(
             RuntimeState.RUNNING,
-            RuntimePresentationState.resolve(
-                runtimeState = RuntimeState.RUNNING,
-                webExpected = true,
-                endpointReachable = true,
-            ),
+            RuntimePresentationState.resolve(runtimeState = RuntimeState.RUNNING),
         )
     }
 
@@ -32,23 +25,15 @@ class RuntimePresentationStateTest {
     fun nonWebProcessKeepsRunningState() {
         assertEquals(
             RuntimeState.RUNNING,
-            RuntimePresentationState.resolve(
-                runtimeState = RuntimeState.RUNNING,
-                webExpected = false,
-                endpointReachable = false,
-            ),
+            RuntimePresentationState.resolve(runtimeState = RuntimeState.RUNNING),
         )
     }
 
     @Test
-    fun terminalStatesAreNeverRewrittenAsStarting() {
+    fun terminalStatesRemainTerminal() {
         assertEquals(
             RuntimeState.EXITED_ERROR,
-            RuntimePresentationState.resolve(
-                runtimeState = RuntimeState.EXITED_ERROR,
-                webExpected = true,
-                endpointReachable = false,
-            ),
+            RuntimePresentationState.resolve(runtimeState = RuntimeState.EXITED_ERROR),
         )
     }
 }

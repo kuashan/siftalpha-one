@@ -1,21 +1,11 @@
 package com.siftalpha.studio.runtime
 
 /**
- * Resolves the user-facing lifecycle state from process state plus capability-specific readiness.
+ * Resolves the user-facing Runtime lifecycle from process state only.
  *
- * A live process is necessary but not sufficient to call a Web project "RUNNING": while the
- * expected local endpoint is not accepting connections, the truthful user-facing state is STARTING.
- * Non-Web projects retain the process-backed RUNNING semantic because Studio has no stronger
- * universal readiness contract for arbitrary CLI/background programs.
+ * Web readiness is exposed separately through [RuntimeWebUiStatus]. A missing or unreachable Web
+ * endpoint must never rewrite a process-backed RUNNING state into STARTING.
  */
 object RuntimePresentationState {
-    fun resolve(
-        runtimeState: RuntimeState,
-        webExpected: Boolean,
-        endpointReachable: Boolean,
-    ): RuntimeState = when {
-        runtimeState == RuntimeState.RUNNING && webExpected && !endpointReachable ->
-            RuntimeState.STARTING
-        else -> runtimeState
-    }
+    fun resolve(runtimeState: RuntimeState): RuntimeState = runtimeState
 }

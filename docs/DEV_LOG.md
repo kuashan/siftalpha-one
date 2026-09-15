@@ -244,3 +244,29 @@ OPTIONAL（建议配置）已经能够被检测和展示，但点击配置后会
 - APK SHA-256：b1ed2c060af2804bae611a543852f8e2afc8d70650de00c661acb9aefbfc17da。
 - 稳定测试证书 SHA-256：3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928。
 
+
+
+## 2026-09-15 · W2 Runtime Presentation State Separation
+
+### 问题
+
+Test_04_Default_Value 的 Python 项目已经由 Runtime 输出确认进入 RUNNING，但 Android UI 长时间显示“正在启动”。原因不是配置缺失、Python 执行失败或 START/PREPARE/STOP 执行失败，而是 Web 就绪展示逻辑覆盖了 Runtime 生命周期。
+
+### 原因
+
+Runtime 的 RUNNING 状态曾因 `webExpected=true` 且端点暂不可达而被重新展示为 STARTING。普通日志中的本地 URL 也可能在端点验证前被保存为 Web 线索，使无实际 HTTP 服务的项目进入等待 Web 的展示路径。
+
+### 修改
+
+- `RuntimePresentationState` 现在只由进程 RuntimeState 决定，RUNNING 不会被 Web 不可达改写为 STARTING。
+- `RuntimeWebUiStatus` 独立表达 AVAILABLE、DETECTING、UNAVAILABLE、WAITING 和 AUTO_DETECT。
+- Runtime 发现的 URL 明确作为 candidate URL 保存；只有配置/声明或 Android 端点探测结果参与 Web 能力判断。
+- 未修改 `ProjectRuntimeController`、Python/ManagedProcess Runtime、RuntimeEnvironmentComposer、PREPARE/START/STOP 执行流程、Configuration 系统、SAF 或 Web 探测执行器。
+
+### 验证状态
+
+- 代码单元测试：待 GitHub Actions 云端运行。
+- 云端构建与签名：待 GitHub Actions 运行。
+- APK：待云端构建通过后生成。
+- 真机测试：待用户使用可覆盖安装 APK 验收。
+- 版本：`0.8.0-alpha18 / versionCode 94`，用于直接覆盖安装。

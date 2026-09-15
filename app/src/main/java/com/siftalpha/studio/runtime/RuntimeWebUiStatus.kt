@@ -6,10 +6,9 @@ import com.siftalpha.studio.R
 /**
  * Single source of truth for the Web availability shown by the project card and Browser button.
  *
- * A URL alone is not proof that a Web server is ready. AVAILABLE is reserved for a RUNNING project
- * whose loopback endpoint was recently verified. A completed negative probe is UNAVAILABLE rather
- * than an endless DETECTING state; DETECTING is reserved for callers that genuinely have no probe
- * result yet.
+ * A URL candidate alone is not proof that a project is Web-enabled. AVAILABLE is reserved for a
+ * RUNNING project whose loopback endpoint was recently verified. AUTO_DETECT means that Studio has
+ * no static Web profile, configured endpoint, or discovered URL candidate to present.
  */
 enum class RuntimeWebUiStatus {
     AVAILABLE,
@@ -31,15 +30,17 @@ enum class RuntimeWebUiStatus {
     companion object {
         fun resolve(
             profileEnabled: Boolean,
-            hasKnownRuntimeUrl: Boolean,
+            hasCandidateRuntimeUrl: Boolean,
             hasConfiguredLocalUrl: Boolean,
             runtimeState: RuntimeState,
             endpointReachable: Boolean? = null,
         ): RuntimeWebUiStatus = when {
+            !profileEnabled && !hasCandidateRuntimeUrl && !hasConfiguredLocalUrl ->
+                AUTO_DETECT
             runtimeState == RuntimeState.RUNNING && endpointReachable == true -> AVAILABLE
             runtimeState == RuntimeState.RUNNING && endpointReachable == null -> DETECTING
             runtimeState == RuntimeState.RUNNING -> UNAVAILABLE
-            profileEnabled || hasKnownRuntimeUrl || hasConfiguredLocalUrl -> WAITING
+            profileEnabled || hasCandidateRuntimeUrl || hasConfiguredLocalUrl -> WAITING
             else -> AUTO_DETECT
         }
     }

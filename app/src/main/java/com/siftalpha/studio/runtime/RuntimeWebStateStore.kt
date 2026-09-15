@@ -3,13 +3,15 @@ package com.siftalpha.studio.runtime
 import android.content.Context
 
 /**
- * App-private persistence for the latest validated Runtime Web URL.
- * This never writes into the user's project directory or GitHub repository.
+ * App-private persistence for the latest Runtime Web URL candidate.
+ *
+ * The stored value is a candidate only. Android-side endpoint probing decides whether it is
+ * reachable, and ProjectUiSnapshot keeps that Web fact separate from the process lifecycle.
  */
 class RuntimeWebStateStore(context: Context) {
 
     data class Snapshot(
-        val url: String?,
+        val candidateUrl: String?,
         val framework: String?,
         val detectedAtEpochMs: Long,
     )
@@ -17,12 +19,12 @@ class RuntimeWebStateStore(context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun snapshot(projectKey: String): Snapshot = Snapshot(
-        url = prefs.getString(key(projectKey, "url"), null),
+        candidateUrl = prefs.getString(key(projectKey, "url"), null),
         framework = prefs.getString(key(projectKey, "framework"), null),
         detectedAtEpochMs = prefs.getLong(key(projectKey, "detected_at"), 0L),
     )
 
-    fun rememberUrl(projectKey: String, url: String, framework: String?) {
+    fun rememberCandidateUrl(projectKey: String, url: String, framework: String?) {
         prefs.edit()
             .putString(key(projectKey, "url"), url)
             .putString(key(projectKey, "framework"), framework)

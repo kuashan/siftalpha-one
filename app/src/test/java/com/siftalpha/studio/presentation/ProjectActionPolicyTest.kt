@@ -26,7 +26,7 @@ class ProjectActionPolicyTest {
 
         val policy = ProjectActionPolicy.resolve(snapshot)
 
-        assertEquals(RuntimeState.STARTING, snapshot.displayedLifecycle)
+        assertEquals(RuntimeState.RUNNING, snapshot.displayedLifecycle)
         assertEquals(ProjectActionPolicy.MessageKey.WEB_ENDPOINT_PENDING, policy.summary)
         assertEquals(ProjectActionPolicy.Action.STOP, policy.primaryAction)
         assertFalse(policy.isEnabled(ProjectActionPolicy.Action.OPEN_BROWSER))

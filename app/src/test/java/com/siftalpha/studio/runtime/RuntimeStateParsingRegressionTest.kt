@@ -61,4 +61,29 @@ class RuntimeStateParsingRegressionTest {
 
         assertEquals(RuntimeState.EXITED_SUCCESS, RuntimeState.fromOutput(output))
     }
+
+    @Test
+    fun noListenPortMarkerDoesNotOverrideRunningState() {
+        val output = """
+            SIFTALPHA_RUNTIME_STATE=RUNNING
+            SIFTALPHA_STATUS=RUNNING
+            STATE=RUNNING
+            SIFTALPHA_WEB_AUTODISCOVERY=NO_LISTEN_PORT source=PROJECT_AND_PROOT_PID_SCOPE
+        """.trimIndent()
+
+        assertEquals(RuntimeState.RUNNING, RuntimeState.fromOutput(output))
+    }
+
+    @Test
+    fun noSocketInodesMarkerDoesNotOverrideRunningState() {
+        val output = """
+            SIFTALPHA_RUNTIME_STATE=RUNNING
+            SIFTALPHA_STATUS=RUNNING
+            STATE=RUNNING
+            SIFTALPHA_WEB_GUEST_SCOPE=NO_SOCKET_INODES
+        """.trimIndent()
+
+        assertEquals(RuntimeState.RUNNING, RuntimeState.fromOutput(output))
+    }
+
 }

@@ -3,7 +3,7 @@
 最后更新：2026-09-15  
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
 当前分支：`main`  
-当前实现版本：0.8.0-alpha16 / versionCode 92
+当前实现版本：0.8.0-alpha18 / versionCode 94（W2 Runtime/Web 展示状态分离，云端构建待执行）
 当前实现提交：[5e2d739](https://github.com/kuashan/siftalpha-one/commit/5e2d7395acef37ab7965e517918c02fef19c7cb6)
 上一版发布：[W2 test APK · w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)  
 最新发布：[W2 test APK · w2-test-8a91895](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-8a91895)
@@ -141,3 +141,16 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 - 测试状态写入 [TEST_MATRIX.md](TEST_MATRIX.md)。
 - 任何“通过”必须注明是云端通过、真机通过，还是用户确认通过。
 - 不把旧仓库、旧分支、旧版本号重新当作当前基线。
+
+
+## 9. W2 Runtime/Web 展示状态分离
+
+Runtime 生命周期与 Web 可用性是两个独立维度：
+
+- `RuntimePresentationState` 只表达进程生命周期：STARTING、RUNNING、STOPPED/终止状态。
+- `RuntimeWebUiStatus` 独立表达 Web：AVAILABLE、DETECTING、UNAVAILABLE、WAITING 或 AUTO_DETECT。
+- 日志中发现的 URL 只是 candidate URL，不能单独把项目判定为 Web，也不能让 Web 未就绪覆盖 Runtime RUNNING。
+- Browser 仍然只在真实端点可达且 URL 已验证时开放。
+- 本轮不改变 START/PREPARE/STOP 执行流程、Configuration 系统或 Web 探测执行器。
+
+本轮候选版本为 `0.8.0-alpha18 / versionCode 94`，用于覆盖安装；云端构建和真机结果将在验证后补记。

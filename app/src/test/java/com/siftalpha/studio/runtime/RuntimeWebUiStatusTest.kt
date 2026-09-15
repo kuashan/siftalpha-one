@@ -6,12 +6,26 @@ import org.junit.Test
 class RuntimeWebUiStatusTest {
 
     @Test
+    fun runningWithoutWebEvidenceUsesAutoDetect() {
+        assertEquals(
+            RuntimeWebUiStatus.AUTO_DETECT,
+            RuntimeWebUiStatus.resolve(
+                profileEnabled = false,
+                hasCandidateRuntimeUrl = false,
+                hasConfiguredLocalUrl = false,
+                runtimeState = RuntimeState.RUNNING,
+                endpointReachable = false,
+            ),
+        )
+    }
+
+    @Test
     fun runningWithUnknownProbeStateIsDetecting() {
         assertEquals(
             RuntimeWebUiStatus.DETECTING,
             RuntimeWebUiStatus.resolve(
                 profileEnabled = true,
-                hasKnownRuntimeUrl = true,
+                hasCandidateRuntimeUrl = true,
                 hasConfiguredLocalUrl = false,
                 runtimeState = RuntimeState.RUNNING,
                 endpointReachable = null,
@@ -25,7 +39,7 @@ class RuntimeWebUiStatusTest {
             RuntimeWebUiStatus.AVAILABLE,
             RuntimeWebUiStatus.resolve(
                 profileEnabled = true,
-                hasKnownRuntimeUrl = true,
+                hasCandidateRuntimeUrl = true,
                 hasConfiguredLocalUrl = false,
                 runtimeState = RuntimeState.RUNNING,
                 endpointReachable = true,
@@ -39,7 +53,7 @@ class RuntimeWebUiStatusTest {
             RuntimeWebUiStatus.UNAVAILABLE,
             RuntimeWebUiStatus.resolve(
                 profileEnabled = true,
-                hasKnownRuntimeUrl = true,
+                hasCandidateRuntimeUrl = true,
                 hasConfiguredLocalUrl = false,
                 runtimeState = RuntimeState.RUNNING,
                 endpointReachable = false,
@@ -48,12 +62,12 @@ class RuntimeWebUiStatusTest {
     }
 
     @Test
-    fun runningWithoutUrlDoesNotRemainDetectingAfterNegativeResolution() {
+    fun candidateUrlWithClosedEndpointIsUnavailable() {
         assertEquals(
             RuntimeWebUiStatus.UNAVAILABLE,
             RuntimeWebUiStatus.resolve(
-                profileEnabled = true,
-                hasKnownRuntimeUrl = false,
+                profileEnabled = false,
+                hasCandidateRuntimeUrl = true,
                 hasConfiguredLocalUrl = false,
                 runtimeState = RuntimeState.RUNNING,
                 endpointReachable = false,
@@ -67,7 +81,7 @@ class RuntimeWebUiStatusTest {
             RuntimeWebUiStatus.WAITING,
             RuntimeWebUiStatus.resolve(
                 profileEnabled = true,
-                hasKnownRuntimeUrl = false,
+                hasCandidateRuntimeUrl = false,
                 hasConfiguredLocalUrl = false,
                 runtimeState = RuntimeState.STOPPED_BY_USER,
                 endpointReachable = null,
@@ -81,7 +95,7 @@ class RuntimeWebUiStatusTest {
             RuntimeWebUiStatus.AUTO_DETECT,
             RuntimeWebUiStatus.resolve(
                 profileEnabled = false,
-                hasKnownRuntimeUrl = false,
+                hasCandidateRuntimeUrl = false,
                 hasConfiguredLocalUrl = false,
                 runtimeState = RuntimeState.UNKNOWN,
                 endpointReachable = null,
@@ -95,7 +109,7 @@ class RuntimeWebUiStatusTest {
             RuntimeWebUiStatus.UNAVAILABLE,
             RuntimeWebUiStatus.resolve(
                 profileEnabled = true,
-                hasKnownRuntimeUrl = false,
+                hasCandidateRuntimeUrl = false,
                 hasConfiguredLocalUrl = true,
                 runtimeState = RuntimeState.RUNNING,
                 endpointReachable = false,

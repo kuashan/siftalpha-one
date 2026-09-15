@@ -9,12 +9,12 @@
 
 ## A. 当前版本信息
 
-- 版本：`0.8.0-alpha17`
-- versionCode：`93`
+- 版本：`0.8.0-alpha18`
+- versionCode：`94`
 - 包名：`com.siftalpha.studio`
-- APK：[直接下载](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-6e259f7/app-debug.apk)
-- Release：[w2-test-6e259f7](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-6e259f7)
-- APK SHA-256：b1ed2c060af2804bae611a543852f8e2afc8d70650de00c661acb9aefbfc17da
+- APK：待云端构建与发布
+- Release：待云端构建与发布
+- APK SHA-256：待云端构建后记录
 
 ## B. 云端验证矩阵
 
@@ -94,3 +94,14 @@
 8. 最后确认版本为 alpha16 / versionCode 92，且本地项目数据仍然存在。建议配置缺失时，START 仍然可用；只有必需配置缺失时 START 才应被阻止。
 
 每次真机测试完成后，在对应行把“待真机/回归待确认”改成 PASS 或阻塞，并在 DEV_LOG 追加日期、设备、步骤和结果。
+
+
+## E.1 W2 Runtime Presentation State Separation
+
+| ID | 操作 | 期望 | 状态 |
+|---|---|---|---|
+| R-09 | Python 输出普通 `http://localhost:8000`，但没有 HTTP 服务 | Runtime 显示 RUNNING；Web 独立显示 AUTO_DETECT/UNAVAILABLE；不能显示 STARTING | 待云端/待真机 |
+| R-10 | 纯 Python 脚本，无 URL、无 Web | Runtime 显示 RUNNING | 待云端/待真机 |
+| R-11 | 真实 Web 项目执行 `python -m http.server 8000` | Runtime 显示 RUNNING；Web 显示 AVAILABLE；Browser 可用 | 待云端/待真机 |
+| R-12 | Web 探测输出 `NO_LISTEN_PORT` 或 `NO_SOCKET_INODES` | 只影响 Web 状态，不改写 Runtime RUNNING | 待云端/待真机 |
+| R-13 | STOP 后再次 START | STOP 可用；停止后可以重新运行 | 待真机 |
