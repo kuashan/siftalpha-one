@@ -11,6 +11,50 @@ import org.junit.Test
 class RuntimeIdentityTest {
 
     @Test
+    fun `identity source distinguishes complete partial legacy and unavailable scopes`() {
+        assertEquals(
+            RuntimeIdentitySource.FULL_IDENTITY,
+            RuntimeIdentityStore.sourceFor(
+                hostIdentityAvailable = true,
+                guestIdentityAvailable = true,
+                legacyPidAvailable = false,
+            ),
+        )
+        assertEquals(
+            RuntimeIdentitySource.HOST_ONLY,
+            RuntimeIdentityStore.sourceFor(
+                hostIdentityAvailable = true,
+                guestIdentityAvailable = false,
+                legacyPidAvailable = true,
+            ),
+        )
+        assertEquals(
+            RuntimeIdentitySource.GUEST_ONLY,
+            RuntimeIdentityStore.sourceFor(
+                hostIdentityAvailable = false,
+                guestIdentityAvailable = true,
+                legacyPidAvailable = true,
+            ),
+        )
+        assertEquals(
+            RuntimeIdentitySource.LEGACY_PID,
+            RuntimeIdentityStore.sourceFor(
+                hostIdentityAvailable = false,
+                guestIdentityAvailable = false,
+                legacyPidAvailable = true,
+            ),
+        )
+        assertEquals(
+            RuntimeIdentitySource.UNAVAILABLE,
+            RuntimeIdentityStore.sourceFor(
+                hostIdentityAvailable = false,
+                guestIdentityAvailable = false,
+                legacyPidAvailable = false,
+            ),
+        )
+    }
+
+    @Test
     fun `generic identity round trips host and guest process fields independently`() {
         val root = Files.createTempDirectory("siftalpha-identity").toFile()
         try {
@@ -106,5 +150,15 @@ class RuntimeIdentityTest {
         } finally {
             root.deleteRecursively()
         }
+    }
+
+    @Test
+    fun `guest writer reports the runner root identity and publication failure`() {
+        val script = RuntimeIdentityStore.guestIdentityWriterShell()
+
+        assertTrue(script.contains("runtime_identity_guest_pid=${'$'}${'$'}"))
+        assertTrue(script.contains("SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=RUNNER"))
+        assertTrue(script.contains("SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT_PID=%s"))
+        assertTrue(script.contains("SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=NOT_PUBLISHED"))
     }
 }

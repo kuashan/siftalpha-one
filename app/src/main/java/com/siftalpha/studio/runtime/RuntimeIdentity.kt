@@ -1,6 +1,21 @@
 package com.siftalpha.studio.runtime
 
 /**
+ * Identifies which runtime identity evidence a consumer is using.
+ *
+ * FULL_IDENTITY is the host/guest sidecar pair. The *_ONLY values describe an incomplete pair
+ * before a legacy PID fallback is selected. LEGACY_PID means the old pid/pgid files are the
+ * available runtime scope, while UNAVAILABLE means neither identity contract is available.
+ */
+enum class RuntimeIdentitySource {
+    FULL_IDENTITY,
+    HOST_ONLY,
+    GUEST_ONLY,
+    LEGACY_PID,
+    UNAVAILABLE,
+}
+
+/**
  * Generic identity for one managed runtime session.
  *
  * The host PID/PGID identify the Termux-side session used by the existing lifecycle commands.

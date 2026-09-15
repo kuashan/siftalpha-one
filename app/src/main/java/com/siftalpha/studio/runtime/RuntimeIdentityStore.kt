@@ -141,6 +141,24 @@ class RuntimeIdentityStore(
         const val GUEST_ROOT_PGID_KEY = "SIFTALPHA_GUEST_ROOT_PGID"
 
         /**
+         * Selects the identity source without inspecting or changing runtime processes.
+         *
+         * A partial sidecar is reported explicitly so diagnostics can distinguish an incomplete
+         * migration from a runtime that only has the legacy host PID files.
+         */
+        fun sourceFor(
+            hostIdentityAvailable: Boolean,
+            guestIdentityAvailable: Boolean,
+            legacyPidAvailable: Boolean,
+        ): RuntimeIdentitySource = when {
+            hostIdentityAvailable && guestIdentityAvailable -> RuntimeIdentitySource.FULL_IDENTITY
+            hostIdentityAvailable -> RuntimeIdentitySource.HOST_ONLY
+            guestIdentityAvailable -> RuntimeIdentitySource.GUEST_ONLY
+            legacyPidAvailable -> RuntimeIdentitySource.LEGACY_PID
+            else -> RuntimeIdentitySource.UNAVAILABLE
+        }
+
+        /**
          * Shell-side reader used inside PRoot. Keeping the file parsing here prevents Web
          * discovery from owning a second, subtly different identity format.
          */
@@ -222,14 +240,20 @@ class RuntimeIdentityStore(
                 runtime_identity_guest_pgid="${D}(awk '{print ${D}5}' "/proc/${D}runtime_identity_guest_pid/stat" 2>/dev/null || true)"
               fi
               runtime_identity_tmp="${D}runtime_identity_guest_file.tmp.${D}runtime_identity_guest_pid"
-              {
+              if {
                 printf '${SCHEMA_KEY}=%s\n' '${CURRENT_SCHEMA_VERSION}'
                 printf '${RUNTIME_ID_KEY}=%s\n' "${D}runtime_identity_id"
                 printf '${RUNTIME_TOKEN_KEY}=%s\n' "${D}runtime_identity_token"
                 printf '${START_TIME_KEY}=%s\n' "${D}runtime_identity_start"
                 printf '${GUEST_ROOT_PID_KEY}=%s\n' "${D}runtime_identity_guest_pid"
                 [ -n "${D}runtime_identity_guest_pgid" ] && printf '${GUEST_ROOT_PGID_KEY}=%s\n' "${D}runtime_identity_guest_pgid"
-              } >"${D}runtime_identity_tmp" 2>/dev/null && mv -f -- "${D}runtime_identity_tmp" "${D}runtime_identity_guest_file"
+              } >"${D}runtime_identity_tmp" 2>/dev/null && mv -f -- "${D}runtime_identity_tmp" "${D}runtime_identity_guest_file"; then
+                printf 'SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=RUNNER\n'
+                printf 'SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT_PID=%s\n' "${D}runtime_identity_guest_pid"
+                [ -n "${D}runtime_identity_guest_pgid" ] && printf 'SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT_PGID=%s\n' "${D}runtime_identity_guest_pgid"
+              else
+                printf 'SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=NOT_PUBLISHED\n'
+              fi
               unset runtime_identity_file runtime_identity_guest_file runtime_identity_expected_id runtime_identity_schema runtime_identity_id runtime_identity_token runtime_identity_start runtime_identity_guest_pid runtime_identity_guest_pgid runtime_identity_tmp
               return 0
             }

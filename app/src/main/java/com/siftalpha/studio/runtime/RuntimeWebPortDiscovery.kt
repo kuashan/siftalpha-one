@@ -253,13 +253,47 @@ object RuntimeWebPortDiscovery {
             siftalpha_web_guest_fallback() {
               web_root_pid="${D}1"
               web_pgid="${D}2"
+              identity_host_available=0
+              identity_guest_available=0
+              legacy_pid_available=0
+              if [ -n "${D}runtime_identity_id" ] && \
+                 [ -n "${D}runtime_identity_dir" ] && \
+                 [ -r "${D}runtime_identity_dir/${RuntimeIdentityStore.IDENTITY_FILE_NAME}" ]; then
+                identity_host_available=1
+              fi
+              if [ -n "${D}runtime_identity_id" ] && \
+                 [ -n "${D}runtime_identity_dir" ] && \
+                 [ -r "${D}runtime_identity_dir/${RuntimeIdentityStore.GUEST_IDENTITY_FILE_NAME}" ]; then
+                identity_guest_available=1
+              fi
+              if [ -n "${D}web_root_pid" ] || [ -n "${D}web_pgid" ]; then
+                legacy_pid_available=1
+              fi
+              if [ "${D}identity_host_available" -eq 1 ] && [ "${D}identity_guest_available" -eq 1 ]; then
+                identity_source='${RuntimeIdentitySource.FULL_IDENTITY.name}'
+                identity_mode='identity'
+              elif [ "${D}identity_host_available" -eq 1 ]; then
+                identity_source='${RuntimeIdentitySource.HOST_ONLY.name}'
+                identity_mode='legacy'
+              elif [ "${D}identity_guest_available" -eq 1 ]; then
+                identity_source='${RuntimeIdentitySource.GUEST_ONLY.name}'
+                identity_mode='legacy'
+              elif [ "${D}legacy_pid_available" -eq 1 ]; then
+                identity_source='${RuntimeIdentitySource.LEGACY_PID.name}'
+                identity_mode='legacy'
+              else
+                identity_source='${RuntimeIdentitySource.UNAVAILABLE.name}'
+                identity_mode='legacy'
+              fi
+              printf 'SIFTALPHA_RUNTIME_IDENTITY_SOURCE=%s\n' "${D}identity_source"
+              if [ "${D}identity_mode" = 'legacy' ] && [ "${D}identity_source" != '${RuntimeIdentitySource.UNAVAILABLE.name}' ]; then
+                echo 'SIFTALPHA_RUNTIME_IDENTITY_FALLBACK=LEGACY_PID'
+              fi
               if ! command -v proot-distro >/dev/null 2>&1; then
                 echo 'SIFTALPHA_WEB_GUEST_SCOPE=UNAVAILABLE reason=PROOT_DISTRO_MISSING'
                 return 2
               fi
-              if [ -n "${D}runtime_identity_id" ] && \
-                 [ -n "${D}runtime_identity_dir" ] && \
-                 [ -r "${D}runtime_identity_dir/${RuntimeIdentityStore.IDENTITY_FILE_NAME}" ]; then
+              if [ "${D}identity_mode" = 'identity' ]; then
                 web_guest_output="${D}(proot-distro login \
                   --bind "${D}ROOT:/root/projects" \
                   --bind "${D}runtime_identity_dir:${RuntimeIdentityStore.GUEST_RUNTIME_ROOT}/${D}runtime_identity_id" \
@@ -326,10 +360,12 @@ object RuntimeWebPortDiscovery {
           web_root_pid="${D}SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT_PID"
           web_pgid="${D}SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT_PGID"
           if [ ! -d "/proc/${D}web_root_pid" ]; then
+            echo 'SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=NOT_ALIVE'
             echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS source=PROOT_PROJECT_PID_SCOPE reason=RUNTIME_ROOT_NOT_ALIVE'
             echo 'SIFTALPHA_WEB_GUEST_SCOPE=RUNTIME_ROOT_NOT_ALIVE'
             exit 0
           fi
+          echo 'SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=ALIVE'
           echo 'SIFTALPHA_WEB_IDENTITY=RUNTIME_IDENTITY'
         elif [ "${D}guest_mode" = 'legacy' ]; then
           web_root_pid="${D}2"
