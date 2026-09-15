@@ -413,3 +413,29 @@ Coordinator 是渐进式结构手段：先建立最小 `RuntimeSession`/`Runtime
 ### 变更边界
 
 本次只同步文档；没有修改 Production Code、Test Code、版本号、GitHub Actions workflow 或 Runtime/Web 行为。
+
+## 2026-09-15 · SiftAlpha X Product Definition
+
+### 正式产品决策
+
+Roadmap Simplification / Planning Model Cleanup 完成后，SiftAlpha Studio 不再使用 W2、W3、W4、W5 作为当前或未来 Roadmap 阶段。下一条产品主线改为基于当前真实产品能力定义 SiftAlpha X；本记录不恢复旧阶段编号，也不创建新的阶段编号。
+
+SiftAlpha Studio 定位为面向 Android 的项目运行与管理平台：用户在外部开发环境完成项目，再导入 Studio 进行 Detect、Prepare、Run、Monitor、Use、Stop 和 Restart。Editor 与 Terminal 保持辅助定位，不成为产品主要方向。
+
+### SiftAlpha X 定义
+
+SiftAlpha X 的正式工作名称为 SiftAlpha X — SiftAlpha Execution Runtime。Studio 主要负责 Import、Detect、Manage、Monitor 和 Use；SiftAlpha X 主要负责 Prepare、Execute / Run、Status、Logs、Stop、Restart 和 Recovery。SiftAlpha X 是 Runtime / Execution System，不是 Android/Linux Kernel。
+
+当前实现仍依赖外部 Termux。长期方向是让 Studio 不再要求用户安装或操作独立 Termux App，并逐步走向 Embedded Runtime → Project Runtime → User Project 的架构。这里记录的是产品方向，不是已完成的技术实现；在 Runtime Architecture Audit 前不预先选择 PRoot、Ubuntu、Alpine、Termux fork、bootstrap 或其他第三方 runtime。
+
+### 第一阶段目标与工程顺序
+
+SiftAlpha X 第一阶段只以 Python 项目为目标 Runtime。无 Termux Android 设备上的最终目标包括自动准备 Python Runtime、建立项目环境、处理依赖、START、STATUS、LOGS、STOP、RESTART，以及在本地 Web 服务经过验证后打开 Browser；整个过程不要求用户安装或操作 Termux。该目标不表示当前已经实现，也不扩展到 Node.js、Java、Go 或 Rust。
+
+SiftAlpha X 的第一项工程工作是 Runtime Architecture Audit，而不是立即重写 Runtime。审计将确定 Termux coupling points、RuntimeCommandHost、PRoot、Ubuntu/Linux userspace、PythonRuntimeAdapter、Runtime Identity、Web Discovery / Endpoint Probe、process/session ownership、file/path/bind 的现有职责边界，并判断是否需要 Runtime Provider abstraction。审计完成前不决定最终 Embedded Runtime 技术方案。
+
+### 产品原则与当前边界
+
+正式原则为：“可靠运行优先于盲目兼容；明确失败优先于错误猜测。”SiftAlpha X 不承诺任意桌面项目都能直接在 Android 上运行；遇到 Runtime、CPU architecture、native dependencies、operating-system dependencies 或 Android platform restrictions 导致的不兼容，应明确报告失败，不进行危险猜测或静默降级。
+
+本次只建立产品定义和下一项研究任务。没有修改 Production Code、Test Code、build configuration、GitHub Actions workflow、versionCode、versionName 或 Runtime behavior；没有删除 Termux 支持，也没有开始 Embedded Runtime 实现。
