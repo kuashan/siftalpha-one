@@ -296,5 +296,10 @@ App 进入运行中心时，`RuntimeLifecycleStore.read()` 在读取历史 Share
 - 候选分支提交：`c8beeab`。
 - 候选云端验证 Run #1：成功，严格按“先 `testDebugUnitTest`、后 `assembleDebug`”执行。[查看候选 Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615)
 - 候选单元测试：通过；候选 APK 组装：通过。
-- 正式 main 分支签名 APK：待候选验证通过后发布。
+- 正式 main 分支 Run #47：成功，完成单元测试、APK 组装、稳定签名、证据收集和预发布 Release。[查看 Run #47](https://github.com/kuashan/siftalpha-one/actions/runs/34923173498)
+- 正式 APK：[直接下载 alpha19 测试 APK](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-4e899c6/app-debug.apk)
+- Release：[w2-test-4e899c6](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6)
+- APK SHA-256：`e7ebfdc81fa770ef020c4527a2069103b1fdcae287fdd1af9c4291307ef2496a`
+- 稳定测试证书 SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- Run #47 artifact：[下载 artifact ZIP](https://github.com/kuashan/siftalpha-one/actions/runs/34923173498/artifacts/10378838326)
 - 真机测试：待使用 `0.8.0-alpha19 / versionCode 95` 覆盖安装验收。

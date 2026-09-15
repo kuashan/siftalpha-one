@@ -12,9 +12,9 @@
 - 版本：`0.8.0-alpha19`
 - versionCode：`95`
 - 包名：`com.siftalpha.studio`
-- APK：待云端构建与发布
-- Release：待云端构建与发布
-- APK SHA-256：待云端构建后记录
+- APK：[直接下载 alpha19 测试 APK](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-4e899c6/app-debug.apk)
+- Release：[w2-test-4e899c6](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6)
+- APK SHA-256：e7ebfdc81fa770ef020c4527a2069103b1fdcae287fdd1af9c4291307ef2496a
 
 ## B. 云端验证矩阵
 
@@ -30,7 +30,8 @@
 | C-08 | W2 测试 APK 发布 | 预发布 Release 可下载，资产校验值已记录 | PASS | [Actions Run #42](https://github.com/kuashan/siftalpha-one/actions/runs/34915100958) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-6e259f7) |
 | C-09 | W2 Runtime/Web 展示状态分离云端验证 | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #44](https://github.com/kuashan/siftalpha-one/actions/runs/34918070668) | 
 | C-10 | W2 Runtime 展示状态分离 APK 发布 | 预发布 Release 可下载，版本/签名/SHA-256 已记录 | PASS | [Actions Run #45](https://github.com/kuashan/siftalpha-one/actions/runs/34918441426) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-febcabb) | 
-| C-11 | W2 RuntimeLifecycleStore 候选验证 | 单元测试先通过，随后 APK 组装通过 | PASS | [候选 Actions Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615) |
+| C-11 | W2 RuntimeLifecycleStore 候选验证 | 单元测试先通过，随后 APK 组装通过 | PASS | [候选 Actions Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615) | 
+| C-12 | W2 RuntimeLifecycleStore 正式 APK 发布 | 正式 main 单元测试、APK 组装、稳定签名和 Release 通过 | PASS | [Actions Run #47](https://github.com/kuashan/siftalpha-one/actions/runs/34923173498) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6) |
 
 ## C. 安装与升级矩阵
 
@@ -40,6 +41,7 @@
 | I-02 | 覆盖安装后打开 App | 项目、设置和已有本地数据仍可访问 | 待真机 |
 | I-03 | 覆盖安装后确认版本 | 显示 alpha17 / versionCode 93 | 待真机 |
 | I-04 | 在 alpha17 上直接安装 alpha18 | 安装器允许覆盖，版本为 alpha18 / versionCode 94 | 待真机 |
+| I-05 | 在 alpha18 上直接安装 alpha19 | 安装器允许覆盖，版本为 alpha19 / versionCode 95 | 待真机 |
 
 ## D. 配置功能矩阵
 
@@ -88,14 +90,14 @@
 
 ## F. 当前版本建议测试顺序
 
-1. 先直接覆盖安装，不卸载当前 alpha17。
+1. 先直接覆盖安装，不卸载当前 alpha18。
 2. 打开两个脚本，点击“配置”，确认直接进入“项目配置编辑”并看到 OPTIONAL 输入框。
 3. 返回后不填写候选项，依次执行 PREPARE 和 START。
 4. 观察项目是否正常运行，配置提醒是否仍然存在但不阻止运行。
 5. 如项目实际会报告缺失密钥或环境变量，确认 Studio 给出配置提示；保存后重新运行。
 6. 回归 STOP → START。
 7. 回归打开网页、从 Chrome 返回 Studio，以及返回后短时间内页面是否保持正常。
-8. 最后确认版本为 alpha18 / versionCode 94，且本地项目数据仍然存在。建议配置缺失时，START 仍然可用；只有必需配置缺失时 START 才应被阻止。
+8. 最后确认版本为 alpha19 / versionCode 95，且本地项目数据仍然存在。建议配置缺失时，START 仍然可用；只有必需配置缺失时 START 才应被阻止。
 
 每次真机测试完成后，在对应行把“待真机/回归待确认”改成 PASS 或阻塞，并在 DEV_LOG 追加日期、设备、步骤和结果。
 
@@ -115,7 +117,7 @@
 
 | ID | 操作 | 期望 | 状态 |
 |---|---|---|---|
-| L-01 | 旧数据以字符串 `"true"/"false"` 保存 | 正确读取并迁移为 Boolean，不闪退 | 候选云端通过，待正式构建/真机 |
-| L-02 | 新数据以 Boolean 保存 | 正确读取环境状态、Runtime 状态和失败原因 | 候选云端通过，待正式构建/真机 |
-| L-03 | 迁移后重新创建 Store 再读取 | 结果保持一致，SharedPreferences 类型为 Boolean | 候选云端通过，待正式构建/真机 |
-| L-04 | 空数据或异常类型 | 回退 UNKNOWN/null，不导致运行中心闪退 | 候选云端通过，待正式构建/真机 |
+| L-01 | 旧数据以字符串 `"true"/"false"` 保存 | 正确读取并迁移为 Boolean，不闪退 | 云端通过，待真机 |
+| L-02 | 新数据以 Boolean 保存 | 正确读取环境状态、Runtime 状态和失败原因 | 云端通过，待真机 |
+| L-03 | 迁移后重新创建 Store 再读取 | 结果保持一致，SharedPreferences 类型为 Boolean | 云端通过，待真机 |
+| L-04 | 空数据或异常类型 | 回退 UNKNOWN/null，不导致运行中心闪退 | 云端通过，待真机 |

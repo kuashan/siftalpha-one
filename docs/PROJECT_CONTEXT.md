@@ -3,10 +3,10 @@
 最后更新：2026-09-15  
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
 当前分支：`main`  
-当前实现版本：0.8.0-alpha19 / versionCode 95（W2 RuntimeLifecycleStore 迁移修复，候选云端验证通过，正式 APK 待发布）
-当前实现提交：[febcabb](https://github.com/kuashan/siftalpha-one/commit/febcabbc6ae6d11d1507062f1a6b0441db353ee8)
+当前实现版本：0.8.0-alpha19 / versionCode 95（W2 RuntimeLifecycleStore 迁移修复，云端构建和发布已通过，真机待验收）
+当前实现提交：[4e899c6](https://github.com/kuashan/siftalpha-one/commit/4e899c676edb3cfa248d3be31f6303600185a0e1)
 上一版发布：[W2 test APK · w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)  
-最新发布：[W2 test APK · w2-test-febcabb](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-febcabb)
+最新发布：[W2 test APK · w2-test-4e899c6](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6)
 
 ## 1. 项目目标
 
@@ -160,4 +160,4 @@ Runtime 生命周期与 Web 可用性是两个独立维度：
 
 RuntimeLifecycleStore 读取历史 SharedPreferences 时必须兼容旧字符串布尔值和当前 Boolean 值。读取逻辑通过安全类型解析和迁移处理，异常类型回退到默认状态；新写入使用按项目、按字段区分的键。该修复只涉及生命周期恢复数据的持久化读取，不改变 Runtime 执行、START/PREPARE/STOP 或 Configuration。
 
-候选云端验证 Run #1 已成功完成单元测试和 APK 组装；[查看候选 Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615)。正式 main 分支的签名 APK 待发布，真机结果待验收。
+候选云端验证 Run #1 已成功完成单元测试和 APK 组装；[查看候选 Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615)。正式 main 分支 Run #47 已完成单元测试、APK 组装、稳定签名和发布；[查看 Run #47](https://github.com/kuashan/siftalpha-one/actions/runs/34923173498)。APK：[直接下载](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-4e899c6/app-debug.apk)，SHA-256 为 `e7ebfdc81fa770ef020c4527a2069103b1fdcae287fdd1af9c4291307ef2496a`；真机结果待验收。
