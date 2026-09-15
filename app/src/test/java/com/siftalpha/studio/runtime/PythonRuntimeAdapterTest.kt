@@ -173,13 +173,13 @@ class PythonRuntimeAdapterTest {
 
     @Test
     fun `python logs wire the current runtime log into bounded Web fallback`() {
-        val script = adapter.logs(project).shellScript
-        val innerStart = script.indexOf("siftalpha_web_procfs_success=\"${'$'}{1:-0}\"")
-        val innerEnd = script.indexOf("proot-distro login --bind", innerStart)
-
-        assertTrue("Python logs must contain the guest log command", innerStart >= 0)
-        assertTrue("Python log command must have a stable end", innerEnd > innerStart)
-        val inner = script.substring(innerStart, innerEnd)
+        host.quotedInputs.clear()
+        adapter.logs(project)
+        val inner = host.quotedInputs.single { value ->
+            value.contains("siftalpha_web_procfs_success=\"${'$'}{1:-0}\"") &&
+                value.contains("=== SiftAlpha Project Log ===") &&
+                value.contains("tail -n 160 \"${'$'}log\"")
+        }
         val logTail = inner.indexOf("tail -n 160 \"${'$'}log\"")
         val fallbackGuard = inner.indexOf("if [ \"${'$'}siftalpha_web_procfs_success\" != '1' ]; then")
         val fallback = inner.indexOf("siftalpha_log_web_candidate='", fallbackGuard)
