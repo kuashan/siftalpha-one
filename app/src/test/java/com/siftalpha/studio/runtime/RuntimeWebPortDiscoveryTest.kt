@@ -26,6 +26,86 @@ class RuntimeWebPortDiscoveryTest {
     }
 
     @Test
+    fun noProjectPidsAreDiagnosed() {
+        assertEquals(
+            RuntimeWebDiscoveryDiagnosticStatus.NO_PROJECT_PIDS,
+            RuntimeWebPortDiscovery.diagnosticStatus(
+                observation(projectPidCount = 0),
+            ),
+        )
+    }
+
+    @Test
+    fun procfsUnreadableIsDiagnosed() {
+        assertEquals(
+            RuntimeWebDiscoveryDiagnosticStatus.PROCFS_UNREADABLE,
+            RuntimeWebPortDiscovery.diagnosticStatus(
+                observation(procfsReadable = false),
+            ),
+        )
+    }
+
+    @Test
+    fun pidWithoutSocketInodesIsDiagnosed() {
+        assertEquals(
+            RuntimeWebDiscoveryDiagnosticStatus.NO_SOCKET_INODES,
+            RuntimeWebPortDiscovery.diagnosticStatus(
+                observation(socketInodeCount = 0),
+            ),
+        )
+    }
+
+    @Test
+    fun socketWithoutInodeMatchIsDiagnosed() {
+        assertEquals(
+            RuntimeWebDiscoveryDiagnosticStatus.NO_INODE_MATCH,
+            RuntimeWebPortDiscovery.diagnosticStatus(
+                observation(inodeMatchCount = 0),
+            ),
+        )
+    }
+
+    @Test
+    fun matchingSocketWithoutListenPortIsDiagnosed() {
+        assertEquals(
+            RuntimeWebDiscoveryDiagnosticStatus.NO_LISTEN_PORT,
+            RuntimeWebPortDiscovery.diagnosticStatus(
+                observation(listenPortCount = 0),
+            ),
+        )
+    }
+
+    @Test
+    fun listenPortIsReportedBeforeHttpProbe() {
+        assertEquals(
+            RuntimeWebDiscoveryDiagnosticStatus.LISTEN_PORT_FOUND,
+            RuntimeWebPortDiscovery.diagnosticStatus(
+                observation(httpEndpointReachable = null),
+            ),
+        )
+    }
+
+    @Test
+    fun unreachableHttpEndpointIsDiagnosed() {
+        assertEquals(
+            RuntimeWebDiscoveryDiagnosticStatus.NO_HTTP_ENDPOINT,
+            RuntimeWebPortDiscovery.diagnosticStatus(
+                observation(httpEndpointReachable = false),
+            ),
+        )
+    }
+
+    @Test
+    fun reachableHttpEndpointPasses() {
+        assertEquals(
+            RuntimeWebDiscoveryDiagnosticStatus.PASS,
+            RuntimeWebPortDiscovery.diagnosticStatus(
+                observation(httpEndpointReachable = true),
+            ),
+        )
+    }
+
+    @Test
     fun shellProbeKeepsHostFastPathAndAddsProjectScopedProotFallback() {
         val script = RuntimeWebPortDiscovery.shellSnippet()
 
@@ -41,10 +121,34 @@ class RuntimeWebPortDiscoveryTest {
         assertTrue("PRoot fallback must remain project PID scoped", "PROOT_PROJECT_PID_SCOPE" in script)
         assertTrue("guest descendants must not scan unrelated processes", "/task/" in script && "/children" in script)
         assertTrue("terminal no-listen result should be explicit", "NO_LISTEN_PORT source=PROJECT_AND_PROOT_PID_SCOPE" in script)
+        assertTrue("no-PID diagnostic marker missing", "SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS" in script)
+        assertTrue("procfs diagnostic marker missing", "SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE" in script)
+        assertTrue("socket diagnostic marker missing", "SIFTALPHA_WEB_DISCOVERY_STATUS=NO_SOCKET_INODES" in script)
+        assertTrue("inode diagnostic marker missing", "SIFTALPHA_WEB_DISCOVERY_STATUS=NO_INODE_MATCH" in script)
+        assertTrue("listen diagnostic marker missing", "SIFTALPHA_WEB_DISCOVERY_STATUS=NO_LISTEN_PORT" in script)
+        assertTrue("listen stage marker missing", "SIFTALPHA_WEB_DISCOVERY_STAGE=LISTEN_FOUND" in script)
+        assertTrue("HTTP diagnostic marker missing", "SIFTALPHA_WEB_DISCOVERY_STATUS=NO_HTTP_ENDPOINT" in script)
+        assertTrue("successful diagnostic marker missing", "SIFTALPHA_WEB_DISCOVERY_STATUS=PASS" in script)
 
         assertFalse("discovery must not start an active all-port scan", "SIFTALPHA_WEB_ACTIVE_SCAN=START" in script)
         assertFalse("discovery must not embed a Python TCP scanner", "base64.b64decode" in script)
         assertFalse("discovery must not invoke the old active scan source", "ACTIVE_LOOPBACK_SCAN" in script)
         assertFalse("discovery must not use the unsafe Termux UID fallback", "TERMUX_UID_UNIQUE_HTTP" in script)
     }
+
+    private fun observation(
+        projectPidCount: Int = 1,
+        procfsReadable: Boolean = true,
+        socketInodeCount: Int = 1,
+        inodeMatchCount: Int = 1,
+        listenPortCount: Int = 1,
+        httpEndpointReachable: Boolean? = null,
+    ) = RuntimeWebDiscoveryObservation(
+        projectPidCount = projectPidCount,
+        procfsReadable = procfsReadable,
+        socketInodeCount = socketInodeCount,
+        inodeMatchCount = inodeMatchCount,
+        listenPortCount = listenPortCount,
+        httpEndpointReachable = httpEndpointReachable,
+    )
 }

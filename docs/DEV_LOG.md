@@ -303,3 +303,33 @@ App 进入运行中心时，`RuntimeLifecycleStore.read()` 在读取历史 Share
 - 稳定测试证书 SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
 - Run #47 artifact：[下载 artifact ZIP](https://github.com/kuashan/siftalpha-one/actions/runs/34923173498/artifacts/10378838326)
 - 真机测试：待使用 `0.8.0-alpha19 / versionCode 95` 覆盖安装验收。
+
+## 2026-09-15 · W2 Web Discovery Diagnostic Enhancement
+
+### 问题
+
+真实 HTTP 服务已经输出 `HTTP_READY`，但自动发现仍可能只报告
+`SIFTALPHA_WEB_AUTODISCOVERY=NO_LISTEN_PORT`。旧输出无法区分没有项目进程、
+无法读取 procfs、没有 socket inode、inode 未匹配监听表，还是确实没有监听端口。
+
+### 修改
+
+- 在 `RuntimeWebPortDiscovery` 增加独立的诊断状态分类：
+  `NO_PROJECT_PIDS`、`PROCFS_UNREADABLE`、`NO_SOCKET_INODES`、
+  `NO_INODE_MATCH`、`NO_LISTEN_PORT`、`NO_HTTP_ENDPOINT`。
+- 在发现阶段增加 `LISTEN_PORT_FOUND` 中间状态和
+  `SIFTALPHA_WEB_DISCOVERY_STAGE=LISTEN_FOUND`，用于区分“发现监听端口”和“HTTP
+  检查可达”。
+- 成功时增加 `SIFTALPHA_WEB_DISCOVERY_STATUS=PASS`；失败时按主进程范围和
+  PRoot 范围分别输出 `source`。
+- 保留原有 `SIFTALPHA_WEB_PRIMARY_SCOPE`、`SIFTALPHA_WEB_GUEST_SCOPE` 和
+  `SIFTALPHA_WEB_AUTODISCOVERY` 输出，未改变现有发现算法及兼容日志。
+- 未修改 Runtime 生命周期、PREPARE/START/STOP、Configuration 或 Browser
+  启用条件。
+
+### 验证状态
+
+- 诊断分类单元测试已补充，等待可用的项目 Gradle 环境执行。
+- 诊断分类单元测试已补充；已尝试执行 `./gradlew testDebugUnitTest`，但当前仓库不含 Gradle Wrapper，执行环境也没有 `gradle` 命令，因此本轮未能执行项目单元测试。
+- 已通过 `git diff --check` 以及主进程/PRoot 诊断 shell 语法检查。
+- 按本轮要求未提交、未触发 GitHub Actions、未构建 APK，尚未进行真机测试。

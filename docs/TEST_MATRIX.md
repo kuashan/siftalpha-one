@@ -121,3 +121,17 @@
 | L-02 | 新数据以 Boolean 保存 | 正确读取环境状态、Runtime 状态和失败原因 | 云端通过，待真机 |
 | L-03 | 迁移后重新创建 Store 再读取 | 结果保持一致，SharedPreferences 类型为 Boolean | 云端通过，待真机 |
 | L-04 | 空数据或异常类型 | 回退 UNKNOWN/null，不导致运行中心闪退 | 云端通过，待真机 |
+
+## E.3 W2 Web Discovery Diagnostic Enhancement
+
+| ID | 操作/模拟条件 | 期望诊断输出 | 状态 |
+|---|---|---|---|
+| W-01 | 项目 PID 列表为空 | `SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS` | 单元测试待云端执行 |
+| W-02 | 有项目 PID，但没有可读 socket inode | `SIFTALPHA_WEB_DISCOVERY_STATUS=NO_SOCKET_INODES` | 单元测试待云端执行 |
+| W-03 | 项目 procfs 或 TCP 表不可读 | `SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE` | 单元测试待云端执行 |
+| W-04 | 有 socket inode，但 TCP 表中没有匹配 inode | `SIFTALPHA_WEB_DISCOVERY_STATUS=NO_INODE_MATCH` | 单元测试待云端执行 |
+| W-05 | 匹配到 LISTEN 端口，尚未完成 HTTP 检查 | `SIFTALPHA_WEB_DISCOVERY_STATUS=LISTEN_PORT_FOUND` 与 `SIFTALPHA_WEB_DISCOVERY_STAGE=LISTEN_FOUND` | 单元测试待云端执行 |
+| W-06 | 匹配到端口，但 HTTP 探测不可达 | `SIFTALPHA_WEB_DISCOVERY_STATUS=NO_HTTP_ENDPOINT` | 单元测试待云端执行 |
+| W-07 | HTTP 探测成功 | `SIFTALPHA_WEB_DISCOVERY_STATUS=PASS`，并保留原有 PASS/URL 输出 | 单元测试待云端执行 |
+| W-08 | 任一诊断失败场景 | 原有 `SIFTALPHA_WEB_AUTODISCOVERY` 兼容输出仍存在 | 静态检查通过，待云端 |
+| W-09 | Runtime START/PREPARE/STOP 回归 | 生命周期和 Browser 安全条件不受诊断字段影响 | 待后续 APK 真机回归 |
