@@ -206,9 +206,17 @@ class RuntimeWebPortDiscoveryTest {
 
         assertTrue("host project scope diagnostics must be wired", "siftalpha_web_diagnostic_status_for_scope PROJECT_PID_SCOPE" in script)
         assertTrue("guest project scope diagnostics must be wired", "siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE" in script)
-        val guestProcfsFailureBranch = script.substringAfter(
+        val guestProcfsFailureStart = script.indexOf(
             """if [ "${'$'}guest_fd_directory_present" -eq 0 ]; then""",
         )
+        val guestProcfsFailureEnd = script.indexOf(
+            "\n        fi\n\n        guest_inodes=",
+            guestProcfsFailureStart,
+        )
+
+        assertTrue("guest procfs failure branch must be locatable", guestProcfsFailureStart >= 0)
+        assertTrue("guest procfs failure branch must have a bounded end", guestProcfsFailureEnd > guestProcfsFailureStart)
+        val guestProcfsFailureBranch = script.substring(guestProcfsFailureStart, guestProcfsFailureEnd)
         val guestProcfsDiagnosticIndex = guestProcfsFailureBranch.indexOf(
             "siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE",
         )
@@ -238,68 +246,9 @@ class RuntimeWebPortDiscoveryTest {
         assertFalse("diagnostics must not enumerate global procfs", "/proc/[0-9]*" in script)
         assertFalse("diagnostics must not add global listener discovery", "lsof" in script || "netstat" in script || " ss " in script)
         assertFalse("diagnostics must not add an all-port scan", "seq 1 65535" in script)
-    }
-
-    @Test
-    fun shellProbeIncludesPerPidNetworkTableDiagnostics() {
-        val script = RuntimeWebPortDiscovery.shellSnippet()
-        val hostDiagnosticSectionStart = script.indexOf("siftalpha_web_debug_pid_net_stats() {")
-        val hostDiagnosticSectionEnd = script.indexOf("siftalpha_web_ports_for_inodes()", hostDiagnosticSectionStart)
-        val guestSectionStart = script.indexOf(
-            """guest_pids="${'$'}(""",
-        )
-        val guestDiagnosticSectionStart = script.indexOf(
-            "siftalpha_web_debug_pid_net_stats() {",
-            guestSectionStart,
-        )
-        val guestSectionEnd = script.indexOf(
-            """guest_ports="${'$'}(""",
-            guestDiagnosticSectionStart,
-        )
-
-        assertTrue("host network diagnostic section must be locatable", hostDiagnosticSectionStart >= 0)
-        assertTrue("host network diagnostic section must end before host port mapping", hostDiagnosticSectionEnd > hostDiagnosticSectionStart)
-        assertTrue("guest discovery section must be locatable", guestSectionStart >= 0)
-        assertTrue("guest network diagnostic section must be locatable", guestDiagnosticSectionStart > guestSectionStart)
-        assertTrue("guest discovery section must have a bounded end", guestSectionEnd > guestDiagnosticSectionStart)
-
-        val hostDiagnosticSection = script.substring(hostDiagnosticSectionStart, hostDiagnosticSectionEnd)
-        val guestDiagnosticSection = script.substring(guestDiagnosticSectionStart, guestSectionEnd)
-
-        assertTrue("host project scope must invoke per-PID net diagnostics", "siftalpha_web_diagnostic_status_for_scope PROJECT_PID_SCOPE" in script)
-        assertTrue("guest project scope must invoke per-PID net diagnostics", "siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE" in script)
-        val networkAvailabilityDiagnostic =
-            "SIFTALPHA_WEB_DEBUG_PID_NET=%s TCP_EXISTS=%s TCP_READABLE=%s TCP6_EXISTS=%s TCP6_READABLE=%s"
-        val tcpMatchDiagnostic =
-            "SIFTALPHA_WEB_DEBUG_PID_NET_MATCH=%s TCP_ROWS=%s LISTEN_ROWS=%s INODE_MATCHES=%s LISTEN_INODE_MATCHES=%s"
-        val tcp6MatchDiagnostic =
-            "SIFTALPHA_WEB_DEBUG_PID_NET_MATCH=%s TCP6_ROWS=%s TCP6_LISTEN_ROWS=%s TCP6_INODE_MATCHES=%s TCP6_LISTEN_INODE_MATCHES=%s"
-
-        assertTrue("host per-PID TCP path missing", "\"/proc/${'$'}web_debug_pid/net/tcp\"" in hostDiagnosticSection)
-        assertTrue("guest per-PID TCP path missing", "\"/proc/${'$'}web_debug_pid/net/tcp\"" in guestDiagnosticSection)
-        assertTrue("host per-PID TCP6 path missing", "\"/proc/${'$'}web_debug_pid/net/tcp6\"" in hostDiagnosticSection)
-        assertTrue("guest per-PID TCP6 path missing", "\"/proc/${'$'}web_debug_pid/net/tcp6\"" in guestDiagnosticSection)
-        assertTrue("host network availability diagnostic missing", networkAvailabilityDiagnostic in hostDiagnosticSection)
-        assertTrue("guest network availability diagnostic missing", networkAvailabilityDiagnostic in guestDiagnosticSection)
-        assertTrue("host TCP match summary missing", tcpMatchDiagnostic in hostDiagnosticSection)
-        assertTrue("guest TCP match summary missing", tcpMatchDiagnostic in guestDiagnosticSection)
-        assertTrue("host TCP6 match summary missing", tcp6MatchDiagnostic in hostDiagnosticSection)
-        assertTrue("guest TCP6 match summary missing", tcp6MatchDiagnostic in guestDiagnosticSection)
-        assertTrue("host per-PID network stats helper missing", "siftalpha_web_debug_pid_net_stats() {" in hostDiagnosticSection)
-        assertTrue("guest per-PID network stats helper missing", "siftalpha_web_debug_pid_net_stats() {" in guestDiagnosticSection)
-        assertTrue("host network diagnostics must count LISTEN state", """if (${'$'}4 == "0A") listen_rows++""" in hostDiagnosticSection)
-        assertTrue("guest network diagnostics must count LISTEN state", """if (${'$'}4 == "0A") listen_rows++""" in guestDiagnosticSection)
-        assertTrue("host network diagnostics must match project socket inodes", "project_inodes" in hostDiagnosticSection && "INODE_MATCHES" in hostDiagnosticSection)
-        assertTrue("guest network diagnostics must match project socket inodes", "project_inodes" in guestDiagnosticSection && "INODE_MATCHES" in guestDiagnosticSection)
-        assertTrue("host network diagnostics must use the existing scoped PID list", "for web_debug_pid in ${'$'}web_debug_pids; do" in hostDiagnosticSection)
-        assertTrue("guest network diagnostics must use the existing scoped PID list", "for web_debug_pid in ${'$'}web_debug_pids; do" in guestDiagnosticSection)
-        assertTrue("host inode-to-port mapping must remain present", "siftalpha_web_ports_for_inodes()" in script)
-        assertTrue("guest inode-to-port mapping must remain present", "guest_ports=\"${'$'}(" in script)
-        assertTrue("HTTP probe must remain present", "timeout 1" in script)
-        assertTrue("FULL_IDENTITY guest discovery must remain present", "siftalpha-web identity" in script)
-        assertFalse("network diagnostics must not enumerate global procfs", "/proc/[0-9]*" in script)
-        assertFalse("network diagnostics must not add an all-port scan", "seq 1 65535" in script)
-        assertFalse("network diagnostics must not add global listener discovery", "lsof" in script || "netstat" in script || " ss " in script)
+        assertFalse("per-PID TCP investigation helper must be removed", "siftalpha_web_debug_pid_net_stats() {" in script)
+        assertFalse("per-PID TCP investigation diagnostics must be removed", "SIFTALPHA_WEB_DEBUG_PID_NET=" in script)
+        assertFalse("per-PID TCP paths must be removed", "/proc/${'$'}web_debug_pid/net/tcp" in script)
     }
 
     private fun observation(

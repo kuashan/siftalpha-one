@@ -199,16 +199,56 @@ class PythonRuntimeAdapterTest {
 
     @Test
     fun `python logs keep procfs discovery authoritative and preserve the endpoint gate`() {
+        host.quotedInputs.clear()
         val script = adapter.logs(project).shellScript
-        val procfsStart = script.indexOf("siftalpha_web_procfs_output=\"")
-        val procfsPass = script.indexOf("SIFTALPHA_WEB_AUTODISCOVERY=PASS ", procfsStart)
-        val procfsPrint = script.indexOf("printf '%s\\n' \"${'$'}siftalpha_web_procfs_output\"", procfsStart)
-        val guestLogs = script.indexOf("proot-distro login --bind", procfsPrint)
+        val inner = host.quotedInputs.single { value ->
+            value.contains("siftalpha_web_procfs_success=\"${'$'}{1:-0}\"") &&
+                value.contains("=== SiftAlpha Project Log ===") &&
+                value.contains("tail -n 160 \"${'$'}log\"")
+        }
 
-        assertTrue("Python logs must retain project-scoped procfs discovery", procfsStart >= 0)
-        assertTrue("procfs success must be detected from the existing protocol", procfsPass > procfsStart)
-        assertTrue("existing procfs output must remain visible", procfsPrint > procfsPass)
-        assertTrue("runtime log fallback must be invoked after procfs discovery", guestLogs > procfsPrint)
+        val procfsCaptureStart = script.indexOf("siftalpha_web_procfs_output=\"${'$'}(")
+        val procfsCaptureEnd = script.indexOf("\n            )\"", procfsCaptureStart)
+        val procfsOutputPrint = script.indexOf(
+            "printf '%s\\n' \"${'$'}siftalpha_web_procfs_output\"",
+            procfsCaptureEnd,
+        )
+        val procfsGuardStart = script.indexOf(
+            "if printf '%s\\n' \"${'$'}siftalpha_web_procfs_output\" | grep -q '^SIFTALPHA_WEB_AUTODISCOVERY=PASS '; then",
+            procfsOutputPrint,
+        )
+        val procfsGuardEnd = script.indexOf(
+            "\n            fi\n            proot-distro login --bind",
+            procfsGuardStart,
+        )
+        val guestLogs = script.indexOf(
+            "proot-distro login --bind \"${'$'}ROOT:/root/projects\" ubuntu -- bash -lc",
+            procfsGuardEnd,
+        )
+
+        assertTrue("Python logs must retain project-scoped procfs discovery", procfsCaptureStart >= 0)
+        assertTrue("procfs capture must have a bounded end", procfsCaptureEnd > procfsCaptureStart)
+        assertTrue("existing procfs output must remain visible", procfsOutputPrint > procfsCaptureEnd)
+        assertTrue("outer procfs success guard must be present", procfsGuardStart > procfsOutputPrint)
+        assertTrue("outer procfs success guard must have a bounded end", procfsGuardEnd > procfsGuardStart)
+        val procfsGuard = script.substring(procfsGuardStart, procfsGuardEnd)
+        assertTrue("procfs success branch must set success", "siftalpha_web_procfs_success=1" in procfsGuard)
+        assertTrue("procfs failure branch must clear success", "siftalpha_web_procfs_success=0" in procfsGuard)
+        assertTrue("runtime log fallback must be invoked after procfs discovery", guestLogs > procfsGuardEnd)
+        assertTrue(
+            "guest logs must receive the procfs success flag",
+            "siftalpha-web-logs \"${'$'}siftalpha_web_procfs_success\"" in script.substring(guestLogs),
+        )
+
+        val logTail = inner.indexOf("tail -n 160 \"${'$'}log\"")
+        val fallbackGuardStart = inner.indexOf("if [ \"${'$'}siftalpha_web_procfs_success\" != '1' ]; then")
+        val fallbackGuardEnd = inner.lastIndexOf("\nfi")
+        val fallback = inner.indexOf("siftalpha_log_web_candidate='", fallbackGuardStart)
+
+        assertTrue("log fallback guard must exist", fallbackGuardStart >= 0)
+        assertTrue("log fallback guard must have a bounded end", fallbackGuardEnd > fallbackGuardStart)
+        assertTrue("log fallback must run after the bounded log read", fallbackGuardStart > logTail)
+        assertTrue("RuntimeWebLogDiscoveryShell must remain inside the fallback guard", fallback in (fallbackGuardStart until fallbackGuardEnd))
         assertTrue(script.contains("siftalpha_web_http_probe"))
         assertTrue(script.contains("SIFTALPHA_WEB_AUTODISCOVERY=PASS"))
         assertFalse(script.contains("seq 1 65535"))
