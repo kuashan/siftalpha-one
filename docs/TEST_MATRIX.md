@@ -176,12 +176,47 @@
 | UI State Model | PARTIAL | `ProjectUiSnapshot` 是卡片主要事实来源，但 `V04Activity` 仍持有多份可变 map 并负责构建/归并状态。 |
 | Real-device Coverage | PARTIAL | alpha25 的 04B/04C/04D 已由用户确认；导入、配置、Node、App 重启 recovery、清理和 Output 仍缺当前基线的完整真机覆盖。 |
 
-### G.1 当前 W2 优先级
+### G.1 Runtime Session Ownership Boundary 与当前 W2 优先级
 
-- **P0 — W2 关闭前**：抽取 project-scoped `RuntimeSession`/ViewModel/coordinator，统一 refresh、dispatch、recovery、lifecycle 和 Web invalidation，让 Activity 主要负责渲染、对话框和导航。
-- **P1 — W2 应完成**：把 Web candidate 与 Runtime identity/generation 绑定并在 STOP/CLEAN 清除；补齐 alpha25 的 Import、Configuration、App restart recovery、Node 真机矩阵；决定是否移除剩余紧凑 debug 输出。
-- **P2 — W3/W4 可延后**：继续 Compose 化 Workspace、细化结构化失败 UI、扩展 Node 能力，并加固云端签名初始化流程。
+Project identity 已由 SAF `documentId` 建立可信边界，Runtime Identity 已由 `FULL_IDENTITY` 真机结果验证。当前首要缺口不是单纯的 Activity 规模，而是以下 ownership chain 尚未完全闭合：
 
-若 W2 只能再做一个开发任务，优先 P0 的 `RuntimeSession`/coordinator 抽取：它能同时收敛 Activity 中的多份可变状态和重复 guard，为 `ProjectUiSnapshot`、Web candidate 清理及恢复 ownership 提供唯一上游。
+`Project Identity → Runtime Identity / Runtime Generation → Runtime Lifecycle → Web Candidate Ownership → Recovery`
 
-当前 W2 结论：**W2 NOT COMPLETE**。核心 Runtime/Web 功能已合并并通过指定真机场景，但会话协调、candidate 生命周期和覆盖范围仍构成关闭前缺口。
+当前 `RuntimeWebStateStore` 主要持久化 `candidateUrl`、`framework` 和 `detectedAtEpochMs`，并主要按 `projectKey` 存储。若 Runtime A 停止后 Runtime B 启动，旧 candidate 仍可能存在；Endpoint Probe 只能证明端点可达，不能单独证明端点属于当前 Runtime。若其他本地服务复用同一端口，可能出现 reachability 成立但 ownership 错误的结果。
+
+**P0 — Runtime Session Ownership Boundary**
+
+建立最小 project-scoped runtime session ownership 模型，使以下事实明确绑定：project identity、runtime identity/runtime generation、lifecycle state、current runtime candidate URL 和 recovery state。
+
+最低生命周期合同：
+
+- `START` 创建新的 runtime session/generation；旧 session 的 candidate 不得自动继承。
+- `RUNNING` 的 Web candidate 必须属于当前 runtime session。
+- `LOGS` 必须读取当前 runtime 对应日志。
+- `STATUS` 恢复必须验证当前 runtime identity。
+- `STOP` 结束当前 runtime session，并 invalidated/cleared 当前 candidate。
+- `CLEAN` 使当前项目相关 runtime candidate/session state 失效。
+- `RESTART` 创建新的 runtime session/generation，不得继承旧 runtime candidate。
+- `RECOVERY` 只能恢复仍匹配当前 runtime identity 的 session 信息；相同 `projectKey` 不能单独使旧 candidate 继续生效。
+
+Coordinator 不是一次性大规模 UI 重构的要求，而是渐进实现该 ownership boundary 的结构手段：第一阶段建立最小 `RuntimeSession`/`RuntimeSessionState`/`RuntimeGeneration` 等价 abstraction，不重写整个 `V04Activity`；第二阶段逐步迁移 refresh、dispatch、recovery 和 Web invalidation；第三阶段再减少 Activity orchestration 职责。
+
+**P1 — W2 应完成**
+
+- Web candidate 绑定 runtime identity/generation。
+- STOP/CLEAN 明确清理 candidate。
+- 完成 App restart recovery、Import、Configuration 和 Node Runtime 真机验证。
+- 按需要逐步抽取 coordinator。
+
+**P2 — W3/W4 可延后**
+
+- Workspace Compose 化。
+- 更完整的结构化 Failure UI。
+- Node 能力扩展。
+- 进一步 Activity cleanup。
+- 默认 debug 日志 cleanup。
+- 签名流程进一步加固。
+
+若 W2 只能再做一个开发任务，优先完成 **Runtime Session Ownership Boundary**。它直接补齐当前最重要的 correctness/ownership 缺口，并为后续 Web candidate 清理、Recovery、Restart 和 coordinator 抽取提供统一边界；`V04Activity` 过大是后续结构表现，不是第一理由。
+
+当前 W2 结论：**W2 NOT COMPLETE**。阻塞原因是 `Project → Runtime Session → Web Candidate` 的 ownership chain 尚未完整闭合，而不是单独因为 `V04Activity` 规模较大。

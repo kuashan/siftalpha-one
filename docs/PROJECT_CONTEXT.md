@@ -115,9 +115,9 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 
 当前正式 main 构建证据：GitHub Actions [Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426)，head 为 `893229ce26d49a6ea22c79d6e2be85290cb8b0c3`，`Build and verify APK` 成功；artifact 为 `siftalpha-w0-70`（ID `10405122896`）。该构建完成仓库校验、`testDebugUnitTest`、`assembleDebug`、APK 元数据和签名证据收集。
 
-## 7. 当前基线与下一步
+## 7. 历史 alpha16 验收计划（已过时，仅保留记录）
 
-当前 W2 配置语义实现（历史基线）：
+当前 W2 配置语义实现（历史基线，不是当前开发计划）：
 
 - 实现提交：[0873f23](https://github.com/kuashan/siftalpha-one/commit/0873f23e4626757b4cf2bd0681adc24e98492ecb)
 - 云端构建：[Run #30](https://github.com/kuashan/siftalpha-one/actions/runs/34885104600)，成功
@@ -130,7 +130,7 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 - 稳定测试签名证书摘要：3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928
 - 稳定测试签名证书摘要：3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928
 
-下一步按优先级：
+历史 alpha16 下一步按优先级（已过时，仅保留记录）：
 
 1. 直接覆盖安装 alpha16，不卸载 alpha15，并确认本地数据保留。
 2. 用两个真实脚本验证建议配置可进入输入框、保存后刷新状态，且不阻止运行。
@@ -187,18 +187,35 @@ RuntimeLifecycleStore 读取历史 SharedPreferences 时必须兼容旧字符串
 
 ### 11.3 当前审计缺口
 
-- `V04Activity` 仍同时拥有刷新、UI 组装、动作二次守卫、Runtime orchestration、配置 orchestration、Web orchestration、恢复和结果归并；`ProjectUiSnapshot` 与 `ProjectActionPolicy` 已存在，但尚未成为唯一会话状态/副作用协调边界。
-- `RuntimeWebStateStore` 有 `clear(projectKey)`，但 STOP/CLEAN 结果路径只使 `RuntimeWebAvailabilityTracker` 失效，没有同时清除持久 candidate；同一项目重启或端口复用时仍可能重新探测旧 candidate。当前 endpoint gate 能阻止直接误报，但 ownership 生命周期仍应加固。
+- Project identity 已通过 SAF `documentId` 建立可信边界，Runtime Identity 也已经通过 `FULL_IDENTITY` 真机结果验证；尚未完全闭合的是 `Project Identity → Runtime Identity / Runtime Generation → Runtime Lifecycle → Web Candidate Ownership → Recovery` ownership chain。
+- `RuntimeWebStateStore` 当前主要持久化 `candidateUrl`、`framework` 和 `detectedAtEpochMs`，并主要按 `projectKey` 存储；如果 Runtime A 停止后 Runtime B 启动，旧 candidate 仍可能存在。Endpoint Probe 只能证明端点可达，不能单独证明端点属于当前 Runtime；若其他本地服务复用端口，可能出现可达但 ownership 错误的结果。
+- `V04Activity` 仍同时拥有刷新、UI 组装、动作二次守卫、Runtime orchestration、配置 orchestration、Web orchestration、恢复和结果归并。Coordinator 方向仍然有价值，但应作为逐步实现 Runtime Session Ownership Boundary 的结构手段，而不是为了“架构漂亮”进行一次性大规模重构。
 - Node 主运行时仅支持受限的 npm/managed Node 与显式 `run` 或 `scripts.start` 合约；Node/Vite 主要有 JVM 结构测试，缺少与 Python 同等的真实 Android 运行验收。
 - 导入、配置编辑、Output、App 重启后 recovery 和清理的当前 alpha25 真机覆盖不完整；现有测试主要是 JVM/生成脚本测试。
 - `RuntimeWebPortDiscovery` 仍输出紧凑的 `SIFTALPHA_WEB_DEBUG_*` PID/FD/TCP 可访问性摘要。它不改变发现结果，但属于默认日志噪声，是否保留应在后续 cleanup 中明确决定。
 
 ### 11.4 审计结论与后续优先级
 
-- **P0 — W2 关闭前**：建立 project-scoped `RuntimeSession`/ViewModel（或等价 coordinator），让它统一持有 refresh、dispatch、recovery、lifecycle 和 Web invalidation；Activity 只负责渲染和 Android 对话框/导航。
-- **P1 — W2 应完成**：把 Web candidate 与 runtime identity/generation 绑定，并在 STOP/CLEAN 时清除；补齐 alpha25 的导入、配置、App 重启恢复和 Node 真机矩阵；决定是否移除剩余紧凑 debug 输出。
-- **P2 — W3/W4 可延后**：继续 Compose 化工作区、细化结构化失败 UI、扩展 Node package manager/运行时能力，并加固云端签名初始化流程。
+**P0 — Runtime Session Ownership Boundary**
 
-若 W2 只允许再做一个开发任务，优先完成 P0 的 project-scoped RuntimeSession/coordinator 抽取，因为它同时消除 Activity 中多份可变状态和重复 guard，提供 `ProjectUiSnapshot` 的唯一上游，并为 Web candidate 清理、恢复和跨 Runtime ownership 提供稳定边界。
+目标是建立最小的 project-scoped runtime session ownership 模型，把以下事实绑定在一起：project identity、runtime identity/runtime generation、lifecycle state、current runtime candidate URL 和 recovery state。P0 的重点是 correctness 与 ownership，不是单纯缩小 `V04Activity`。
 
-当前 W2 完成度审计结论：**W2 NOT COMPLETE**。核心 Runtime/Web 功能已经合并并通过指定真机场景，但上述 P0 会话协调缺口仍是关闭 W2 前的结构性阻塞。
+最低合同：
+
+- `START` 创建新的 runtime session/generation；旧 session 的 candidate 不得自动继承。
+- `RUNNING` 期间的 Web candidate 必须属于当前 runtime session。
+- `LOGS` 只能读取当前 runtime 对应日志。
+- `STATUS` 恢复必须验证当前 runtime identity。
+- `STOP` 结束当前 runtime session，并 invalidated/cleared 当前 candidate。
+- `CLEAN` 使当前项目相关 runtime candidate/session state 失效。
+- `RESTART` 创建新的 runtime session/generation，不继承旧 runtime candidate。
+- `RECOVERY` 只能恢复仍匹配当前 runtime identity 的 session 信息；相同 `projectKey` 不能单独使旧 candidate 继续生效。
+
+Coordinator 是渐进式实现手段：第一阶段建立最小 `RuntimeSession`/`RuntimeSessionState`/`RuntimeGeneration` 等价 abstraction，不要求一次性重写 `V04Activity`；第二阶段逐步迁移 refresh、dispatch、recovery 和 Web invalidation；第三阶段再减少 Activity orchestration 职责。
+
+- **P1 — W2 应完成**：把 Web candidate 绑定到 runtime identity/generation；在 STOP/CLEAN 明确清理 candidate；完成 App restart recovery、Import、Configuration 和 Node Runtime 真机验证；按需要逐步抽取 coordinator。
+- **P2 — W3/W4 可延后**：Workspace Compose 化、更完整结构化 Failure UI、Node 能力扩展、进一步 Activity cleanup、默认 debug 日志 cleanup 和签名流程进一步加固。
+
+若 W2 只允许再做一个开发任务，优先完成 **Runtime Session Ownership Boundary**。它直接补齐当前最重要的 correctness/ownership 缺口，并为后续 Web candidate 清理、Recovery、Restart 和 coordinator 抽取提供统一边界；`V04Activity` 过大是后续结构表现，不是第一理由。
+
+当前 W2 完成度审计结论：**W2 NOT COMPLETE**。阻塞原因是 `Project → Runtime Session → Web Candidate` 的 ownership chain 尚未完整闭合，而不是单独因为 `V04Activity` 规模较大。
