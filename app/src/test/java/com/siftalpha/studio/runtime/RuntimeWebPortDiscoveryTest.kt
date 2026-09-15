@@ -240,6 +240,39 @@ class RuntimeWebPortDiscoveryTest {
         assertFalse("diagnostics must not add an all-port scan", "seq 1 65535" in script)
     }
 
+    @Test
+    fun shellProbeIncludesPerPidNetworkTableDiagnostics() {
+        val script = RuntimeWebPortDiscovery.shellSnippet()
+
+        assertTrue("host project scope must invoke per-PID net diagnostics", "siftalpha_web_diagnostic_status_for_scope PROJECT_PID_SCOPE" in script)
+        assertTrue("guest project scope must invoke per-PID net diagnostics", "siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE" in script)
+        assertTrue("per-PID TCP path missing", "\"/proc/${'$'}web_debug_pid/net/tcp\"" in script)
+        assertTrue("per-PID TCP6 path missing", "\"/proc/${'$'}web_debug_pid/net/tcp6\"" in script)
+        assertTrue(
+            "per-PID network availability diagnostic missing",
+            "SIFTALPHA_WEB_DEBUG_PID_NET=%s TCP_EXISTS=%s TCP_READABLE=%s TCP6_EXISTS=%s TCP6_READABLE=%s" in script,
+        )
+        assertTrue(
+            "per-PID TCP match summary missing",
+            "SIFTALPHA_WEB_DEBUG_PID_NET_MATCH=%s TCP_ROWS=%s LISTEN_ROWS=%s INODE_MATCHES=%s LISTEN_INODE_MATCHES=%s" in script,
+        )
+        assertTrue(
+            "per-PID TCP6 match summary missing",
+            "SIFTALPHA_WEB_DEBUG_PID_NET_MATCH=%s TCP6_ROWS=%s TCP6_LISTEN_ROWS=%s TCP6_INODE_MATCHES=%s TCP6_LISTEN_INODE_MATCHES=%s" in script,
+        )
+        assertTrue("per-PID network stats helper missing", "siftalpha_web_debug_pid_net_stats()" in script)
+        assertTrue("network diagnostics must count LISTEN state", """if (${'$'}4 == "0A") listen_rows++""" in script)
+        assertTrue("network diagnostics must match project socket inodes", "project_inodes" in script && "INODE_MATCHES" in script)
+        assertTrue("network diagnostics must use the existing scoped PID list", "for web_debug_pid in ${'$'}web_debug_pids; do" in script)
+        assertTrue("host inode-to-port mapping must remain present", "siftalpha_web_ports_for_inodes()" in script)
+        assertTrue("guest inode-to-port mapping must remain present", "guest_ports=\"${'$'}(" in script)
+        assertTrue("HTTP probe must remain present", "timeout 1" in script)
+        assertTrue("FULL_IDENTITY guest discovery must remain present", "siftalpha-web identity" in script)
+        assertFalse("network diagnostics must not enumerate global procfs", "/proc/[0-9]*" in script)
+        assertFalse("network diagnostics must not add an all-port scan", "seq 1 65535" in script)
+        assertFalse("network diagnostics must not add global listener discovery", "lsof" in script || "netstat" in script || " ss " in script)
+    }
+
     private fun observation(
         projectPidCount: Int = 1,
         procfsReadable: Boolean = true,

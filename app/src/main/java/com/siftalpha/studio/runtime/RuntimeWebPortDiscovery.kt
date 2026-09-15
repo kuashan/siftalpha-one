@@ -109,6 +109,29 @@ object RuntimeWebPortDiscovery {
               done | awk 'NF && !seen[${D}1]++'
             }
 
+            siftalpha_web_debug_pid_net_stats() {
+              local web_debug_net_table="${D}1"
+              local web_debug_net_inodes="${D}2"
+              awk -v project_inodes="${D}web_debug_net_inodes" '
+                BEGIN { project_inode_count = split(project_inodes, project_inode_values, " ") }
+                NR > 1 {
+                  rows++
+                  if (${D}4 == "0A") listen_rows++
+                  web_debug_net_inode=${D}10
+                  for (i = 1; i <= project_inode_count; i++) {
+                    if (project_inode_values[i] == web_debug_net_inode) {
+                      inode_matches++
+                      if (${D}4 == "0A") listen_inode_matches++
+                      break
+                    }
+                  }
+                }
+                END {
+                  printf "%d %d %d %d\n", rows + 0, listen_rows + 0, inode_matches + 0, listen_inode_matches + 0
+                }
+              ' "${D}web_debug_net_table" 2>/dev/null || true
+            }
+
             siftalpha_web_debug_scope() {
               local web_debug_source="${D}1"
               local web_debug_root_pid="${D}2"
@@ -127,6 +150,14 @@ object RuntimeWebPortDiscovery {
               local web_debug_readlink_success web_debug_socket_links web_debug_fd web_debug_link
               local web_debug_inode web_debug_tcp_exists web_debug_tcp_readable
               local web_debug_tcp6_exists web_debug_tcp6_readable
+              local web_debug_pid_net_tcp web_debug_pid_net_tcp6
+              local web_debug_pid_net_tcp_exists web_debug_pid_net_tcp_readable
+              local web_debug_pid_net_tcp6_exists web_debug_pid_net_tcp6_readable
+              local web_debug_pid_net_tcp_stats web_debug_pid_net_tcp6_stats
+              local web_debug_pid_net_tcp_rows web_debug_pid_net_tcp_listen_rows
+              local web_debug_pid_net_tcp_inode_matches web_debug_pid_net_tcp_listen_inode_matches
+              local web_debug_pid_net_tcp6_rows web_debug_pid_net_tcp6_listen_rows
+              local web_debug_pid_net_tcp6_inode_matches web_debug_pid_net_tcp6_listen_inode_matches
               web_debug_self_pgid="${D}(ps -o pgid= -p "${D}${D}" 2>/dev/null | tr -d ' ' || true)"
               web_debug_inode_count="${D}(printf '%s\n' "${D}web_debug_inodes" | awk 'NF { count++ } END { print count + 0 }' || printf '0')"
               printf 'SIFTALPHA_WEB_DEBUG_SCOPE=%s\n' "${D}web_debug_source"
@@ -181,6 +212,51 @@ object RuntimeWebPortDiscovery {
                   "${D}web_debug_pid" "${D}web_debug_proc_present" "${D}web_debug_fd_present" \
                   "${D}web_debug_fd_enum" "${D}web_debug_fd_count" \
                   "${D}web_debug_readlink_success" "${D}web_debug_socket_links"
+
+                web_debug_pid_net_tcp="/proc/${D}web_debug_pid/net/tcp"
+                web_debug_pid_net_tcp6="/proc/${D}web_debug_pid/net/tcp6"
+                web_debug_pid_net_tcp_exists=NO
+                web_debug_pid_net_tcp_readable=NO
+                web_debug_pid_net_tcp6_exists=NO
+                web_debug_pid_net_tcp6_readable=NO
+                web_debug_pid_net_tcp_stats=''
+                web_debug_pid_net_tcp6_stats=''
+                web_debug_pid_net_tcp_rows=0
+                web_debug_pid_net_tcp_listen_rows=0
+                web_debug_pid_net_tcp_inode_matches=0
+                web_debug_pid_net_tcp_listen_inode_matches=0
+                web_debug_pid_net_tcp6_rows=0
+                web_debug_pid_net_tcp6_listen_rows=0
+                web_debug_pid_net_tcp6_inode_matches=0
+                web_debug_pid_net_tcp6_listen_inode_matches=0
+                if [ -e "${D}web_debug_pid_net_tcp" ]; then web_debug_pid_net_tcp_exists=YES; fi
+                if [ -r "${D}web_debug_pid_net_tcp" ]; then web_debug_pid_net_tcp_readable=YES; fi
+                if [ -e "${D}web_debug_pid_net_tcp6" ]; then web_debug_pid_net_tcp6_exists=YES; fi
+                if [ -r "${D}web_debug_pid_net_tcp6" ]; then web_debug_pid_net_tcp6_readable=YES; fi
+                if [ "${D}web_debug_pid_net_tcp_readable" = YES ]; then
+                  web_debug_pid_net_tcp_stats="${D}(siftalpha_web_debug_pid_net_stats "${D}web_debug_pid_net_tcp" "${D}web_debug_inodes")"
+                  read -r web_debug_pid_net_tcp_rows web_debug_pid_net_tcp_listen_rows \
+                    web_debug_pid_net_tcp_inode_matches web_debug_pid_net_tcp_listen_inode_matches \
+                    <<< "${D}web_debug_pid_net_tcp_stats" || true
+                fi
+                if [ "${D}web_debug_pid_net_tcp6_readable" = YES ]; then
+                  web_debug_pid_net_tcp6_stats="${D}(siftalpha_web_debug_pid_net_stats "${D}web_debug_pid_net_tcp6" "${D}web_debug_inodes")"
+                  read -r web_debug_pid_net_tcp6_rows web_debug_pid_net_tcp6_listen_rows \
+                    web_debug_pid_net_tcp6_inode_matches web_debug_pid_net_tcp6_listen_inode_matches \
+                    <<< "${D}web_debug_pid_net_tcp6_stats" || true
+                fi
+                printf 'SIFTALPHA_WEB_DEBUG_PID_NET=%s TCP_EXISTS=%s TCP_READABLE=%s TCP6_EXISTS=%s TCP6_READABLE=%s\n' \
+                  "${D}web_debug_pid" "${D}web_debug_pid_net_tcp_exists" \
+                  "${D}web_debug_pid_net_tcp_readable" "${D}web_debug_pid_net_tcp6_exists" \
+                  "${D}web_debug_pid_net_tcp6_readable"
+                printf 'SIFTALPHA_WEB_DEBUG_PID_NET_MATCH=%s TCP_ROWS=%s LISTEN_ROWS=%s INODE_MATCHES=%s LISTEN_INODE_MATCHES=%s\n' \
+                  "${D}web_debug_pid" "${D}web_debug_pid_net_tcp_rows" \
+                  "${D}web_debug_pid_net_tcp_listen_rows" "${D}web_debug_pid_net_tcp_inode_matches" \
+                  "${D}web_debug_pid_net_tcp_listen_inode_matches"
+                printf 'SIFTALPHA_WEB_DEBUG_PID_NET_MATCH=%s TCP6_ROWS=%s TCP6_LISTEN_ROWS=%s TCP6_INODE_MATCHES=%s TCP6_LISTEN_INODE_MATCHES=%s\n' \
+                  "${D}web_debug_pid" "${D}web_debug_pid_net_tcp6_rows" \
+                  "${D}web_debug_pid_net_tcp6_listen_rows" "${D}web_debug_pid_net_tcp6_inode_matches" \
+                  "${D}web_debug_pid_net_tcp6_listen_inode_matches"
               done
               printf 'SIFTALPHA_WEB_DEBUG_PID_COUNT=%s\n' "${D}web_debug_pid_count"
               printf 'SIFTALPHA_WEB_DEBUG_FD_COUNT_TOTAL=%s\n' "${D}web_debug_fd_count_total"
