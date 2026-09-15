@@ -187,7 +187,7 @@ class ProjectConfigurationUiController(
         projectName: String,
         projectDocumentId: String,
         folderName: String,
-        snapshot: Snapshot,
+        currentSnapshot: Snapshot,
         items: List<ConfigurationItem>,
         onCompleted: () -> Unit,
     ) {
@@ -214,7 +214,7 @@ class ProjectConfigurationUiController(
             }
             val details = TextView(activity).apply {
                 text = listOf(
-                    stateLabel(snapshot, item.key, item.required),
+                    stateLabel(currentSnapshot, item.key, item.required),
                     sourceLabel(item.source),
                     item.description.orEmpty(),
                     evidenceText(item.evidence),
@@ -309,7 +309,7 @@ class ProjectConfigurationUiController(
         }
         val requiredWasMissing = items.any { it.required && !it.isConfigured }
         val message = activity.getString(R.string.runtime_configuration_editor_message) +
-            "\n\n" + summaryText(snapshot)
+            "\n\n" + summaryText(currentSnapshot)
         dialog = AlertDialog.Builder(activity)
             .setTitle(activity.getString(R.string.runtime_configuration_editor_title, projectName))
             .setMessage(message)
