@@ -177,7 +177,7 @@ class ProjectConfigurationUiController(
             projectName = projectName,
             projectDocumentId = projectDocumentId,
             folderName = folderName,
-            snapshot = snapshot,
+            currentSnapshot = snapshot,
             items = items,
             onCompleted = onCompleted,
         )
