@@ -3,7 +3,7 @@
 最后更新：2026-09-15（Roadmap Simplification / Planning Model Cleanup）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
 产品基线分支：`main`
-Roadmap/docs 工作分支：`codex/remove-w2-w5-roadmap`
+SiftAlpha X 产品定义工作分支：`codex/siftalpha-x-product-definition`
 当前实现版本：0.8.0-alpha25 / versionCode 101（Runtime Identity 与 Web Discovery 合并基线，云端构建和真机 04B/04C/04D 已验证）
 Production baseline merge：[893229c](https://github.com/kuashan/siftalpha-one/commit/893229ce26d49a6ea22c79d6e2be85290cb8b0c3)
 上一版历史发布：[W2 test APK · w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)
@@ -23,11 +23,109 @@ SiftAlpha Studio 是一个 Android 端项目工作台，用于在手机上：
 
 项目采用“手机真机使用 + GitHub 云端构建”的工作方式。开发环境不要求本地安装 Gradle、JDK 或 Android SDK。
 
-## 2. 历史基础阶段与当前产品基线
+## 2. 产品定义与 SiftAlpha X
+
+### 2.1 SiftAlpha Studio 产品定位
+
+SiftAlpha Studio 是一个面向 Android 的项目运行与管理平台。它的主要目标不是成为 IDE，也不是替代 VS Code、PyCharm、Codex 等外部开发工具。用户可以在任意外部开发环境完成项目开发，再把已经写好的项目导入 SiftAlpha Studio，在 Android 手机上可靠地准备、运行、管理和使用。
+
+核心用户流程是：
+
+Import（导入）→ Detect（识别）→ Prepare（准备）→ Run（运行）→ Monitor（监控）→ Use（使用）→ Stop / Restart（停止 / 重启）。
+
+Editor（编辑器）和 Terminal（终端）可以作为查看、小规模修改、配置和维护的辅助能力存在，但不是产品的主要方向。
+
+### 2.2 SiftAlpha X 定义与职责边界
+
+正式工作名称：SiftAlpha X
+
+技术定义：SiftAlpha X — SiftAlpha Execution Runtime（SiftAlpha 执行运行系统）。
+
+SiftAlpha X 是 SiftAlpha Studio 的核心项目执行系统。两者的职责边界如下：
+
+| SiftAlpha Studio | SiftAlpha X |
+|---|---|
+| Import（导入） | Prepare（准备） |
+| Detect（识别） | Execute / Run（执行 / 运行） |
+| Manage（管理） | Status（状态） |
+| Monitor（监控） | Logs（日志） |
+| Use（使用） | Stop（停止） |
+|  | Restart（重启） |
+|  | Recovery（恢复） |
+
+SiftAlpha X 是 Runtime / Execution System（运行 / 执行系统），不是 Android/Linux Kernel（操作系统内核）。Studio 负责项目入口、管理和使用体验，SiftAlpha X 负责项目运行生命周期及其执行边界。
+
+### 2.3 长期 Runtime 方向
+
+当前实现依赖外部 Termux 提供底层 Android/Linux 运行能力。SiftAlpha X 的长期目标是让 SiftAlpha Studio 不再要求用户安装或操作独立 Termux App。
+
+目标架构方向是：
+
+SiftAlpha Studio
+→ SiftAlpha X
+→ Embedded Runtime（内置运行环境）
+→ Project Runtime（项目运行环境）
+→ User Project（用户项目）
+
+这是正式产品方向，不是当前实现状态。本阶段不决定 Embedded Runtime 的具体技术方案；在 Runtime Architecture Audit 完成前，不预先决定使用 PRoot、Ubuntu、Alpine、Termux fork、Termux bootstrap 或某个第三方 runtime。
+
+### 2.4 SiftAlpha X 第一阶段产品目标（Python）
+
+SiftAlpha X 第一阶段只以 Python 项目作为目标 Runtime，不同时扩展 Node.js、Java、Go、Rust 等语言。这是产品验收目标，不是新的历史路线图阶段编号，也不表示当前已经实现。
+
+最终目标是在一台没有安装 Termux 的 Android 设备上：
+
+1. 安装 SiftAlpha Studio。
+2. 导入一个已经在外部开发环境完成的 Python 项目。
+3. SiftAlpha X 自动准备 Python Runtime。
+4. 自动建立项目环境。
+5. 自动处理 Python 项目依赖。
+6. START 能启动项目。
+7. STATUS 能确认项目运行状态。
+8. LOGS 能查看项目日志。
+9. STOP 能可靠停止项目。
+10. RESTART 能建立新的可靠运行生命周期。
+11. 如果项目启动本地 Web 服务，SiftAlpha Studio 能发现并打开 Browser。
+12. 整个过程不要求用户安装、打开或操作 Termux。
+
+上述内容定义目标验收边界，不把未来目标伪装成当前能力。
+
+### 2.5 产品原则
+
+可靠运行优先于盲目兼容；明确失败优先于错误猜测。
+
+SiftAlpha X 不承诺任意桌面项目都可以直接在 Android 上运行。项目兼容性可能受到 Runtime、CPU architecture、native dependencies、operating-system dependencies 和 Android platform restrictions 等因素限制。如果项目无法可靠运行，应明确报告不兼容或准备失败，而不是错误猜测、静默降级或启动错误项目。
+
+### 2.6 与当前产品基线的关系
+
+当前已经实现和验证的 Runtime Identity、Python Runtime lifecycle、PREPARE、START、STATUS、LOGS、STOP、Web Discovery、Endpoint Probe、Browser、Configuration 及其测试证据继续属于 Current Product Baseline。
+
+SiftAlpha X 的工作是在这些可靠能力基础上，逐步替换底层外部 Termux 依赖，而不是推倒重写 SiftAlpha Studio。当前任务只建立产品定义，不开始 Runtime 重构、不删除 Termux 支持，也不实现 Embedded Runtime。
+
+### 2.7 下一项工程工作：SiftAlpha X Runtime Architecture Audit
+
+SiftAlpha X 的第一项工程工作不是立即重写 Runtime，而是进行 Runtime Architecture Audit（SiftAlpha X 运行架构审计）。审计需要读取当前真实源码，明确：
+
+1. Termux coupling points（Termux 耦合点）。
+2. RuntimeCommandHost 当前职责。
+3. PRoot 当前职责。
+4. Ubuntu/Linux userspace 当前职责。
+5. PythonRuntimeAdapter 可复用部分。
+6. Runtime Identity 可复用部分。
+7. Web Discovery / Endpoint Probe 可复用部分。
+8. Process/session ownership 当前实现。
+9. File/path/bind 当前实现。
+10. 哪些属于 SiftAlpha Studio 上层能力。
+11. 哪些属于未来 SiftAlpha X 底层能力。
+12. 是否应该建立 Runtime Provider abstraction（运行环境提供者抽象层）。
+
+审计完成之前，不选择最终 Embedded Runtime 技术方案。
+
+## 3. 历史基础阶段与当前产品基线
 
 早期项目曾使用 W0、W1A、W1B、W1C 记录基础建设历史。原 W2、W3、W4、W5 是历史规划标签；它们不再表示当前阶段、未来阶段、完成度门槛、阻塞容器或开发顺序。原规划覆盖的能力已经按真实实现并入当前产品基线。
 
-### 2.1 Historical Foundation Stages
+### 3.1 Historical Foundation Stages
 
 | 历史基础阶段 | 状态 | 说明 |
 |---|---|---|
@@ -36,7 +134,7 @@ SiftAlpha Studio 是一个 Android 端项目工作台，用于在手机上：
 | W1B | 核心完成，持续收敛 | 已有状态快照、动作策略、生命周期和安全守卫；协调逻辑仍需继续从 Activity 收敛。 |
 | W1C | 已完成主要验收 | 首页、导航、项目列表和筛选能力已落地并完成真机验证。 |
 
-### 2.2 Current Product Baseline
+### 3.2 Current Product Baseline
 
 当前产品基线直接按真实能力组织，而不是按已退役的阶段编号组织：
 
@@ -50,17 +148,17 @@ SiftAlpha Studio 是一个 Android 端项目工作台，用于在手机上：
 
 未来 Roadmap 尚待重新定义。本文件不创建 W6 或其他新的阶段编号。
 
-## 3. 不可破坏的产品规则
+## 4. 不可破坏的产品规则
 
-### 3.1 状态必须分开表达
+### 4.1 状态必须分开表达
 
 环境、配置、进程生命周期和 Web 可用性是四种不同事实，不能合并成一个“全部就绪”。
 
-### 3.2 项目身份必须可信
+### 4.2 项目身份必须可信
 
 项目操作使用 SAF 的稳定 `documentId`，不能使用项目名称、列表下标或临时排序位置作为身份。
 
-### 3.3 运行安全
+### 4.3 运行安全
 
 - PREPARE 与 START 分开，准备完成后由用户主动运行。
 - 运行中的项目始终保留 STOP 能力。
@@ -69,15 +167,15 @@ SiftAlpha Studio 是一个 Android 端项目工作台，用于在手机上：
 - 不确定状态时优先 STATUS 恢复，不能凭旧界面猜测进程是否存在。
 - 清理项目环境、共享工具、缓存和删除源码必须分开确认。
 
-### 3.4 Web 安全
+### 4.4 Web 安全
 
 Browser 只有在当前项目进程存在、Android 回环端点真实可达并且 URL 已验证时才开放。检测到“可能是网页”不等于允许打开浏览器。
 
-### 3.5 隐私与配置
+### 4.5 隐私与配置
 
 运行输出、配置值和日志不得泄露密钥。Studio 保存的配置使用 Android Keystore 保护并在运行时注入，不写回项目源码或 GitHub。
 
-## 4. 当前架构基线
+## 5. 当前架构基线
 
 主要职责分布：
 
@@ -96,7 +194,7 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 - `RuntimeIdentity` / `RuntimeIdentityStore`：START、STATUS、LOGS、STOP、恢复和 Web 发现使用的运行时身份。
 - `ProjectRuntimeController`：生成 Python/Node 等运行命令并维持统一动作入口。
 
-## 5. 配置语义
+## 6. 配置语义
 
 配置检测分为“必需项”和“建议配置”两层：
 
@@ -109,7 +207,7 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 7. 普通硬编码 URL 不会自动判定为需要用户配置；只有通过项目声明、环境变量或运行结果明确要求时才进入配置流程。
 8. 建议配置显示提醒但不阻止运行。只有 REQUIRED 缺失时，才显示必填向导或在后续运行前阻止 START。
 
-## 6. 构建与发布基线
+## 7. 构建与发布基线
 
 工作流：[.github/workflows/w0-cloud-build.yml](../.github/workflows/w0-cloud-build.yml)
 
@@ -128,7 +226,7 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 
 alpha25 Production baseline 构建证据：GitHub Actions [Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426)，其 head 为 Production baseline merge `893229ce26d49a6ea22c79d6e2be85290cb8b0c3`；`Build and verify APK` 成功，artifact 为 `siftalpha-w0-70`（ID `10405122896`）。该构建完成仓库校验、`testDebugUnitTest`、`assembleDebug`、APK 元数据和签名证据收集；之后的 Roadmap/docs 变更未修改 Production Code。
 
-## 7. 历史 alpha16 验收计划（已过时，仅保留记录）
+## 8. 历史 alpha16 验收计划（已过时，仅保留记录）
 
 历史配置语义实现（alpha16 基线，仅保留记录，不是当前开发计划）：
 
@@ -152,7 +250,7 @@ alpha25 Production baseline 构建证据：GitHub Actions [Run #70](https://gith
 5. 回归 STOP → START、Chrome 返回、配置保存和覆盖安装。
 6. 继续完善当时规划的单项目工作区和完整任务闭环。
 
-## 8. 记录维护约定
+## 9. 记录维护约定
 
 - 开发行为写入 [DEV_LOG.md](DEV_LOG.md)。
 - 测试状态写入 [TEST_MATRIX.md](TEST_MATRIX.md)。
@@ -160,7 +258,7 @@ alpha25 Production baseline 构建证据：GitHub Actions [Run #70](https://gith
 - 不把旧仓库、旧分支、旧版本号重新当作当前基线。
 
 
-## 9. Runtime/Web 展示状态分离（历史实现记录）
+## 10. Runtime/Web 展示状态分离（历史实现记录）
 
 Runtime 生命周期与 Web 可用性是两个独立维度：
 
@@ -173,24 +271,24 @@ Runtime 生命周期与 Web 可用性是两个独立维度：
 本轮版本为 `0.8.0-alpha18 / versionCode 94`，用于覆盖安装。GitHub Actions Run #44 已成功完成 `testDebugUnitTest assembleDebug`，APK SHA-256 为 `3e61e76b1c80ff11dba53d9afb135c9759cc742fe0b489f704b22d550629f922`；[Run #44 artifact ZIP](https://github.com/kuashan/siftalpha-one/actions/runs/34918070668/artifacts/10377191664) 可下载。直接 APK：[下载 alpha18 测试 APK](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-febcabb/app-debug.apk)；Release：[w2-test-febcabb](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-febcabb)。Run #45：[Actions](https://github.com/kuashan/siftalpha-one/actions/runs/34918441426) 已成功，真机结果待用户验收。
 
 
-## 10. RuntimeLifecycleStore SharedPreferences Migration Fix（历史实现记录）
+## 11. RuntimeLifecycleStore SharedPreferences Migration Fix（历史实现记录）
 
 RuntimeLifecycleStore 读取历史 SharedPreferences 时必须兼容旧字符串布尔值和当前 Boolean 值。读取逻辑通过安全类型解析和迁移处理，异常类型回退到默认状态；新写入使用按项目、按字段区分的键。该修复只涉及生命周期恢复数据的持久化读取，不改变 Runtime 执行、START/PREPARE/STOP 或 Configuration。
 
 候选云端验证 Run #1 已成功完成单元测试和 APK 组装；[查看候选 Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615)。正式 main 分支 Run #47 已完成单元测试、APK 组装、稳定签名和发布；[查看 Run #47](https://github.com/kuashan/siftalpha-one/actions/runs/34923173498)。APK：[直接下载](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-4e899c6/app-debug.apk)，SHA-256 为 `e7ebfdc81fa770ef020c4527a2069103b1fdcae287fdd1af9c4291307ef2496a`；该条为历史记录。
 
-## 11. 合并后正式基线与产品能力审计（历史记录）
+## 12. 合并后正式基线与产品能力审计（历史记录）
 
 本节记录以 Production baseline merge `893229ce26d49a6ea22c79d6e2be85290cb8b0c3` 为依据的历史审计结果；原审计使用的阶段标签只作为历史记录保留，不再作为当前路线、阶段状态或完成度门槛。Roadmap/docs base main 为 `38fb60af8e4c7a4b09eafb1cad0e305ae56fc353`。
 
-### 11.1 证据分类
+### 12.1 证据分类
 
 - **unit-test verified**：当前源码包含 314 个 JUnit `@Test` 方法；覆盖 Runtime Identity、配置 preflight/editor、ActionPolicy、生命周期恢复、Python/Node adapter、Web URL/端点/发现和失败诊断。
 - **GitHub Actions verified**：Run #70（ID `34989822426`）成功；仓库 validators、`testDebugUnitTest`、`assembleDebug`、APK metadata、`apksigner` 和稳定签名证据收集均成功。artifact `siftalpha-w0-70`（ID `10405122896`）未过期。
 - **real-device verified**：alpha25 已完成真实 Android 设备 smoke；Test 04B 明确 loopback Web discovery 成功，04C 拒绝裸 `PORT`/模糊端口和 external URL，04D 验证 Start → Browser → Logs/仍 RUNNING → Stop → Restart。
 - **user-confirmed**：上述 04B、04C、04D PASS 由用户提供并确认；它们不替代尚未覆盖的导入、配置全流程、Node 和 App 重启恢复测试。
 
-### 11.2 已进入当前产品基线的能力
+### 12.2 已进入当前产品基线的能力
 
 - 修复 Runtime Identity wiring，使 START、STATUS、LOGS、STOP、恢复和 Web discovery 共享 project/runtime identity；Android 真机已进入 `FULL_IDENTITY`，guest root 为 `ALIVE`。
 - 保持 project-scoped PID/PGID 与 socket inode ownership discovery。Android/Termux/PRoot 诊断确认 `/proc/<pid>/fd` 能发现 socket inode，但 `/proc/net/tcp{,6}` 及 per-PID net 表不可用；没有引入全端口扫描、全局进程扫描或不可信端口猜测。
@@ -198,7 +296,7 @@ RuntimeLifecycleStore 读取历史 SharedPreferences 时必须兼容旧字符串
 - 完成 Web Discovery Contract：candidate 与 reachable 分离；loopback URL 才能成为候选，Browser 必须满足当前 Runtime RUNNING、URL 安全校验和真实 endpoint probe。
 - 完成 alpha25 cleanup，删除 per-PID TCP/TCP6 investigation instrumentation，保留 Web 状态协议和少量基础 procfs diagnostics；PR #1 已解决冲突并合并，merge commit 为 `893229ce26d49a6ea22c79d6e2be85290cb8b0c3`。
 
-### 11.3 当前审计缺口
+### 12.3 当前审计缺口
 
 - Project identity 已通过 SAF `documentId` 建立可信边界，Runtime Identity 也已经通过 `FULL_IDENTITY` 真机结果验证；尚未完全闭合的是 `Project Identity → Runtime Identity / Runtime Generation → Runtime Lifecycle → Web Candidate Ownership → Recovery` ownership chain。
 - `RuntimeWebStateStore` 当前主要持久化 `candidateUrl`、`framework` 和 `detectedAtEpochMs`，并主要按 `projectKey` 存储；如果 Runtime A 停止后 Runtime B 启动，旧 candidate 仍可能存在。Endpoint Probe 只能证明端点可达，不能单独证明端点属于当前 Runtime；若其他本地服务复用端口，可能出现可达但 ownership 错误的结果。
@@ -207,7 +305,7 @@ RuntimeLifecycleStore 读取历史 SharedPreferences 时必须兼容旧字符串
 - 导入、配置编辑、Output、App 重启后 recovery 和清理的当前 alpha25 真机覆盖不完整；现有测试主要是 JVM/生成脚本测试。
 - `RuntimeWebPortDiscovery` 仍输出紧凑的 `SIFTALPHA_WEB_DEBUG_*` PID/FD/TCP 可访问性摘要。它不改变发现结果，但属于默认日志噪声，是否保留应在后续 cleanup 中明确决定。
 
-### 11.4 当前产品 backlog 与后续优先级
+### 12.4 当前产品 backlog 与后续优先级
 
 **P0 — Runtime Session Ownership Boundary（产品硬化 backlog）**
 
