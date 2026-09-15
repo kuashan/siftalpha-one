@@ -635,6 +635,7 @@ object RuntimeWebPortDiscovery {
           fi
         done
         if [ "${D}guest_fd_directory_present" -eq 0 ]; then
+          siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE "${D}web_root_pid" "${D}web_pgid" "${D}guest_pids" ''
           echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE source=PROOT_PROJECT_PID_SCOPE'
           echo 'SIFTALPHA_WEB_GUEST_SCOPE=NO_SOCKET_INODES'
           exit 0
