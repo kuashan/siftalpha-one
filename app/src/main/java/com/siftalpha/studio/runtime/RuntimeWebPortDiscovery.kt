@@ -1,5 +1,25 @@
 package com.siftalpha.studio.runtime
 
+internal enum class RuntimeWebDiscoveryDiagnosticStatus {
+    NO_PROJECT_PIDS,
+    PROCFS_UNREADABLE,
+    NO_SOCKET_INODES,
+    NO_INODE_MATCH,
+    NO_LISTEN_PORT,
+    LISTEN_PORT_FOUND,
+    NO_HTTP_ENDPOINT,
+    PASS,
+}
+
+internal data class RuntimeWebDiscoveryObservation(
+    val projectPidCount: Int,
+    val procfsReadable: Boolean,
+    val socketInodeCount: Int,
+    val inodeMatchCount: Int,
+    val listenPortCount: Int,
+    val httpEndpointReachable: Boolean? = null,
+)
+
 /**
  * Runtime-owned Web listener discovery used by LOGS/browser inspection.
  *
@@ -35,11 +55,29 @@ object RuntimeWebPortDiscovery {
         return preferred + remainder
     }
 
+    internal fun diagnosticStatus(
+        observation: RuntimeWebDiscoveryObservation,
+    ): RuntimeWebDiscoveryDiagnosticStatus = when {
+        observation.projectPidCount <= 0 -> RuntimeWebDiscoveryDiagnosticStatus.NO_PROJECT_PIDS
+        !observation.procfsReadable -> RuntimeWebDiscoveryDiagnosticStatus.PROCFS_UNREADABLE
+        observation.socketInodeCount <= 0 -> RuntimeWebDiscoveryDiagnosticStatus.NO_SOCKET_INODES
+        observation.inodeMatchCount <= 0 -> RuntimeWebDiscoveryDiagnosticStatus.NO_INODE_MATCH
+        observation.listenPortCount <= 0 -> RuntimeWebDiscoveryDiagnosticStatus.NO_LISTEN_PORT
+        observation.httpEndpointReachable == null ->
+            RuntimeWebDiscoveryDiagnosticStatus.LISTEN_PORT_FOUND
+        observation.httpEndpointReachable == true ->
+            RuntimeWebDiscoveryDiagnosticStatus.PASS
+        else -> RuntimeWebDiscoveryDiagnosticStatus.NO_HTTP_ENDPOINT
+    }
+
     fun shellSnippet(): String {
         val preferred = preferredPorts.joinToString(" ")
         val guestScript = guestDiscoveryScript(preferred)
         val quotedGuestScript = shellQuote(guestScript)
         return """
+            runtime_identity_id="${D}{runtime_identity_id:-}"
+            runtime_identity_dir="${D}{runtime_identity_dir:-}"
+
             siftalpha_web_runtime_pids() {
               web_root_pid="${D}1"
               web_pgid="${D}2"
@@ -88,6 +126,62 @@ object RuntimeWebPortDiscovery {
                     ;;
                 esac
               done | sort -n -u
+            }
+
+            siftalpha_web_diagnostic_status_for_scope() {
+              web_diagnostic_source="${D}1"
+              web_diagnostic_pids="${D}2"
+              web_diagnostic_inodes="${D}3"
+              if [ -z "${D}{web_diagnostic_pids// }" ]; then
+                printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS source=%s\n' "${D}web_diagnostic_source"
+                return 0
+              fi
+
+              web_diagnostic_procfs_readable=0
+              for web_pid in ${D}web_diagnostic_pids; do
+                if [ -r "/proc/${D}web_pid/fd" ]; then
+                  web_diagnostic_procfs_readable=1
+                  break
+                fi
+              done
+              if [ "${D}web_diagnostic_procfs_readable" -eq 0 ]; then
+                printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE source=%s\n' "${D}web_diagnostic_source"
+                return 0
+              fi
+
+              if [ -z "${D}{web_diagnostic_inodes// }" ]; then
+                printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_SOCKET_INODES source=%s\n' "${D}web_diagnostic_source"
+                return 0
+              fi
+
+              web_diagnostic_tables_readable=0
+              web_diagnostic_inode_matches=0
+              web_diagnostic_listen_ports=0
+              for web_table in /proc/net/tcp /proc/net/tcp6; do
+                [ -r "${D}web_table" ] || continue
+                web_diagnostic_tables_readable=1
+                while read -r web_state web_inode; do
+                  [ -n "${D}web_inode" ] || continue
+                  case " ${D}web_diagnostic_inodes " in
+                    *" ${D}web_inode "*)
+                      web_diagnostic_inode_matches="${D}((web_diagnostic_inode_matches + 1))"
+                      [ "${D}web_state" = '0A' ] && web_diagnostic_listen_ports="${D}((web_diagnostic_listen_ports + 1))"
+                      ;;
+                  esac
+                done < <(awk 'NR > 1 { print ${D}4, ${D}10 }' "${D}web_table" 2>/dev/null || true)
+              done
+
+              if [ "${D}web_diagnostic_tables_readable" -eq 0 ]; then
+                printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE source=%s\n' "${D}web_diagnostic_source"
+              elif [ "${D}web_diagnostic_inode_matches" -eq 0 ]; then
+                printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_INODE_MATCH source=%s\n' "${D}web_diagnostic_source"
+              elif [ "${D}web_diagnostic_listen_ports" -eq 0 ]; then
+                printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_LISTEN_PORT source=%s\n' "${D}web_diagnostic_source"
+              else
+                printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=LISTEN_PORT_FOUND source=%s\n' "${D}web_diagnostic_source"
+                printf 'SIFTALPHA_WEB_DISCOVERY_STAGE=LISTEN_FOUND source=%s\n' "${D}web_diagnostic_source"
+              fi
+              return 0
             }
 
             siftalpha_web_candidate_ports() {
@@ -147,6 +241,7 @@ object RuntimeWebPortDiscovery {
                 web_checked="${D}((web_checked + 1))"
                 printf 'SIFTALPHA_WEB_PORT_CANDIDATE=%s source=%s\n' "${D}web_port" "${D}web_source"
                 if siftalpha_web_http_probe "${D}web_port"; then
+                  printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=PASS source=%s port=%s\n' "${D}web_source" "${D}web_port"
                   printf 'SIFTALPHA_WEB_AUTODISCOVERY=PASS source=%s port=%s\n' "${D}web_source" "${D}web_port"
                   printf 'SIFTALPHA_WEB_URL=http://127.0.0.1:%s\n' "${D}web_port"
                   return 0
@@ -162,7 +257,16 @@ object RuntimeWebPortDiscovery {
                 echo 'SIFTALPHA_WEB_GUEST_SCOPE=UNAVAILABLE reason=PROOT_DISTRO_MISSING'
                 return 2
               fi
-              web_guest_output="${D}(proot-distro login --bind "${D}ROOT:/root/projects" ubuntu -- bash -lc $quotedGuestScript siftalpha-web "${D}web_root_pid" "${D}web_pgid" 2>/dev/null || true)"
+              if [ -n "${D}runtime_identity_id" ] && \
+                 [ -n "${D}runtime_identity_dir" ] && \
+                 [ -r "${D}runtime_identity_dir/${RuntimeIdentityStore.IDENTITY_FILE_NAME}" ]; then
+                web_guest_output="${D}(proot-distro login \
+                  --bind "${D}ROOT:/root/projects" \
+                  --bind "${D}runtime_identity_dir:${RuntimeIdentityStore.GUEST_RUNTIME_ROOT}/${D}runtime_identity_id" \
+                  ubuntu -- bash -lc $quotedGuestScript siftalpha-web identity "${D}runtime_identity_id" 2>/dev/null || true)"
+              else
+                web_guest_output="${D}(proot-distro login --bind "${D}ROOT:/root/projects" ubuntu -- bash -lc $quotedGuestScript siftalpha-web legacy "${D}web_root_pid" "${D}web_pgid" 2>/dev/null || true)"
+              fi
               [ -n "${D}web_guest_output" ] && printf '%s\n' "${D}web_guest_output"
               case "${D}web_guest_output" in
                 *'SIFTALPHA_WEB_AUTODISCOVERY=PASS source=PROOT_PROJECT_PID_SCOPE'*) return 0 ;;
@@ -173,12 +277,17 @@ object RuntimeWebPortDiscovery {
             siftalpha_web_autodiscover() {
               web_root_pid="${D}1"
               web_pgid="${D}2"
+              web_primary_pids="${D}(siftalpha_web_runtime_pids "${D}web_root_pid" "${D}web_pgid" | tr '\n' ' ')"
+              # shellcheck disable=SC2086
+              web_primary_inodes="${D}(siftalpha_web_socket_inodes_for_pids ${D}web_primary_pids | tr '\n' ' ')"
+              siftalpha_web_diagnostic_status_for_scope PROJECT_PID_SCOPE "${D}web_primary_pids" "${D}web_primary_inodes"
               web_ports="${D}(siftalpha_web_candidate_ports "${D}web_root_pid" "${D}web_pgid" | tr '\n' ' ')"
 
               if [ -n "${D}{web_ports// }" ]; then
                 if siftalpha_web_probe_ports PROJECT_PID_SCOPE ${D}web_ports; then
                   return 0
                 fi
+                printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_HTTP_ENDPOINT source=PROJECT_PID_SCOPE\n'
                 echo 'SIFTALPHA_WEB_PRIMARY_SCOPE=NO_HTTP_ENDPOINT'
               else
                 echo 'SIFTALPHA_WEB_PRIMARY_SCOPE=NO_LISTEN_PORT'
@@ -201,8 +310,35 @@ object RuntimeWebPortDiscovery {
     }
 
     private fun guestDiscoveryScript(preferred: String): String = """
-        web_root_pid="${D}1"
-        web_pgid="${D}2"
+        ${RuntimeIdentityStore.guestIdentityLoaderShell()}
+
+        guest_mode="${D}1"
+        web_root_pid=''
+        web_pgid=''
+
+        if [ "${D}guest_mode" = 'identity' ]; then
+          guest_identity_id="${D}2"
+          if ! siftalpha_runtime_identity_load "${D}guest_identity_id"; then
+            echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS source=PROOT_PROJECT_PID_SCOPE reason=RUNTIME_IDENTITY_INVALID'
+            echo 'SIFTALPHA_WEB_GUEST_SCOPE=RUNTIME_IDENTITY_INVALID'
+            exit 0
+          fi
+          web_root_pid="${D}SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT_PID"
+          web_pgid="${D}SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT_PGID"
+          if [ ! -d "/proc/${D}web_root_pid" ]; then
+            echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS source=PROOT_PROJECT_PID_SCOPE reason=RUNTIME_ROOT_NOT_ALIVE'
+            echo 'SIFTALPHA_WEB_GUEST_SCOPE=RUNTIME_ROOT_NOT_ALIVE'
+            exit 0
+          fi
+          echo 'SIFTALPHA_WEB_IDENTITY=RUNTIME_IDENTITY'
+        elif [ "${D}guest_mode" = 'legacy' ]; then
+          web_root_pid="${D}2"
+          web_pgid="${D}3"
+        else
+          # Keep the old argument shape usable for runtimes created by older app versions.
+          web_root_pid="${D}1"
+          web_pgid="${D}2"
+        fi
 
         guest_descendants() {
           guest_parent="${D}1"
@@ -237,7 +373,21 @@ object RuntimeWebPortDiscovery {
           } | awk 'NF && !seen[${D}1]++' | tr '\n' ' '
         )"
         if [ -z "${D}{guest_pids// }" ]; then
+          echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS source=PROOT_PROJECT_PID_SCOPE'
           echo 'SIFTALPHA_WEB_GUEST_SCOPE=NO_PROJECT_PIDS'
+          exit 0
+        fi
+
+        guest_procfs_readable=0
+        for guest_pid in ${D}guest_pids; do
+          if [ -r "/proc/${D}guest_pid/fd" ]; then
+            guest_procfs_readable=1
+            break
+          fi
+        done
+        if [ "${D}guest_procfs_readable" -eq 0 ]; then
+          echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE source=PROOT_PROJECT_PID_SCOPE'
+          echo 'SIFTALPHA_WEB_GUEST_SCOPE=NO_SOCKET_INODES'
           exit 0
         fi
 
@@ -260,8 +410,36 @@ object RuntimeWebPortDiscovery {
           done | awk 'NF && !seen[${D}1]++' | tr '\n' ' '
         )"
         if [ -z "${D}{guest_inodes// }" ]; then
+          echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_SOCKET_INODES source=PROOT_PROJECT_PID_SCOPE'
           echo 'SIFTALPHA_WEB_GUEST_SCOPE=NO_SOCKET_INODES'
           exit 0
+        fi
+
+        guest_diagnostic_tables_readable=0
+        guest_diagnostic_inode_matches=0
+        guest_diagnostic_listen_ports=0
+        for guest_table in /proc/net/tcp /proc/net/tcp6; do
+          [ -r "${D}guest_table" ] || continue
+          guest_diagnostic_tables_readable=1
+          while read -r guest_state guest_inode; do
+            [ -n "${D}guest_inode" ] || continue
+            case " ${D}guest_inodes " in
+              *" ${D}guest_inode "*)
+                guest_diagnostic_inode_matches="${D}((guest_diagnostic_inode_matches + 1))"
+                [ "${D}guest_state" = '0A' ] && guest_diagnostic_listen_ports="${D}((guest_diagnostic_listen_ports + 1))"
+                ;;
+            esac
+          done < <(awk 'NR > 1 { print ${D}4, ${D}10 }' "${D}guest_table" 2>/dev/null || true)
+        done
+        if [ "${D}guest_diagnostic_tables_readable" -eq 0 ]; then
+          echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE source=PROOT_PROJECT_PID_SCOPE'
+        elif [ "${D}guest_diagnostic_inode_matches" -eq 0 ]; then
+          echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_INODE_MATCH source=PROOT_PROJECT_PID_SCOPE'
+        elif [ "${D}guest_diagnostic_listen_ports" -eq 0 ]; then
+          echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_LISTEN_PORT source=PROOT_PROJECT_PID_SCOPE'
+        else
+          echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=LISTEN_PORT_FOUND source=PROOT_PROJECT_PID_SCOPE'
+          echo 'SIFTALPHA_WEB_DISCOVERY_STAGE=LISTEN_FOUND source=PROOT_PROJECT_PID_SCOPE'
         fi
 
         guest_ports="${D}(
@@ -306,12 +484,14 @@ object RuntimeWebPortDiscovery {
           guest_first_line="${D}(timeout 1 bash -c 'exec 3<>"/dev/tcp/127.0.0.1/${D}1" || exit 1; printf "GET / HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n" >&3; IFS= read -r line <&3 || true; printf "%s" "${D}line"' _ "${D}guest_port" 2>/dev/null | tr -d '\r' | head -n 1 || true)"
           case "${D}guest_first_line" in
             HTTP/*)
+              printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=PASS source=PROOT_PROJECT_PID_SCOPE port=%s\n' "${D}guest_port"
               printf 'SIFTALPHA_WEB_AUTODISCOVERY=PASS source=PROOT_PROJECT_PID_SCOPE port=%s\n' "${D}guest_port"
               printf 'SIFTALPHA_WEB_URL=http://127.0.0.1:%s\n' "${D}guest_port"
               exit 0
               ;;
           esac
         done
+        echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_HTTP_ENDPOINT source=PROOT_PROJECT_PID_SCOPE'
         echo 'SIFTALPHA_WEB_GUEST_SCOPE=NO_HTTP_ENDPOINT'
     """.trimIndent()
 

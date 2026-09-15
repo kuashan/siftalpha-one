@@ -122,6 +122,9 @@ class PythonRuntimeAdapter(
         val runner = "/root/siftalpha/run-$id.sh"
         val secrets = "/root/siftalpha/secrets-$id.env"
         val ready = "/root/siftalpha/env-ready-$id.txt"
+        val identityFileName = RuntimeIdentityStore.IDENTITY_FILE_NAME
+        val guestIdentityFileName = RuntimeIdentityStore.GUEST_IDENTITY_FILE_NAME
+        val guestRuntimeRoot = RuntimeIdentityStore.GUEST_RUNTIME_ROOT
         val entry = project.entry
         val run = project.run.ifBlank { "python $entry" }
         val trimmedRun = run.trim()
@@ -142,10 +145,16 @@ class PythonRuntimeAdapter(
             configured_run=${sh(run)}
             auto_entry_mode=${if (autoEntryMode) "1" else "0"}
             resolved_entry=''
+            identity_dir=${sh("$guestRuntimeRoot/$id")}
+            identity_file=${sh("$guestRuntimeRoot/$id/$identityFileName")}
+            guest_identity_file=${sh("$guestRuntimeRoot/$id/$guestIdentityFileName")}
+            ${RuntimeIdentityStore.guestIdentityWriterShell()}
+
             mkdir -p /root/siftalpha/logs
             exec >>"${'$'}log" 2>&1
             echo '=== SiftAlpha Studio Runtime ==='
             printf 'STARTED_AT=%s\n' "${'$'}(date '+%Y-%m-%d %H:%M:%S')"
+            siftalpha_runtime_identity_write_guest "${'$'}identity_file" "${'$'}guest_identity_file" ${sh(id)} || true
             printf 'STATE=RUNNING\n' >"${'$'}state"
 
             secret_status='NONE'
@@ -354,6 +363,9 @@ SIFTALPHA_RUNNER
             pgid_file="${'$'}runtime_dir/${id}.pgid"
             launch_log="${'$'}runtime_dir/${id}.launch.log"
             secret_input_file="${'$'}runtime_dir/${id}.secrets.in"
+            identity_dir="${'$'}runtime_dir/${id}"
+            identity_file="${'$'}identity_dir/${identityFileName}"
+            guest_identity_file="${'$'}identity_dir/${guestIdentityFileName}"
 
             if [ -f "${'$'}pid_file" ]; then
               old_pid="${'$'}(cat "${'$'}pid_file" 2>/dev/null || true)"
@@ -372,6 +384,18 @@ SIFTALPHA_RUNNER
               rm -f "${'$'}pid_file" "${'$'}pgid_file"
             fi
 
+            mkdir -p "${'$'}identity_dir"
+            rm -f -- "${'$'}identity_file" "${'$'}guest_identity_file"
+            runtime_token="${'$'}(date +%s 2>/dev/null || echo 0)-${'$'}${'$'}"
+            runtime_start_time="${'$'}(date +%s 2>/dev/null || echo 0)"
+            {
+              printf '${RuntimeIdentityStore.SCHEMA_KEY}=%s\n' '${RuntimeIdentityStore.CURRENT_SCHEMA_VERSION}'
+              printf '${RuntimeIdentityStore.RUNTIME_ID_KEY}=%s\n' '${id}'
+              printf '${RuntimeIdentityStore.RUNTIME_TOKEN_KEY}=%s\n' "${'$'}runtime_token"
+              printf '${RuntimeIdentityStore.START_TIME_KEY}=%s\n' "${'$'}runtime_start_time"
+            } >"${'$'}identity_file"
+            chmod 600 "${'$'}identity_file"
+
             umask 077
             : >"${'$'}secret_input_file"
             cat >"${'$'}secret_input_file" || true
@@ -381,6 +405,7 @@ SIFTALPHA_RUNNER
             proot-distro login \
               --bind "${'$'}ROOT:/root/projects" \
               --bind "${'$'}runtime_dir:/root/.siftalpha-host" \
+              --bind "${'$'}identity_dir:${guestRuntimeRoot}/${id}" \
               ubuntu -- bash -lc ${sh(setupInner)}
 
             rm -f -- "${'$'}secret_input_file"
@@ -389,16 +414,24 @@ SIFTALPHA_RUNNER
             : >"${'$'}launch_log"
             rm -f "${'$'}pgid_file"
             if command -v setsid >/dev/null 2>&1; then
-              nohup setsid proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash ${sh(runner)} >"${'$'}launch_log" 2>&1 < /dev/null &
+              nohup setsid proot-distro login --bind "${'$'}ROOT:/root/projects" --bind "${'$'}identity_dir:${guestRuntimeRoot}/${id}" ubuntu -- bash ${sh(runner)} >"${'$'}launch_log" 2>&1 < /dev/null &
               pid=${'$'}!
               printf '%s\n' "${'$'}pid" >"${'$'}pgid_file"
               echo 'SIFTALPHA_RUNTIME_SESSION=SETSID'
             else
-              nohup proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash ${sh(runner)} >"${'$'}launch_log" 2>&1 < /dev/null &
+              nohup proot-distro login --bind "${'$'}ROOT:/root/projects" --bind "${'$'}identity_dir:${guestRuntimeRoot}/${id}" ubuntu -- bash ${sh(runner)} >"${'$'}launch_log" 2>&1 < /dev/null &
               pid=${'$'}!
               echo 'SIFTALPHA_RUNTIME_SESSION=PID_TREE'
             fi
             printf '%s\n' "${'$'}pid" >"${'$'}pid_file"
+            host_identity_tmp="${'$'}identity_file.tmp.${'$'}pid"
+            {
+              cat "${'$'}identity_file"
+              printf '${RuntimeIdentityStore.HOST_SESSION_PID_KEY}=%s\n' "${'$'}pid"
+              if [ -s "${'$'}pgid_file" ]; then
+                printf '${RuntimeIdentityStore.HOST_SESSION_PGID_KEY}=%s\n' "${'$'}(cat "${'$'}pgid_file")"
+              fi
+            } >"${'$'}host_identity_tmp" 2>/dev/null && mv -f -- "${'$'}host_identity_tmp" "${'$'}identity_file"
             printf 'SIFTALPHA_HOST_PID=%s\n' "${'$'}pid"
             if [ -s "${'$'}pgid_file" ]; then
               printf 'SIFTALPHA_HOST_PGID=%s\n' "${'$'}(cat "${'$'}pgid_file")"
@@ -442,6 +475,8 @@ SIFTALPHA_RUNNER
             pid_file="${'$'}runtime_dir/${id}.pid"
             pgid_file="${'$'}runtime_dir/${id}.pgid"
             launch_log="${'$'}runtime_dir/${id}.launch.log"
+            runtime_identity_dir="${'$'}runtime_dir/${id}"
+            runtime_identity_id=${sh(id)}
             pid="${'$'}(cat "${'$'}pid_file" 2>/dev/null || true)"
             pgid="${'$'}(cat "${'$'}pgid_file" 2>/dev/null || true)"
 
