@@ -9,45 +9,49 @@
 
 ## A. 当前版本信息
 
-- 版本：`0.8.0-alpha15`
-- versionCode：`91`
+- 版本：`0.8.0-alpha16`
+- versionCode：`92`
 - 包名：`com.siftalpha.studio`
-- APK：[直接下载](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-80efac5/app-debug.apk)
-- Release：[w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)
-- APK SHA-256：4da88d0d8d2bd757d5a0b29f6d83ab9d8b9fbe15bf2d844659b43c45a439d562
+- APK：待发布（Run #35 已生成并验收构建产物）
+- Release：待发布；上一版 [w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)
+- APK SHA-256：待发布后记录
 
 ## B. 云端验证矩阵
 
 | ID | 场景 | 期望 | 状态 | 证据 |
 |---|---|---|---|---|
-| C-01 | 仓库校验器 | 启动图、本地化和 UI 源码校验通过 | PASS | [Actions Run #30](https://github.com/kuashan/siftalpha-one/actions/runs/34885104600) |
-| C-02 | 单元测试 | `testDebugUnitTest` 通过 | PASS | [Actions Run #30](https://github.com/kuashan/siftalpha-one/actions/runs/34885104600) |
-| C-03 | APK 组装 | `assembleDebug` 成功 | PASS | [Actions Run #30](https://github.com/kuashan/siftalpha-one/actions/runs/34885104600) |
-| C-04 | 稳定测试签名 | 包签名证书与既有测试版本一致 | PASS | Actions evidence / certificate digest |
-| C-05 | APK 元数据 | 包名、版本名和 versionCode 正确 | PASS | `com.siftalpha.studio`, alpha15, 91 |
-| C-06 | 发布资产 | 新版本 Release 中存在可下载 APK | PASS | [w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5) |
+| C-01 | 仓库校验器 | 启动图、本地化和 UI 源码校验通过 | PASS | [Actions Run #35](https://github.com/kuashan/siftalpha-one/actions/runs/34911589787) |
+| C-02 | 单元测试 | `testDebugUnitTest` 通过 | PASS | [Actions Run #35](https://github.com/kuashan/siftalpha-one/actions/runs/34911589787) |
+| C-03 | APK 组装 | `assembleDebug` 成功 | PASS | [Actions Run #35](https://github.com/kuashan/siftalpha-one/actions/runs/34911589787) |
+| C-04 | 稳定测试签名 | 包签名证书与既有测试版本一致 | PASS | Run #35 evidence / certificate digest |
+| C-05 | APK 元数据 | 包名、版本名和 versionCode 正确 | PASS | `com.siftalpha.studio`, alpha16, 92 |
+| C-06 | 发布资产 | 新版本 Release 中存在可下载 APK | 待发布 | 发布触发提交后更新 |
 
 ## C. 安装与升级矩阵
 
 | ID | 操作 | 期望 | 状态 |
 |---|---|---|---|
-| I-01 | 在 alpha14 上直接安装 alpha15 | 安装器允许覆盖，不要求卸载 | 待真机 |
+| I-01 | 在 alpha15 上直接安装 alpha16 | 安装器允许覆盖，不要求卸载 | 待真机 |
 | I-02 | 覆盖安装后打开 App | 项目、设置和已有本地数据仍可访问 | 待真机 |
-| I-03 | 覆盖安装后确认版本 | 显示 alpha15 / versionCode 91 | 待真机 |
+| I-03 | 覆盖安装后确认版本 | 显示 alpha16 / versionCode 92 | 待真机 |
 
 ## D. 配置功能矩阵
 
 | ID | 操作 | 期望 | 状态 |
 |---|---|---|---|
 | K-01 | 打开两个真实脚本的项目卡片 | 建议项显示提醒，并明确“不阻止运行” | 待真机 |
-| K-02 | 两个脚本只有候选项时点击“配置” | 直接进入配置列表，不出现强制的第 1/2 项向导 | 待真机 |
+| K-02 | 两个脚本只有候选项时点击“配置” | 先显示摘要，点击“查看配置”后进入编辑列表；不出现强制的第 1/2 项向导 | 待真机 |
 | K-03 | 不填写候选项，直接 PREPARE → START | 项目仍可运行，候选提醒不阻止启动 | 待真机 |
-| K-04 | 保存一个可选配置 | 值安全保存，重新打开时显示已配置，项目仍可运行 | 待真机 |
+| K-04 | 点击未配置的 OPTIONAL 项 | 直接出现输入框；保存后显示已配置，且不自动启动项目 | 待真机 |
 | K-05 | 项目明确声明 requiredEnv 或代码直接读取 | 缺失项显示为必需配置，并在首次 START 前阻止运行 | 待真机 |
 | K-06 | 运行输出明确报告缺失环境变量 | 标记为运行诊断来源，并进入下一次启动前的必需预检 | 待真机 |
 | K-07 | 为真实缺失变量保存值后再次运行 | 配置预检通过，项目可以重新启动 | 待真机 |
 | K-08 | 项目只写普通硬编码 URL | 不自动生成误报配置项 | 待真机 |
 | K-09 | 点击配置项 | 显示 REQUIRED/OPTIONAL、检测来源和文件/行号证据；不显示秘密值 | 待真机 |
+| K-10 | OPTIONAL 编辑闭环 | 提醒 → 查看配置 → 输入 → 保存 → 状态刷新完成 | 待真机 |
+| K-11 | OPTIONAL 不填写 | 关闭编辑后仍可 PREPARE → START | 待真机 |
+| K-12 | REQUIRED 回归 | 缺少 REQUIRED 仍阻止 START；填写后恢复运行 | 待真机 |
+| K-13 | Mixed 配置 | REQUIRED 完成、OPTIONAL 缺失时可运行；填写 OPTIONAL 只更新其状态 | 待真机 |
 
 ## E. Runtime 回归矩阵
 
@@ -65,12 +69,12 @@
 ## F. 当前版本建议测试顺序
 
 1. 先直接覆盖安装，不卸载 alpha14。
-2. 打开两个脚本，进入“配置”，确认只有候选项时直接显示列表。
+2. 打开两个脚本，进入“配置”，点击“查看配置”，确认 OPTIONAL 项可直接进入输入框。
 3. 返回后不填写候选项，依次执行 PREPARE 和 START。
 4. 观察项目是否正常运行，配置提醒是否仍然存在但不阻止运行。
 5. 如项目实际会报告缺失密钥或环境变量，确认 Studio 给出配置提示；保存后重新运行。
 6. 回归 STOP → START。
 7. 回归打开网页、从 Chrome 返回 Studio，以及返回后短时间内页面是否保持正常。
-8. 最后确认版本和本地项目数据仍然存在。建议配置缺失时，START 仍然可用；只有必需配置缺失时 START 才应被阻止。
+8. 最后确认版本为 alpha16 / versionCode 92，且本地项目数据仍然存在。建议配置缺失时，START 仍然可用；只有必需配置缺失时 START 才应被阻止。
 
 每次真机测试完成后，在对应行把“待真机/回归待确认”改成 PASS 或阻塞，并在 DEV_LOG 追加日期、设备、步骤和结果。

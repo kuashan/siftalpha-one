@@ -1,12 +1,12 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-14  
+最后更新：2026-09-15  
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
 当前分支：`main`  
-当前实现版本：0.8.0-alpha15 / versionCode 91
-当前实现提交：[0873f23](https://github.com/kuashan/siftalpha-one/commit/0873f23e4626757b4cf2bd0681adc24e98492ecb)
-上一版发布：[W2 test APK · w2-test-0ee299e](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-0ee299e)  
-最新发布：[W2 test APK · w2-test-0ee299e](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-0ee299e)
+当前实现版本：0.8.0-alpha16 / versionCode 92
+当前实现提交：[5e2d739](https://github.com/kuashan/siftalpha-one/commit/5e2d7395acef37ab7965e517918c02fef19c7cb6)
+上一版发布：[W2 test APK · w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)  
+最新发布：待 alpha16 发布
 
 ## 1. 项目目标
 
@@ -117,17 +117,18 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 
 - 实现提交：[0873f23](https://github.com/kuashan/siftalpha-one/commit/0873f23e4626757b4cf2bd0681adc24e98492ecb)
 - 云端构建：[Run #30](https://github.com/kuashan/siftalpha-one/actions/runs/34885104600)，成功
-- 版本：0.8.0-alpha15 / versionCode 91
-- Release：[w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)
-- APK：[直接下载](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-80efac5/app-debug.apk)
-- APK SHA-256：4da88d0d8d2bd757d5a0b29f6d83ab9d8b9fbe15bf2d844659b43c45a439d562
+- 版本：0.8.0-alpha16 / versionCode 92
+- 应用修复提交：[5e2d739](https://github.com/kuashan/siftalpha-one/commit/5e2d7395acef37ab7965e517918c02fef19c7cb6)
+- Run #35：[Actions](https://github.com/kuashan/siftalpha-one/actions/runs/34911589787)，成功
+- Release：待发布；上一版 [w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)
+- APK SHA-256：待发布后记录
 - 稳定测试签名证书摘要：3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928
 
 下一步按优先级：
 
-1. 直接覆盖安装 alpha15，不卸载 versionCode 90，并确认本地数据保留。
-2. 用两个真实脚本验证建议配置只提醒、不阻止运行。
-3. 验证配置列表能够显示检测来源和文件/行号证据。
+1. 发布后直接覆盖安装 alpha16，不卸载 alpha15，并确认本地数据保留。
+2. 用两个真实脚本验证建议配置可进入输入框、保存后刷新状态，且不阻止运行。
+3. 验证配置摘要的“查看配置”入口和配置列表能够显示检测来源、文件/行号证据。
 4. 验证运行时明确缺失项会在下一次启动前变成 REQUIRED。
 5. 回归 STOP → START、Chrome 返回、配置保存和覆盖安装。
 6. 继续完善单项目工作区和 W2 的完整任务闭环。

@@ -174,3 +174,34 @@
 - 新 APK 已发布，等待用户进行覆盖安装和真机验收。
 - 使用“直接覆盖安装，不卸载上一版”的方式测试配置页面与两个脚本。
 - 重点确认：只有建议项时不出现强制向导；建议项缺失不阻止 PREPARE → START；来源和证据显示清楚。
+
+
+## 2026-09-15 · W2 Optional Configuration Editing Flow
+
+### 用户问题
+
+OPTIONAL（建议配置）已经能够被检测和展示，但点击配置后会停留在说明弹窗，用户无法稳定进入输入框，因而没有形成“提醒 → 编辑 → 保存 → 状态更新”的闭环。
+
+### 修复
+
+- 配置入口先显示当前 REQUIRED/OPTIONAL 摘要，并提供“查看配置”入口。
+- 配置编辑列表继续使用已有的 ConfigurationItem，保留所有配置项的严重程度、来源和检测依据。
+- 点击配置项直接打开输入框；OPTIONAL 不再经过没有输入入口的说明弹窗。
+- 保存后写入既有 ConfigurationStore，并刷新 ProjectUiSnapshot/UI 状态。
+- OPTIONAL 保存只改变配置状态，不改变 START 权限，也不会因为保存建议项自动启动项目。
+- REQUIRED 缺失仍由原有向导处理，并继续阻止 START。
+- 未修改 ConfigurationAnalyzer、RuntimeController、PREPARE/START/STOP、SAF、Web 检测或 Secret Storage。
+
+### 提交与云端验证
+
+- 应用修复提交：[5e2d739](https://github.com/kuashan/siftalpha-one/commit/5e2d7395acef37ab7965e517918c02fef19c7cb6)。
+- 版本：0.8.0-alpha16 / versionCode 92，用于覆盖安装。
+- Run #34 因 GitHub Actions 的 Android SDK 初始化请求已不存在的 tools 包失败；该次未进入应用编译。
+- 工作流修复提交：[903ad94](https://github.com/kuashan/siftalpha-one/commit/903ad94cbe47a1d24ff14f65788312cd4ea3352f)，改为只请求现行 platform-tools。
+- Run #35：[Actions](https://github.com/kuashan/siftalpha-one/actions/runs/34911589787) 成功：SDK、仓库校验、单元测试、APK 组装、签名和证据收集全部通过。
+- Release 尚待发布；发布后补录 APK 下载地址、SHA-256 和稳定签名证书摘要。
+
+### 真机测试与下一步
+
+- 新 APK 尚未发布，暂不复用 alpha15 的真机结论。
+- 发布后直接覆盖安装 alpha15，不卸载；重点测试 OPTIONAL 进入输入框、保存后显示已配置、跳过仍可运行，以及 REQUIRED/Runtime 回归。
