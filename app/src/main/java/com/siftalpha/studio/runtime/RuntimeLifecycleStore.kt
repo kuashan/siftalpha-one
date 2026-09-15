@@ -1,8 +1,10 @@
 package com.siftalpha.studio.runtime
 
 import android.content.Context
+import android.content.SharedPreferences
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.util.Locale
 
 /**
  * Small, non-secret persistence layer for lifecycle recovery.
@@ -11,28 +13,40 @@ import java.security.MessageDigest
  * a bounded redacted failure reason. Persisted active states are hints only and are reconciled by
  * a real STATUS command when the Activity returns to the foreground.
  */
-class RuntimeLifecycleStore(context: Context) {
+class RuntimeLifecycleStore internal constructor(
+    private val prefs: SharedPreferences,
+) {
+    constructor(context: Context) : this(
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+    )
+
     data class Snapshot(
         val environmentReady: Boolean?,
         val runtimeState: RuntimeState,
         val failureReason: String?,
     )
 
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
     fun read(projectKey: String): Snapshot {
-        val env = when {
-            prefs.getBoolean(key(projectKey, FIELD_ENV_PRESENT), false) ->
-                prefs.getBoolean(key(projectKey, FIELD_ENV_VALUE), false)
-            else -> null
+        val environmentReady = if (
+            readBoolean(
+                key(projectKey, FIELD_ENV_PRESENT),
+                legacyKey(projectKey, FIELD_ENV_PRESENT),
+                defaultValue = false,
+            )
+        ) {
+            readBoolean(
+                key(projectKey, FIELD_ENV_VALUE),
+                legacyKey(projectKey, FIELD_ENV_VALUE),
+                defaultValue = false,
+            )
+        } else {
+            null
         }
-        val state = prefs.getString(key(projectKey, FIELD_STATE), null)
-            ?.let { token -> runCatching { RuntimeState.valueOf(token) }.getOrNull() }
-            ?: RuntimeState.UNKNOWN
+
         return Snapshot(
-            environmentReady = env,
-            runtimeState = state,
-            failureReason = prefs.getString(key(projectKey, FIELD_FAILURE), null),
+            environmentReady = environmentReady,
+            runtimeState = readState(projectKey),
+            failureReason = readFailureReason(projectKey),
         )
     }
 
@@ -68,8 +82,85 @@ class RuntimeLifecycleStore(context: Context) {
             .apply()
     }
 
+    private fun readBoolean(
+        currentKey: String,
+        oldKey: String,
+        defaultValue: Boolean,
+    ): Boolean {
+        val currentRaw = rawValue(currentKey)
+        val currentValue = currentRaw.toBooleanOrNull()
+        if (currentValue != null) {
+            migrateBoolean(currentKey, currentRaw, currentValue)
+            return currentValue
+        }
+
+        val oldRaw = rawValue(oldKey)
+        val oldValue = oldRaw.toBooleanOrNull()
+        if (oldValue != null) {
+            // The old key may have been shared by several fields. Copy only the boolean fact that
+            // can be established safely; all other lifecycle facts use their own safe fallback.
+            migrateBoolean(currentKey, oldRaw, oldValue)
+            return oldValue
+        }
+
+        return defaultValue
+    }
+
+    private fun readState(projectKey: String): RuntimeState {
+        val current = runtimeStateFrom(rawValue(key(projectKey, FIELD_STATE)))
+        if (current != null) return current
+
+        return runtimeStateFrom(rawValue(legacyKey(projectKey, FIELD_STATE)))
+            ?: RuntimeState.UNKNOWN
+    }
+
+    private fun readFailureReason(projectKey: String): String? {
+        val current = rawValue(key(projectKey, FIELD_FAILURE))
+        if (current is String) return current
+
+        val old = rawValue(legacyKey(projectKey, FIELD_FAILURE)) as? String ?: return null
+        if (old.toBooleanOrNull() != null || runtimeStateFrom(old) != null) return null
+        return old
+    }
+
+    private fun runtimeStateFrom(value: Any?): RuntimeState? =
+        (value as? String)?.let { token ->
+            runCatching { RuntimeState.valueOf(token) }.getOrNull()
+        }
+
+    private fun migrateBoolean(key: String, raw: Any?, value: Boolean) {
+        if (raw is String) {
+            runCatching {
+                prefs.edit().putBoolean(key, value).apply()
+            }
+        }
+    }
+
+    private fun rawValue(key: String): Any? =
+        runCatching { prefs.all[key] }.getOrNull()
+
+    private fun Any?.toBooleanOrNull(): Boolean? = when (this) {
+        is Boolean -> this
+        is String -> when (trim().lowercase(Locale.ROOT)) {
+            "true" -> true
+            "false" -> false
+            else -> null
+        }
+        else -> null
+    }
+
     private fun key(projectKey: String, suffix: String): String =
-        "project:\${digest(projectKey)}:\$suffix"
+        "project:${digest(projectKey)}:$suffix"
+
+    /**
+     * Exact key shape emitted by the pre-migration implementation.
+     *
+     * It is intentionally retained only as a read fallback so an old malformed preference cannot
+     * crash the Activity or overwrite the new field-specific keys.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    private fun legacyKey(projectKey: String, suffix: String): String =
+        "project:${'$'}{digest(projectKey)}:${'$'}suffix"
 
     private fun digest(value: String): String {
         val bytes = MessageDigest.getInstance("SHA-256")

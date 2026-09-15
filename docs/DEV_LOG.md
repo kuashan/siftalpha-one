@@ -275,3 +275,24 @@ Runtime 的 RUNNING 状态曾因 `webExpected=true` 且端点暂不可达而被�
 - 发布工作流 artifact：[下载 artifact ZIP](https://github.com/kuashan/siftalpha-one/actions/runs/34918441426/artifacts/10376164249)
 - 真机测试：待用户使用 alpha18 覆盖安装 APK 验收。
 - 版本：`0.8.0-alpha18 / versionCode 94`，用于直接覆盖安装。
+
+
+## 2026-09-15 · W2 RuntimeLifecycleStore SharedPreferences Migration Fix
+
+### 问题
+
+App 进入运行中心时，`RuntimeLifecycleStore.read()` 在读取历史 SharedPreferences 时因 `String` 被当作 `Boolean` 读取而抛出 `ClassCastException`，导致 `V04Activity.restoreStoredState()` 闪退。
+
+### 修改
+
+- 读取布尔值时通过 `SharedPreferences.all` 安全识别 `Boolean` 和字符串 `"true"/"false"`。
+- 成功识别的历史字符串值会迁移为当前布尔类型；缺失、未知类型或读取异常回退到安全默认值。
+- 修复生命周期存储键按项目和字段生成，保留旧键作为只读兼容回退，避免历史状态再次触发崩溃。
+- 新增字符串旧数据、Boolean 新数据、迁移后二次读取、空数据和异常类型回退测试。
+- 未修改 Runtime 执行流程、START/PREPARE/STOP 逻辑或 Configuration 系统。
+
+### 验证状态
+
+- 候选代码：待 GitHub Actions 云端单元测试。
+- 云端 APK：待单元测试通过后组装。
+- 真机测试：待使用 `0.8.0-alpha19 / versionCode 95` 覆盖安装验收。
