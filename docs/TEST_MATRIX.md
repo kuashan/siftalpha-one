@@ -9,12 +9,12 @@
 
 ## A. 当前版本信息
 
-- 版本：`0.8.0-alpha18`
-- versionCode：`94`
+- 版本：`0.8.0-alpha19`
+- versionCode：`95`
 - 包名：`com.siftalpha.studio`
-- APK：[直接下载 alpha18 测试 APK](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-febcabb/app-debug.apk)
-- Release：[w2-test-febcabb](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-febcabb)
-- APK SHA-256：3e61e76b1c80ff11dba53d9afb135c9759cc742fe0b489f704b22d550629f922
+- APK：待云端构建与发布
+- Release：待云端构建与发布
+- APK SHA-256：待云端构建后记录
 
 ## B. 云端验证矩阵
 
@@ -29,7 +29,8 @@
 | C-07 | W2 编辑器云端构建 | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #41](https://github.com/kuashan/siftalpha-one/actions/runs/34914830358) |
 | C-08 | W2 测试 APK 发布 | 预发布 Release 可下载，资产校验值已记录 | PASS | [Actions Run #42](https://github.com/kuashan/siftalpha-one/actions/runs/34915100958) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-6e259f7) |
 | C-09 | W2 Runtime/Web 展示状态分离云端验证 | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #44](https://github.com/kuashan/siftalpha-one/actions/runs/34918070668) | 
-| C-10 | W2 Runtime 展示状态分离 APK 发布 | 预发布 Release 可下载，版本/签名/SHA-256 已记录 | PASS | [Actions Run #45](https://github.com/kuashan/siftalpha-one/actions/runs/34918441426) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-febcabb) |
+| C-10 | W2 Runtime 展示状态分离 APK 发布 | 预发布 Release 可下载，版本/签名/SHA-256 已记录 | PASS | [Actions Run #45](https://github.com/kuashan/siftalpha-one/actions/runs/34918441426) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-febcabb) | 
+| C-11 | W2 RuntimeLifecycleStore 候选验证 | 单元测试先通过，随后 APK 组装通过 | PASS | [候选 Actions Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615) |
 
 ## C. 安装与升级矩阵
 
@@ -108,3 +109,13 @@
 | R-11 | 真实 Web 项目执行 `python -m http.server 8000` | Runtime 显示 RUNNING；Web 显示 AVAILABLE；Browser 可用 | 云端通过，待真机 |
 | R-12 | Web 探测输出 `NO_LISTEN_PORT` 或 `NO_SOCKET_INODES` | 只影响 Web 状态，不改写 Runtime RUNNING | 云端通过，待真机 |
 | R-13 | STOP 后再次 START | STOP 可用；停止后可以重新运行 | 待真机 |
+
+
+## E.2 W2 RuntimeLifecycleStore SharedPreferences Migration Fix
+
+| ID | 操作 | 期望 | 状态 |
+|---|---|---|---|
+| L-01 | 旧数据以字符串 `"true"/"false"` 保存 | 正确读取并迁移为 Boolean，不闪退 | 候选云端通过，待正式构建/真机 |
+| L-02 | 新数据以 Boolean 保存 | 正确读取环境状态、Runtime 状态和失败原因 | 候选云端通过，待正式构建/真机 |
+| L-03 | 迁移后重新创建 Store 再读取 | 结果保持一致，SharedPreferences 类型为 Boolean | 候选云端通过，待正式构建/真机 |
+| L-04 | 空数据或异常类型 | 回退 UNKNOWN/null，不导致运行中心闪退 | 候选云端通过，待正式构建/真机 |

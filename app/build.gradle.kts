@@ -33,8 +33,8 @@ android {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        versionCode = 94
-        versionName = "0.8.0-alpha18"
+        versionCode = 95
+        versionName = "0.8.0-alpha19"
     }
 
     buildFeatures {
