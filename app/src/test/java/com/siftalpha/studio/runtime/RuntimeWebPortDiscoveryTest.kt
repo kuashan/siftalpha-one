@@ -243,27 +243,54 @@ class RuntimeWebPortDiscoveryTest {
     @Test
     fun shellProbeIncludesPerPidNetworkTableDiagnostics() {
         val script = RuntimeWebPortDiscovery.shellSnippet()
+        val hostDebugScopeStart = script.indexOf("siftalpha_web_debug_scope() {")
+        val hostDebugScopeEnd = script.indexOf("siftalpha_web_ports_for_inodes()", hostDebugScopeStart)
+        val guestSectionStart = script.indexOf(
+            """guest_pids="${'$'}(""",
+        )
+        val guestSectionEnd = script.indexOf(
+            """guest_ports="${'$'}(""",
+            guestSectionStart,
+        )
+
+        assertTrue("host debug scope must be locatable", hostDebugScopeStart >= 0)
+        assertTrue("host debug scope must end before host port mapping", hostDebugScopeEnd > hostDebugScopeStart)
+        assertTrue("guest discovery section must be locatable", guestSectionStart >= 0)
+        assertTrue("guest discovery section must have a bounded end", guestSectionEnd > guestSectionStart)
+
+        val hostDebugScope = script.substring(hostDebugScopeStart, hostDebugScopeEnd)
+        val guestSection = script.substring(guestSectionStart, guestSectionEnd)
+        val guestDebugScopeStart = guestSection.indexOf("siftalpha_web_debug_scope() {")
+        assertTrue("guest debug scope must be present in guest discovery", guestDebugScopeStart >= 0)
+        val guestDebugScope = guestSection.substring(guestDebugScopeStart)
 
         assertTrue("host project scope must invoke per-PID net diagnostics", "siftalpha_web_diagnostic_status_for_scope PROJECT_PID_SCOPE" in script)
         assertTrue("guest project scope must invoke per-PID net diagnostics", "siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE" in script)
-        assertTrue("per-PID TCP path missing", "\"/proc/${'$'}web_debug_pid/net/tcp\"" in script)
-        assertTrue("per-PID TCP6 path missing", "\"/proc/${'$'}web_debug_pid/net/tcp6\"" in script)
-        assertTrue(
-            "per-PID network availability diagnostic missing",
-            "SIFTALPHA_WEB_DEBUG_PID_NET=%s TCP_EXISTS=%s TCP_READABLE=%s TCP6_EXISTS=%s TCP6_READABLE=%s" in script,
-        )
-        assertTrue(
-            "per-PID TCP match summary missing",
-            "SIFTALPHA_WEB_DEBUG_PID_NET_MATCH=%s TCP_ROWS=%s LISTEN_ROWS=%s INODE_MATCHES=%s LISTEN_INODE_MATCHES=%s" in script,
-        )
-        assertTrue(
-            "per-PID TCP6 match summary missing",
-            "SIFTALPHA_WEB_DEBUG_PID_NET_MATCH=%s TCP6_ROWS=%s TCP6_LISTEN_ROWS=%s TCP6_INODE_MATCHES=%s TCP6_LISTEN_INODE_MATCHES=%s" in script,
-        )
-        assertTrue("per-PID network stats helper missing", "siftalpha_web_debug_pid_net_stats()" in script)
-        assertTrue("network diagnostics must count LISTEN state", """if (${'$'}4 == "0A") listen_rows++""" in script)
-        assertTrue("network diagnostics must match project socket inodes", "project_inodes" in script && "INODE_MATCHES" in script)
-        assertTrue("network diagnostics must use the existing scoped PID list", "for web_debug_pid in ${'$'}web_debug_pids; do" in script)
+        val networkAvailabilityDiagnostic =
+            "SIFTALPHA_WEB_DEBUG_PID_NET=%s TCP_EXISTS=%s TCP_READABLE=%s TCP6_EXISTS=%s TCP6_READABLE=%s"
+        val tcpMatchDiagnostic =
+            "SIFTALPHA_WEB_DEBUG_PID_NET_MATCH=%s TCP_ROWS=%s LISTEN_ROWS=%s INODE_MATCHES=%s LISTEN_INODE_MATCHES=%s"
+        val tcp6MatchDiagnostic =
+            "SIFTALPHA_WEB_DEBUG_PID_NET_MATCH=%s TCP6_ROWS=%s TCP6_LISTEN_ROWS=%s TCP6_INODE_MATCHES=%s TCP6_LISTEN_INODE_MATCHES=%s"
+
+        assertTrue("host per-PID TCP path missing", "\"/proc/${'$'}web_debug_pid/net/tcp\"" in hostDebugScope)
+        assertTrue("guest per-PID TCP path missing", "\"/proc/${'$'}web_debug_pid/net/tcp\"" in guestDebugScope)
+        assertTrue("host per-PID TCP6 path missing", "\"/proc/${'$'}web_debug_pid/net/tcp6\"" in hostDebugScope)
+        assertTrue("guest per-PID TCP6 path missing", "\"/proc/${'$'}web_debug_pid/net/tcp6\"" in guestDebugScope)
+        assertTrue("host network availability diagnostic missing", networkAvailabilityDiagnostic in hostDebugScope)
+        assertTrue("guest network availability diagnostic missing", networkAvailabilityDiagnostic in guestDebugScope)
+        assertTrue("host TCP match summary missing", tcpMatchDiagnostic in hostDebugScope)
+        assertTrue("guest TCP match summary missing", tcpMatchDiagnostic in guestDebugScope)
+        assertTrue("host TCP6 match summary missing", tcp6MatchDiagnostic in hostDebugScope)
+        assertTrue("guest TCP6 match summary missing", tcp6MatchDiagnostic in guestDebugScope)
+        assertTrue("host per-PID network stats helper missing", "siftalpha_web_debug_pid_net_stats()" in hostDebugScope)
+        assertTrue("guest per-PID network stats helper missing", "siftalpha_web_debug_pid_net_stats()" in guestDebugScope)
+        assertTrue("host network diagnostics must count LISTEN state", """if (${'$'}4 == "0A") listen_rows++""" in hostDebugScope)
+        assertTrue("guest network diagnostics must count LISTEN state", """if (${'$'}4 == "0A") listen_rows++""" in guestDebugScope)
+        assertTrue("host network diagnostics must match project socket inodes", "project_inodes" in hostDebugScope && "INODE_MATCHES" in hostDebugScope)
+        assertTrue("guest network diagnostics must match project socket inodes", "project_inodes" in guestDebugScope && "INODE_MATCHES" in guestDebugScope)
+        assertTrue("host network diagnostics must use the existing scoped PID list", "for web_debug_pid in ${'$'}web_debug_pids; do" in hostDebugScope)
+        assertTrue("guest network diagnostics must use the existing scoped PID list", "for web_debug_pid in ${'$'}web_debug_pids; do" in guestDebugScope)
         assertTrue("host inode-to-port mapping must remain present", "siftalpha_web_ports_for_inodes()" in script)
         assertTrue("guest inode-to-port mapping must remain present", "guest_ports=\"${'$'}(" in script)
         assertTrue("HTTP probe must remain present", "timeout 1" in script)
