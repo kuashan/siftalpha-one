@@ -170,6 +170,56 @@ class PythonRuntimeAdapterTest {
         assertTrue("runtime identity id must precede Web Discovery", discovery > identityId)
         assertTrue("runtime identity directory must precede Web Discovery", discovery > identityDir)
     }
+
+    @Test
+    fun `python logs wire the current runtime log into bounded Web fallback`() {
+        val script = adapter.logs(project).shellScript
+        val innerStart = script.indexOf("runtime_web_procfs_success=\"${'$'}{1:-0}\"")
+        val innerEnd = script.indexOf("proot-distro login --bind", innerStart)
+
+        assertTrue("Python logs must contain the guest log command", innerStart >= 0)
+        assertTrue("Python log command must have a stable end", innerEnd > innerStart)
+        val inner = script.substring(innerStart, innerEnd)
+        val logTail = inner.indexOf("tail -n 160 \"${'$'}log\"")
+        val fallbackGuard = inner.indexOf("if [ \"${'$'}siftalpha_web_procfs_success\" != '1' ]; then")
+        val fallback = inner.indexOf("siftalpha_log_web_candidate='", fallbackGuard)
+
+        assertTrue("log path must be scoped to this runtime", inner.contains("log='/root/siftalpha/logs/run-runtime-id.log'"))
+        assertTrue("log fallback must run after the bounded log read", fallbackGuard > logTail)
+        assertTrue("log fallback must be guarded by procfs success", fallback > fallbackGuard)
+        assertTrue(inner.contains("SIFTALPHA_WEB_DISCOVERY_SOURCE=RUNTIME_LOG"))
+        assertTrue(inner.contains("SIFTALPHA_WEB_URL=%s"))
+        assertTrue(inner.contains("127\\.0\\.0\\.1"))
+        assertTrue(inner.contains("localhost"))
+        assertTrue(inner.contains("0\\.0\\.0\\.0"))
+        assertTrue(inner.contains("\\[::\\]"))
+        assertFalse("bare PORT output must not be treated as Web evidence", inner.contains("PORT:"))
+        assertFalse("external hosts must not be accepted by the shell candidate source", inner.contains("example.com"))
+    }
+
+    @Test
+    fun `python logs keep procfs discovery authoritative and preserve the endpoint gate`() {
+        val script = adapter.logs(project).shellScript
+        val procfsStart = script.indexOf("siftalpha_web_procfs_output=\"")
+        val procfsPass = script.indexOf("SIFTALPHA_WEB_AUTODISCOVERY=PASS ", procfsStart)
+        val procfsPrint = script.indexOf("printf '%s\\n' \"${'$'}siftalpha_web_procfs_output\"", procfsStart)
+        val guestLogs = script.indexOf("proot-distro login --bind", procfsPrint)
+
+        assertTrue("Python logs must retain project-scoped procfs discovery", procfsStart >= 0)
+        assertTrue("procfs success must be detected from the existing protocol", procfsPass > procfsStart)
+        assertTrue("existing procfs output must remain visible", procfsPrint > procfsPass)
+        assertTrue("runtime log fallback must be invoked after procfs discovery", guestLogs > procfsPrint)
+        assertTrue(script.contains("siftalpha_web_http_probe"))
+        assertTrue(script.contains("SIFTALPHA_WEB_AUTODISCOVERY=PASS"))
+        assertFalse(script.contains("seq 1 65535"))
+        assertFalse(script.contains("/proc/[0-9]*"))
+        assertFalse(script.contains("global ss"))
+        assertFalse(script.contains("netstat"))
+        assertFalse(script.contains("lsof"))
+        assertTrue(RuntimeWebEndpointProbe.targets("http://127.0.0.1:8766").isNotEmpty())
+        assertTrue(RuntimeWebEndpointProbe.targets("http://example.com:8766").isEmpty())
+    }
+
     @Test
     fun `custom run command remains delegated instead of forced to python entry`() {
         host.quotedInputs.clear()

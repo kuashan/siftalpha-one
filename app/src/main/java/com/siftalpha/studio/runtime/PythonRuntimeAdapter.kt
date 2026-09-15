@@ -567,6 +567,7 @@ SIFTALPHA_RUNNER
         val log = "/root/siftalpha/logs/run-$id.log"
         val state = "/root/siftalpha/state-$id.txt"
         val logsInner = """
+            siftalpha_web_procfs_success="${'$'}{1:-0}"
             log=${sh(log)}
             state=${sh(state)}
             echo '=== SiftAlpha Project Log ==='
@@ -583,6 +584,9 @@ SIFTALPHA_RUNNER
               tail -n 160 "${'$'}log"
             else
               echo 'SIFTALPHA_LOG=EMPTY'
+            fi
+            if [ "${'$'}siftalpha_web_procfs_success" != '1' ]; then
+              ${RuntimeWebLogDiscoveryShell.shellSnippet()}
             fi
         """.trimIndent()
         return """
@@ -602,8 +606,17 @@ SIFTALPHA_RUNNER
             else
               rm -f "${'$'}pid_file" "${'$'}pgid_file"
             fi
-            ${RuntimeWebPortDiscovery.shellSnippet()}
-            proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${sh(logsInner)} || true
+            siftalpha_web_procfs_output="${'$'}(
+              ${RuntimeWebPortDiscovery.shellSnippet()}
+            )"
+            printf '%s\n' "${'$'}siftalpha_web_procfs_output"
+            if printf '%s\n' "${'$'}siftalpha_web_procfs_output" | grep -q '^SIFTALPHA_WEB_AUTODISCOVERY=PASS '; then
+              siftalpha_web_procfs_success=1
+            else
+              siftalpha_web_procfs_success=0
+            fi
+            proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${sh(logsInner)} siftalpha-web-logs "${'$'}siftalpha_web_procfs_success" || true
+            unset siftalpha_web_procfs_output siftalpha_web_procfs_success
             if [ -s "${'$'}launch_log" ]; then
               echo '--- launcher ---'
               tail -n 40 "${'$'}launch_log" 2>/dev/null || true
