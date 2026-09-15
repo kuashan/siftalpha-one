@@ -238,5 +238,9 @@ OPTIONAL（建议配置）已经能够被检测和展示，但点击配置后会
 - Run #41 构建产物：[artifact ZIP](https://github.com/kuashan/siftalpha-one/actions/runs/34914830358/artifacts/10374759918)。
 - APK SHA-256：b1ed2c060af2804bae611a543852f8e2afc8d70650de00c661acb9aefbfc17da。
 - 稳定测试证书 SHA-256：3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928。
-- 正式 W2 测试 APK：本次提交将按工作流规则发布为预发布 Release。
+- 正式 W2 测试 APK：[直接下载](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-6e259f7/app-debug.apk)。
+- Release：[w2-test-6e259f7](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-6e259f7)。
+- Run #42：[Actions](https://github.com/kuashan/siftalpha-one/actions/runs/34915100958) 成功，包含单元测试、APK 组装、签名、证据收集和发布。
+- APK SHA-256：b1ed2c060af2804bae611a543852f8e2afc8d70650de00c661acb9aefbfc17da。
+- 稳定测试证书 SHA-256：3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928。
 

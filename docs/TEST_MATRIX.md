@@ -12,8 +12,8 @@
 - 版本：`0.8.0-alpha17`
 - versionCode：`93`
 - 包名：`com.siftalpha.studio`
-- 构建产物：[Run #41 artifact ZIP](https://github.com/kuashan/siftalpha-one/actions/runs/34914830358/artifacts/10374759918)
-- Release：本次提交触发发布，待 Actions 完成
+- APK：[直接下载](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-6e259f7/app-debug.apk)
+- Release：[w2-test-6e259f7](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-6e259f7)
 - APK SHA-256：b1ed2c060af2804bae611a543852f8e2afc8d70650de00c661acb9aefbfc17da
 
 ## B. 云端验证矩阵
@@ -27,14 +27,15 @@
 | C-05 | APK 元数据 | 包名、版本名和 versionCode 正确 | PASS | `com.siftalpha.studio`, alpha16, 92 |
 | C-06 | 发布资产 | 新版本 Release 中存在可下载 APK | PASS | [w2-test-8a91895](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-8a91895) |
 | C-07 | W2 编辑器云端构建 | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #41](https://github.com/kuashan/siftalpha-one/actions/runs/34914830358) |
+| C-08 | W2 测试 APK 发布 | 预发布 Release 可下载，资产校验值已记录 | PASS | [Actions Run #42](https://github.com/kuashan/siftalpha-one/actions/runs/34915100958) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-6e259f7) |
 
 ## C. 安装与升级矩阵
 
 | ID | 操作 | 期望 | 状态 |
 |---|---|---|---|
-| I-01 | 在 alpha15 上直接安装 alpha16 | 安装器允许覆盖，不要求卸载 | 待真机 |
+| I-01 | 在 alpha16 上直接安装 alpha17 | 安装器允许覆盖，不要求卸载 | 待真机 |
 | I-02 | 覆盖安装后打开 App | 项目、设置和已有本地数据仍可访问 | 待真机 |
-| I-03 | 覆盖安装后确认版本 | 显示 alpha16 / versionCode 92 | 待真机 |
+| I-03 | 覆盖安装后确认版本 | 显示 alpha17 / versionCode 93 | 待真机 |
 
 ## D. 配置功能矩阵
 
