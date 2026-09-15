@@ -206,12 +206,20 @@ class RuntimeWebPortDiscoveryTest {
 
         assertTrue("host project scope diagnostics must be wired", "siftalpha_web_diagnostic_status_for_scope PROJECT_PID_SCOPE" in script)
         assertTrue("guest project scope diagnostics must be wired", "siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE" in script)
-        assertTrue(
-            "guest procfs precheck failure must emit diagnostics",
-            script.split(
-                """siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE "${'$'}web_root_pid" "${'$'}web_pgid" "${'$'}guest_pids" ''""",
-            ).size - 1 >= 2,
+        val guestProcfsFailureBranch = script.substringAfter(
+            """if [ "${'$'}guest_fd_directory_present" -eq 0 ]; then""",
         )
+        val guestProcfsDiagnosticIndex = guestProcfsFailureBranch.indexOf(
+            "siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE",
+        )
+        val guestProcfsFailureIndex = guestProcfsFailureBranch.indexOf(
+            "SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE source=PROOT_PROJECT_PID_SCOPE",
+        )
+        val guestProcfsExitIndex = guestProcfsFailureBranch.indexOf("exit 0")
+
+        assertTrue("guest procfs precheck failure must emit diagnostics", guestProcfsDiagnosticIndex >= 0)
+        assertTrue("guest procfs diagnostic must precede failure status", guestProcfsFailureIndex > guestProcfsDiagnosticIndex)
+        assertTrue("guest procfs failure status must precede exit", guestProcfsExitIndex > guestProcfsFailureIndex)
         assertTrue("scope diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_SCOPE=%s" in script)
         assertTrue("self PID diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_SELF_PID=%s" in script)
         assertTrue("self PGID diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_SELF_PGID=%s" in script)
