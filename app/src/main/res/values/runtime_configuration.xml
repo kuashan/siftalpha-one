@@ -9,6 +9,7 @@
     <string name="runtime_configuration_status_pending_discovery">配置：等待首次运行检测配置需求</string>
     <string name="runtime_configuration_status_ready">配置：必需项已满足</string>
     <string name="runtime_configuration_button">配置</string>
+    <string name="runtime_configuration_view">查看配置</string>
     <string name="runtime_configuration_title">项目配置 · %1$s</string>
     <string name="runtime_configuration_summary">必需配置来自 .project.json；Studio 也会检测 Python 脚本中的环境变量读取。.env.example 和非必需读取只提供候选提示，不会擅自阻止运行。</string>
     <string name="runtime_configuration_required_section">必需配置</string>

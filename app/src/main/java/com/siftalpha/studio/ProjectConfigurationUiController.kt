@@ -155,7 +155,7 @@ class ProjectConfigurationUiController(
         }
 
         // Static candidates remain visible as reminders, but only required items enter the
-        // blocking wizard. Optional candidates must never make the user fill a form just to run.
+        // blocking wizard. Optional candidates open the editor directly and never block a run.
         val pendingRequiredItems = items.filter {
             it.severity == ConfigurationSeverity.REQUIRED && !it.isConfigured
         }
@@ -169,23 +169,47 @@ class ProjectConfigurationUiController(
             return
         }
 
-        showConfigurationList(
+        showConfigurationSummary(
             projectName = projectName,
             projectDocumentId = projectDocumentId,
             folderName = folderName,
             snapshot = snapshot,
             items = items,
-            onCompleted = onCompleted,
         )
     }
 
-    private fun showConfigurationList(
+    private fun showConfigurationSummary(
         projectName: String,
         projectDocumentId: String,
         folderName: String,
         snapshot: Snapshot,
         items: List<ConfigurationItem>,
-        onCompleted: () -> Unit,
+    ) {
+        AlertDialog.Builder(activity)
+            .setTitle(activity.getString(R.string.runtime_configuration_title, projectName))
+            .setMessage(
+                summaryText(snapshot) + "\n\n" +
+                    activity.getString(R.string.runtime_configuration_summary),
+            )
+            .setNegativeButton(R.string.common_close, null)
+            .setPositiveButton(R.string.runtime_configuration_view) { _, _ ->
+                showConfigurationEditor(
+                    projectName = projectName,
+                    projectDocumentId = projectDocumentId,
+                    folderName = folderName,
+                    snapshot = snapshot,
+                    items = items,
+                )
+            }
+            .show()
+    }
+
+    private fun showConfigurationEditor(
+        projectName: String,
+        projectDocumentId: String,
+        folderName: String,
+        snapshot: Snapshot,
+        items: List<ConfigurationItem>,
     ) {
         val labels = items.map { item ->
             val state = stateLabel(snapshot, item.key, item.required)
@@ -225,26 +249,14 @@ class ProjectConfigurationUiController(
             )
             .setItems(labels) { _, which ->
                 val selected = items[which]
-                if (
-                    selected.severity == ConfigurationSeverity.OPTIONAL &&
-                    !selected.isConfigured
-                ) {
-                    showOptionalPrompt(
-                        projectName = projectName,
-                        projectDocumentId = projectDocumentId,
-                        folderName = folderName,
-                        item = selected,
-                        onSaved = onCompleted,
-                    )
-                } else {
-                    showValueEditor(
-                        projectName = projectName,
-                        projectDocumentId = projectDocumentId,
-                        folderName = folderName,
-                        item = selected,
-                        onSaved = onCompleted,
-                    )
-                }
+                // Selecting an item always opens the editor immediately. In particular,
+                // OPTIONAL items must not terminate at an explanation-only dialog.
+                showValueEditor(
+                    projectName = projectName,
+                    projectDocumentId = projectDocumentId,
+                    folderName = folderName,
+                    item = selected,
+                )
             }
             .setNegativeButton(R.string.common_close, null)
             .show()
@@ -509,34 +521,6 @@ class ProjectConfigurationUiController(
             .joinToString(" · ")
     }
 
-    private fun showOptionalPrompt(
-        projectName: String,
-        projectDocumentId: String,
-        folderName: String,
-        item: ConfigurationItem,
-        onSaved: () -> Unit,
-    ) {
-        AlertDialog.Builder(activity)
-            .setTitle(
-                activity.getString(
-                    R.string.runtime_configuration_optional_title,
-                    item.key,
-                ),
-            )
-            .setMessage(R.string.runtime_configuration_optional_message)
-            .setNegativeButton(R.string.runtime_configuration_optional_later, null)
-            .setPositiveButton(R.string.runtime_configuration_optional_fill) { _, _ ->
-                showValueEditor(
-                    projectName = projectName,
-                    projectDocumentId = projectDocumentId,
-                    folderName = folderName,
-                    item = item,
-                    onSaved = onSaved,
-                )
-            }
-            .show()
-    }
-
     private fun showValueEditor(
         projectName: String,
         projectDocumentId: String,
@@ -555,17 +539,22 @@ class ProjectConfigurationUiController(
                 InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
             }
         }
+        val storageMessage = activity.getString(
+            if (item.secret) {
+                R.string.runtime_configuration_edit_secret_message
+            } else {
+                R.string.runtime_configuration_edit_value_message
+            },
+        )
+        val message = if (item.severity == ConfigurationSeverity.OPTIONAL) {
+            activity.getString(R.string.runtime_configuration_optional_message) +
+                "\n\n" + storageMessage
+        } else {
+            storageMessage
+        }
         val builder = AlertDialog.Builder(activity)
             .setTitle(activity.getString(R.string.runtime_configuration_edit_title, item.key))
-            .setMessage(
-                activity.getString(
-                    if (item.secret) {
-                        R.string.runtime_configuration_edit_secret_message
-                    } else {
-                        R.string.runtime_configuration_edit_value_message
-                    },
-                ),
-            )
+            .setMessage(message)
             .setView(input)
             .setNegativeButton(R.string.common_cancel, null)
             .setPositiveButton(R.string.runtime_configuration_save, null)

@@ -9,6 +9,7 @@
     <string name="runtime_configuration_status_pending_discovery">設定：等待首次執行檢測設定需求</string>
     <string name="runtime_configuration_status_ready">設定：必要項目已滿足</string>
     <string name="runtime_configuration_button">設定</string>
+    <string name="runtime_configuration_view">查看設定</string>
     <string name="runtime_configuration_title">專案設定 · %1$s</string>
     <string name="runtime_configuration_summary">必要設定來自 .project.json；Studio 也會檢查 Python 讀取的環境變數。.env.example 與選用項目只提供候選提示，不會因猜測而阻止執行。</string>
     <string name="runtime_configuration_required_section">必要設定</string>

@@ -9,6 +9,7 @@
     <string name="runtime_configuration_status_pending_discovery">구성: 첫 실행에서 필요한 항목을 감지할 때까지 대기 중</string>
     <string name="runtime_configuration_status_ready">구성: 필수 항목 충족</string>
     <string name="runtime_configuration_button">구성</string>
+    <string name="runtime_configuration_view">구성 보기</string>
     <string name="runtime_configuration_title">프로젝트 구성 · %1$s</string>
     <string name="runtime_configuration_summary">필수 설정은 .project.json에서 가져옵니다. Studio는 Python의 환경 변수 읽기도 검사합니다. .env.example과 선택 항목은 제안으로만 취급하며 추측으로 실행을 차단하지 않습니다.</string>
     <string name="runtime_configuration_required_section">필수 구성</string>
