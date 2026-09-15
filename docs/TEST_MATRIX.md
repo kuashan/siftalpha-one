@@ -21,7 +21,8 @@
 - 当前正式开发版本：`0.8.0-alpha25`
 - versionCode：`101`
 - 包名：`com.siftalpha.studio`
-- 当前 main HEAD：`893229ce26d49a6ea22c79d6e2be85290cb8b0c3`
+- Roadmap Cleanup base main HEAD：`38fb60af8e4c7a4b09eafb1cad0e305ae56fc353`
+- 本文档所在 docs branch：`codex/remove-w2-w5-roadmap`（尚未合并；branch HEAD 以 GitHub ref 为准）
 - alpha25 主线构建：[GitHub Actions Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426)，artifact 为 `siftalpha-w0-70`（ID `10405122896`）；Run #70 未发布 Release。
 - 最近一次带 Release 的 APK：[w2-test-4e899c6](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6)（历史 alpha19 产物）。
 
@@ -148,9 +149,9 @@
 | W-08 | 任一诊断失败场景 | 原有 `SIFTALPHA_WEB_AUTODISCOVERY` 兼容输出仍存在 | 云端构建通过，待真机 |
 | W-09 | Runtime START/PREPARE/STOP 回归 | 生命周期和 Browser 安全条件不受诊断字段影响 | 待后续 APK 真机回归 |
 
-## G. 合并后产品基线审计记录 — main@893229ce（历史审计）
+## G. 合并后产品基线审计记录 — Production baseline merge@893229ce（历史审计）
 
-本节是当前 main 基线的完成度审计，不覆盖范围外的未来功能。评级只使用 `COMPLETE`、`PARTIAL`、`MISSING`、`BLOCKED`；`PARTIAL` 表示实现存在，但架构收敛或验证证据仍不完整。
+本节记录 Production baseline merge 的历史完成度审计，不覆盖范围外的未来功能；Roadmap/docs base main 为 `38fb60af8e4c7a4b09eafb1cad0e305ae56fc353`。评级只使用 `COMPLETE`、`PARTIAL`、`MISSING`、`BLOCKED`；`PARTIAL` 表示实现存在，但架构收敛或验证证据仍不完整。
 
 | 领域 | 评级 | 当前源码证据与验证边界 |
 |---|---|---|

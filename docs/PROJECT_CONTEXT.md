@@ -2,11 +2,12 @@
 
 最后更新：2026-09-15（Roadmap Simplification / Planning Model Cleanup）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
-当前分支：`main`  
+产品基线分支：`main`
+Roadmap/docs 工作分支：`codex/remove-w2-w5-roadmap`
 当前实现版本：0.8.0-alpha25 / versionCode 101（Runtime Identity 与 Web Discovery 合并基线，云端构建和真机 04B/04C/04D 已验证）
-当前实现提交：[893229c](https://github.com/kuashan/siftalpha-one/commit/893229ce26d49a6ea22c79d6e2be85290cb8b0c3)
+Production baseline merge：[893229c](https://github.com/kuashan/siftalpha-one/commit/893229ce26d49a6ea22c79d6e2be85290cb8b0c3)
 上一版历史发布：[W2 test APK · w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)
-最近一次带 Release 的历史 APK：[W2 test APK · w2-test-4e899c6](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6)；alpha25 主线构建产物见 [Run #70 artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426/artifacts/10405122896)
+最近一次带 Release 的历史 APK：[W2 test APK · w2-test-4e899c6](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6)；Roadmap/docs base main 构建产物见 [Run #70 artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426/artifacts/10405122896)
 
 ## 1. 项目目标
 
@@ -125,7 +126,7 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 
 `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
 
-当前正式 main 构建证据：GitHub Actions [Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426)，head 为 `893229ce26d49a6ea22c79d6e2be85290cb8b0c3`，`Build and verify APK` 成功；artifact 为 `siftalpha-w0-70`（ID `10405122896`）。该构建完成仓库校验、`testDebugUnitTest`、`assembleDebug`、APK 元数据和签名证据收集。
+alpha25 Production baseline 构建证据：GitHub Actions [Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426)，其 head 为 Production baseline merge `893229ce26d49a6ea22c79d6e2be85290cb8b0c3`；`Build and verify APK` 成功，artifact 为 `siftalpha-w0-70`（ID `10405122896`）。该构建完成仓库校验、`testDebugUnitTest`、`assembleDebug`、APK 元数据和签名证据收集；之后的 Roadmap/docs 变更未修改 Production Code。
 
 ## 7. 历史 alpha16 验收计划（已过时，仅保留记录）
 
@@ -180,7 +181,7 @@ RuntimeLifecycleStore 读取历史 SharedPreferences 时必须兼容旧字符串
 
 ## 11. 合并后正式基线与产品能力审计（历史记录）
 
-本节记录截至 `main@893229ce26d49a6ea22c79d6e2be85290cb8b0c3` 的历史审计结果；原审计使用的阶段标签只作为历史记录保留，不再作为当前路线、阶段状态或完成度门槛。
+本节记录以 Production baseline merge `893229ce26d49a6ea22c79d6e2be85290cb8b0c3` 为依据的历史审计结果；原审计使用的阶段标签只作为历史记录保留，不再作为当前路线、阶段状态或完成度门槛。Roadmap/docs base main 为 `38fb60af8e4c7a4b09eafb1cad0e305ae56fc353`。
 
 ### 11.1 证据分类
 
