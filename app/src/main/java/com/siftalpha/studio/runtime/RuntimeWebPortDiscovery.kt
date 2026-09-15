@@ -137,14 +137,14 @@ object RuntimeWebPortDiscovery {
                 return 0
               fi
 
-              web_diagnostic_procfs_readable=0
+              web_diagnostic_fd_directory_present=0
               for web_pid in ${D}web_diagnostic_pids; do
-                if [ -r "/proc/${D}web_pid/fd" ]; then
-                  web_diagnostic_procfs_readable=1
+                if [ -d "/proc/${D}web_pid/fd" ]; then
+                  web_diagnostic_fd_directory_present=1
                   break
                 fi
               done
-              if [ "${D}web_diagnostic_procfs_readable" -eq 0 ]; then
+              if [ "${D}web_diagnostic_fd_directory_present" -eq 0 ]; then
                 printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE source=%s\n' "${D}web_diagnostic_source"
                 return 0
               fi
@@ -448,14 +448,14 @@ object RuntimeWebPortDiscovery {
           exit 0
         fi
 
-        guest_procfs_readable=0
+        guest_fd_directory_present=0
         for guest_pid in ${D}guest_pids; do
-          if [ -r "/proc/${D}guest_pid/fd" ]; then
-            guest_procfs_readable=1
+          if [ -d "/proc/${D}guest_pid/fd" ]; then
+            guest_fd_directory_present=1
             break
           fi
         done
-        if [ "${D}guest_procfs_readable" -eq 0 ]; then
+        if [ "${D}guest_fd_directory_present" -eq 0 ]; then
           echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE source=PROOT_PROJECT_PID_SCOPE'
           echo 'SIFTALPHA_WEB_GUEST_SCOPE=NO_SOCKET_INODES'
           exit 0

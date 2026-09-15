@@ -169,6 +169,37 @@ class RuntimeWebPortDiscoveryTest {
         assertFalse("discovery must not use the unsafe Termux UID fallback", "TERMUX_UID_UNIQUE_HTTP" in script)
     }
 
+    @Test
+    fun fdDirectoryPrecheckMatchesSocketEnumeration() {
+        val script = RuntimeWebPortDiscovery.shellSnippet()
+
+        assertTrue(
+            "host FD discovery must treat /proc/<pid>/fd as a directory",
+            "[ -d \"/proc/${'$'}web_pid/fd\" ]" in script,
+        )
+        assertTrue(
+            "guest FD discovery must treat /proc/<pid>/fd as a directory",
+            "[ -d \"/proc/${'$'}guest_pid/fd\" ]" in script,
+        )
+        assertFalse(
+            "host FD diagnostics must not use regular-file readability on an fd directory",
+            "[ -r \"/proc/${'$'}web_pid/fd\" ]" in script,
+        )
+        assertFalse(
+            "guest FD diagnostics must not use regular-file readability on an fd directory",
+            "[ -r \"/proc/${'$'}guest_pid/fd\" ]" in script,
+        )
+        assertTrue(
+            "host TCP table readability must remain guarded separately",
+            "[ -r \"${'$'}web_table\" ]" in script,
+        )
+        assertTrue(
+            "guest TCP table readability must remain guarded separately",
+            "[ -r \"${'$'}guest_table\" ]" in script,
+        )
+        assertTrue("FD enumeration must still use readlink", "readlink" in script)
+    }
+
     private fun observation(
         projectPidCount: Int = 1,
         procfsReadable: Boolean = true,
