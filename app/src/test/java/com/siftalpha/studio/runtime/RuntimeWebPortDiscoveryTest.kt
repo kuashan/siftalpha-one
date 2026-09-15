@@ -200,6 +200,32 @@ class RuntimeWebPortDiscoveryTest {
         assertTrue("FD enumeration must still use readlink", "readlink" in script)
     }
 
+    @Test
+    fun shellProbeIncludesScopedProcfsDiagnostics() {
+        val script = RuntimeWebPortDiscovery.shellSnippet()
+
+        assertTrue("host project scope diagnostics must be wired", "siftalpha_web_diagnostic_status_for_scope PROJECT_PID_SCOPE" in script)
+        assertTrue("guest project scope diagnostics must be wired", "siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE" in script)
+        assertTrue("scope diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_SCOPE=%s" in script)
+        assertTrue("self PID diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_SELF_PID=%s" in script)
+        assertTrue("self PGID diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_SELF_PGID=%s" in script)
+        assertTrue("root PID diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_ROOT_PID=%s" in script)
+        assertTrue("root PGID diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_ROOT_PGID=%s" in script)
+        assertTrue("PID list diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_PIDS=%s" in script)
+        assertTrue("PID count diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_PID_COUNT=%s" in script)
+        assertTrue("per-PID procfs summary missing", "SIFTALPHA_WEB_DEBUG_PID=%s PROC_DIR=%s FD_DIR=%s FD_ENUM=%s FD_COUNT=%s READLINK_SUCCESS=%s SOCKET_LINKS=%s" in script)
+        assertTrue("socket inode diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_SOCKET_INODES=%s" in script)
+        assertTrue("TCP diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_TCP_EXISTS=%s" in script && "SIFTALPHA_WEB_DEBUG_TCP_READABLE=%s" in script)
+        assertTrue("TCP6 diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_TCP6_EXISTS=%s" in script && "SIFTALPHA_WEB_DEBUG_TCP6_READABLE=%s" in script)
+        assertTrue("FD diagnostics must remain project PID scoped", "for web_debug_pid in ${'$'}web_debug_pids; do" in script)
+        assertTrue("socket FD readlink discovery must remain present", "readlink" in script)
+        assertTrue("HTTP endpoint probe must remain present", "timeout 1" in script)
+        assertTrue("FULL_IDENTITY guest discovery must remain present", "siftalpha-web identity" in script)
+        assertFalse("diagnostics must not enumerate global procfs", "/proc/[0-9]*" in script)
+        assertFalse("diagnostics must not add global listener discovery", "lsof" in script || "netstat" in script || " ss " in script)
+        assertFalse("diagnostics must not add an all-port scan", "seq 1 65535" in script)
+    }
+
     private fun observation(
         projectPidCount: Int = 1,
         procfsReadable: Boolean = true,

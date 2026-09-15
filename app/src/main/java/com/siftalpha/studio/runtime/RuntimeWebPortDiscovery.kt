@@ -109,7 +109,95 @@ object RuntimeWebPortDiscovery {
               done | awk 'NF && !seen[${D}1]++'
             }
 
+            siftalpha_web_debug_scope() {
+              local web_debug_source="${D}1"
+              local web_debug_root_pid="${D}2"
+              local web_debug_root_pgid="${D}3"
+              local web_debug_pids="${D}4"
+              local web_debug_inodes="${D}5"
+              local web_debug_self_pid="${D}${D}"
+              local web_debug_self_pgid
+              local web_debug_inode_count
+              local web_debug_pid_count=0
+              local web_debug_fd_count_total=0
+              local web_debug_readlink_success_total=0
+              local web_debug_socket_links_total=0
+              local web_debug_pid web_debug_proc_dir web_debug_fd_dir web_debug_proc_present
+              local web_debug_fd_present web_debug_fd_enum web_debug_entries web_debug_fd_count
+              local web_debug_readlink_success web_debug_socket_links web_debug_fd web_debug_link
+              local web_debug_inode web_debug_tcp_exists web_debug_tcp_readable
+              local web_debug_tcp6_exists web_debug_tcp6_readable
+              web_debug_self_pgid="${D}(ps -o pgid= -p "${D}${D}" 2>/dev/null | tr -d ' ' || true)"
+              web_debug_inode_count="${D}(printf '%s\n' "${D}web_debug_inodes" | awk 'NF { count++ } END { print count + 0 }' || printf '0')"
+              printf 'SIFTALPHA_WEB_DEBUG_SCOPE=%s\n' "${D}web_debug_source"
+              printf 'SIFTALPHA_WEB_DEBUG_SELF_PID=%s\n' "${D}web_debug_self_pid"
+              printf 'SIFTALPHA_WEB_DEBUG_SELF_PGID=%s\n' "${D}web_debug_self_pgid"
+              printf 'SIFTALPHA_WEB_DEBUG_ROOT_PID=%s\n' "${D}web_debug_root_pid"
+              printf 'SIFTALPHA_WEB_DEBUG_ROOT_PGID=%s\n' "${D}web_debug_root_pgid"
+              printf 'SIFTALPHA_WEB_DEBUG_PIDS=%s\n' "${D}web_debug_pids"
+              printf 'SIFTALPHA_WEB_DEBUG_SOCKET_INODES=%s\n' "${D}web_debug_inode_count"
+              for web_debug_pid in ${D}web_debug_pids; do
+                web_debug_pid_count="${D}((web_debug_pid_count + 1))"
+                web_debug_proc_dir="/proc/${D}web_debug_pid"
+                web_debug_fd_dir="${D}web_debug_proc_dir/fd"
+                web_debug_proc_present=NO
+                web_debug_fd_present=NO
+                web_debug_fd_enum=NO
+                web_debug_entries=''
+                web_debug_fd_count=0
+                web_debug_readlink_success=0
+                web_debug_socket_links=0
+                if [ -d "${D}web_debug_proc_dir" ]; then
+                  web_debug_proc_present=YES
+                  if [ -d "${D}web_debug_fd_dir" ]; then
+                    web_debug_fd_present=YES
+                    if web_debug_entries="${D}(ls -1A "${D}web_debug_fd_dir" 2>/dev/null)"; then
+                      web_debug_fd_enum=YES
+                      web_debug_fd_count="${D}(printf '%s\n' "${D}web_debug_entries" | awk 'NF { count++ } END { print count + 0 }' || printf '0')"
+                      for web_debug_fd in "${D}web_debug_fd_dir"/*; do
+                        if [ -e "${D}web_debug_fd" ] || [ -L "${D}web_debug_fd" ]; then
+                          if web_debug_link="${D}(readlink "${D}web_debug_fd" 2>/dev/null)"; then
+                            web_debug_readlink_success="${D}((web_debug_readlink_success + 1))"
+                            case "${D}web_debug_link" in
+                              socket:\[*\])
+                                web_debug_inode="${D}{web_debug_link#socket:[}"
+                                web_debug_inode="${D}{web_debug_inode%]}"
+                                case "${D}web_debug_inode" in
+                                  ''|*[!0-9]*) ;;
+                                  *) web_debug_socket_links="${D}((web_debug_socket_links + 1))" ;;
+                                esac
+                                ;;
+                            esac
+                          fi
+                        fi
+                      done
+                    fi
+                  fi
+                fi
+                web_debug_fd_count_total="${D}((web_debug_fd_count_total + web_debug_fd_count))"
+                web_debug_readlink_success_total="${D}((web_debug_readlink_success_total + web_debug_readlink_success))"
+                web_debug_socket_links_total="${D}((web_debug_socket_links_total + web_debug_socket_links))"
+                printf 'SIFTALPHA_WEB_DEBUG_PID=%s PROC_DIR=%s FD_DIR=%s FD_ENUM=%s FD_COUNT=%s READLINK_SUCCESS=%s SOCKET_LINKS=%s\n' \
+                  "${D}web_debug_pid" "${D}web_debug_proc_present" "${D}web_debug_fd_present" \
+                  "${D}web_debug_fd_enum" "${D}web_debug_fd_count" \
+                  "${D}web_debug_readlink_success" "${D}web_debug_socket_links"
+              done
+              printf 'SIFTALPHA_WEB_DEBUG_PID_COUNT=%s\n' "${D}web_debug_pid_count"
+              printf 'SIFTALPHA_WEB_DEBUG_FD_COUNT_TOTAL=%s\n' "${D}web_debug_fd_count_total"
+              printf 'SIFTALPHA_WEB_DEBUG_READLINK_SUCCESS_TOTAL=%s\n' "${D}web_debug_readlink_success_total"
+              printf 'SIFTALPHA_WEB_DEBUG_SOCKET_LINKS_TOTAL=%s\n' "${D}web_debug_socket_links_total"
+              if [ -e /proc/net/tcp ]; then web_debug_tcp_exists=YES; else web_debug_tcp_exists=NO; fi
+              if [ -r /proc/net/tcp ]; then web_debug_tcp_readable=YES; else web_debug_tcp_readable=NO; fi
+              printf 'SIFTALPHA_WEB_DEBUG_TCP_EXISTS=%s\n' "${D}web_debug_tcp_exists"
+              printf 'SIFTALPHA_WEB_DEBUG_TCP_READABLE=%s\n' "${D}web_debug_tcp_readable"
+              if [ -e /proc/net/tcp6 ]; then web_debug_tcp6_exists=YES; else web_debug_tcp6_exists=NO; fi
+              if [ -r /proc/net/tcp6 ]; then web_debug_tcp6_readable=YES; else web_debug_tcp6_readable=NO; fi
+              printf 'SIFTALPHA_WEB_DEBUG_TCP6_EXISTS=%s\n' "${D}web_debug_tcp6_exists"
+              printf 'SIFTALPHA_WEB_DEBUG_TCP6_READABLE=%s\n' "${D}web_debug_tcp6_readable"
+            }
+
             siftalpha_web_ports_for_inodes() {
+
               web_inodes=" ${D}1 "
               [ "${D}web_inodes" != '  ' ] || return 0
               for web_table in /proc/net/tcp /proc/net/tcp6; do
@@ -132,6 +220,9 @@ object RuntimeWebPortDiscovery {
               web_diagnostic_source="${D}1"
               web_diagnostic_pids="${D}2"
               web_diagnostic_inodes="${D}3"
+              siftalpha_web_debug_scope \
+                "${D}web_diagnostic_source" "${D}4" "${D}5" \
+                "${D}web_diagnostic_pids" "${D}web_diagnostic_inodes"
               if [ -z "${D}{web_diagnostic_pids// }" ]; then
                 printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS source=%s\n' "${D}web_diagnostic_source"
                 return 0
@@ -344,7 +435,7 @@ object RuntimeWebPortDiscovery {
               web_primary_pids="${D}(siftalpha_web_runtime_pids "${D}web_root_pid" "${D}web_pgid" | tr '\n' ' ')"
               # shellcheck disable=SC2086
               web_primary_inodes="${D}(siftalpha_web_socket_inodes_for_pids ${D}web_primary_pids | tr '\n' ' ')"
-              siftalpha_web_diagnostic_status_for_scope PROJECT_PID_SCOPE "${D}web_primary_pids" "${D}web_primary_inodes"
+              siftalpha_web_diagnostic_status_for_scope PROJECT_PID_SCOPE "${D}web_primary_pids" "${D}web_primary_inodes" "${D}web_root_pid" "${D}web_pgid"
               web_ports="${D}(siftalpha_web_candidate_ports "${D}web_root_pid" "${D}web_pgid" | tr '\n' ' ')"
 
               if [ -n "${D}{web_ports// }" ]; then
@@ -442,7 +533,95 @@ object RuntimeWebPortDiscovery {
             fi
           } | awk 'NF && !seen[${D}1]++' | tr '\n' ' '
         )"
+        siftalpha_web_debug_scope() {
+          local web_debug_source="${D}1"
+          local web_debug_root_pid="${D}2"
+          local web_debug_root_pgid="${D}3"
+          local web_debug_pids="${D}4"
+          local web_debug_inodes="${D}5"
+          local web_debug_self_pid="${D}${D}"
+          local web_debug_self_pgid
+          local web_debug_inode_count
+          local web_debug_pid_count=0
+          local web_debug_fd_count_total=0
+          local web_debug_readlink_success_total=0
+          local web_debug_socket_links_total=0
+          local web_debug_pid web_debug_proc_dir web_debug_fd_dir web_debug_proc_present
+          local web_debug_fd_present web_debug_fd_enum web_debug_entries web_debug_fd_count
+          local web_debug_readlink_success web_debug_socket_links web_debug_fd web_debug_link
+          local web_debug_inode web_debug_tcp_exists web_debug_tcp_readable
+          local web_debug_tcp6_exists web_debug_tcp6_readable
+          web_debug_self_pgid="${D}(ps -o pgid= -p "${D}${D}" 2>/dev/null | tr -d ' ' || true)"
+          web_debug_inode_count="${D}(printf '%s\n' "${D}web_debug_inodes" | awk 'NF { count++ } END { print count + 0 }' || printf '0')"
+          printf 'SIFTALPHA_WEB_DEBUG_SCOPE=%s\n' "${D}web_debug_source"
+          printf 'SIFTALPHA_WEB_DEBUG_SELF_PID=%s\n' "${D}web_debug_self_pid"
+          printf 'SIFTALPHA_WEB_DEBUG_SELF_PGID=%s\n' "${D}web_debug_self_pgid"
+          printf 'SIFTALPHA_WEB_DEBUG_ROOT_PID=%s\n' "${D}web_debug_root_pid"
+          printf 'SIFTALPHA_WEB_DEBUG_ROOT_PGID=%s\n' "${D}web_debug_root_pgid"
+          printf 'SIFTALPHA_WEB_DEBUG_PIDS=%s\n' "${D}web_debug_pids"
+          printf 'SIFTALPHA_WEB_DEBUG_SOCKET_INODES=%s\n' "${D}web_debug_inode_count"
+          for web_debug_pid in ${D}web_debug_pids; do
+            web_debug_pid_count="${D}((web_debug_pid_count + 1))"
+            web_debug_proc_dir="/proc/${D}web_debug_pid"
+            web_debug_fd_dir="${D}web_debug_proc_dir/fd"
+            web_debug_proc_present=NO
+            web_debug_fd_present=NO
+            web_debug_fd_enum=NO
+            web_debug_entries=''
+            web_debug_fd_count=0
+            web_debug_readlink_success=0
+            web_debug_socket_links=0
+            if [ -d "${D}web_debug_proc_dir" ]; then
+              web_debug_proc_present=YES
+              if [ -d "${D}web_debug_fd_dir" ]; then
+                web_debug_fd_present=YES
+                if web_debug_entries="${D}(ls -1A "${D}web_debug_fd_dir" 2>/dev/null)"; then
+                  web_debug_fd_enum=YES
+                  web_debug_fd_count="${D}(printf '%s\n' "${D}web_debug_entries" | awk 'NF { count++ } END { print count + 0 }' || printf '0')"
+                  for web_debug_fd in "${D}web_debug_fd_dir"/*; do
+                    if [ -e "${D}web_debug_fd" ] || [ -L "${D}web_debug_fd" ]; then
+                      if web_debug_link="${D}(readlink "${D}web_debug_fd" 2>/dev/null)"; then
+                        web_debug_readlink_success="${D}((web_debug_readlink_success + 1))"
+                        case "${D}web_debug_link" in
+                          socket:\[*\])
+                            web_debug_inode="${D}{web_debug_link#socket:[}"
+                            web_debug_inode="${D}{web_debug_inode%]}"
+                            case "${D}web_debug_inode" in
+                              ''|*[!0-9]*) ;;
+                              *) web_debug_socket_links="${D}((web_debug_socket_links + 1))" ;;
+                            esac
+                            ;;
+                        esac
+                      fi
+                    fi
+                  done
+                fi
+              fi
+            fi
+            web_debug_fd_count_total="${D}((web_debug_fd_count_total + web_debug_fd_count))"
+            web_debug_readlink_success_total="${D}((web_debug_readlink_success_total + web_debug_readlink_success))"
+            web_debug_socket_links_total="${D}((web_debug_socket_links_total + web_debug_socket_links))"
+            printf 'SIFTALPHA_WEB_DEBUG_PID=%s PROC_DIR=%s FD_DIR=%s FD_ENUM=%s FD_COUNT=%s READLINK_SUCCESS=%s SOCKET_LINKS=%s\n' \
+              "${D}web_debug_pid" "${D}web_debug_proc_present" "${D}web_debug_fd_present" \
+              "${D}web_debug_fd_enum" "${D}web_debug_fd_count" \
+              "${D}web_debug_readlink_success" "${D}web_debug_socket_links"
+          done
+          printf 'SIFTALPHA_WEB_DEBUG_PID_COUNT=%s\n' "${D}web_debug_pid_count"
+          printf 'SIFTALPHA_WEB_DEBUG_FD_COUNT_TOTAL=%s\n' "${D}web_debug_fd_count_total"
+          printf 'SIFTALPHA_WEB_DEBUG_READLINK_SUCCESS_TOTAL=%s\n' "${D}web_debug_readlink_success_total"
+          printf 'SIFTALPHA_WEB_DEBUG_SOCKET_LINKS_TOTAL=%s\n' "${D}web_debug_socket_links_total"
+          if [ -e /proc/net/tcp ]; then web_debug_tcp_exists=YES; else web_debug_tcp_exists=NO; fi
+          if [ -r /proc/net/tcp ]; then web_debug_tcp_readable=YES; else web_debug_tcp_readable=NO; fi
+          printf 'SIFTALPHA_WEB_DEBUG_TCP_EXISTS=%s\n' "${D}web_debug_tcp_exists"
+          printf 'SIFTALPHA_WEB_DEBUG_TCP_READABLE=%s\n' "${D}web_debug_tcp_readable"
+          if [ -e /proc/net/tcp6 ]; then web_debug_tcp6_exists=YES; else web_debug_tcp6_exists=NO; fi
+          if [ -r /proc/net/tcp6 ]; then web_debug_tcp6_readable=YES; else web_debug_tcp6_readable=NO; fi
+          printf 'SIFTALPHA_WEB_DEBUG_TCP6_EXISTS=%s\n' "${D}web_debug_tcp6_exists"
+          printf 'SIFTALPHA_WEB_DEBUG_TCP6_READABLE=%s\n' "${D}web_debug_tcp6_readable"
+        }
+
         if [ -z "${D}{guest_pids// }" ]; then
+          siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE "${D}web_root_pid" "${D}web_pgid" "${D}guest_pids" ''
           echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS source=PROOT_PROJECT_PID_SCOPE'
           echo 'SIFTALPHA_WEB_GUEST_SCOPE=NO_PROJECT_PIDS'
           exit 0
@@ -479,6 +658,7 @@ object RuntimeWebPortDiscovery {
             done
           done | awk 'NF && !seen[${D}1]++' | tr '\n' ' '
         )"
+        siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE "${D}web_root_pid" "${D}web_pgid" "${D}guest_pids" "${D}guest_inodes"
         if [ -z "${D}{guest_inodes// }" ]; then
           echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_SOCKET_INODES source=PROOT_PROJECT_PID_SCOPE'
           echo 'SIFTALPHA_WEB_GUEST_SCOPE=NO_SOCKET_INODES'
