@@ -32,6 +32,7 @@
 | C-10 | W2 Runtime 展示状态分离 APK 发布 | 预发布 Release 可下载，版本/签名/SHA-256 已记录 | PASS | [Actions Run #45](https://github.com/kuashan/siftalpha-one/actions/runs/34918441426) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-febcabb) | 
 | C-11 | W2 RuntimeLifecycleStore 候选验证 | 单元测试先通过，随后 APK 组装通过 | PASS | [候选 Actions Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615) | 
 | C-12 | W2 RuntimeLifecycleStore 正式 APK 发布 | 正式 main 单元测试、APK 组装、稳定签名和 Release 通过 | PASS | [Actions Run #47](https://github.com/kuashan/siftalpha-one/actions/runs/34923173498) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6) |
+| C-13 | W2 Web Discovery Diagnostic Enhancement 云端验证 | 仓库校验、单元测试、APK 组装、签名和证据收集通过；不发布 Release | PASS | [Actions Run #49](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920/artifacts/10379489647) |
 
 ## C. 安装与升级矩阵
 
@@ -126,12 +127,12 @@
 
 | ID | 操作/模拟条件 | 期望诊断输出 | 状态 |
 |---|---|---|---|
-| W-01 | 项目 PID 列表为空 | `SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS` | 单元测试待云端执行 |
-| W-02 | 有项目 PID，但没有可读 socket inode | `SIFTALPHA_WEB_DISCOVERY_STATUS=NO_SOCKET_INODES` | 单元测试待云端执行 |
-| W-03 | 项目 procfs 或 TCP 表不可读 | `SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE` | 单元测试待云端执行 |
-| W-04 | 有 socket inode，但 TCP 表中没有匹配 inode | `SIFTALPHA_WEB_DISCOVERY_STATUS=NO_INODE_MATCH` | 单元测试待云端执行 |
-| W-05 | 匹配到 LISTEN 端口，尚未完成 HTTP 检查 | `SIFTALPHA_WEB_DISCOVERY_STATUS=LISTEN_PORT_FOUND` 与 `SIFTALPHA_WEB_DISCOVERY_STAGE=LISTEN_FOUND` | 单元测试待云端执行 |
-| W-06 | 匹配到端口，但 HTTP 探测不可达 | `SIFTALPHA_WEB_DISCOVERY_STATUS=NO_HTTP_ENDPOINT` | 单元测试待云端执行 |
-| W-07 | HTTP 探测成功 | `SIFTALPHA_WEB_DISCOVERY_STATUS=PASS`，并保留原有 PASS/URL 输出 | 单元测试待云端执行 |
-| W-08 | 任一诊断失败场景 | 原有 `SIFTALPHA_WEB_AUTODISCOVERY` 兼容输出仍存在 | 静态检查通过，待云端 |
+| W-01 | 项目 PID 列表为空 | `SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS` | 云端单元测试通过，待真机 |
+| W-02 | 有项目 PID，但没有可读 socket inode | `SIFTALPHA_WEB_DISCOVERY_STATUS=NO_SOCKET_INODES` | 云端单元测试通过，待真机 |
+| W-03 | 项目 procfs 或 TCP 表不可读 | `SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE` | 云端单元测试通过，待真机 |
+| W-04 | 有 socket inode，但 TCP 表中没有匹配 inode | `SIFTALPHA_WEB_DISCOVERY_STATUS=NO_INODE_MATCH` | 云端单元测试通过，待真机 |
+| W-05 | 匹配到 LISTEN 端口，尚未完成 HTTP 检查 | `SIFTALPHA_WEB_DISCOVERY_STATUS=LISTEN_PORT_FOUND` 与 `SIFTALPHA_WEB_DISCOVERY_STAGE=LISTEN_FOUND` | 云端单元测试通过，待真机 |
+| W-06 | 匹配到端口，但 HTTP 探测不可达 | `SIFTALPHA_WEB_DISCOVERY_STATUS=NO_HTTP_ENDPOINT` | 云端单元测试通过，待真机 |
+| W-07 | HTTP 探测成功 | `SIFTALPHA_WEB_DISCOVERY_STATUS=PASS`，并保留原有 PASS/URL 输出 | 云端单元测试通过，待真机 |
+| W-08 | 任一诊断失败场景 | 原有 `SIFTALPHA_WEB_AUTODISCOVERY` 兼容输出仍存在 | 云端构建通过，待真机 |
 | W-09 | Runtime START/PREPARE/STOP 回归 | 生命周期和 Browser 安全条件不受诊断字段影响 | 待后续 APK 真机回归 |

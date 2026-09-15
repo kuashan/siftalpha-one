@@ -330,6 +330,11 @@ App 进入运行中心时，`RuntimeLifecycleStore.read()` 在读取历史 Share
 ### 验证状态
 
 - 诊断分类单元测试已补充，等待可用的项目 Gradle 环境执行。
-- 诊断分类单元测试已补充；已尝试执行 `./gradlew testDebugUnitTest`，但当前仓库不含 Gradle Wrapper，执行环境也没有 `gradle` 命令，因此本轮未能执行项目单元测试。
+- 诊断分类单元测试已补充；本地执行环境不含 Gradle Wrapper，云端负责执行项目测试。
 - 已通过 `git diff --check` 以及主进程/PRoot 诊断 shell 语法检查。
-- 按本轮要求未提交、未触发 GitHub Actions、未构建 APK，尚未进行真机测试。
+- GitHub Actions Run #49 成功：仓库校验、`testDebugUnitTest`、`assembleDebug`、APK 证据收集全部通过；[查看 Run #49](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920)。
+- 云端构建结果：`BUILD SUCCESSFUL`，`testDebugUnitTest assembleDebug` 耗时约 1 分 8 秒。
+- APK：包名 `com.siftalpha.studio`，版本 `0.8.0-alpha19`，versionCode `95`；APK SHA-256 为 `851925953f85b11f52d6d2d504ce92b7c9ae86ce419df1c1db5f294095a243d3`。
+- 稳定测试证书 SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+- 云端 artifact：[下载 siftalpha-w0-49](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920/artifacts/10379489647)；Release 发布步骤已跳过。
+- 已推送当前范围验证提交 `14733f7`，未增加额外功能；等待用户进行真机覆盖安装测试。
