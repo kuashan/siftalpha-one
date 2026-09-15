@@ -208,7 +208,9 @@ class RuntimeWebPortDiscoveryTest {
         assertTrue("guest project scope diagnostics must be wired", "siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE" in script)
         assertTrue(
             "guest procfs precheck failure must emit diagnostics",
-            script.split("siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE ${'$'}web_root_pid ${'$'}web_pgid ${'$'}guest_pids ''").size - 1 >= 2,
+            script.split(
+                """siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE "${'$'}web_root_pid" "${'$'}web_pgid" "${'$'}guest_pids" ''""",
+            ).size - 1 >= 2,
         )
         assertTrue("scope diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_SCOPE=%s" in script)
         assertTrue("self PID diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_SELF_PID=%s" in script)
