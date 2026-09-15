@@ -98,6 +98,7 @@ class PythonRuntimeAdapterTest {
         assertTrue(rawQuotedInputs.contains(RuntimeIdentityStore.SCHEMA_KEY))
         assertTrue(rawQuotedInputs.contains(RuntimeIdentityStore.GUEST_ROOT_PID_KEY))
         assertTrue(rawQuotedInputs.contains(RuntimeIdentityStore.GUEST_ROOT_PGID_KEY))
+        assertTrue(rawQuotedInputs.contains("SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=RUNNER"))
         assertTrue(script.contains("identity_dir=\"${'$'}runtime_dir/runtime-id\""))
         assertTrue(script.contains("${RuntimeIdentityStore.GUEST_RUNTIME_ROOT}/runtime-id"))
         assertTrue(script.contains("pid_file=\"${'$'}runtime_dir/runtime-id.pid\""))
@@ -105,6 +106,21 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("SIFTALPHA_RUNTIME_SESSION=SETSID"))
         assertTrue(script.contains("SIFTALPHA_RUNTIME_BACKEND=TERMUX_PROOT_PID"))
         assertTrue(script.contains("SIFTALPHA_STATUS=RUNNING"))
+    }
+
+    @Test
+    fun `guest root identity is published before the long lived runtime command`() {
+        host.quotedInputs.clear()
+        adapter.start(project)
+        val runner = host.quotedInputs.joinToString("\n---\n")
+
+        val publish = runner.indexOf("siftalpha_runtime_identity_write_guest")
+        val runningState = runner.indexOf("printf 'STATE=RUNNING")
+        val runtimeCommand = runner.indexOf("bash -c \"${'$'}configured_run\"")
+
+        assertTrue("guest root must be published", publish >= 0)
+        assertTrue("runner must publish identity before declaring RUNNING", runningState > publish)
+        assertTrue("runtime command must run after the root identity is published", runtimeCommand > publish)
     }
 
     @Test

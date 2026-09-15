@@ -52,6 +52,47 @@ class RuntimeIdentityTest {
                 legacyPidAvailable = false,
             ),
         )
+        assertEquals(
+            RuntimeIdentitySource.METADATA_MISMATCH,
+            RuntimeIdentityStore.sourceFor(
+                hostIdentityAvailable = true,
+                guestIdentityAvailable = true,
+                legacyPidAvailable = true,
+                metadataMatches = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `identity usage only reports legacy when legacy PID scope is selected`() {
+        assertEquals(
+            RuntimeIdentityUsage.FULL_IDENTITY,
+            RuntimeIdentityStore.usageFor(RuntimeIdentitySource.FULL_IDENTITY, legacyPidUsed = false),
+        )
+        assertEquals(
+            RuntimeIdentityUsage.UNAVAILABLE,
+            RuntimeIdentityStore.usageFor(RuntimeIdentitySource.HOST_ONLY, legacyPidUsed = false),
+        )
+        assertEquals(
+            RuntimeIdentityUsage.UNAVAILABLE,
+            RuntimeIdentityStore.usageFor(RuntimeIdentitySource.GUEST_ONLY, legacyPidUsed = false),
+        )
+        assertEquals(
+            RuntimeIdentityUsage.UNAVAILABLE,
+            RuntimeIdentityStore.usageFor(RuntimeIdentitySource.METADATA_MISMATCH, legacyPidUsed = false),
+        )
+        assertEquals(
+            RuntimeIdentityUsage.LEGACY_PID,
+            RuntimeIdentityStore.usageFor(RuntimeIdentitySource.HOST_ONLY, legacyPidUsed = true),
+        )
+        assertEquals(
+            RuntimeIdentityUsage.LEGACY_PID,
+            RuntimeIdentityStore.usageFor(RuntimeIdentitySource.METADATA_MISMATCH, legacyPidUsed = true),
+        )
+        assertEquals(
+            RuntimeIdentityUsage.LEGACY_PID,
+            RuntimeIdentityStore.usageFor(RuntimeIdentitySource.FULL_IDENTITY, legacyPidUsed = true),
+        )
     }
 
     @Test
@@ -103,6 +144,39 @@ class RuntimeIdentityTest {
             assertEquals(202L, restored.hostSessionPgid)
             assertEquals(9L, restored.guestRootPid)
             assertEquals(9L, restored.guestRootPgid)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `host and guest token mismatch returns an explicit resolution`() {
+        val root = Files.createTempDirectory("siftalpha-identity-mismatch").toFile()
+        try {
+            val store = RuntimeIdentityStore(root)
+            val host = RuntimeIdentity(
+                runtimeId = "runtime-id",
+                runtimeToken = "host-token",
+                startTime = 42L,
+                hostSessionPid = 202L,
+                hostSessionPgid = 202L,
+            )
+            val guest = RuntimeIdentity(
+                runtimeId = "runtime-id",
+                runtimeToken = "guest-token",
+                startTime = 42L,
+                guestRootPid = 9L,
+                guestRootPgid = 9L,
+            )
+
+            assertTrue(store.writeHost(host))
+            assertTrue(store.writeGuest(guest))
+
+            val resolution = store.resolve("runtime-id")
+            assertEquals(RuntimeIdentitySource.METADATA_MISMATCH, resolution.source)
+            assertNull(resolution.identity)
+            assertEquals("host-token", resolution.hostIdentity?.runtimeToken)
+            assertEquals("guest-token", resolution.guestIdentity?.runtimeToken)
         } finally {
             root.deleteRecursively()
         }

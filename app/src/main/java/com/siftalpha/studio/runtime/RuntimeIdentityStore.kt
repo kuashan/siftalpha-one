@@ -23,35 +23,85 @@ class RuntimeIdentityStore(
         validate(identity) && writeFile(identity.runtimeId, GUEST_IDENTITY_FILE_NAME, encodeGuest(identity))
 
     /**
-     * Reads the combined identity. Host and guest sidecars are merged when both are present.
-     * A missing, malformed, or metadata-inconsistent sidecar is treated as unavailable.
+     * Resolves the sidecars without collapsing a host/guest metadata mismatch into UNAVAILABLE.
+     * A mismatched pair never produces a merged identity, but both valid sides remain available to
+     * diagnostics and the caller can decide whether a legacy PID scope is appropriate.
      */
-    fun read(runtimeId: String): RuntimeIdentity? {
-        if (!isSafeRuntimeId(runtimeId)) return null
+    fun resolve(runtimeId: String): RuntimeIdentityResolution {
+        if (!isSafeRuntimeId(runtimeId)) {
+            return RuntimeIdentityResolution(RuntimeIdentitySource.UNAVAILABLE)
+        }
         val runtimeDirectory = File(rootDirectory, runtimeId)
         val hostFile = File(runtimeDirectory, IDENTITY_FILE_NAME)
         val guestFile = File(runtimeDirectory, GUEST_IDENTITY_FILE_NAME)
+        val hostPresent = hostFile.isFile
+        val guestPresent = guestFile.isFile
+        val legacyPidAvailable = legacyPidFilesExist(runtimeId)
         val host = readFile(hostFile)
         val guest = readFile(guestFile)
-        if ((hostFile.exists() && host == null) || (guestFile.exists() && guest == null)) return null
-        if (host == null && guest == null) return null
+        if (!hostPresent && !guestPresent) {
+            return RuntimeIdentityResolution(
+                source = sourceFor(false, false, legacyPidAvailable),
+            )
+        }
+        if ((hostPresent && host == null) || (guestPresent && guest == null)) {
+            return RuntimeIdentityResolution(
+                source = RuntimeIdentitySource.METADATA_MISMATCH,
+                hostIdentity = host,
+                guestIdentity = guest,
+            )
+        }
+        if (host == null) {
+            return RuntimeIdentityResolution(
+                source = RuntimeIdentitySource.GUEST_ONLY,
+                identity = guest,
+                guestIdentity = guest,
+            )
+        }
+        if (guest == null) {
+            return RuntimeIdentityResolution(
+                source = RuntimeIdentitySource.HOST_ONLY,
+                identity = host,
+                hostIdentity = host,
+            )
+        }
 
-        val metadata = host ?: guest ?: return null
-        if (!metadataMatches(metadata, runtimeId)) return null
-        if (guest != null && !metadataMatches(guest, runtimeId)) return null
-        if (host != null && guest != null && !sameMetadata(host, guest)) return null
+        if (!metadataMatches(host, runtimeId) || !metadataMatches(guest, runtimeId) || !sameMetadata(host, guest)) {
+            return RuntimeIdentityResolution(
+                source = RuntimeIdentitySource.METADATA_MISMATCH,
+                hostIdentity = host,
+                guestIdentity = guest,
+            )
+        }
 
-        return RuntimeIdentity(
+        val merged = RuntimeIdentity(
             runtimeId = runtimeId,
-            runtimeToken = metadata.runtimeToken,
-            startTime = metadata.startTime,
-            schemaVersion = metadata.schemaVersion,
-            hostSessionPid = host?.hostSessionPid ?: metadata.hostSessionPid,
-            hostSessionPgid = host?.hostSessionPgid ?: metadata.hostSessionPgid,
-            guestRootPid = guest?.guestRootPid ?: metadata.guestRootPid,
-            guestRootPgid = guest?.guestRootPgid ?: metadata.guestRootPgid,
-        ).takeIf { validate(it, expectedRuntimeId = runtimeId) }
+            runtimeToken = host.runtimeToken,
+            startTime = host.startTime,
+            schemaVersion = host.schemaVersion,
+            hostSessionPid = host.hostSessionPid,
+            hostSessionPgid = host.hostSessionPgid,
+            guestRootPid = guest.guestRootPid,
+            guestRootPgid = guest.guestRootPgid,
+        )
+        return if (validate(merged, expectedRuntimeId = runtimeId)) {
+            RuntimeIdentityResolution(
+                source = RuntimeIdentitySource.FULL_IDENTITY,
+                identity = merged,
+                hostIdentity = host,
+                guestIdentity = guest,
+            )
+        } else {
+            RuntimeIdentityResolution(
+                source = RuntimeIdentitySource.METADATA_MISMATCH,
+                hostIdentity = host,
+                guestIdentity = guest,
+            )
+        }
     }
+
+    /** Compatibility accessor; callers needing the reason must use [resolve]. */
+    fun read(runtimeId: String): RuntimeIdentity? = resolve(runtimeId).identity
 
     /**
      * Structural validation. Host and guest process fields are deliberately optional because the
@@ -121,6 +171,10 @@ class RuntimeIdentityStore(
         null
     }
 
+    private fun legacyPidFilesExist(runtimeId: String): Boolean =
+        File(rootDirectory, "$runtimeId.pid").isFile ||
+            File(rootDirectory, "$runtimeId.pgid").isFile
+
     companion object {
         private const val D = "$"
 
@@ -150,12 +204,27 @@ class RuntimeIdentityStore(
             hostIdentityAvailable: Boolean,
             guestIdentityAvailable: Boolean,
             legacyPidAvailable: Boolean,
+            metadataMatches: Boolean = true,
         ): RuntimeIdentitySource = when {
+            hostIdentityAvailable && guestIdentityAvailable && !metadataMatches -> RuntimeIdentitySource.METADATA_MISMATCH
             hostIdentityAvailable && guestIdentityAvailable -> RuntimeIdentitySource.FULL_IDENTITY
             hostIdentityAvailable -> RuntimeIdentitySource.HOST_ONLY
             guestIdentityAvailable -> RuntimeIdentitySource.GUEST_ONLY
             legacyPidAvailable -> RuntimeIdentitySource.LEGACY_PID
             else -> RuntimeIdentitySource.UNAVAILABLE
+        }
+
+        /**
+         * Resolves the process scope actually used by discovery. Partial or mismatched identity
+         * may use Legacy only when the old PID/PGID scope was selected.
+         */
+        fun usageFor(
+            resolution: RuntimeIdentitySource,
+            legacyPidUsed: Boolean,
+        ): RuntimeIdentityUsage = when {
+            legacyPidUsed -> RuntimeIdentityUsage.LEGACY_PID
+            resolution == RuntimeIdentitySource.FULL_IDENTITY -> RuntimeIdentityUsage.FULL_IDENTITY
+            else -> RuntimeIdentityUsage.UNAVAILABLE
         }
 
         /**
