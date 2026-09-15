@@ -14,12 +14,15 @@
 - **real-device verified**：由 Android 真机实际操作覆盖并通过。
 - **user-confirmed**：由用户提供并确认的真机结果；与代码/云端证据分开记录。
 
+本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
+
 ## A. 当前版本信息
 
 - 当前正式开发版本：`0.8.0-alpha25`
 - versionCode：`101`
 - 包名：`com.siftalpha.studio`
-- 当前 main HEAD：`893229ce26d49a6ea22c79d6e2be85290cb8b0c3`
+- Roadmap Cleanup base main HEAD：`38fb60af8e4c7a4b09eafb1cad0e305ae56fc353`
+- 本文档所在 docs branch：`codex/remove-w2-w5-roadmap`（尚未合并；branch HEAD 以 GitHub ref 为准）
 - alpha25 主线构建：[GitHub Actions Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426)，artifact 为 `siftalpha-w0-70`（ID `10405122896`）；Run #70 未发布 Release。
 - 最近一次带 Release 的 APK：[w2-test-4e899c6](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6)（历史 alpha19 产物）。
 
@@ -33,14 +36,14 @@
 | C-04 | 稳定测试签名 | 包签名证书与既有测试版本一致 | PASS | Run #35 evidence / certificate digest |
 | C-05 | APK 元数据 | 包名、版本名和 versionCode 正确 | PASS | `com.siftalpha.studio`, alpha16, 92 |
 | C-06 | 发布资产 | 新版本 Release 中存在可下载 APK | PASS | [w2-test-8a91895](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-8a91895) |
-| C-07 | W2 编辑器云端构建 | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #41](https://github.com/kuashan/siftalpha-one/actions/runs/34914830358) |
-| C-08 | W2 测试 APK 发布 | 预发布 Release 可下载，资产校验值已记录 | PASS | [Actions Run #42](https://github.com/kuashan/siftalpha-one/actions/runs/34915100958) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-6e259f7) |
-| C-09 | W2 Runtime/Web 展示状态分离云端验证 | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #44](https://github.com/kuashan/siftalpha-one/actions/runs/34918070668) | 
-| C-10 | W2 Runtime 展示状态分离 APK 发布 | 预发布 Release 可下载，版本/签名/SHA-256 已记录 | PASS | [Actions Run #45](https://github.com/kuashan/siftalpha-one/actions/runs/34918441426) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-febcabb) | 
-| C-11 | W2 RuntimeLifecycleStore 候选验证 | 单元测试先通过，随后 APK 组装通过 | PASS | [候选 Actions Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615) | 
-| C-12 | W2 RuntimeLifecycleStore 正式 APK 发布 | 正式 main 单元测试、APK 组装、稳定签名和 Release 通过 | PASS | [Actions Run #47](https://github.com/kuashan/siftalpha-one/actions/runs/34923173498) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6) |
-| C-13 | W2 Web Discovery Diagnostic Enhancement 云端验证 | 仓库校验、单元测试、APK 组装、签名和证据收集通过；不发布 Release | PASS | [Actions Run #49](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920/artifacts/10379489647) |
-| C-14 | W2 合并后正式 main 构建 | validators、`testDebugUnitTest`、`assembleDebug`、APK metadata 和签名证据收集通过 | PASS | [Actions Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426/artifacts/10405122896) |
+| C-07 | 编辑器云端构建（历史工作项） | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #41](https://github.com/kuashan/siftalpha-one/actions/runs/34914830358) |
+| C-08 | 测试 APK 发布（历史工作项） | 预发布 Release 可下载，资产校验值已记录 | PASS | [Actions Run #42](https://github.com/kuashan/siftalpha-one/actions/runs/34915100958) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-6e259f7) |
+| C-09 | Runtime/Web 展示状态分离云端验证（历史工作项） | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #44](https://github.com/kuashan/siftalpha-one/actions/runs/34918070668) |
+| C-10 | Runtime 展示状态分离 APK 发布（历史工作项） | 预发布 Release 可下载，版本/签名/SHA-256 已记录 | PASS | [Actions Run #45](https://github.com/kuashan/siftalpha-one/actions/runs/34918441426) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-febcabb) |
+| C-11 | RuntimeLifecycleStore 候选验证（历史工作项） | 单元测试先通过，随后 APK 组装通过 | PASS | [候选 Actions Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615) |
+| C-12 | RuntimeLifecycleStore 正式 APK 发布（历史工作项） | 正式 main 单元测试、APK 组装、稳定签名和 Release 通过 | PASS | [Actions Run #47](https://github.com/kuashan/siftalpha-one/actions/runs/34923173498) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6) |
+| C-13 | Web Discovery Diagnostic Enhancement 云端验证（历史工作项） | 仓库校验、单元测试、APK 组装、签名和证据收集通过；不发布 Release | PASS | [Actions Run #49](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920/artifacts/10379489647) |
+| C-14 | 合并后正式 main 构建（当前基线证据） | validators、`testDebugUnitTest`、`assembleDebug`、APK metadata 和签名证据收集通过 | PASS | [Actions Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426/artifacts/10405122896) |
 
 ## C. 安装与升级矩阵
 
@@ -73,7 +76,7 @@
 
 
 
-## D.1 W2 Configuration Editor UX Simplification
+## D.1 Configuration Editor UX Simplification（历史工作项）
 
 | ID | 操作 | 期望 | 状态 |
 |---|---|---|---|
@@ -100,7 +103,7 @@
 
 ## F. 当前版本建议测试顺序
 
-1. 先直接覆盖安装，不卸载当前 alpha24。
+1. 先直接覆盖安装，不卸载当前 alpha25。
 2. 打开两个脚本，点击“配置”，确认直接进入“项目配置编辑”并看到 OPTIONAL 输入框。
 3. 返回后不填写候选项，依次执行 PREPARE 和 START。
 4. 观察项目是否正常运行，配置提醒是否仍然存在但不阻止运行。
@@ -112,7 +115,7 @@
 每次真机测试完成后，在对应行把“待真机/回归待确认”改成 PASS 或阻塞，并在 DEV_LOG 追加日期、设备、步骤和结果。
 
 
-## E.1 W2 Runtime Presentation State Separation
+## E.1 Runtime Presentation State Separation（历史工作项）
 
 | ID | 操作 | 期望 | 状态 |
 |---|---|---|---|
@@ -123,7 +126,7 @@
 | R-13 | STOP 后再次 START | STOP 可用；停止后可以重新运行 | real-device verified / user-confirmed（04D） |
 
 
-## E.2 W2 RuntimeLifecycleStore SharedPreferences Migration Fix
+## E.2 RuntimeLifecycleStore SharedPreferences Migration Fix（历史工作项）
 
 | ID | 操作 | 期望 | 状态 |
 |---|---|---|---|
@@ -132,7 +135,7 @@
 | L-03 | 迁移后重新创建 Store 再读取 | 结果保持一致，SharedPreferences 类型为 Boolean | 云端通过，待真机 |
 | L-04 | 空数据或异常类型 | 回退 UNKNOWN/null，不导致运行中心闪退 | 云端通过，待真机 |
 
-## E.3 W2 Web Discovery Diagnostic Enhancement
+## E.3 Web Discovery Diagnostic Enhancement（历史工作项）
 
 | ID | 操作/模拟条件 | 期望诊断输出 | 状态 |
 |---|---|---|---|
@@ -146,9 +149,9 @@
 | W-08 | 任一诊断失败场景 | 原有 `SIFTALPHA_WEB_AUTODISCOVERY` 兼容输出仍存在 | 云端构建通过，待真机 |
 | W-09 | Runtime START/PREPARE/STOP 回归 | 生命周期和 Browser 安全条件不受诊断字段影响 | 待后续 APK 真机回归 |
 
-## G. W2 Completion Audit — main@893229ce
+## G. 合并后产品基线审计记录 — Production baseline merge@893229ce（历史审计）
 
-本节是当前 main 基线的完成度审计，不覆盖范围外的未来功能。评级只使用 `COMPLETE`、`PARTIAL`、`MISSING`、`BLOCKED`；`PARTIAL` 表示实现存在，但架构收敛或验证证据仍不完整。
+本节记录 Production baseline merge 的历史完成度审计，不覆盖范围外的未来功能；Roadmap/docs base main 为 `38fb60af8e4c7a4b09eafb1cad0e305ae56fc353`。评级只使用 `COMPLETE`、`PARTIAL`、`MISSING`、`BLOCKED`；`PARTIAL` 表示实现存在，但架构收敛或验证证据仍不完整。
 
 | 领域 | 评级 | 当前源码证据与验证边界 |
 |---|---|---|
@@ -176,7 +179,7 @@
 | UI State Model | PARTIAL | `ProjectUiSnapshot` 是卡片主要事实来源，但 `V04Activity` 仍持有多份可变 map 并负责构建/归并状态。 |
 | Real-device Coverage | PARTIAL | alpha25 的 04B/04C/04D 已由用户确认；导入、配置、Node、App 重启 recovery、清理和 Output 仍缺当前基线的完整真机覆盖。 |
 
-### G.1 Runtime Session Ownership Boundary 与当前 W2 优先级
+### G.1 Runtime Session Ownership Boundary（当前 backlog）
 
 Project identity 已由 SAF `documentId` 建立可信边界，Runtime Identity 已由 `FULL_IDENTITY` 真机结果验证。当前首要缺口不是单纯的 Activity 规模，而是以下 ownership chain 尚未完全闭合：
 
@@ -201,14 +204,14 @@ Project identity 已由 SAF `documentId` 建立可信边界，Runtime Identity �
 
 Coordinator 不是一次性大规模 UI 重构的要求，而是渐进实现该 ownership boundary 的结构手段：第一阶段建立最小 `RuntimeSession`/`RuntimeSessionState`/`RuntimeGeneration` 等价 abstraction，不重写整个 `V04Activity`；第二阶段逐步迁移 refresh、dispatch、recovery 和 Web invalidation；第三阶段再减少 Activity orchestration 职责。
 
-**P1 — W2 应完成**
+**P1 — 产品基线硬化与验证**
 
 - Web candidate 绑定 runtime identity/generation。
 - STOP/CLEAN 明确清理 candidate。
 - 完成 App restart recovery、Import、Configuration 和 Node Runtime 真机验证。
 - 按需要逐步抽取 coordinator。
 
-**P2 — W3/W4 可延后**
+**P2 — 后续增强（未来 Roadmap 待重新定义）**
 
 - Workspace Compose 化。
 - 更完整的结构化 Failure UI。
@@ -217,6 +220,6 @@ Coordinator 不是一次性大规模 UI 重构的要求，而是渐进实现该 
 - 默认 debug 日志 cleanup。
 - 签名流程进一步加固。
 
-若 W2 只能再做一个开发任务，优先完成 **Runtime Session Ownership Boundary**。它直接补齐当前最重要的 correctness/ownership 缺口，并为后续 Web candidate 清理、Recovery、Restart 和 coordinator 抽取提供统一边界；`V04Activity` 过大是后续结构表现，不是第一理由。
+如果当前只允许再做一个开发任务，优先完成 **Runtime Session Ownership Boundary**。它直接补齐当前最重要的 correctness/ownership 缺口，并为后续 Web candidate 清理、Recovery、Restart 和 coordinator 抽取提供统一边界；`V04Activity` 过大是后续结构表现，不是第一理由。
 
-当前 W2 结论：**W2 NOT COMPLETE**。阻塞原因是 `Project → Runtime Session → Web Candidate` 的 ownership chain 尚未完整闭合，而不是单独因为 `V04Activity` 规模较大。
+当前结论：当前产品基线已经形成，但 `Project → Runtime Session → Web Candidate` 的 ownership chain 尚未完整闭合；这属于普通的产品 backlog / hardening，不再使用阶段完成或阻塞语义。未来 Roadmap 尚待重新定义。
