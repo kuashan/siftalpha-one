@@ -3,8 +3,8 @@
 最后更新：2026-09-15  
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
 当前分支：`main`  
-当前实现版本：0.8.0-alpha18 / versionCode 94（W2 Runtime/Web 展示状态分离，云端构建待执行）
-当前实现提交：[5e2d739](https://github.com/kuashan/siftalpha-one/commit/5e2d7395acef37ab7965e517918c02fef19c7cb6)
+当前实现版本：0.8.0-alpha18 / versionCode 94（W2 Runtime/Web 展示状态分离，云端构建已通过，真机待验收）
+当前实现提交：[e9354da](https://github.com/kuashan/siftalpha-one/commit/e9354da265746b730f093852544db75a83ca2224)
 上一版发布：[W2 test APK · w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)  
 最新发布：[W2 test APK · w2-test-8a91895](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-8a91895)
 
@@ -113,7 +113,7 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 
 ## 7. 当前基线与下一步
 
-当前 W2 配置语义实现：
+当前 W2 配置语义实现（历史基线）：
 
 - 实现提交：[0873f23](https://github.com/kuashan/siftalpha-one/commit/0873f23e4626757b4cf2bd0681adc24e98492ecb)
 - 云端构建：[Run #30](https://github.com/kuashan/siftalpha-one/actions/runs/34885104600)，成功
@@ -153,4 +153,4 @@ Runtime 生命周期与 Web 可用性是两个独立维度：
 - Browser 仍然只在真实端点可达且 URL 已验证时开放。
 - 本轮不改变 START/PREPARE/STOP 执行流程、Configuration 系统或 Web 探测执行器。
 
-本轮候选版本为 `0.8.0-alpha18 / versionCode 94`，用于覆盖安装；云端构建和真机结果将在验证后补记。
+本轮版本为 `0.8.0-alpha18 / versionCode 94`，用于覆盖安装。GitHub Actions Run #44 已成功完成 `testDebugUnitTest assembleDebug`，APK SHA-256 为 `3e61e76b1c80ff11dba53d9afb135c9759cc742fe0b489f704b22d550629f922`；[Run #44 artifact ZIP](https://github.com/kuashan/siftalpha-one/actions/runs/34918070668/artifacts/10377191664) 可下载。直接 APK Release 待发布，真机结果待用户验收。

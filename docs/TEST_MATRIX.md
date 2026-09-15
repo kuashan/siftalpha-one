@@ -28,6 +28,7 @@
 | C-06 | 发布资产 | 新版本 Release 中存在可下载 APK | PASS | [w2-test-8a91895](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-8a91895) |
 | C-07 | W2 编辑器云端构建 | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #41](https://github.com/kuashan/siftalpha-one/actions/runs/34914830358) |
 | C-08 | W2 测试 APK 发布 | 预发布 Release 可下载，资产校验值已记录 | PASS | [Actions Run #42](https://github.com/kuashan/siftalpha-one/actions/runs/34915100958) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-6e259f7) |
+| C-09 | W2 Runtime/Web 展示状态分离云端验证 | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #44](https://github.com/kuashan/siftalpha-one/actions/runs/34918070668) |
 
 ## C. 安装与升级矩阵
 
@@ -100,8 +101,8 @@
 
 | ID | 操作 | 期望 | 状态 |
 |---|---|---|---|
-| R-09 | Python 输出普通 `http://localhost:8000`，但没有 HTTP 服务 | Runtime 显示 RUNNING；Web 独立显示 AUTO_DETECT/UNAVAILABLE；不能显示 STARTING | 待云端/待真机 |
-| R-10 | 纯 Python 脚本，无 URL、无 Web | Runtime 显示 RUNNING | 待云端/待真机 |
-| R-11 | 真实 Web 项目执行 `python -m http.server 8000` | Runtime 显示 RUNNING；Web 显示 AVAILABLE；Browser 可用 | 待云端/待真机 |
-| R-12 | Web 探测输出 `NO_LISTEN_PORT` 或 `NO_SOCKET_INODES` | 只影响 Web 状态，不改写 Runtime RUNNING | 待云端/待真机 |
+| R-09 | Python 输出普通 `http://localhost:8000`，但没有 HTTP 服务 | Runtime 显示 RUNNING；Web 独立显示 AUTO_DETECT/UNAVAILABLE；不能显示 STARTING | 云端通过，待真机 |
+| R-10 | 纯 Python 脚本，无 URL、无 Web | Runtime 显示 RUNNING | 云端通过，待真机 |
+| R-11 | 真实 Web 项目执行 `python -m http.server 8000` | Runtime 显示 RUNNING；Web 显示 AVAILABLE；Browser 可用 | 云端通过，待真机 |
+| R-12 | Web 探测输出 `NO_LISTEN_PORT` 或 `NO_SOCKET_INODES` | 只影响 Web 状态，不改写 Runtime RUNNING | 云端通过，待真机 |
 | R-13 | STOP 后再次 START | STOP 可用；停止后可以重新运行 | 待真机 |

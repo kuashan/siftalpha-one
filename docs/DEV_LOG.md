@@ -265,8 +265,10 @@ Runtime 的 RUNNING 状态曾因 `webExpected=true` 且端点暂不可达而被�
 
 ### 验证状态
 
-- 代码单元测试：待 GitHub Actions 云端运行。
-- 云端构建与签名：待 GitHub Actions 运行。
-- APK：待云端构建通过后生成。
-- 真机测试：待用户使用可覆盖安装 APK 验收。
+- GitHub Actions Run #44：成功（仓库校验、`testDebugUnitTest`、`assembleDebug`、签名和证据收集全部通过）。[查看 Run #44](https://github.com/kuashan/siftalpha-one/actions/runs/34918070668)
+- 云端 Gradle 结果：`testDebugUnitTest assembleDebug` 成功，构建耗时约 3 分 5 秒。
+- 当前云端 APK 产物：[下载 artifact ZIP](https://github.com/kuashan/siftalpha-one/actions/runs/34918070668/artifacts/10377191664)；APK SHA-256：`3e61e76b1c80ff11dba53d9afb135c9759cc742fe0b489f704b22d550629f922`。
+- 稳定测试证书 SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+- 直接 APK Release：待下一次发布工作流生成。
+- 真机测试：待用户使用 alpha18 覆盖安装 APK 验收。
 - 版本：`0.8.0-alpha18 / versionCode 94`，用于直接覆盖安装。
