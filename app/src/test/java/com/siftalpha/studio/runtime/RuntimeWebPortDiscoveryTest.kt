@@ -106,6 +106,17 @@ class RuntimeWebPortDiscoveryTest {
     }
 
     @Test
+    fun fullIdentityIsPreferredOverLegacyPidFallback() {
+        assertEquals(
+            RuntimeIdentitySource.FULL_IDENTITY,
+            RuntimeIdentityStore.sourceFor(
+                hostIdentityAvailable = true,
+                guestIdentityAvailable = true,
+                legacyPidAvailable = true,
+            ),
+        )
+    }
+    @Test
     fun shellProbeKeepsHostFastPathAndAddsProjectScopedProotFallback() {
         val script = RuntimeWebPortDiscovery.shellSnippet()
 

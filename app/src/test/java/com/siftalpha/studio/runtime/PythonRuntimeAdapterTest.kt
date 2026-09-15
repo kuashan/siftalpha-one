@@ -158,6 +158,18 @@ class PythonRuntimeAdapterTest {
     }
 
     @Test
+    fun `logs pass runtime identity context before web discovery`() {
+        val logs = adapter.logs(project).shellScript
+        val identityId = logs.indexOf("runtime_identity_id='runtime-id'")
+        val identityDir = logs.indexOf("runtime_identity_dir=\"\$runtime_dir/runtime-id\"")
+        val discovery = logs.indexOf("siftalpha-web identity")
+
+        assertTrue("logs must define runtime identity id", identityId >= 0)
+        assertTrue("logs must define runtime identity directory", identityDir >= 0)
+        assertTrue("runtime identity id must precede Web Discovery", discovery > identityId)
+        assertTrue("runtime identity directory must precede Web Discovery", discovery > identityDir)
+    }
+    @Test
     fun `custom run command remains delegated instead of forced to python entry`() {
         host.quotedInputs.clear()
         val custom = project.copy(run = "python -m package.worker --mode live")

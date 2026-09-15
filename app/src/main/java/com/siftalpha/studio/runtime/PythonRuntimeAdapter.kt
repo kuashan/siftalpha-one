@@ -591,6 +591,8 @@ SIFTALPHA_RUNNER
             pid_file="${'$'}runtime_dir/${id}.pid"
             pgid_file="${'$'}runtime_dir/${id}.pgid"
             launch_log="${'$'}runtime_dir/${id}.launch.log"
+            runtime_identity_id=${sh(id)}
+            runtime_identity_dir="${'$'}runtime_dir/${id}"
             pid="${'$'}(cat "${'$'}pid_file" 2>/dev/null || true)"
             pgid="${'$'}(cat "${'$'}pgid_file" 2>/dev/null || true)"
             if siftalpha_pid_alive "${'$'}pid" || { [ -n "${'$'}pgid" ] && siftalpha_group_alive "${'$'}pgid"; }; then
