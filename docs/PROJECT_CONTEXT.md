@@ -5,7 +5,7 @@
 当前分支：`main`  
 当前实现版本：0.8.0-alpha25 / versionCode 101（Runtime Identity 与 Web Discovery 合并基线，云端构建和真机 04B/04C/04D 已验证）
 当前实现提交：[893229c](https://github.com/kuashan/siftalpha-one/commit/893229ce26d49a6ea22c79d6e2be85290cb8b0c3)
-上一版历史发布：[W2 test APK · w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)  
+上一版历史发布：[W2 test APK · w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)
 最近一次带 Release 的历史 APK：[W2 test APK · w2-test-4e899c6](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6)；alpha25 主线构建产物见 [Run #70 artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426/artifacts/10405122896)
 
 ## 1. 项目目标

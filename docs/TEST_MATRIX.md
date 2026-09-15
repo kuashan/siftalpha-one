@@ -37,9 +37,9 @@
 | C-06 | 发布资产 | 新版本 Release 中存在可下载 APK | PASS | [w2-test-8a91895](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-8a91895) |
 | C-07 | 编辑器云端构建（历史工作项） | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #41](https://github.com/kuashan/siftalpha-one/actions/runs/34914830358) |
 | C-08 | 测试 APK 发布（历史工作项） | 预发布 Release 可下载，资产校验值已记录 | PASS | [Actions Run #42](https://github.com/kuashan/siftalpha-one/actions/runs/34915100958) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-6e259f7) |
-| C-09 | Runtime/Web 展示状态分离云端验证（历史工作项） | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #44](https://github.com/kuashan/siftalpha-one/actions/runs/34918070668) | 
-| C-10 | Runtime 展示状态分离 APK 发布（历史工作项） | 预发布 Release 可下载，版本/签名/SHA-256 已记录 | PASS | [Actions Run #45](https://github.com/kuashan/siftalpha-one/actions/runs/34918441426) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-febcabb) | 
-| C-11 | RuntimeLifecycleStore 候选验证（历史工作项） | 单元测试先通过，随后 APK 组装通过 | PASS | [候选 Actions Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615) | 
+| C-09 | Runtime/Web 展示状态分离云端验证（历史工作项） | 单元测试、APK 组装、签名和证据收集通过 | PASS | [Actions Run #44](https://github.com/kuashan/siftalpha-one/actions/runs/34918070668) |
+| C-10 | Runtime 展示状态分离 APK 发布（历史工作项） | 预发布 Release 可下载，版本/签名/SHA-256 已记录 | PASS | [Actions Run #45](https://github.com/kuashan/siftalpha-one/actions/runs/34918441426) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-febcabb) |
+| C-11 | RuntimeLifecycleStore 候选验证（历史工作项） | 单元测试先通过，随后 APK 组装通过 | PASS | [候选 Actions Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615) |
 | C-12 | RuntimeLifecycleStore 正式 APK 发布（历史工作项） | 正式 main 单元测试、APK 组装、稳定签名和 Release 通过 | PASS | [Actions Run #47](https://github.com/kuashan/siftalpha-one/actions/runs/34923173498) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6) |
 | C-13 | Web Discovery Diagnostic Enhancement 云端验证（历史工作项） | 仓库校验、单元测试、APK 组装、签名和证据收集通过；不发布 Release | PASS | [Actions Run #49](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920/artifacts/10379489647) |
 | C-14 | 合并后正式 main 构建（当前基线证据） | validators、`testDebugUnitTest`、`assembleDebug`、APK metadata 和签名证据收集通过 | PASS | [Actions Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426/artifacts/10405122896) |
