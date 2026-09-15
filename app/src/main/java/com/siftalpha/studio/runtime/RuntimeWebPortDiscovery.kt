@@ -75,6 +75,9 @@ object RuntimeWebPortDiscovery {
         val guestScript = guestDiscoveryScript(preferred)
         val quotedGuestScript = shellQuote(guestScript)
         return """
+            runtime_identity_id="${D}{runtime_identity_id:-}"
+            runtime_identity_dir="${D}{runtime_identity_dir:-}"
+
             siftalpha_web_runtime_pids() {
               web_root_pid="${D}1"
               web_pgid="${D}2"
@@ -106,7 +109,96 @@ object RuntimeWebPortDiscovery {
               done | awk 'NF && !seen[${D}1]++'
             }
 
+            siftalpha_web_debug_scope() {
+              local web_debug_source="${D}1"
+              local web_debug_root_pid="${D}2"
+              local web_debug_root_pgid="${D}3"
+              local web_debug_pids="${D}4"
+              local web_debug_inodes="${D}5"
+              local web_debug_self_pid="${D}${D}"
+              local web_debug_self_pgid
+              local web_debug_inode_count
+              local web_debug_pid_count=0
+              local web_debug_fd_count_total=0
+              local web_debug_readlink_success_total=0
+              local web_debug_socket_links_total=0
+              local web_debug_pid web_debug_proc_dir web_debug_fd_dir web_debug_proc_present
+              local web_debug_fd_present web_debug_fd_enum web_debug_entries web_debug_fd_count
+              local web_debug_readlink_success web_debug_socket_links web_debug_fd web_debug_link
+              local web_debug_inode web_debug_tcp_exists web_debug_tcp_readable
+              local web_debug_tcp6_exists web_debug_tcp6_readable
+              web_debug_self_pgid="${D}(ps -o pgid= -p "${D}${D}" 2>/dev/null | tr -d ' ' || true)"
+              web_debug_inode_count="${D}(printf '%s\n' "${D}web_debug_inodes" | awk 'NF { count++ } END { print count + 0 }' || printf '0')"
+              printf 'SIFTALPHA_WEB_DEBUG_SCOPE=%s\n' "${D}web_debug_source"
+              printf 'SIFTALPHA_WEB_DEBUG_SELF_PID=%s\n' "${D}web_debug_self_pid"
+              printf 'SIFTALPHA_WEB_DEBUG_SELF_PGID=%s\n' "${D}web_debug_self_pgid"
+              printf 'SIFTALPHA_WEB_DEBUG_ROOT_PID=%s\n' "${D}web_debug_root_pid"
+              printf 'SIFTALPHA_WEB_DEBUG_ROOT_PGID=%s\n' "${D}web_debug_root_pgid"
+              printf 'SIFTALPHA_WEB_DEBUG_PIDS=%s\n' "${D}web_debug_pids"
+              printf 'SIFTALPHA_WEB_DEBUG_SOCKET_INODES=%s\n' "${D}web_debug_inode_count"
+              for web_debug_pid in ${D}web_debug_pids; do
+                web_debug_pid_count="${D}((web_debug_pid_count + 1))"
+                web_debug_proc_dir="/proc/${D}web_debug_pid"
+                web_debug_fd_dir="${D}web_debug_proc_dir/fd"
+                web_debug_proc_present=NO
+                web_debug_fd_present=NO
+                web_debug_fd_enum=NO
+                web_debug_entries=''
+                web_debug_fd_count=0
+                web_debug_readlink_success=0
+                web_debug_socket_links=0
+                if [ -d "${D}web_debug_proc_dir" ]; then
+                  web_debug_proc_present=YES
+                  if [ -d "${D}web_debug_fd_dir" ]; then
+                    web_debug_fd_present=YES
+                    if web_debug_entries="${D}(ls -1A "${D}web_debug_fd_dir" 2>/dev/null)"; then
+                      web_debug_fd_enum=YES
+                      web_debug_fd_count="${D}(printf '%s\n' "${D}web_debug_entries" | awk 'NF { count++ } END { print count + 0 }' || printf '0')"
+                      for web_debug_fd in "${D}web_debug_fd_dir"/*; do
+                        if [ -e "${D}web_debug_fd" ] || [ -L "${D}web_debug_fd" ]; then
+                          if web_debug_link="${D}(readlink "${D}web_debug_fd" 2>/dev/null)"; then
+                            web_debug_readlink_success="${D}((web_debug_readlink_success + 1))"
+                            case "${D}web_debug_link" in
+                              socket:\[*\])
+                                web_debug_inode="${D}{web_debug_link#socket:[}"
+                                web_debug_inode="${D}{web_debug_inode%]}"
+                                case "${D}web_debug_inode" in
+                                  ''|*[!0-9]*) ;;
+                                  *) web_debug_socket_links="${D}((web_debug_socket_links + 1))" ;;
+                                esac
+                                ;;
+                            esac
+                          fi
+                        fi
+                      done
+                    fi
+                  fi
+                fi
+                web_debug_fd_count_total="${D}((web_debug_fd_count_total + web_debug_fd_count))"
+                web_debug_readlink_success_total="${D}((web_debug_readlink_success_total + web_debug_readlink_success))"
+                web_debug_socket_links_total="${D}((web_debug_socket_links_total + web_debug_socket_links))"
+                printf 'SIFTALPHA_WEB_DEBUG_PID=%s PROC_DIR=%s FD_DIR=%s FD_ENUM=%s FD_COUNT=%s READLINK_SUCCESS=%s SOCKET_LINKS=%s\n' \
+                  "${D}web_debug_pid" "${D}web_debug_proc_present" "${D}web_debug_fd_present" \
+                  "${D}web_debug_fd_enum" "${D}web_debug_fd_count" \
+                  "${D}web_debug_readlink_success" "${D}web_debug_socket_links"
+
+              done
+              printf 'SIFTALPHA_WEB_DEBUG_PID_COUNT=%s\n' "${D}web_debug_pid_count"
+              printf 'SIFTALPHA_WEB_DEBUG_FD_COUNT_TOTAL=%s\n' "${D}web_debug_fd_count_total"
+              printf 'SIFTALPHA_WEB_DEBUG_READLINK_SUCCESS_TOTAL=%s\n' "${D}web_debug_readlink_success_total"
+              printf 'SIFTALPHA_WEB_DEBUG_SOCKET_LINKS_TOTAL=%s\n' "${D}web_debug_socket_links_total"
+              if [ -e /proc/net/tcp ]; then web_debug_tcp_exists=YES; else web_debug_tcp_exists=NO; fi
+              if [ -r /proc/net/tcp ]; then web_debug_tcp_readable=YES; else web_debug_tcp_readable=NO; fi
+              printf 'SIFTALPHA_WEB_DEBUG_TCP_EXISTS=%s\n' "${D}web_debug_tcp_exists"
+              printf 'SIFTALPHA_WEB_DEBUG_TCP_READABLE=%s\n' "${D}web_debug_tcp_readable"
+              if [ -e /proc/net/tcp6 ]; then web_debug_tcp6_exists=YES; else web_debug_tcp6_exists=NO; fi
+              if [ -r /proc/net/tcp6 ]; then web_debug_tcp6_readable=YES; else web_debug_tcp6_readable=NO; fi
+              printf 'SIFTALPHA_WEB_DEBUG_TCP6_EXISTS=%s\n' "${D}web_debug_tcp6_exists"
+              printf 'SIFTALPHA_WEB_DEBUG_TCP6_READABLE=%s\n' "${D}web_debug_tcp6_readable"
+            }
+
             siftalpha_web_ports_for_inodes() {
+
               web_inodes=" ${D}1 "
               [ "${D}web_inodes" != '  ' ] || return 0
               for web_table in /proc/net/tcp /proc/net/tcp6; do
@@ -129,19 +221,22 @@ object RuntimeWebPortDiscovery {
               web_diagnostic_source="${D}1"
               web_diagnostic_pids="${D}2"
               web_diagnostic_inodes="${D}3"
+              siftalpha_web_debug_scope \
+                "${D}web_diagnostic_source" "${D}4" "${D}5" \
+                "${D}web_diagnostic_pids" "${D}web_diagnostic_inodes"
               if [ -z "${D}{web_diagnostic_pids// }" ]; then
                 printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS source=%s\n' "${D}web_diagnostic_source"
                 return 0
               fi
 
-              web_diagnostic_procfs_readable=0
+              web_diagnostic_fd_directory_present=0
               for web_pid in ${D}web_diagnostic_pids; do
-                if [ -r "/proc/${D}web_pid/fd" ]; then
-                  web_diagnostic_procfs_readable=1
+                if [ -d "/proc/${D}web_pid/fd" ]; then
+                  web_diagnostic_fd_directory_present=1
                   break
                 fi
               done
-              if [ "${D}web_diagnostic_procfs_readable" -eq 0 ]; then
+              if [ "${D}web_diagnostic_fd_directory_present" -eq 0 ]; then
                 printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE source=%s\n' "${D}web_diagnostic_source"
                 return 0
               fi
@@ -250,16 +345,89 @@ object RuntimeWebPortDiscovery {
             siftalpha_web_guest_fallback() {
               web_root_pid="${D}1"
               web_pgid="${D}2"
+              identity_host_available=0
+              identity_guest_available=0
+              legacy_pid_available=0
+              identity_resolution='${RuntimeIdentitySource.UNAVAILABLE.name}'
+              identity_mode='unavailable'
+              if [ -n "${D}runtime_identity_id" ] && \
+                 [ -n "${D}runtime_identity_dir" ] && \
+                 [ -r "${D}runtime_identity_dir/${RuntimeIdentityStore.IDENTITY_FILE_NAME}" ]; then
+                identity_host_available=1
+              fi
+              if [ -n "${D}runtime_identity_id" ] && \
+                 [ -n "${D}runtime_identity_dir" ] && \
+                 [ -r "${D}runtime_identity_dir/${RuntimeIdentityStore.GUEST_IDENTITY_FILE_NAME}" ]; then
+                identity_guest_available=1
+              fi
+              if [ -n "${D}web_root_pid" ] || [ -n "${D}web_pgid" ]; then
+                legacy_pid_available=1
+              fi
+              if [ "${D}identity_host_available" -eq 1 ] && [ "${D}identity_guest_available" -eq 1 ]; then
+                identity_resolution='${RuntimeIdentitySource.FULL_IDENTITY.name}'
+                identity_mode='identity'
+              elif [ "${D}identity_host_available" -eq 1 ]; then
+                identity_resolution='${RuntimeIdentitySource.HOST_ONLY.name}'
+                identity_mode='partial_identity'
+              elif [ "${D}identity_guest_available" -eq 1 ]; then
+                identity_resolution='${RuntimeIdentitySource.GUEST_ONLY.name}'
+                identity_mode='partial_identity'
+              elif [ "${D}legacy_pid_available" -eq 1 ]; then
+                identity_resolution='${RuntimeIdentitySource.LEGACY_PID.name}'
+                identity_mode='legacy'
+              fi
+              if [ "${D}identity_mode" != 'identity' ]; then
+                printf 'SIFTALPHA_RUNTIME_IDENTITY_RESOLUTION=%s\n' "${D}identity_resolution"
+              fi
+
+              siftalpha_web_legacy_fallback() {
+                echo 'SIFTALPHA_RUNTIME_IDENTITY_SOURCE=${RuntimeIdentityUsage.LEGACY_PID.name}'
+                echo 'SIFTALPHA_RUNTIME_IDENTITY_FALLBACK=${RuntimeIdentityUsage.LEGACY_PID.name}'
+                web_guest_output="${D}(proot-distro login --bind "${D}ROOT:/root/projects" ubuntu -- bash -lc $quotedGuestScript siftalpha-web legacy "${D}web_root_pid" "${D}web_pgid" 2>/dev/null || true)"
+                [ -n "${D}web_guest_output" ] && printf '%s\n' "${D}web_guest_output"
+                case "${D}web_guest_output" in
+                  *'SIFTALPHA_WEB_AUTODISCOVERY=PASS source=PROOT_PROJECT_PID_SCOPE'*) web_guest_success=1 ;;
+                esac
+              }
+
               if ! command -v proot-distro >/dev/null 2>&1; then
+                echo 'SIFTALPHA_RUNTIME_IDENTITY_SOURCE=${RuntimeIdentityUsage.UNAVAILABLE.name}'
                 echo 'SIFTALPHA_WEB_GUEST_SCOPE=UNAVAILABLE reason=PROOT_DISTRO_MISSING'
                 return 2
               fi
-              web_guest_output="${D}(proot-distro login --bind "${D}ROOT:/root/projects" ubuntu -- bash -lc $quotedGuestScript siftalpha-web "${D}web_root_pid" "${D}web_pgid" 2>/dev/null || true)"
-              [ -n "${D}web_guest_output" ] && printf '%s\n' "${D}web_guest_output"
-              case "${D}web_guest_output" in
-                *'SIFTALPHA_WEB_AUTODISCOVERY=PASS source=PROOT_PROJECT_PID_SCOPE'*) return 0 ;;
-                *) return 1 ;;
-              esac
+              if [ "${D}identity_mode" = 'identity' ]; then
+                web_guest_output="${D}(proot-distro login \
+                  --bind "${D}ROOT:/root/projects" \
+                  --bind "${D}runtime_identity_dir:${RuntimeIdentityStore.GUEST_RUNTIME_ROOT}/${D}runtime_identity_id" \
+                  ubuntu -- bash -lc $quotedGuestScript siftalpha-web identity "${D}runtime_identity_id" 2>/dev/null || true)"
+                [ -n "${D}web_guest_output" ] && printf '%s\n' "${D}web_guest_output"
+                web_guest_success=0
+                case "${D}web_guest_output" in
+                  *'SIFTALPHA_RUNTIME_IDENTITY_SOURCE=${RuntimeIdentityUsage.FULL_IDENTITY.name}'*) web_guest_success=1 ;;
+                  *)
+                    if [ "${D}legacy_pid_available" -eq 1 ]; then
+                      siftalpha_web_legacy_fallback
+                    else
+                      echo 'SIFTALPHA_RUNTIME_IDENTITY_SOURCE=${RuntimeIdentityUsage.UNAVAILABLE.name}'
+                    fi
+                    ;;
+                esac
+              elif [ "${D}identity_mode" = 'legacy' ]; then
+                web_guest_success=0
+                siftalpha_web_legacy_fallback
+              elif [ "${D}identity_mode" = 'partial_identity' ]; then
+                web_guest_success=0
+                if [ "${D}legacy_pid_available" -eq 1 ]; then
+                  siftalpha_web_legacy_fallback
+                else
+                  echo 'SIFTALPHA_RUNTIME_IDENTITY_SOURCE=${RuntimeIdentityUsage.UNAVAILABLE.name}'
+                fi
+              else
+                web_guest_success=0
+                echo 'SIFTALPHA_RUNTIME_IDENTITY_SOURCE=${RuntimeIdentityUsage.UNAVAILABLE.name}'
+              fi
+              [ "${D}web_guest_success" -eq 1 ] && return 0
+              return 1
             }
 
             siftalpha_web_autodiscover() {
@@ -268,7 +436,7 @@ object RuntimeWebPortDiscovery {
               web_primary_pids="${D}(siftalpha_web_runtime_pids "${D}web_root_pid" "${D}web_pgid" | tr '\n' ' ')"
               # shellcheck disable=SC2086
               web_primary_inodes="${D}(siftalpha_web_socket_inodes_for_pids ${D}web_primary_pids | tr '\n' ' ')"
-              siftalpha_web_diagnostic_status_for_scope PROJECT_PID_SCOPE "${D}web_primary_pids" "${D}web_primary_inodes"
+              siftalpha_web_diagnostic_status_for_scope PROJECT_PID_SCOPE "${D}web_primary_pids" "${D}web_primary_inodes" "${D}web_root_pid" "${D}web_pgid"
               web_ports="${D}(siftalpha_web_candidate_ports "${D}web_root_pid" "${D}web_pgid" | tr '\n' ' ')"
 
               if [ -n "${D}{web_ports// }" ]; then
@@ -298,8 +466,41 @@ object RuntimeWebPortDiscovery {
     }
 
     private fun guestDiscoveryScript(preferred: String): String = """
-        web_root_pid="${D}1"
-        web_pgid="${D}2"
+        ${RuntimeIdentityStore.guestIdentityLoaderShell()}
+
+        guest_mode="${D}1"
+        web_root_pid=''
+        web_pgid=''
+
+        if [ "${D}guest_mode" = 'identity' ]; then
+          guest_identity_id="${D}2"
+          if ! siftalpha_runtime_identity_load "${D}guest_identity_id"; then
+            echo 'SIFTALPHA_RUNTIME_IDENTITY_RESOLUTION=${RuntimeIdentitySource.METADATA_MISMATCH.name}'
+            echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS source=PROOT_PROJECT_PID_SCOPE reason=RUNTIME_IDENTITY_INVALID'
+            echo 'SIFTALPHA_WEB_GUEST_SCOPE=RUNTIME_IDENTITY_INVALID'
+            exit 0
+          fi
+          web_root_pid="${D}SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT_PID"
+          web_pgid="${D}SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT_PGID"
+          if [ ! -d "/proc/${D}web_root_pid" ]; then
+            echo 'SIFTALPHA_RUNTIME_IDENTITY_SOURCE=${RuntimeIdentityUsage.FULL_IDENTITY.name}'
+            echo 'SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=NOT_ALIVE'
+            echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS source=PROOT_PROJECT_PID_SCOPE reason=RUNTIME_ROOT_NOT_ALIVE'
+            echo 'SIFTALPHA_WEB_GUEST_SCOPE=RUNTIME_ROOT_NOT_ALIVE'
+            exit 0
+          fi
+          echo 'SIFTALPHA_RUNTIME_IDENTITY_RESOLUTION=${RuntimeIdentitySource.FULL_IDENTITY.name}'
+          echo 'SIFTALPHA_RUNTIME_IDENTITY_SOURCE=${RuntimeIdentityUsage.FULL_IDENTITY.name}'
+          echo 'SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=ALIVE'
+          echo 'SIFTALPHA_WEB_IDENTITY=RUNTIME_IDENTITY'
+        elif [ "${D}guest_mode" = 'legacy' ]; then
+          web_root_pid="${D}2"
+          web_pgid="${D}3"
+        else
+          # Keep the old argument shape usable for runtimes created by older app versions.
+          web_root_pid="${D}1"
+          web_pgid="${D}2"
+        fi
 
         guest_descendants() {
           guest_parent="${D}1"
@@ -333,20 +534,111 @@ object RuntimeWebPortDiscovery {
             fi
           } | awk 'NF && !seen[${D}1]++' | tr '\n' ' '
         )"
+
+        siftalpha_web_debug_scope() {
+          local web_debug_source="${D}1"
+          local web_debug_root_pid="${D}2"
+          local web_debug_root_pgid="${D}3"
+          local web_debug_pids="${D}4"
+          local web_debug_inodes="${D}5"
+          local web_debug_self_pid="${D}${D}"
+          local web_debug_self_pgid
+          local web_debug_inode_count
+          local web_debug_pid_count=0
+          local web_debug_fd_count_total=0
+          local web_debug_readlink_success_total=0
+          local web_debug_socket_links_total=0
+          local web_debug_pid web_debug_proc_dir web_debug_fd_dir web_debug_proc_present
+          local web_debug_fd_present web_debug_fd_enum web_debug_entries web_debug_fd_count
+          local web_debug_readlink_success web_debug_socket_links web_debug_fd web_debug_link
+          local web_debug_inode web_debug_tcp_exists web_debug_tcp_readable
+          local web_debug_tcp6_exists web_debug_tcp6_readable
+          web_debug_self_pgid="${D}(ps -o pgid= -p "${D}${D}" 2>/dev/null | tr -d ' ' || true)"
+          web_debug_inode_count="${D}(printf '%s\n' "${D}web_debug_inodes" | awk 'NF { count++ } END { print count + 0 }' || printf '0')"
+          printf 'SIFTALPHA_WEB_DEBUG_SCOPE=%s\n' "${D}web_debug_source"
+          printf 'SIFTALPHA_WEB_DEBUG_SELF_PID=%s\n' "${D}web_debug_self_pid"
+          printf 'SIFTALPHA_WEB_DEBUG_SELF_PGID=%s\n' "${D}web_debug_self_pgid"
+          printf 'SIFTALPHA_WEB_DEBUG_ROOT_PID=%s\n' "${D}web_debug_root_pid"
+          printf 'SIFTALPHA_WEB_DEBUG_ROOT_PGID=%s\n' "${D}web_debug_root_pgid"
+          printf 'SIFTALPHA_WEB_DEBUG_PIDS=%s\n' "${D}web_debug_pids"
+          printf 'SIFTALPHA_WEB_DEBUG_SOCKET_INODES=%s\n' "${D}web_debug_inode_count"
+          for web_debug_pid in ${D}web_debug_pids; do
+            web_debug_pid_count="${D}((web_debug_pid_count + 1))"
+            web_debug_proc_dir="/proc/${D}web_debug_pid"
+            web_debug_fd_dir="${D}web_debug_proc_dir/fd"
+            web_debug_proc_present=NO
+            web_debug_fd_present=NO
+            web_debug_fd_enum=NO
+            web_debug_entries=''
+            web_debug_fd_count=0
+            web_debug_readlink_success=0
+            web_debug_socket_links=0
+            if [ -d "${D}web_debug_proc_dir" ]; then
+              web_debug_proc_present=YES
+              if [ -d "${D}web_debug_fd_dir" ]; then
+                web_debug_fd_present=YES
+                if web_debug_entries="${D}(ls -1A "${D}web_debug_fd_dir" 2>/dev/null)"; then
+                  web_debug_fd_enum=YES
+                  web_debug_fd_count="${D}(printf '%s\n' "${D}web_debug_entries" | awk 'NF { count++ } END { print count + 0 }' || printf '0')"
+                  for web_debug_fd in "${D}web_debug_fd_dir"/*; do
+                    if [ -e "${D}web_debug_fd" ] || [ -L "${D}web_debug_fd" ]; then
+                      if web_debug_link="${D}(readlink "${D}web_debug_fd" 2>/dev/null)"; then
+                        web_debug_readlink_success="${D}((web_debug_readlink_success + 1))"
+                        case "${D}web_debug_link" in
+                          socket:\[*\])
+                            web_debug_inode="${D}{web_debug_link#socket:[}"
+                            web_debug_inode="${D}{web_debug_inode%]}"
+                            case "${D}web_debug_inode" in
+                              ''|*[!0-9]*) ;;
+                              *) web_debug_socket_links="${D}((web_debug_socket_links + 1))" ;;
+                            esac
+                            ;;
+                        esac
+                      fi
+                    fi
+                  done
+                fi
+              fi
+            fi
+            web_debug_fd_count_total="${D}((web_debug_fd_count_total + web_debug_fd_count))"
+            web_debug_readlink_success_total="${D}((web_debug_readlink_success_total + web_debug_readlink_success))"
+            web_debug_socket_links_total="${D}((web_debug_socket_links_total + web_debug_socket_links))"
+            printf 'SIFTALPHA_WEB_DEBUG_PID=%s PROC_DIR=%s FD_DIR=%s FD_ENUM=%s FD_COUNT=%s READLINK_SUCCESS=%s SOCKET_LINKS=%s\n' \
+              "${D}web_debug_pid" "${D}web_debug_proc_present" "${D}web_debug_fd_present" \
+              "${D}web_debug_fd_enum" "${D}web_debug_fd_count" \
+              "${D}web_debug_readlink_success" "${D}web_debug_socket_links"
+
+          done
+          printf 'SIFTALPHA_WEB_DEBUG_PID_COUNT=%s\n' "${D}web_debug_pid_count"
+          printf 'SIFTALPHA_WEB_DEBUG_FD_COUNT_TOTAL=%s\n' "${D}web_debug_fd_count_total"
+          printf 'SIFTALPHA_WEB_DEBUG_READLINK_SUCCESS_TOTAL=%s\n' "${D}web_debug_readlink_success_total"
+          printf 'SIFTALPHA_WEB_DEBUG_SOCKET_LINKS_TOTAL=%s\n' "${D}web_debug_socket_links_total"
+          if [ -e /proc/net/tcp ]; then web_debug_tcp_exists=YES; else web_debug_tcp_exists=NO; fi
+          if [ -r /proc/net/tcp ]; then web_debug_tcp_readable=YES; else web_debug_tcp_readable=NO; fi
+          printf 'SIFTALPHA_WEB_DEBUG_TCP_EXISTS=%s\n' "${D}web_debug_tcp_exists"
+          printf 'SIFTALPHA_WEB_DEBUG_TCP_READABLE=%s\n' "${D}web_debug_tcp_readable"
+          if [ -e /proc/net/tcp6 ]; then web_debug_tcp6_exists=YES; else web_debug_tcp6_exists=NO; fi
+          if [ -r /proc/net/tcp6 ]; then web_debug_tcp6_readable=YES; else web_debug_tcp6_readable=NO; fi
+          printf 'SIFTALPHA_WEB_DEBUG_TCP6_EXISTS=%s\n' "${D}web_debug_tcp6_exists"
+          printf 'SIFTALPHA_WEB_DEBUG_TCP6_READABLE=%s\n' "${D}web_debug_tcp6_readable"
+        }
+
         if [ -z "${D}{guest_pids// }" ]; then
+          siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE "${D}web_root_pid" "${D}web_pgid" "${D}guest_pids" ''
           echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS source=PROOT_PROJECT_PID_SCOPE'
           echo 'SIFTALPHA_WEB_GUEST_SCOPE=NO_PROJECT_PIDS'
           exit 0
         fi
 
-        guest_procfs_readable=0
+        guest_fd_directory_present=0
         for guest_pid in ${D}guest_pids; do
-          if [ -r "/proc/${D}guest_pid/fd" ]; then
-            guest_procfs_readable=1
+          if [ -d "/proc/${D}guest_pid/fd" ]; then
+            guest_fd_directory_present=1
             break
           fi
         done
-        if [ "${D}guest_procfs_readable" -eq 0 ]; then
+        if [ "${D}guest_fd_directory_present" -eq 0 ]; then
+          siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE "${D}web_root_pid" "${D}web_pgid" "${D}guest_pids" ''
           echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE source=PROOT_PROJECT_PID_SCOPE'
           echo 'SIFTALPHA_WEB_GUEST_SCOPE=NO_SOCKET_INODES'
           exit 0
@@ -370,6 +662,7 @@ object RuntimeWebPortDiscovery {
             done
           done | awk 'NF && !seen[${D}1]++' | tr '\n' ' '
         )"
+        siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE "${D}web_root_pid" "${D}web_pgid" "${D}guest_pids" "${D}guest_inodes"
         if [ -z "${D}{guest_inodes// }" ]; then
           echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_SOCKET_INODES source=PROOT_PROJECT_PID_SCOPE'
           echo 'SIFTALPHA_WEB_GUEST_SCOPE=NO_SOCKET_INODES'

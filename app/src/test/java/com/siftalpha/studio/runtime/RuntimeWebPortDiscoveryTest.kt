@@ -106,6 +106,17 @@ class RuntimeWebPortDiscoveryTest {
     }
 
     @Test
+    fun fullIdentityIsPreferredOverLegacyPidFallback() {
+        assertEquals(
+            RuntimeIdentitySource.FULL_IDENTITY,
+            RuntimeIdentityStore.sourceFor(
+                hostIdentityAvailable = true,
+                guestIdentityAvailable = true,
+                legacyPidAvailable = true,
+            ),
+        )
+    }
+    @Test
     fun shellProbeKeepsHostFastPathAndAddsProjectScopedProotFallback() {
         val script = RuntimeWebPortDiscovery.shellSnippet()
 
@@ -120,6 +131,28 @@ class RuntimeWebPortDiscoveryTest {
         assertTrue("PRoot fallback must run from Ubuntu guest", "proot-distro login" in script)
         assertTrue("PRoot fallback must remain project PID scoped", "PROOT_PROJECT_PID_SCOPE" in script)
         assertTrue("guest descendants must not scan unrelated processes", "/task/" in script && "/children" in script)
+        assertTrue("guest discovery must consume the generic runtime identity", "siftalpha-web identity" in script)
+        assertTrue("guest root PID must come from the identity sidecar", RuntimeIdentityStore.GUEST_ROOT_PID_KEY in script)
+        assertTrue("guest root PGID must come from the identity sidecar", RuntimeIdentityStore.GUEST_ROOT_PGID_KEY in script)
+        assertTrue("identity sidecar must use the neutral guest mount", RuntimeIdentityStore.GUEST_RUNTIME_ROOT in script)
+        assertTrue("invalid identity must fail closed", "RUNTIME_IDENTITY_INVALID" in script)
+        assertTrue("legacy PID fallback must remain available", "siftalpha-web legacy" in script)
+        assertTrue("partial identity mode must be explicit", "identity_mode='partial_identity'" in script)
+        assertTrue("full identity resolution must be visible", "SIFTALPHA_RUNTIME_IDENTITY_RESOLUTION=FULL_IDENTITY" in script)
+        assertTrue("host-only identity resolution must be visible", "identity_resolution='HOST_ONLY'" in script)
+        assertTrue("guest-only identity resolution must be visible", "identity_resolution='GUEST_ONLY'" in script)
+        assertTrue("metadata mismatch resolution must be visible", "SIFTALPHA_RUNTIME_IDENTITY_RESOLUTION=METADATA_MISMATCH" in script)
+        assertTrue("legacy identity resolution must be visible", "identity_resolution='LEGACY_PID'" in script)
+        assertTrue("unavailable identity resolution must be visible", "identity_resolution='UNAVAILABLE'" in script)
+        assertTrue("full identity usage must be visible", "SIFTALPHA_RUNTIME_IDENTITY_SOURCE=FULL_IDENTITY" in script)
+        assertTrue("legacy identity usage must be visible", "SIFTALPHA_RUNTIME_IDENTITY_SOURCE=LEGACY_PID" in script)
+        assertTrue("unavailable identity usage must be visible", "SIFTALPHA_RUNTIME_IDENTITY_SOURCE=UNAVAILABLE" in script)
+        assertTrue("partial identity may use legacy only through the explicit fallback", "identity_mode" in script && "partial_identity" in script && "siftalpha_web_legacy_fallback" in script)
+        assertTrue("partial resolution must not be reported as source", "SIFTALPHA_RUNTIME_IDENTITY_SOURCE=HOST_ONLY" !in script)
+        assertTrue("partial resolution must not be reported as source", "SIFTALPHA_RUNTIME_IDENTITY_SOURCE=GUEST_ONLY" !in script)
+        assertTrue("legacy fallback must not be silent", "SIFTALPHA_RUNTIME_IDENTITY_FALLBACK=LEGACY_PID" in script)
+        assertTrue("guest root liveness must be diagnosed", "SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=ALIVE" in script)
+        assertTrue("dead guest root must be diagnosed", "SIFTALPHA_RUNTIME_IDENTITY_GUEST_ROOT=NOT_ALIVE" in script)
         assertTrue("terminal no-listen result should be explicit", "NO_LISTEN_PORT source=PROJECT_AND_PROOT_PID_SCOPE" in script)
         assertTrue("no-PID diagnostic marker missing", "SIFTALPHA_WEB_DISCOVERY_STATUS=NO_PROJECT_PIDS" in script)
         assertTrue("procfs diagnostic marker missing", "SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE" in script)
@@ -134,6 +167,88 @@ class RuntimeWebPortDiscoveryTest {
         assertFalse("discovery must not embed a Python TCP scanner", "base64.b64decode" in script)
         assertFalse("discovery must not invoke the old active scan source", "ACTIVE_LOOPBACK_SCAN" in script)
         assertFalse("discovery must not use the unsafe Termux UID fallback", "TERMUX_UID_UNIQUE_HTTP" in script)
+    }
+
+    @Test
+    fun fdDirectoryPrecheckMatchesSocketEnumeration() {
+        val script = RuntimeWebPortDiscovery.shellSnippet()
+
+        assertTrue(
+            "host FD discovery must treat /proc/<pid>/fd as a directory",
+            "[ -d \"/proc/${'$'}web_pid/fd\" ]" in script,
+        )
+        assertTrue(
+            "guest FD discovery must treat /proc/<pid>/fd as a directory",
+            "[ -d \"/proc/${'$'}guest_pid/fd\" ]" in script,
+        )
+        assertFalse(
+            "host FD diagnostics must not use regular-file readability on an fd directory",
+            "[ -r \"/proc/${'$'}web_pid/fd\" ]" in script,
+        )
+        assertFalse(
+            "guest FD diagnostics must not use regular-file readability on an fd directory",
+            "[ -r \"/proc/${'$'}guest_pid/fd\" ]" in script,
+        )
+        assertTrue(
+            "host TCP table readability must remain guarded separately",
+            "[ -r \"${'$'}web_table\" ]" in script,
+        )
+        assertTrue(
+            "guest TCP table readability must remain guarded separately",
+            "[ -r \"${'$'}guest_table\" ]" in script,
+        )
+        assertTrue("FD enumeration must still use readlink", "readlink" in script)
+    }
+
+    @Test
+    fun shellProbeIncludesScopedProcfsDiagnostics() {
+        val script = RuntimeWebPortDiscovery.shellSnippet()
+
+        assertTrue("host project scope diagnostics must be wired", "siftalpha_web_diagnostic_status_for_scope PROJECT_PID_SCOPE" in script)
+        assertTrue("guest project scope diagnostics must be wired", "siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE" in script)
+        val guestProcfsFailureStart = script.indexOf(
+            """if [ "${'$'}guest_fd_directory_present" -eq 0 ]; then""",
+        )
+        val guestProcfsFailureEnd = script.indexOf(
+            "\n        fi\n\n        guest_inodes=",
+            guestProcfsFailureStart,
+        )
+
+        assertTrue("guest procfs failure branch must be locatable", guestProcfsFailureStart >= 0)
+        assertTrue("guest procfs failure branch must have a bounded end", guestProcfsFailureEnd > guestProcfsFailureStart)
+        val guestProcfsFailureBranch = script.substring(guestProcfsFailureStart, guestProcfsFailureEnd)
+        val guestProcfsDiagnosticIndex = guestProcfsFailureBranch.indexOf(
+            "siftalpha_web_debug_scope PROOT_PROJECT_PID_SCOPE",
+        )
+        val guestProcfsFailureIndex = guestProcfsFailureBranch.indexOf(
+            "SIFTALPHA_WEB_DISCOVERY_STATUS=PROCFS_UNREADABLE source=PROOT_PROJECT_PID_SCOPE",
+        )
+        val guestProcfsExitIndex = guestProcfsFailureBranch.indexOf("exit 0")
+
+        assertTrue("guest procfs precheck failure must emit diagnostics", guestProcfsDiagnosticIndex >= 0)
+        assertTrue("guest procfs diagnostic must precede failure status", guestProcfsFailureIndex > guestProcfsDiagnosticIndex)
+        assertTrue("guest procfs failure status must precede exit", guestProcfsExitIndex > guestProcfsFailureIndex)
+        assertTrue("scope diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_SCOPE=%s" in script)
+        assertTrue("self PID diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_SELF_PID=%s" in script)
+        assertTrue("self PGID diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_SELF_PGID=%s" in script)
+        assertTrue("root PID diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_ROOT_PID=%s" in script)
+        assertTrue("root PGID diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_ROOT_PGID=%s" in script)
+        assertTrue("PID list diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_PIDS=%s" in script)
+        assertTrue("PID count diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_PID_COUNT=%s" in script)
+        assertTrue("per-PID procfs summary missing", "SIFTALPHA_WEB_DEBUG_PID=%s PROC_DIR=%s FD_DIR=%s FD_ENUM=%s FD_COUNT=%s READLINK_SUCCESS=%s SOCKET_LINKS=%s" in script)
+        assertTrue("socket inode diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_SOCKET_INODES=%s" in script)
+        assertTrue("TCP diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_TCP_EXISTS=%s" in script && "SIFTALPHA_WEB_DEBUG_TCP_READABLE=%s" in script)
+        assertTrue("TCP6 diagnostic marker missing", "SIFTALPHA_WEB_DEBUG_TCP6_EXISTS=%s" in script && "SIFTALPHA_WEB_DEBUG_TCP6_READABLE=%s" in script)
+        assertTrue("FD diagnostics must remain project PID scoped", "for web_debug_pid in ${'$'}web_debug_pids; do" in script)
+        assertTrue("socket FD readlink discovery must remain present", "readlink" in script)
+        assertTrue("HTTP endpoint probe must remain present", "timeout 1" in script)
+        assertTrue("FULL_IDENTITY guest discovery must remain present", "siftalpha-web identity" in script)
+        assertFalse("diagnostics must not enumerate global procfs", "/proc/[0-9]*" in script)
+        assertFalse("diagnostics must not add global listener discovery", "lsof" in script || "netstat" in script || " ss " in script)
+        assertFalse("diagnostics must not add an all-port scan", "seq 1 65535" in script)
+        assertFalse("per-PID TCP investigation helper must be removed", "siftalpha_web_debug_pid_net_stats() {" in script)
+        assertFalse("per-PID TCP investigation diagnostics must be removed", "SIFTALPHA_WEB_DEBUG_PID_NET=" in script)
+        assertFalse("per-PID TCP paths must be removed", "/proc/${'$'}web_debug_pid/net/tcp" in script)
     }
 
     private fun observation(
