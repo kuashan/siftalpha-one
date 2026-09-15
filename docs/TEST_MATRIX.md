@@ -7,14 +7,21 @@
 - **回归待确认**：历史版本已通过，新 APK 仍应快速复测。
 - **阻塞**：发现问题，必须修复后再继续。
 
+证据标签：
+
+- **unit-test verified**：由 JVM 单元测试覆盖并通过。
+- **GitHub Actions verified**：由主线 GitHub Actions 构建、测试或验证步骤覆盖并通过。
+- **real-device verified**：由 Android 真机实际操作覆盖并通过。
+- **user-confirmed**：由用户提供并确认的真机结果；与代码/云端证据分开记录。
+
 ## A. 当前版本信息
 
-- 版本：`0.8.0-alpha19`
-- versionCode：`95`
+- 当前正式开发版本：`0.8.0-alpha25`
+- versionCode：`101`
 - 包名：`com.siftalpha.studio`
-- APK：[直接下载 alpha19 测试 APK](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-4e899c6/app-debug.apk)
-- Release：[w2-test-4e899c6](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6)
-- APK SHA-256：e7ebfdc81fa770ef020c4527a2069103b1fdcae287fdd1af9c4291307ef2496a
+- 当前 main HEAD：`893229ce26d49a6ea22c79d6e2be85290cb8b0c3`
+- alpha25 主线构建：[GitHub Actions Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426)，artifact 为 `siftalpha-w0-70`（ID `10405122896`）；Run #70 未发布 Release。
+- 最近一次带 Release 的 APK：[w2-test-4e899c6](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6)（历史 alpha19 产物）。
 
 ## B. 云端验证矩阵
 
@@ -33,6 +40,7 @@
 | C-11 | W2 RuntimeLifecycleStore 候选验证 | 单元测试先通过，随后 APK 组装通过 | PASS | [候选 Actions Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615) | 
 | C-12 | W2 RuntimeLifecycleStore 正式 APK 发布 | 正式 main 单元测试、APK 组装、稳定签名和 Release 通过 | PASS | [Actions Run #47](https://github.com/kuashan/siftalpha-one/actions/runs/34923173498) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6) |
 | C-13 | W2 Web Discovery Diagnostic Enhancement 云端验证 | 仓库校验、单元测试、APK 组装、签名和证据收集通过；不发布 Release | PASS | [Actions Run #49](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920/artifacts/10379489647) |
+| C-14 | W2 合并后正式 main 构建 | validators、`testDebugUnitTest`、`assembleDebug`、APK metadata 和签名证据收集通过 | PASS | [Actions Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426/artifacts/10405122896) |
 
 ## C. 安装与升级矩阵
 
@@ -42,7 +50,8 @@
 | I-02 | 覆盖安装后打开 App | 项目、设置和已有本地数据仍可访问 | 待真机 |
 | I-03 | 覆盖安装后确认版本 | 显示 alpha17 / versionCode 93 | 待真机 |
 | I-04 | 在 alpha17 上直接安装 alpha18 | 安装器允许覆盖，版本为 alpha18 / versionCode 94 | 待真机 |
-| I-05 | 在 alpha18 上直接安装 alpha19 | 安装器允许覆盖，版本为 alpha19 / versionCode 95 | 待真机 |
+| I-05 | 在 alpha18 上直接安装 alpha19 | 安装器允许覆盖，版本为 alpha19 / versionCode 95 | 历史记录 |
+| I-06 | 在 alpha24 上直接安装 alpha25 | 安装器允许覆盖，版本为 alpha25 / versionCode 101；签名保持一致 | real-device verified / user-confirmed |
 
 ## D. 配置功能矩阵
 
@@ -91,14 +100,14 @@
 
 ## F. 当前版本建议测试顺序
 
-1. 先直接覆盖安装，不卸载当前 alpha18。
+1. 先直接覆盖安装，不卸载当前 alpha24。
 2. 打开两个脚本，点击“配置”，确认直接进入“项目配置编辑”并看到 OPTIONAL 输入框。
 3. 返回后不填写候选项，依次执行 PREPARE 和 START。
 4. 观察项目是否正常运行，配置提醒是否仍然存在但不阻止运行。
 5. 如项目实际会报告缺失密钥或环境变量，确认 Studio 给出配置提示；保存后重新运行。
 6. 回归 STOP → START。
 7. 回归打开网页、从 Chrome 返回 Studio，以及返回后短时间内页面是否保持正常。
-8. 最后确认版本为 alpha19 / versionCode 95，且本地项目数据仍然存在。建议配置缺失时，START 仍然可用；只有必需配置缺失时 START 才应被阻止。
+8. 最后确认版本为 alpha25 / versionCode 101，且本地项目数据仍然存在。建议配置缺失时，START 仍然可用；只有必需配置缺失时 START 才应被阻止。
 
 每次真机测试完成后，在对应行把“待真机/回归待确认”改成 PASS 或阻塞，并在 DEV_LOG 追加日期、设备、步骤和结果。
 
@@ -107,11 +116,11 @@
 
 | ID | 操作 | 期望 | 状态 |
 |---|---|---|---|
-| R-09 | Python 输出普通 `http://localhost:8000`，但没有 HTTP 服务 | Runtime 显示 RUNNING；Web 独立显示 AUTO_DETECT/UNAVAILABLE；不能显示 STARTING | 云端通过，待真机 |
-| R-10 | 纯 Python 脚本，无 URL、无 Web | Runtime 显示 RUNNING | 云端通过，待真机 |
-| R-11 | 真实 Web 项目执行 `python -m http.server 8000` | Runtime 显示 RUNNING；Web 显示 AVAILABLE；Browser 可用 | 云端通过，待真机 |
-| R-12 | Web 探测输出 `NO_LISTEN_PORT` 或 `NO_SOCKET_INODES` | 只影响 Web 状态，不改写 Runtime RUNNING | 云端通过，待真机 |
-| R-13 | STOP 后再次 START | STOP 可用；停止后可以重新运行 | 待真机 |
+| R-09 | Python 输出普通 `http://localhost:8000`，但没有 HTTP 服务 | Runtime 显示 RUNNING；Web 独立显示 AUTO_DETECT/UNAVAILABLE；不能显示 STARTING | unit-test verified / GitHub Actions verified |
+| R-10 | 纯 Python 脚本，无 URL、无 Web | Runtime 显示 RUNNING | unit-test verified / GitHub Actions verified |
+| R-11 | 真实 Web 项目执行 `python -m http.server 8000` | Runtime 显示 RUNNING；Web 显示 AVAILABLE；Browser 可用 | unit-test verified / GitHub Actions verified |
+| R-12 | Web 探测输出 `NO_LISTEN_PORT` 或 `NO_SOCKET_INODES` | 只影响 Web 状态，不改写 Runtime RUNNING | unit-test verified / GitHub Actions verified |
+| R-13 | STOP 后再次 START | STOP 可用；停止后可以重新运行 | real-device verified / user-confirmed（04D） |
 
 
 ## E.2 W2 RuntimeLifecycleStore SharedPreferences Migration Fix
@@ -136,3 +145,43 @@
 | W-07 | HTTP 探测成功 | `SIFTALPHA_WEB_DISCOVERY_STATUS=PASS`，并保留原有 PASS/URL 输出 | 云端单元测试通过，待真机 |
 | W-08 | 任一诊断失败场景 | 原有 `SIFTALPHA_WEB_AUTODISCOVERY` 兼容输出仍存在 | 云端构建通过，待真机 |
 | W-09 | Runtime START/PREPARE/STOP 回归 | 生命周期和 Browser 安全条件不受诊断字段影响 | 待后续 APK 真机回归 |
+
+## G. W2 Completion Audit — main@893229ce
+
+本节是当前 main 基线的完成度审计，不覆盖范围外的未来功能。评级只使用 `COMPLETE`、`PARTIAL`、`MISSING`、`BLOCKED`；`PARTIAL` 表示实现存在，但架构收敛或验证证据仍不完整。
+
+| 领域 | 评级 | 当前源码证据与验证边界 |
+|---|---|---|
+| Import | PARTIAL | `MainActivity` 的 SAF 选择、`ProjectStore`、`V04ProjectGateway` 的 Python/ZIP/GitHub 导入路径存在；缺少当前 alpha25 导入全链路真机证据。 |
+| Project Identity | COMPLETE | SAF `documentId` 在 `MainActivity`、`HomeScreen`、`ProjectWorkspaceActivity` 和 `V04ProjectGateway` 间传递；有 JVM policy/identity 测试。 |
+| Workspace | PARTIAL | `ProjectWorkspaceActivity` 提供单项目入口，但仍复用 `V04Activity`，没有独立 session/ViewModel 协调层。 |
+| Configuration | PARTIAL | `ConfigurationModels`、`ProjectConfigurationInspector/Preflight`、`ProjectConfigurationUiController` 和 `ProjectActionPolicy` 已接入；当前版本缺少完整真机配置编辑证据。 |
+| Secret Storage | COMPLETE | `ProjectSecretStore` 使用 Android Keystore AES/GCM，SharedPreferences 只保存密文；有存储、脱敏和读取测试。 |
+| Prepare | COMPLETE | `ProjectRuntimeController`、运行时 planner 和 `ManagedProcessRuntime` 提供项目范围 PREPARE；JVM/云端及 04B/04D 覆盖。 |
+| Start | COMPLETE | Python 主路径、受限 Node 路径和统一 controller 已接入；有 planner/adapter 测试及 04B/04D 证据。 |
+| Status | COMPLETE | `RuntimeState`、`RuntimeLifecycleStore`、STATUS 解析与真实进程 reconciliation 已存在；迁移和生命周期测试通过。 |
+| Logs | COMPLETE | Python 使用当前 runtime log 和 bounded tail，Web log fallback 有 raw `logsInner` 测试；04D 验证 Logs 不破坏 RUNNING。 |
+| Output | PARTIAL | `ProjectOutputPanelController` 和 bounded output 存在，但当前 alpha25 缺少专门的真机输出闭环证据。 |
+| Stop | COMPLETE | `ManagedProcessRuntime` 按项目进程树停止并写入状态；有 STOP 测试，04D 已验证。 |
+| Restart | COMPLETE | 04D 已由用户确认 Stop 后重新 Start 和 Browser 恢复；持久 Web candidate 生命周期仍列为风险。 |
+| Recovery | PARTIAL | 进入前使用真实 STATUS reconciliation，而非只信旧 UI；尚无 App 重启后的真机 recovery 证据。 |
+| Runtime Identity | COMPLETE | `RuntimeIdentity/RuntimeIdentityStore` 贯穿 START、STATUS、LOGS、STOP、恢复和 Web discovery；FULL_IDENTITY/guest root ALIVE 已真机确认。 |
+| Python Runtime | COMPLETE | Python 为第一优先路径，使用项目/Runtime identity、ManagedProcess 和 bounded logs；JVM、Run #70、04B/04D 均有证据。 |
+| Node Runtime | PARTIAL | 有受限 managed Node/npm 与显式 start 合约，但缺少等价 Android 真机验收，且 catalog 与 controller 的暴露方式不完全一致。 |
+| Web Discovery | COMPLETE | project-scoped procfs 与 Runtime Log fallback 均存在，禁止全端口/全局进程扫描；04B/04C 已验证成功发现与拒绝误报。 |
+| Endpoint Probe | COMPLETE | `RuntimeWebEndpointProbe` 只验证本地 loopback socket；候选仍需探测，JVM/04B/04C 有证据。 |
+| Browser | COMPLETE | `ProjectActionPolicy` 要求 RUNNING、Web AVAILABLE 和 endpoint reachable；`V04Activity` 打开前再次验证，04B/04C 已确认。 |
+| Failure Handling | PARTIAL | `RuntimeFailureReason`、结构化 markers 和 diagnostics 已有，但部分 UI 仍直接展示原始输出/对话框。 |
+| Action Policy | PARTIAL | `ProjectActionPolicy` 覆盖主要动作并有矩阵测试；`V04Activity` 仍有重复 `canDispatch` 和少量 UI-only guard。 |
+| UI State Model | PARTIAL | `ProjectUiSnapshot` 是卡片主要事实来源，但 `V04Activity` 仍持有多份可变 map 并负责构建/归并状态。 |
+| Real-device Coverage | PARTIAL | alpha25 的 04B/04C/04D 已由用户确认；导入、配置、Node、App 重启 recovery、清理和 Output 仍缺当前基线的完整真机覆盖。 |
+
+### G.1 当前 W2 优先级
+
+- **P0 — W2 关闭前**：抽取 project-scoped `RuntimeSession`/ViewModel/coordinator，统一 refresh、dispatch、recovery、lifecycle 和 Web invalidation，让 Activity 主要负责渲染、对话框和导航。
+- **P1 — W2 应完成**：把 Web candidate 与 Runtime identity/generation 绑定并在 STOP/CLEAN 清除；补齐 alpha25 的 Import、Configuration、App restart recovery、Node 真机矩阵；决定是否移除剩余紧凑 debug 输出。
+- **P2 — W3/W4 可延后**：继续 Compose 化 Workspace、细化结构化失败 UI、扩展 Node 能力，并加固云端签名初始化流程。
+
+若 W2 只能再做一个开发任务，优先 P0 的 `RuntimeSession`/coordinator 抽取：它能同时收敛 Activity 中的多份可变状态和重复 guard，为 `ProjectUiSnapshot`、Web candidate 清理及恢复 ownership 提供唯一上游。
+
+当前 W2 结论：**W2 NOT COMPLETE**。核心 Runtime/Web 功能已合并并通过指定真机场景，但会话协调、candidate 生命周期和覆盖范围仍构成关闭前缺口。

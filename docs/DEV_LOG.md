@@ -338,3 +338,46 @@ App 进入运行中心时，`RuntimeLifecycleStore.read()` 在读取历史 Share
 - 稳定测试证书 SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
 - 云端 artifact：[下载 siftalpha-w0-49](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920/artifacts/10379489647)；Release 发布步骤已跳过。
 - 已推送当前范围验证提交 `14733f7`，未增加额外功能；等待用户进行真机覆盖安装测试。
+
+## 2026-09-15 · W2 Completion Audit 与项目文档同步
+
+### 审计基线
+
+- 仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)。
+- 审计目标：`main`。
+- 当前 main HEAD：`893229ce26d49a6ea22c79d6e2be85290cb8b0c3`。
+- 当前正式开发版本：`0.8.0-alpha25` / `versionCode 101`，包名 `com.siftalpha.studio`。
+- 当前开放 PR：无。
+- `AGENTS.md`：仓库中不存在；本次按现有项目文档维护规则执行。
+
+### 已完成工作记录
+
+- Runtime Identity wiring repair 已完成；`START`、`STATUS`、`LOGS`、`STOP`、Recovery 和 Web Discovery 共用 project/runtime identity。
+- Android 真机已验证 `FULL_IDENTITY`、`FULL_IDENTITY` source 和 guest root `ALIVE`。
+- project-scoped socket ownership discovery 已保留。诊断确认 Android/Termux/PRoot 中 `/proc/<pid>/fd` 可以得到 socket inode，但 `/proc/net/tcp`、`/proc/net/tcp6` 以及 per-PID network table 不可用；没有采用全端口扫描、全局进程扫描或不可信端口猜测。
+- `RuntimeWebLogDiscoveryShell` 已正式接入 Python 当前 Runtime log 的 bounded fallback。procfs discovery 先执行，只有没有可信 procfs endpoint 时才读取当前 runtime log；日志候选仍必须通过 Android Endpoint Probe。
+- Web Discovery Contract 已固定：candidate 不等于 reachable；仅本地 loopback candidate 可进入探测；Browser 只在当前 Runtime RUNNING 且 endpoint probe 成功后开放。
+- alpha25 cleanup 已删除 per-PID TCP/TCP6 investigation-only instrumentation，没有恢复这些调查代码；保留 Web 状态协议和少量基础 procfs 诊断。
+- PR #1 冲突已解决并合并；merge commit 为 `893229ce26d49a6ea22c79d6e2be85290cb8b0c3`。
+
+### 验证证据分类
+
+- **unit-test verified**：当前源码有 314 个 JUnit `@Test` 方法；涵盖 Runtime Identity、Configuration、ActionPolicy、生命周期、Python/Node adapter、Web Discovery、Endpoint Probe、Browser 状态和失败诊断。
+- **GitHub Actions verified**：SiftAlpha W0 Cloud Build Run #70（ID `34989822426`）成功；仓库 validators、`testDebugUnitTest`、`assembleDebug`、APK metadata、`apksigner` 和稳定测试签名证据收集成功。artifact 为 `siftalpha-w0-70`（ID `10405122896`）。
+- **real-device verified**：alpha25 smoke 已完成。Test 04B 明确 loopback Web discovery 和 Browser 打开项目页面 PASS；Test 04C 无 HTTP server 时拒绝裸 `PORT`、模糊端口和 external URL PASS；Test 04D Start → Browser available → Logs/Runtime remains RUNNING → Stop → Restart PASS。
+- **user-confirmed**：上述 04B、04C、04D PASS 由用户提供并确认。导入、配置编辑全流程、Node 主运行时和 App 重启后 recovery 没有被这些结果覆盖。
+
+### W2 完成度审计摘要
+
+- 已完成：Runtime Identity、Python Runtime、Prepare/Start/Status/Logs/Stop、Web candidate/probe/browser contract、配置 REQUIRED/OPTIONAL 语义和基本单项目入口。
+- 部分完成：Import/SAF 全链路当前版本真机覆盖、Workspace 独立协调层、Output 全链路、App 重启 recovery、Node Runtime 真机验收、Failure UI 结构化程度。
+- 已识别风险：`V04Activity` 仍集中刷新、动作 dispatch、生命周期 recovery、配置和 Web 协调；`ProjectUiSnapshot`/`ProjectActionPolicy` 尚未成为唯一的会话状态副作用边界。`RuntimeWebStateStore.clear()` 尚未在 STOP/CLEAN 结果路径统一调用，持久 candidate 的跨 Runtime 生命周期 ownership 需要加固。
+- 当前结论：**W2 NOT COMPLETE**。这不是 Web 04B/04C/04D 功能失败，而是会话协调、candidate 生命周期和覆盖范围尚未达到可关闭的完成度。
+
+### 后续事项
+
+- P0：抽取 project-scoped `RuntimeSession`/ViewModel/coordinator，统一 refresh、dispatch、recovery、lifecycle 和 Web invalidation，使 Activity 只保留渲染、对话框和导航职责。
+- P1：将 Web candidate 与 Runtime identity/generation 绑定并在 STOP/CLEAN 清除；补做 alpha25 的 Import、Configuration、App restart recovery、Node 真机矩阵；决定是否移除剩余紧凑 `SIFTALPHA_WEB_DEBUG_*` 默认输出。
+- P2：继续 Compose 化 Workspace、细化结构化失败 UI、扩展 Node 能力并加固云端签名初始化流程。
+
+本次仅同步 `PROJECT_CONTEXT.md`、`DEV_LOG.md`、`TEST_MATRIX.md`；没有修改 Production Code、Test Code、workflow、版本号或签名配置。
