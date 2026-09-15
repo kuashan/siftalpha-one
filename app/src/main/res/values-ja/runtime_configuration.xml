@@ -9,7 +9,11 @@
     <string name="runtime_configuration_status_pending_discovery">設定：最初の起動で必要項目を検出するまで待機中</string>
     <string name="runtime_configuration_status_ready">設定：必須項目を満たしています</string>
     <string name="runtime_configuration_button">設定</string>
-    <string name="runtime_configuration_view">設定を表示</string>
+    <string name="runtime_configuration_view">設定を編集</string>
+    <string name="runtime_configuration_editor_saved">設定を保存しました</string>
+    <string name="runtime_configuration_keep_existing_hint">%1$s を入力（現在の値を保持する場合は空欄）</string>
+    <string name="runtime_configuration_editor_message">ここで設定値を入力します。必須設定が未入力の場合は START がブロックされます。任意設定は空欄のままでも実行を妨げません。設定済み項目を空欄にすると現在の値を保持します。</string>
+    <string name="runtime_configuration_editor_title">プロジェクト設定を編集 · %1$s</string>
     <string name="runtime_configuration_title">プロジェクト設定 · %1$s</string>
     <string name="runtime_configuration_summary">必須設定は .project.json から取得します。Studio は Python の環境変数読み取りも検出します。.env.example と任意の読み取りは候補としてのみ扱い、推測で実行をブロックしません。</string>
     <string name="runtime_configuration_required_section">必須設定</string>

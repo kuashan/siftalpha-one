@@ -9,7 +9,11 @@
     <string name="runtime_configuration_status_pending_discovery">Configuration: waiting for the first run to detect requirements</string>
     <string name="runtime_configuration_status_ready">Configuration: required items satisfied</string>
     <string name="runtime_configuration_button">Configuration</string>
-    <string name="runtime_configuration_view">View configuration</string>
+    <string name="runtime_configuration_view">Edit configuration</string>
+    <string name="runtime_configuration_editor_saved">Configuration saved</string>
+    <string name="runtime_configuration_keep_existing_hint">Enter %1$s (leave blank to keep current value)</string>
+    <string name="runtime_configuration_editor_message">Enter configuration values here. Missing required items keep START blocked; optional items may stay blank and never block a run. Leave configured items blank to keep their current values.</string>
+    <string name="runtime_configuration_editor_title">Edit project configuration · %1$s</string>
     <string name="runtime_configuration_title">Project configuration · %1$s</string>
     <string name="runtime_configuration_summary">Required items come from .project.json. Studio also inspects Python environment-variable reads. .env.example and optional reads remain suggestions and never block a run by guessing.</string>
     <string name="runtime_configuration_required_section">Required configuration</string>

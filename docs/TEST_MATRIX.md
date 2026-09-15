@@ -9,12 +9,12 @@
 
 ## A. 当前版本信息
 
-- 版本：`0.8.0-alpha16`
-- versionCode：`92`
+- 版本：`0.8.0-alpha17`
+- versionCode：`93`
 - 包名：`com.siftalpha.studio`
-- APK：[直接下载](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-8a91895/app-debug.apk)
-- Release：[w2-test-8a91895](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-8a91895)
-- APK SHA-256：e1ecfd0c62315c1d940ab0f3d2c21a0d466bbb11fdbc9f2214c6061c84d26ba7
+- APK：待 GitHub Actions 构建发布
+- Release：待发布
+- APK SHA-256：待构建后记录
 
 ## B. 云端验证矩阵
 
@@ -53,6 +53,20 @@
 | K-12 | REQUIRED 回归 | 缺少 REQUIRED 仍阻止 START；填写后恢复运行 | 待真机 |
 | K-13 | Mixed 配置 | REQUIRED 完成、OPTIONAL 缺失时可运行；填写 OPTIONAL 只更新其状态 | 待真机 |
 
+
+
+## D.1 W2 Configuration Editor UX Simplification
+
+| ID | 操作 | 期望 | 状态 |
+|---|---|---|---|
+| K-14 | 点击项目卡片“配置” | 直接进入“项目配置编辑”，不再先显示 Summary | 待真机 |
+| K-15 | 编辑列表中同时存在 REQUIRED 与 OPTIONAL | 两类配置都显示输入框和来源/证据 | 待真机 |
+| K-16 | 填写 OPTIONAL 后保存 | 状态更新为已配置，且不改变 START 权限 | 待真机 |
+| K-17 | OPTIONAL 留空后保存/关闭 | 不报必填错误，仍可 START | 待真机 |
+| K-18 | 填写 REQUIRED 后保存 | 状态更新，缺失 REQUIRED 消失，原有运行策略保持 | 待真机 |
+| K-19 | Mixed 配置 | REQUIRED 与 OPTIONAL 状态独立显示，OPTIONAL 不阻塞 START | 待真机 |
+| K-20 | STOP 后打开配置 | 配置入口仍可用，OPTIONAL/REQUIRED 仍可编辑保存 | 待真机 |
+
 ## E. Runtime 回归矩阵
 
 | ID | 操作 | 期望 | 状态 |
@@ -68,8 +82,8 @@
 
 ## F. 当前版本建议测试顺序
 
-1. 先直接覆盖安装，不卸载 alpha14。
-2. 打开两个脚本，进入“配置”，点击“查看配置”，确认 OPTIONAL 项可直接进入输入框。
+1. 先直接覆盖安装，不卸载 alpha16。
+2. 打开两个脚本，点击“配置”，确认直接进入“项目配置编辑”并看到 OPTIONAL 输入框。
 3. 返回后不填写候选项，依次执行 PREPARE 和 START。
 4. 观察项目是否正常运行，配置提醒是否仍然存在但不阻止运行。
 5. 如项目实际会报告缺失密钥或环境变量，确认 Studio 给出配置提示；保存后重新运行。

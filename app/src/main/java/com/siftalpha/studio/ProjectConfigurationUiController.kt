@@ -4,7 +4,11 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.text.InputType
+import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import com.siftalpha.studio.project.ConfigurationEvidence
 import com.siftalpha.studio.project.ConfigurationItem
@@ -56,6 +60,19 @@ class ProjectConfigurationUiController(
     private val runtimeDiscoveryFolders = mutableSetOf<String>()
     private val discoveryPrefs = activity.getSharedPreferences(DISCOVERY_PREFS, Context.MODE_PRIVATE)
     private val legacyPolicyInspector = ProjectSecretPolicyInspector(activity.applicationContext)
+
+    private data class EditorField(
+        val item: ConfigurationItem,
+        val input: EditText,
+    )
+
+    internal data class ConfigurationSavePlan(
+        val missingRequiredKeys: List<String>,
+        val valuesToSave: Map<String, String>,
+    ) {
+        val canSave: Boolean
+            get() = missingRequiredKeys.isEmpty()
+    }
 
     fun snapshot(projectDocumentId: String, folderName: String): Snapshot {
         val inspected = runCatching { inspector.inspect(projectDocumentId) }
@@ -144,7 +161,7 @@ class ProjectConfigurationUiController(
         val items = buildItems(snapshot)
         if (items.isEmpty()) {
             AlertDialog.Builder(activity)
-                .setTitle(activity.getString(R.string.runtime_configuration_title, projectName))
+                .setTitle(activity.getString(R.string.runtime_configuration_editor_title, projectName))
                 .setMessage(
                     summaryText(snapshot) + "\n\n" +
                         activity.getString(R.string.runtime_configuration_none),
@@ -154,54 +171,16 @@ class ProjectConfigurationUiController(
             return
         }
 
-        // Static candidates remain visible as reminders, but only required items enter the
-        // blocking wizard. Optional candidates open the editor directly and never block a run.
-        val pendingRequiredItems = items.filter {
-            it.severity == ConfigurationSeverity.REQUIRED && !it.isConfigured
-        }
-        if (pendingRequiredItems.isNotEmpty()) {
-            showConfigurationWizard(
-                projectName = projectName,
-                folderName = folderName,
-                items = pendingRequiredItems,
-                onCompleted = onCompleted,
-            )
-            return
-        }
-
-        showConfigurationSummary(
+        // Configuration opens directly as an editor. REQUIRED remains enforceable by
+        // ProjectActionPolicy, while OPTIONAL remains a reminder and never blocks START.
+        showConfigurationEditor(
             projectName = projectName,
             projectDocumentId = projectDocumentId,
             folderName = folderName,
             snapshot = snapshot,
             items = items,
+            onCompleted = onCompleted,
         )
-    }
-
-    private fun showConfigurationSummary(
-        projectName: String,
-        projectDocumentId: String,
-        folderName: String,
-        snapshot: Snapshot,
-        items: List<ConfigurationItem>,
-    ) {
-        AlertDialog.Builder(activity)
-            .setTitle(activity.getString(R.string.runtime_configuration_title, projectName))
-            .setMessage(
-                summaryText(snapshot) + "\n\n" +
-                    activity.getString(R.string.runtime_configuration_summary),
-            )
-            .setNegativeButton(R.string.common_close, null)
-            .setPositiveButton(R.string.runtime_configuration_view) { _, _ ->
-                showConfigurationEditor(
-                    projectName = projectName,
-                    projectDocumentId = projectDocumentId,
-                    folderName = folderName,
-                    snapshot = snapshot,
-                    items = items,
-                )
-            }
-            .show()
     }
 
     private fun showConfigurationEditor(
@@ -210,146 +189,185 @@ class ProjectConfigurationUiController(
         folderName: String,
         snapshot: Snapshot,
         items: List<ConfigurationItem>,
+        onCompleted: () -> Unit,
     ) {
-        val labels = items.map { item ->
-            val state = stateLabel(snapshot, item.key, item.required)
-            val requirement = if (item.required) {
-                activity.getString(R.string.runtime_configuration_required_section)
-            } else {
-                activity.getString(R.string.runtime_configuration_item_optional)
-            }
-            val source = sourceLabel(item.source)
-            val evidence = evidenceText(item.evidence)
-            buildString {
-                append(item.key)
-                append(" · ")
-                append(requirement)
-                append('\n')
-                append(state)
-                append(" · ")
-                append(source)
-                if (item.description.orEmpty().isNotBlank()) {
+        lateinit var dialog: AlertDialog
+        val content = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), 0, dp(20), dp(4))
+        }
+        val fields = items.map { item ->
+            val itemTitle = TextView(activity).apply {
+                text = buildString {
+                    append(item.key)
                     append(" · ")
-                    append(item.description.orEmpty())
-                }
-                if (evidence.isNotBlank()) {
-                    append(" · ")
-                    append(activity.getString(R.string.runtime_configuration_evidence_label))
-                    append(": ")
-                    append(evidence)
-                }
-            }
-        }.toTypedArray()
-
-        AlertDialog.Builder(activity)
-            .setTitle(activity.getString(R.string.runtime_configuration_title, projectName))
-            .setMessage(
-                summaryText(snapshot) + "\n\n" +
-                    activity.getString(R.string.runtime_configuration_summary),
-            )
-            .setItems(labels) { _, which ->
-                val selected = items[which]
-                // Selecting an item always opens the editor immediately. In particular,
-                // OPTIONAL items must not terminate at an explanation-only dialog.
-                showValueEditor(
-                    projectName = projectName,
-                    projectDocumentId = projectDocumentId,
-                    folderName = folderName,
-                    item = selected,
-                )
-            }
-            .setNegativeButton(R.string.common_close, null)
-            .show()
-    }
-
-    private fun showConfigurationWizard(
-        projectName: String,
-        folderName: String,
-        items: List<ConfigurationItem>,
-        index: Int = 0,
-        onCompleted: () -> Unit = {},
-    ) {
-        if (index >= items.size) {
-            onChanged()
-            onCompleted()
-            toast(activity.getString(R.string.runtime_configuration_completed))
-            return
-        }
-
-        val item = items[index]
-        val input = EditText(activity).apply {
-            hint = activity.getString(R.string.runtime_configuration_value_hint, item.key)
-            setSingleLine(true)
-            inputType = InputType.TYPE_CLASS_TEXT or if (item.secret) {
-                InputType.TYPE_TEXT_VARIATION_PASSWORD
-            } else {
-                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-            }
-        }
-        val description = buildString {
-            if (item.description.orEmpty().isNotBlank()) append(item.description)
-            if (item.required) {
-                if (isNotEmpty()) append("\n\n")
-                append(activity.getString(R.string.runtime_configuration_required_section))
-            } else {
-                if (isNotEmpty()) append("\n\n")
-                append(activity.getString(R.string.runtime_configuration_wizard_optional))
-            }
-        }
-        val builder = AlertDialog.Builder(activity)
-            .setTitle(
-                activity.getString(
-                    R.string.runtime_configuration_step_title,
-                    projectName,
-                    index + 1,
-                    items.size,
-                ),
-            )
-            .setMessage(description)
-            .setView(input)
-            .setPositiveButton(R.string.runtime_configuration_save_and_next, null)
-            .setNegativeButton(
-                if (item.required) R.string.common_cancel else R.string.runtime_configuration_skip,
-                null,
-            )
-        val dialog = builder.create()
-
-        dialog.setOnShowListener {
-            if (!item.required) {
-                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
-                    dialog.dismiss()
-                    showConfigurationWizard(
-                        projectName = projectName,
-                        folderName = folderName,
-                        items = items,
-                        index = index + 1,
-                        onCompleted = onCompleted,
+                    append(
+                        if (item.required) {
+                            activity.getString(R.string.runtime_configuration_required_section)
+                        } else {
+                            activity.getString(R.string.runtime_configuration_item_optional)
+                        },
                     )
                 }
+                textSize = 16f
+                setPadding(0, dp(10), 0, dp(2))
             }
+            val details = TextView(activity).apply {
+                text = listOf(
+                    stateLabel(snapshot, item.key, item.required),
+                    sourceLabel(item.source),
+                    item.description.orEmpty(),
+                    evidenceText(item.evidence),
+                )
+                    .filter { it.isNotBlank() }
+                    .joinToString(" · ")
+                textSize = 12f
+                setPadding(0, 0, 0, dp(4))
+            }
+            val input = EditText(activity).apply {
+                hint = activity.getString(
+                    R.string.runtime_configuration_keep_existing_hint,
+                    item.key,
+                )
+                setSingleLine(true)
+                inputType = InputType.TYPE_CLASS_TEXT or if (item.secret) {
+                    InputType.TYPE_TEXT_VARIATION_PASSWORD
+                } else {
+                    InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                }
+            }
+            content.addView(
+                itemTitle,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+            content.addView(
+                details,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+            content.addView(
+                input,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    bottomMargin = dp(4)
+                },
+            )
+
+            val configuredInStudio = runCatching {
+                store.hasEnvironmentValue(folderName, item.key)
+            }.getOrDefault(false)
+            if (configuredInStudio) {
+                content.addView(
+                    Button(activity).apply {
+                        text = activity.getString(R.string.runtime_configuration_clear)
+                        setOnClickListener {
+                            runCatching {
+                                store.clearEnvironmentValue(folderName, item.key)
+                            }.onSuccess {
+                                toast(
+                                    activity.getString(
+                                        R.string.runtime_configuration_cleared,
+                                        item.key,
+                                    ),
+                                )
+                                dialog.dismiss()
+                                onChanged()
+                                showConfiguration(
+                                    projectName = projectName,
+                                    projectDocumentId = projectDocumentId,
+                                    folderName = folderName,
+                                    onCompleted = onCompleted,
+                                )
+                            }.onFailure {
+                                errorDialog(
+                                    activity.getString(R.string.runtime_configuration_clear_failed),
+                                    it.message ?: it.javaClass.simpleName,
+                                )
+                            }
+                        }
+                    },
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply {
+                        bottomMargin = dp(6)
+                    },
+                )
+            }
+            EditorField(item = item, input = input)
+        }
+
+        val scroll = ScrollView(activity).apply {
+            addView(content)
+        }
+        val requiredWasMissing = items.any { it.required && !it.isConfigured }
+        val message = activity.getString(R.string.runtime_configuration_editor_message) +
+            "\n\n" + summaryText(snapshot)
+        dialog = AlertDialog.Builder(activity)
+            .setTitle(activity.getString(R.string.runtime_configuration_editor_title, projectName))
+            .setMessage(message)
+            .setView(scroll)
+            .setNegativeButton(R.string.common_close, null)
+            .setPositiveButton(R.string.runtime_configuration_save, null)
+            .create()
+
+        dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val value = input.text.toString()
-                if (value.isBlank()) {
-                    toast(activity.getString(R.string.runtime_configuration_blank_value, item.key))
+                val enteredValues = fields.associate { field ->
+                    field.item.key to field.input.text.toString()
+                }
+                val plan = planConfigurationSave(items, enteredValues)
+                val missingRequired = plan.missingRequiredKeys.firstOrNull()
+                if (missingRequired != null) {
+                    toast(
+                        activity.getString(
+                            R.string.runtime_configuration_blank_value,
+                            missingRequired,
+                        ),
+                    )
+                    fields.firstOrNull { it.item.key == missingRequired }?.input?.requestFocus()
                     return@setOnClickListener
                 }
-                runCatching { store.saveEnvironmentValue(folderName, item.key, value) }
-                    .onSuccess {
-                        dialog.dismiss()
-                        showConfigurationWizard(
-                            projectName = projectName,
-                            folderName = folderName,
-                            items = items,
-                            index = index + 1,
-                            onCompleted = onCompleted,
-                        )
+
+                var savedCount = 0
+                var failure: Throwable? = null
+                for ((key, value) in plan.valuesToSave) {
+                    try {
+                        store.saveEnvironmentValue(folderName, key, value)
+                        savedCount += 1
+                    } catch (error: Throwable) {
+                        failure = error
+                        break
                     }
-                    .onFailure {
-                        errorDialog(
-                            activity.getString(R.string.runtime_configuration_save_failed),
-                            it.message ?: it.javaClass.simpleName,
-                        )
+                }
+                if (failure != null) {
+                    if (savedCount > 0) onChanged()
+                    errorDialog(
+                        activity.getString(R.string.runtime_configuration_save_failed),
+                        failure?.message ?: failure?.javaClass?.simpleName.orEmpty(),
+                    )
+                    return@setOnClickListener
+                }
+
+                dialog.dismiss()
+                if (savedCount > 0) {
+                    toast(activity.getString(R.string.runtime_configuration_editor_saved))
+                    onChanged()
+                    val refreshed = snapshot(projectDocumentId, folderName)
+                    if (
+                        requiredWasMissing &&
+                        refreshed.preflight.missingRequired.isEmpty()
+                    ) {
+                        onCompleted()
                     }
+                }
             }
         }
         dialog.show()
@@ -521,86 +539,8 @@ class ProjectConfigurationUiController(
             .joinToString(" · ")
     }
 
-    private fun showValueEditor(
-        projectName: String,
-        projectDocumentId: String,
-        folderName: String,
-        item: ConfigurationItem,
-        onSaved: () -> Unit = {},
-    ) {
-        val configuredInStudio = runCatching { store.hasEnvironmentValue(folderName, item.key) }
-            .getOrDefault(false)
-        val input = EditText(activity).apply {
-            hint = activity.getString(R.string.runtime_configuration_value_hint, item.key)
-            setSingleLine(true)
-            inputType = InputType.TYPE_CLASS_TEXT or if (item.secret) {
-                InputType.TYPE_TEXT_VARIATION_PASSWORD
-            } else {
-                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-            }
-        }
-        val storageMessage = activity.getString(
-            if (item.secret) {
-                R.string.runtime_configuration_edit_secret_message
-            } else {
-                R.string.runtime_configuration_edit_value_message
-            },
-        )
-        val message = if (item.severity == ConfigurationSeverity.OPTIONAL) {
-            activity.getString(R.string.runtime_configuration_optional_message) +
-                "\n\n" + storageMessage
-        } else {
-            storageMessage
-        }
-        val builder = AlertDialog.Builder(activity)
-            .setTitle(activity.getString(R.string.runtime_configuration_edit_title, item.key))
-            .setMessage(message)
-            .setView(input)
-            .setNegativeButton(R.string.common_cancel, null)
-            .setPositiveButton(R.string.runtime_configuration_save, null)
-
-        if (configuredInStudio) {
-            builder.setNeutralButton(R.string.runtime_configuration_clear) { _, _ ->
-                runCatching { store.clearEnvironmentValue(folderName, item.key) }
-                    .onSuccess {
-                        toast(activity.getString(R.string.runtime_configuration_cleared, item.key))
-                        onChanged()
-                        showConfiguration(projectName, projectDocumentId, folderName)
-                    }
-                    .onFailure {
-                        errorDialog(
-                            activity.getString(R.string.runtime_configuration_clear_failed),
-                            it.message ?: it.javaClass.simpleName,
-                        )
-                    }
-            }
-        }
-
-        val dialog = builder.create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val value = input.text.toString()
-                if (value.isBlank()) {
-                    toast(activity.getString(R.string.runtime_configuration_blank_value, item.key))
-                    return@setOnClickListener
-                }
-                runCatching { store.saveEnvironmentValue(folderName, item.key, value) }
-                    .onSuccess {
-                        toast(activity.getString(R.string.runtime_configuration_saved, item.key))
-                        dialog.dismiss()
-                        onChanged()
-                        onSaved()
-                    }
-                    .onFailure {
-                        errorDialog(
-                            activity.getString(R.string.runtime_configuration_save_failed),
-                            it.message ?: it.javaClass.simpleName,
-                        )
-                    }
-            }
-        }
-        dialog.show()
-    }
+    private fun dp(value: Int): Int =
+        (value * activity.resources.displayMetrics.density).toInt()
 
     private fun errorDialog(title: String, message: String) {
         if (activity.isFinishing || activity.isDestroyed) return
@@ -618,6 +558,30 @@ class ProjectConfigurationUiController(
     private fun hintsKey(folderName: String): String = "hints:$folderName"
 
     companion object {
+        internal fun planConfigurationSave(
+            items: List<ConfigurationItem>,
+            enteredValues: Map<String, String>,
+        ): ConfigurationSavePlan {
+            val missingRequiredKeys = items
+                .filter { item ->
+                    item.required &&
+                        !item.isConfigured &&
+                        enteredValues[item.key].orEmpty().isBlank()
+                }
+                .map { it.key }
+            val valuesToSave = linkedMapOf<String, String>()
+            items.forEach { item ->
+                val value = enteredValues[item.key] ?: return@forEach
+                if (value.isNotBlank()) {
+                    valuesToSave[item.key] = value
+                }
+            }
+            return ConfigurationSavePlan(
+                missingRequiredKeys = missingRequiredKeys,
+                valuesToSave = valuesToSave,
+            )
+        }
+
         private const val DISCOVERY_PREFS = "siftalpha_runtime_configuration_discovery_v1"
     }
 }

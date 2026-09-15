@@ -209,3 +209,30 @@ OPTIONAL（建议配置）已经能够被检测和展示，但点击配置后会
 
 - 新 APK 已发布，等待用户进行 alpha15 → alpha16 的覆盖安装和真机验收。
 - 发布后直接覆盖安装 alpha15，不卸载；重点测试 OPTIONAL 进入输入框、保存后显示已配置、跳过仍可运行，以及 REQUIRED/Runtime 回归。
+
+## 2026-09-15 · W2 Configuration Editor UX Simplification
+
+### 修改目标
+
+- 配置按钮直接进入配置编辑列表，不再先显示 Configuration Summary。
+- 编辑界面明确标记为“项目配置编辑”。
+- REQUIRED 与 OPTIONAL 使用同一编辑列表，均可直接填写。
+- OPTIONAL 留空或保存不会影响 START 权限。
+- 删除旧的 Summary → item list → value editor 多层弹窗路径，改为一个包含输入框的编辑弹窗。
+- 已配置项输入框留空时保持原值；仍保留已保存 Studio 配置的清除入口。
+
+### 测试
+
+新增 `ProjectConfigurationEditorFlowTest`，覆盖：
+
+- OPTIONAL 编辑并生成保存计划；
+- REQUIRED 编辑、保存和缺失阻止；
+- Mixed 配置中 OPTIONAL 留空不阻止保存；
+- STOP 后 CONFIGURE 与 START 仍可用，配置仍可编辑保存。
+
+### 构建与真机
+
+- 版本提升为 `0.8.0-alpha17 / versionCode 93`，用于从 alpha16 直接覆盖安装。
+- 云端构建结果：提交后由 GitHub Actions 验证。
+- APK、SHA-256 和真机结果：云端构建完成后补录。
+
