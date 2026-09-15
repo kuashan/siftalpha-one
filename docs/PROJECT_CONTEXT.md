@@ -6,7 +6,7 @@
 当前实现版本：0.8.0-alpha16 / versionCode 92
 当前实现提交：[5e2d739](https://github.com/kuashan/siftalpha-one/commit/5e2d7395acef37ab7965e517918c02fef19c7cb6)
 上一版发布：[W2 test APK · w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)  
-最新发布：待 alpha16 发布
+最新发布：[W2 test APK · w2-test-8a91895](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-8a91895)
 
 ## 1. 项目目标
 
@@ -120,13 +120,15 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 - 版本：0.8.0-alpha16 / versionCode 92
 - 应用修复提交：[5e2d739](https://github.com/kuashan/siftalpha-one/commit/5e2d7395acef37ab7965e517918c02fef19c7cb6)
 - Run #35：[Actions](https://github.com/kuashan/siftalpha-one/actions/runs/34911589787)，成功
-- Release：待发布；上一版 [w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)
-- APK SHA-256：待发布后记录
+- Release：[w2-test-8a91895](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-8a91895)
+- APK：[直接下载](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-8a91895/app-debug.apk)
+- APK SHA-256：e1ecfd0c62315c1d940ab0f3d2c21a0d466bbb11fdbc9f2214c6061c84d26ba7
+- 稳定测试签名证书摘要：3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928
 - 稳定测试签名证书摘要：3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928
 
 下一步按优先级：
 
-1. 发布后直接覆盖安装 alpha16，不卸载 alpha15，并确认本地数据保留。
+1. 直接覆盖安装 alpha16，不卸载 alpha15，并确认本地数据保留。
 2. 用两个真实脚本验证建议配置可进入输入框、保存后刷新状态，且不阻止运行。
 3. 验证配置摘要的“查看配置”入口和配置列表能够显示检测来源、文件/行号证据。
 4. 验证运行时明确缺失项会在下一次启动前变成 REQUIRED。

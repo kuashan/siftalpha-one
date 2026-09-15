@@ -199,9 +199,13 @@ OPTIONAL（建议配置）已经能够被检测和展示，但点击配置后会
 - Run #34 因 GitHub Actions 的 Android SDK 初始化请求已不存在的 tools 包失败；该次未进入应用编译。
 - 工作流修复提交：[903ad94](https://github.com/kuashan/siftalpha-one/commit/903ad94cbe47a1d24ff14f65788312cd4ea3352f)，改为只请求现行 platform-tools。
 - Run #35：[Actions](https://github.com/kuashan/siftalpha-one/actions/runs/34911589787) 成功：SDK、仓库校验、单元测试、APK 组装、签名和证据收集全部通过。
-- Release 尚待发布；发布后补录 APK 下载地址、SHA-256 和稳定签名证书摘要。
+- 发布：[w2-test-8a91895](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-8a91895)。
+- Run #37：[Actions](https://github.com/kuashan/siftalpha-one/actions/runs/34912031461) 成功。
+- APK：[直接下载](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-8a91895/app-debug.apk)。
+- APK SHA-256：e1ecfd0c62315c1d940ab0f3d2c21a0d466bbb11fdbc9f2214c6061c84d26ba7。
+- 稳定测试证书 SHA-256：3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928。
 
 ### 真机测试与下一步
 
-- 新 APK 尚未发布，暂不复用 alpha15 的真机结论。
+- 新 APK 已发布，等待用户进行 alpha15 → alpha16 的覆盖安装和真机验收。
 - 发布后直接覆盖安装 alpha15，不卸载；重点测试 OPTIONAL 进入输入框、保存后显示已配置、跳过仍可运行，以及 REQUIRED/Runtime 回归。

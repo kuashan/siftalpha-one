@@ -12,9 +12,9 @@
 - 版本：`0.8.0-alpha16`
 - versionCode：`92`
 - 包名：`com.siftalpha.studio`
-- APK：待发布（Run #35 已生成并验收构建产物）
-- Release：待发布；上一版 [w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)
-- APK SHA-256：待发布后记录
+- APK：[直接下载](https://github.com/kuashan/siftalpha-one/releases/download/w2-test-8a91895/app-debug.apk)
+- Release：[w2-test-8a91895](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-8a91895)
+- APK SHA-256：e1ecfd0c62315c1d940ab0f3d2c21a0d466bbb11fdbc9f2214c6061c84d26ba7
 
 ## B. 云端验证矩阵
 
@@ -25,7 +25,7 @@
 | C-03 | APK 组装 | `assembleDebug` 成功 | PASS | [Actions Run #35](https://github.com/kuashan/siftalpha-one/actions/runs/34911589787) |
 | C-04 | 稳定测试签名 | 包签名证书与既有测试版本一致 | PASS | Run #35 evidence / certificate digest |
 | C-05 | APK 元数据 | 包名、版本名和 versionCode 正确 | PASS | `com.siftalpha.studio`, alpha16, 92 |
-| C-06 | 发布资产 | 新版本 Release 中存在可下载 APK | 待发布 | 发布触发提交后更新 |
+| C-06 | 发布资产 | 新版本 Release 中存在可下载 APK | PASS | [w2-test-8a91895](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-8a91895) |
 
 ## C. 安装与升级矩阵
 
