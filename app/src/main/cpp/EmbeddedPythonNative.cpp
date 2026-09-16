@@ -120,6 +120,75 @@ const char* runtimePhaseName(RuntimePhase phase) {
     return "IDLE";
 }
 
+enum class StopPhase {
+    IDLE,
+    STOP_REQUEST_RECEIVED,
+    STOP_TARGET_FOUND,
+    STOP_THREAD_STATE_ATTACH_BEGIN,
+    STOP_THREAD_STATE_ATTACHED,
+    STOP_INTERRUPT_BEGIN,
+    STOP_INTERRUPT_RESULT_0,
+    STOP_INTERRUPT_RESULT_1,
+    STOP_INTERRUPT_RESULT_GT1,
+    STOP_REQUEST_RETURNED,
+};
+
+const char* stopPhaseName(StopPhase phase) {
+    switch (phase) {
+        case StopPhase::IDLE:
+            return "IDLE";
+        case StopPhase::STOP_REQUEST_RECEIVED:
+            return "STOP_REQUEST_RECEIVED";
+        case StopPhase::STOP_TARGET_FOUND:
+            return "STOP_TARGET_FOUND";
+        case StopPhase::STOP_THREAD_STATE_ATTACH_BEGIN:
+            return "STOP_THREAD_STATE_ATTACH_BEGIN";
+        case StopPhase::STOP_THREAD_STATE_ATTACHED:
+            return "STOP_THREAD_STATE_ATTACHED";
+        case StopPhase::STOP_INTERRUPT_BEGIN:
+            return "STOP_INTERRUPT_BEGIN";
+        case StopPhase::STOP_INTERRUPT_RESULT_0:
+            return "STOP_INTERRUPT_RESULT_0";
+        case StopPhase::STOP_INTERRUPT_RESULT_1:
+            return "STOP_INTERRUPT_RESULT_1";
+        case StopPhase::STOP_INTERRUPT_RESULT_GT1:
+            return "STOP_INTERRUPT_RESULT_GT1";
+        case StopPhase::STOP_REQUEST_RETURNED:
+            return "STOP_REQUEST_RETURNED";
+    }
+    return "IDLE";
+}
+
+enum class StopResult {
+    NONE,
+    REQUEST_ACCEPTED,
+    INTERRUPT_DELIVERED,
+    TARGET_NOT_FOUND,
+    MULTIPLE_TARGETS,
+    RUNTIME_FINALIZING,
+    DISPATCH_FAILED,
+};
+
+const char* stopResultName(StopResult result) {
+    switch (result) {
+        case StopResult::NONE:
+            return "NONE";
+        case StopResult::REQUEST_ACCEPTED:
+            return "REQUEST_ACCEPTED";
+        case StopResult::INTERRUPT_DELIVERED:
+            return "INTERRUPT_DELIVERED";
+        case StopResult::TARGET_NOT_FOUND:
+            return "TARGET_NOT_FOUND";
+        case StopResult::MULTIPLE_TARGETS:
+            return "MULTIPLE_TARGETS";
+        case StopResult::RUNTIME_FINALIZING:
+            return "RUNTIME_FINALIZING";
+        case StopResult::DISPATCH_FAILED:
+            return "DISPATCH_FAILED";
+    }
+    return "NONE";
+}
+
 std::int64_t nowEpochMillis() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
                std::chrono::system_clock::now().time_since_epoch())
@@ -188,6 +257,8 @@ struct SessionSnapshot {
     std::int64_t finishedAtEpochMs = 0;
     SessionState state = SessionState::IDLE;
     RuntimePhase runtimePhase = RuntimePhase::IDLE;
+    StopPhase stopPhase = StopPhase::IDLE;
+    StopResult stopResult = StopResult::NONE;
     int exitCode = 0;
     bool hasExitCode = false;
     std::string stdoutText;
@@ -204,6 +275,8 @@ struct Session {
     std::int64_t finishedAtEpochMs = 0;
     SessionState state = SessionState::IDLE;
     RuntimePhase runtimePhase = RuntimePhase::IDLE;
+    StopPhase stopPhase = StopPhase::IDLE;
+    StopResult stopResult = StopResult::NONE;
     int exitCode = 0;
     bool hasExitCode = false;
     std::string stdoutText;
@@ -240,6 +313,42 @@ void setRuntimePhase(Session* session, RuntimePhase phase) {
         "SIFTALPHA_X_RUNTIME_PHASE=%s SIFTALPHA_X_SESSION_ID=%s "
         "SIFTALPHA_X_GENERATION=%lld",
         runtimePhaseName(phase),
+        session->sessionId.c_str(),
+        static_cast<long long>(session->generation));
+}
+
+void setStopPhase(Session* session, StopPhase phase) {
+    StopResult result;
+    {
+        std::lock_guard<std::mutex> lock(session->mutex);
+        session->stopPhase = phase;
+        result = session->stopResult;
+    }
+    __android_log_print(
+        ANDROID_LOG_INFO,
+        kLogTag,
+        "SIFTALPHA_X_STOP_PHASE=%s SIFTALPHA_X_STOP_RESULT=%s "
+        "SIFTALPHA_X_SESSION_ID=%s SIFTALPHA_X_GENERATION=%lld",
+        stopPhaseName(phase),
+        stopResultName(result),
+        session->sessionId.c_str(),
+        static_cast<long long>(session->generation));
+}
+
+void setStopResult(Session* session, StopResult result) {
+    StopPhase phase;
+    {
+        std::lock_guard<std::mutex> lock(session->mutex);
+        session->stopResult = result;
+        phase = session->stopPhase;
+    }
+    __android_log_print(
+        ANDROID_LOG_INFO,
+        kLogTag,
+        "SIFTALPHA_X_STOP_PHASE=%s SIFTALPHA_X_STOP_RESULT=%s "
+        "SIFTALPHA_X_SESSION_ID=%s SIFTALPHA_X_GENERATION=%lld",
+        stopPhaseName(phase),
+        stopResultName(result),
         session->sessionId.c_str(),
         static_cast<long long>(session->generation));
 }
@@ -282,6 +391,8 @@ SessionSnapshot snapshotData(Session* session) {
     snapshot.finishedAtEpochMs = session->finishedAtEpochMs;
     snapshot.state = session->state;
     snapshot.runtimePhase = session->runtimePhase;
+    snapshot.stopPhase = session->stopPhase;
+    snapshot.stopResult = session->stopResult;
     snapshot.exitCode = session->exitCode;
     snapshot.hasExitCode = session->hasExitCode;
     snapshot.stdoutText = session->stdoutText;
@@ -300,14 +411,30 @@ void publishTerminalSession(const std::shared_ptr<Session>& session) {
     }
 }
 
+void refreshLastTerminalSnapshot(const std::shared_ptr<Session>& session) {
+    std::lock_guard<std::mutex> lock(gSessionMutex);
+    const SessionSnapshot latest = snapshotData(session.get());
+    if (latest.state == SessionState::SUCCEEDED ||
+        latest.state == SessionState::FAILED ||
+        latest.state == SessionState::STOPPED) {
+        if (latest.generation >= gLastTerminalSnapshot.generation) {
+            gLastTerminalSnapshot = latest;
+        }
+    }
+}
+
 void logSessionResult(Session* session) {
     SessionState finalState;
     RuntimePhase runtimePhase;
+    StopPhase stopPhase;
+    StopResult stopResult;
     std::string sessionId;
     {
         std::lock_guard<std::mutex> lock(session->mutex);
         finalState = session->state;
         runtimePhase = session->runtimePhase;
+        stopPhase = session->stopPhase;
+        stopResult = session->stopResult;
         sessionId = session->sessionId;
     }
     __android_log_print(ANDROID_LOG_INFO, kLogTag,
@@ -320,10 +447,14 @@ void logSessionResult(Session* session) {
     __android_log_print(ANDROID_LOG_INFO, kLogTag, "SIFTALPHA_X_STDERR_END");
     __android_log_print(ANDROID_LOG_INFO, kLogTag,
                         "SIFTALPHA_X_STATE=%s SIFTALPHA_X_RESULT=%s "
-                        "SIFTALPHA_X_RUNTIME_PHASE=%s SIFTALPHA_X_SESSION_ID=%s",
+                        "SIFTALPHA_X_RUNTIME_PHASE=%s "
+                        "SIFTALPHA_X_STOP_PHASE=%s SIFTALPHA_X_STOP_RESULT=%s "
+                        "SIFTALPHA_X_SESSION_ID=%s",
                         stateName(finalState),
                         resultName(finalState),
                         runtimePhaseName(runtimePhase),
+                        stopPhaseName(stopPhase),
+                        stopResultName(stopResult),
                         sessionId.c_str());
 }
 
@@ -567,9 +698,8 @@ void runSession(const std::shared_ptr<Session>& session) {
     setRuntimePhase(session.get(), RuntimePhase::GIL_ACQUIRE_BEGIN);
     PyGILState_STATE pythonGilState = PyGILState_Ensure();
     setRuntimePhase(session.get(), RuntimePhase::GIL_ACQUIRED);
-    PyThreadState* threadState = PyThreadState_Get();
     session->pythonThreadId.store(
-        static_cast<unsigned long>(PyThreadState_GetID(threadState)),
+        PyThread_get_thread_ident(),
         std::memory_order_release);
     session->pythonReady.store(true, std::memory_order_release);
     setRuntimePhase(session.get(), RuntimePhase::THREAD_STATE_READY);
@@ -605,15 +735,21 @@ void runSession(const std::shared_ptr<Session>& session) {
             ? nullptr
             : PyRun_StringFlags(session->script.c_str(), Py_file_input, mainDict, mainDict, nullptr);
         setRuntimePhase(session.get(), RuntimePhase::PYTHON_EXEC_END);
+        const bool controlledStop = session->stopDelivered.load(std::memory_order_acquire);
         if (result != nullptr) {
             Py_DECREF(result);
+        } else if (controlledStop) {
+            // A SiftAlpha STOP-induced KeyboardInterrupt is a controlled stop, not a
+            // user-code failure. Clear it without printing a traceback.
+            PyErr_Clear();
         } else {
             appendPythonTraceback();
         }
 
         stdoutText = stringIoValue(capturedStdout);
         stderrText = stringIoValue(capturedStderr);
-        if (session->stopDelivered.load(std::memory_order_acquire)) {
+        if (controlledStop) {
+            stderrText = boundedOutput(stderrText + "SIFTALPHA_X_STOP=COOPERATIVE\n");
             terminalState = SessionState::STOPPED;
             terminalExitCode = 130;
         } else if (result != nullptr) {
@@ -651,6 +787,8 @@ std::string snapshotJson(const SessionSnapshot& snapshot) {
     json += ",\"generation\":" + jsonLong(snapshot.generation);
     json += ",\"state\":" + jsonString(stateName(snapshot.state));
     json += ",\"runtimePhase\":" + jsonString(runtimePhaseName(snapshot.runtimePhase));
+    json += ",\"stopPhase\":" + jsonString(stopPhaseName(snapshot.stopPhase));
+    json += ",\"stopResult\":" + jsonString(stopResultName(snapshot.stopResult));
     json += ",\"startedAtEpochMs\":" + jsonLong(snapshot.startedAtEpochMs);
     if (snapshot.finishedAtEpochMs == 0) {
         json += ",\"finishedAtEpochMs\":null";
@@ -668,32 +806,62 @@ std::string snapshotJson(const SessionSnapshot& snapshot) {
     return json;
 }
 
-int requestPythonStop(Session* session) {
-    if (!session->pythonReady.load(std::memory_order_acquire)) {
-        return 1;
-    }
-    unsigned long threadId = session->pythonThreadId.load(std::memory_order_acquire);
-    if (threadId == 0) {
-        return 1;
+void deliverPythonStop(const std::shared_ptr<Session>& session) {
+    setStopPhase(session.get(), StopPhase::STOP_THREAD_STATE_ATTACH_BEGIN);
+    if (Py_IsFinalizing()) {
+        setStopResult(session.get(), StopResult::RUNTIME_FINALIZING);
+        setStopPhase(session.get(), StopPhase::STOP_REQUEST_RETURNED);
+        refreshLastTerminalSnapshot(session);
+        return;
     }
 
-    // This is cooperative: the fixed TEST C script receives KeyboardInterrupt at
-    // a Python interruption point. It is not a general forced native-thread kill.
+    const unsigned long targetThreadId =
+        session->pythonThreadId.load(std::memory_order_acquire);
+    if (targetThreadId == 0) {
+        setStopPhase(session.get(), StopPhase::STOP_INTERRUPT_RESULT_0);
+        setStopResult(session.get(), StopResult::TARGET_NOT_FOUND);
+        setStopPhase(session.get(), StopPhase::STOP_REQUEST_RETURNED);
+        refreshLastTerminalSnapshot(session);
+        return;
+    }
+
+    // This control thread is intentionally separate from the Android caller. The
+    // CPython API may wait for the GIL, but the UI thread must remain bounded.
     PyGILState_STATE gilState = PyGILState_Ensure();
-    int affected = PyThreadState_SetAsyncExc(threadId, PyExc_KeyboardInterrupt);
-    if (affected == 1) {
+    setStopPhase(session.get(), StopPhase::STOP_THREAD_STATE_ATTACHED);
+
+    // The execution worker can finish while this control thread is acquiring the
+    // GIL. Recheck the owning Session before targeting a potentially reused thread ID.
+    if (!session->pythonReady.load(std::memory_order_acquire)) {
+        PyGILState_Release(gilState);
+        setStopPhase(session.get(), StopPhase::STOP_INTERRUPT_RESULT_0);
+        setStopResult(session.get(), StopResult::TARGET_NOT_FOUND);
+        setStopPhase(session.get(), StopPhase::STOP_REQUEST_RETURNED);
+        refreshLastTerminalSnapshot(session);
+        return;
+    }
+
+    setStopPhase(session.get(), StopPhase::STOP_INTERRUPT_BEGIN);
+    const int affected = PyThreadState_SetAsyncExc(
+        targetThreadId,
+        PyExc_KeyboardInterrupt);
+    if (affected == 0) {
+        setStopPhase(session.get(), StopPhase::STOP_INTERRUPT_RESULT_0);
+        setStopResult(session.get(), StopResult::TARGET_NOT_FOUND);
+    } else if (affected == 1) {
         session->stopDelivered.store(true, std::memory_order_release);
+        setStopPhase(session.get(), StopPhase::STOP_INTERRUPT_RESULT_1);
+        setStopResult(session.get(), StopResult::INTERRUPT_DELIVERED);
+    } else {
+        // The target ID should identify exactly one thread state. Roll back an
+        // unexpected multi-state match while this control thread still owns the GIL.
+        setStopPhase(session.get(), StopPhase::STOP_INTERRUPT_RESULT_GT1);
+        setStopResult(session.get(), StopResult::MULTIPLE_TARGETS);
+        PyThreadState_SetAsyncExc(targetThreadId, nullptr);
     }
     PyGILState_Release(gilState);
-    if (affected == 1) {
-        return 0;
-    }
-    if (affected > 1) {
-        PyGILState_STATE rollbackGilState = PyGILState_Ensure();
-        PyThreadState_SetAsyncExc(threadId, nullptr);
-        PyGILState_Release(rollbackGilState);
-    }
-    return 1;
+    setStopPhase(session.get(), StopPhase::STOP_REQUEST_RETURNED);
+    refreshLastTerminalSnapshot(session);
 }
 
 }  // namespace
@@ -761,19 +929,46 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeRequestStop(
     if (session == nullptr) {
         return JNI_FALSE;
     }
-    SessionState state;
+
     {
         std::lock_guard<std::mutex> sessionLock(session->mutex);
-        state = session->state;
+        if (session->state != SessionState::STARTING &&
+            session->state != SessionState::RUNNING) {
+            return JNI_FALSE;
+        }
+        if (session->stopRequested.exchange(true, std::memory_order_acq_rel)) {
+            return JNI_TRUE;
+        }
     }
-    if (state != SessionState::STARTING && state != SessionState::RUNNING) {
-        return JNI_FALSE;
-    }
-    session->stopRequested.store(true, std::memory_order_release);
+
+    setStopPhase(session.get(), StopPhase::STOP_REQUEST_RECEIVED);
+    setStopResult(session.get(), StopResult::REQUEST_ACCEPTED);
     if (!session->pythonReady.load(std::memory_order_acquire)) {
+        setStopPhase(session.get(), StopPhase::STOP_REQUEST_RETURNED);
         return JNI_TRUE;
     }
-    return requestPythonStop(session.get()) == 0 ? JNI_TRUE : JNI_FALSE;
+    if (session->pythonThreadId.load(std::memory_order_acquire) == 0) {
+        setStopResult(session.get(), StopResult::DISPATCH_FAILED);
+        setStopPhase(session.get(), StopPhase::STOP_REQUEST_RETURNED);
+        refreshLastTerminalSnapshot(session);
+        return JNI_FALSE;
+    }
+
+    setStopPhase(session.get(), StopPhase::STOP_TARGET_FOUND);
+    try {
+        std::thread([session]() {
+            deliverPythonStop(session);
+        }).detach();
+    } catch (const std::exception&) {
+        setStopResult(session.get(), StopResult::DISPATCH_FAILED);
+        setStopPhase(session.get(), StopPhase::STOP_REQUEST_RETURNED);
+        refreshLastTerminalSnapshot(session);
+        return JNI_FALSE;
+    }
+
+    // Acceptance means the request was recorded and dispatch was scheduled. The
+    // terminal STOPPED state is published only by the execution worker.
+    return JNI_TRUE;
 }
 
 extern "C" JNIEXPORT jstring JNICALL

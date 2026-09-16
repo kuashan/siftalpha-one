@@ -30,17 +30,42 @@ class EmbeddedPythonNativeSmokeTest {
             "A native smoke test session is already active",
             EmbeddedPythonStatePolicy.canStart(session.snapshot().state),
         )
+
+        session.start(EmbeddedPythonScenario.NORMAL)
+        awaitState(session, EmbeddedPythonState.SUCCEEDED, 5_000L)
+        val snapshotA = session.snapshot()
+
         session.start(EmbeddedPythonScenario.LONG_RUNNING)
         awaitState(session, EmbeddedPythonState.RUNNING, 5_000L)
+        awaitRuntimePhase(session, EmbeddedPythonRuntimePhase.PYTHON_EXEC_BEGIN, 5_000L)
+        val snapshotC = session.snapshot()
+        assertNotEquals(snapshotA.sessionId, snapshotC.sessionId)
+        assertTrue(snapshotC.generation > snapshotA.generation)
+
         assertTrue("The cooperative stop request was not accepted", session.requestStop())
         awaitState(session, EmbeddedPythonState.STOPPED, 5_000L)
+        awaitStopDiagnostics(session, 5_000L)
 
-        val snapshot = session.snapshot()
-        assertEquals(EmbeddedPythonState.STOPPED, snapshot.state)
-        assertEquals(130, snapshot.exitCode)
-        assertTrue(snapshot.stdout.contains("SIFTALPHA_X_TEST_C_STARTED"))
-        assertTrue(snapshot.stdout.contains("SIFTALPHA_X_TEST_C_COOPERATIVE_STOP"))
-        assertEquals(EmbeddedPythonRuntimePhase.TERMINAL, snapshot.runtimePhase)
+        val stopped = session.snapshot()
+        assertEquals(EmbeddedPythonState.STOPPED, stopped.state)
+        assertEquals(130, stopped.exitCode)
+        assertEquals(snapshotC.sessionId, stopped.sessionId)
+        assertEquals(snapshotC.generation, stopped.generation)
+        assertEquals(EmbeddedPythonRuntimePhase.TERMINAL, stopped.runtimePhase)
+        assertEquals(EmbeddedPythonStopPhase.STOP_REQUEST_RETURNED, stopped.stopPhase)
+        assertEquals(EmbeddedPythonStopResult.INTERRUPT_DELIVERED, stopped.stopResult)
+        assertTrue(stopped.stdout.contains("SIFTALPHA_X_TEST_C_STARTED"))
+        assertTrue(stopped.stdout.contains("SIFTALPHA_X_TEST_C_COOPERATIVE_STOP"))
+        assertTrue(stopped.stderr.contains("SIFTALPHA_X_STOP=COOPERATIVE"))
+
+        session.start(EmbeddedPythonScenario.NORMAL)
+        awaitState(session, EmbeddedPythonState.SUCCEEDED, 5_000L)
+        val snapshotAAgain = session.snapshot()
+        assertNotEquals(stopped.sessionId, snapshotAAgain.sessionId)
+        assertTrue(stopped.generation < snapshotAAgain.generation)
+        assertEquals(EmbeddedPythonState.SUCCEEDED, snapshotAAgain.state)
+        assertEquals(EmbeddedPythonRuntimePhase.TERMINAL, snapshotAAgain.runtimePhase)
+        assertTrue(snapshotAAgain.stdout.contains("SIFTALPHA_X_PYTHON_OK"))
     }
 
     @Test
@@ -88,6 +113,37 @@ class EmbeddedPythonNativeSmokeTest {
         assertTrue(snapshotAAgain.stdout.contains("SIFTALPHA_X_PYTHON_OK"))
     }
 
+    private fun awaitRuntimePhase(
+        session: EmbeddedPythonSession,
+        expected: EmbeddedPythonRuntimePhase,
+        timeoutMs: Long,
+    ) {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        var snapshot = session.snapshot()
+        while (snapshot.runtimePhase != expected && SystemClock.uptimeMillis() < deadline) {
+            SystemClock.sleep(50L)
+            snapshot = session.snapshot()
+        }
+        assertEquals(expected, snapshot.runtimePhase)
+    }
+
+    private fun awaitStopDiagnostics(
+        session: EmbeddedPythonSession,
+        timeoutMs: Long,
+    ) {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        var snapshot = session.snapshot()
+        while (
+            (snapshot.stopPhase != EmbeddedPythonStopPhase.STOP_REQUEST_RETURNED ||
+                snapshot.stopResult != EmbeddedPythonStopResult.INTERRUPT_DELIVERED) &&
+            SystemClock.uptimeMillis() < deadline
+        ) {
+            SystemClock.sleep(50L)
+            snapshot = session.snapshot()
+        }
+        assertEquals(EmbeddedPythonStopPhase.STOP_REQUEST_RETURNED, snapshot.stopPhase)
+        assertEquals(EmbeddedPythonStopResult.INTERRUPT_DELIVERED, snapshot.stopResult)
+    }
     private fun awaitState(
         session: EmbeddedPythonSession,
         expected: EmbeddedPythonState,

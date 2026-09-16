@@ -36,11 +36,36 @@ enum class EmbeddedPythonRuntimePhase {
     WORKER_EXIT,
 }
 
+enum class EmbeddedPythonStopPhase {
+    IDLE,
+    STOP_REQUEST_RECEIVED,
+    STOP_TARGET_FOUND,
+    STOP_THREAD_STATE_ATTACH_BEGIN,
+    STOP_THREAD_STATE_ATTACHED,
+    STOP_INTERRUPT_BEGIN,
+    STOP_INTERRUPT_RESULT_0,
+    STOP_INTERRUPT_RESULT_1,
+    STOP_INTERRUPT_RESULT_GT1,
+    STOP_REQUEST_RETURNED,
+}
+
+enum class EmbeddedPythonStopResult {
+    NONE,
+    REQUEST_ACCEPTED,
+    INTERRUPT_DELIVERED,
+    TARGET_NOT_FOUND,
+    MULTIPLE_TARGETS,
+    RUNTIME_FINALIZING,
+    DISPATCH_FAILED,
+}
+
 data class EmbeddedPythonSnapshot(
     val sessionId: String = "",
     val generation: Long = 0L,
     val state: EmbeddedPythonState = EmbeddedPythonState.IDLE,
     val runtimePhase: EmbeddedPythonRuntimePhase = EmbeddedPythonRuntimePhase.IDLE,
+    val stopPhase: EmbeddedPythonStopPhase = EmbeddedPythonStopPhase.IDLE,
+    val stopResult: EmbeddedPythonStopResult = EmbeddedPythonStopResult.NONE,
     val startedAtEpochMs: Long? = null,
     val finishedAtEpochMs: Long? = null,
     val exitCode: Int? = null,
@@ -61,11 +86,27 @@ object EmbeddedPythonSnapshotParser {
             EmbeddedPythonRuntimePhase.entries.firstOrNull { it.name == runtimePhaseName }
                 ?: error("Unknown embedded Python runtime phase: $runtimePhaseName")
         }
+        val stopPhaseName = json.stringOrEmpty("stopPhase")
+        val stopPhase = if (stopPhaseName.isBlank()) {
+            EmbeddedPythonStopPhase.IDLE
+        } else {
+            EmbeddedPythonStopPhase.entries.firstOrNull { it.name == stopPhaseName }
+                ?: error("Unknown embedded Python stop phase: $stopPhaseName")
+        }
+        val stopResultName = json.stringOrEmpty("stopResult")
+        val stopResult = if (stopResultName.isBlank()) {
+            EmbeddedPythonStopResult.NONE
+        } else {
+            EmbeddedPythonStopResult.entries.firstOrNull { it.name == stopResultName }
+                ?: error("Unknown embedded Python stop result: $stopResultName")
+        }
         return EmbeddedPythonSnapshot(
             sessionId = json.stringOrEmpty("sessionId"),
             generation = json.longOrDefault("generation", 0L),
             state = state,
             runtimePhase = runtimePhase,
+            stopPhase = stopPhase,
+            stopResult = stopResult,
             startedAtEpochMs = json.nullableLong("startedAtEpochMs"),
             finishedAtEpochMs = json.nullableLong("finishedAtEpochMs"),
             exitCode = json.nullableInt("exitCode"),
@@ -100,6 +141,8 @@ object EmbeddedPythonDiagnosticText {
         "SIFTALPHA_X_GENERATION=${snapshot.generation}",
         "SIFTALPHA_X_STATE=${snapshot.state}",
         "SIFTALPHA_X_RUNTIME_PHASE=${snapshot.runtimePhase}",
+        "SIFTALPHA_X_STOP_PHASE=${snapshot.stopPhase}",
+        "SIFTALPHA_X_STOP_RESULT=${snapshot.stopResult}",
         "exitCode=${snapshot.exitCode ?: "-"}",
     ).joinToString("\n")
 

@@ -27,6 +27,8 @@ class EmbeddedPythonResultTest {
         assertEquals("siftalpha-x-a", snapshot.sessionId)
         assertEquals(1L, snapshot.generation)
         assertEquals(EmbeddedPythonState.SUCCEEDED, snapshot.state)
+        assertEquals(EmbeddedPythonStopPhase.IDLE, snapshot.stopPhase)
+        assertEquals(EmbeddedPythonStopResult.NONE, snapshot.stopResult)
         assertEquals(10L, snapshot.startedAtEpochMs)
         assertEquals(20L, snapshot.finishedAtEpochMs)
         assertEquals(0, snapshot.exitCode)
@@ -39,16 +41,23 @@ class EmbeddedPythonResultTest {
         val snapshot = EmbeddedPythonSnapshotParser.parse(
             """
             {"sessionId":"siftalpha-x-phase","generation":4,"state":"FAILED",
-             "runtimePhase":"TERMINAL","startedAtEpochMs":30,
+             "runtimePhase":"TERMINAL",
+             "stopPhase":"STOP_REQUEST_RETURNED",
+             "stopResult":"INTERRUPT_DELIVERED",
+             "startedAtEpochMs":30,
              "finishedAtEpochMs":40,"exitCode":1,
              "stdout":"out","stderr":"traceback"}
             """.replace("\n", ""),
         )
 
         assertEquals(EmbeddedPythonRuntimePhase.TERMINAL, snapshot.runtimePhase)
+        assertEquals(EmbeddedPythonStopPhase.STOP_REQUEST_RETURNED, snapshot.stopPhase)
+        assertEquals(EmbeddedPythonStopResult.INTERRUPT_DELIVERED, snapshot.stopResult)
         val diagnostics = EmbeddedPythonDiagnosticText.copyAll(snapshot)
         assertTrue(diagnostics.contains("SIFTALPHA_X_SESSION_ID=siftalpha-x-phase"))
         assertTrue(diagnostics.contains("SIFTALPHA_X_RUNTIME_PHASE=TERMINAL"))
+        assertTrue(diagnostics.contains("SIFTALPHA_X_STOP_PHASE=STOP_REQUEST_RETURNED"))
+        assertTrue(diagnostics.contains("SIFTALPHA_X_STOP_RESULT=INTERRUPT_DELIVERED"))
         assertTrue(diagnostics.contains("stdout:\nout"))
         assertTrue(diagnostics.contains("stderr:\ntraceback"))
     }
