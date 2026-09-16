@@ -535,8 +535,13 @@ open class V04Activity : StudioActivity() {
         }
         val configurationRequired =
             configurationSnapshot.preflight.missingRequired.isNotEmpty()
+        val lifecycleEnvironmentReady = if (runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R) {
+            true
+        } else {
+            environmentStates[stateKey]
+        }
         val lifecycleState = RuntimeLifecycleResolver.resolve(
-            environmentReady = environmentStates[stateKey],
+            environmentReady = lifecycleEnvironmentReady,
             runtimeState = typedState,
             operation = pendingItem?.action?.toLifecycleOperation()
                 ?: RuntimeLifecycleOperation.NONE,
