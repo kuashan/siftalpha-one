@@ -86,7 +86,7 @@
     <string name="runtime_selection_termux">Termux (external runtime)</string>
     <string name="runtime_selection_saved">Runtime saved: %1$s</string>
     <string name="runtime_selection_active">Stop the current run before changing its runtime.</string>
-    <string name="runtime_embedded_r_capability_unavailable">This project is outside SiftAlpha R's currently supported capability boundary (%1$s). The selection was kept; switch to Termux if you need to run it.</string>
+    <string name="runtime_embedded_r_capability_unavailable">This project is outside the current SiftAlpha R capability boundary (%1$s). The selection was kept; switch to Termux if you need to run it.</string>
     <string name="runtime_button_run_embedded_r">Run with Embedded R</string>
     <string name="runtime_embedded_r_title">Run %1$s with Embedded R?</string>
     <string name="runtime_embedded_r_message">The SAF project will be copied into an app-private staging directory and run through its resolved Python entrypoint. This experimental path does not use Termux.</string>
