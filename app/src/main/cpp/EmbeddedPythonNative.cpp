@@ -697,8 +697,11 @@ bool pathWithin(const std::string& root, const std::string& candidate) {
         candidate[root.size()] == '/';
 }
 
+bool pathWithin(const std::string& root, const std::string& candidate);
+
 bool validatePathComponents(
     const std::string& path,
+    const std::string& symlinkProtectedRoot,
     bool allowMissingLeaf,
     bool* missingLeaf,
     std::string* failure) {
@@ -753,7 +756,12 @@ bool validatePathComponents(
             }
             return false;
         }
-        if (S_ISLNK(info.st_mode)) {
+        // Android may expose app-private paths through framework-managed symlink
+        // ancestors such as /data/user/0. Only the project/staging subtree is
+        // controlled by this execution boundary; canonical containment checks below
+        // still apply to every final target.
+        if (S_ISLNK(info.st_mode) &&
+            pathWithin(symlinkProtectedRoot, current)) {
             if (failure != nullptr) {
                 *failure = "symlink path components are not supported: " + current;
             }
@@ -789,6 +797,24 @@ bool validateExecutionSpec(
         return false;
     }
 
+    const std::string projectsBase = parentDirectory(session->home) + "/projects";
+    struct stat projectsInfo {};
+    if (lstat(projectsBase.c_str(), &projectsInfo) != 0 ||
+        !S_ISDIR(projectsInfo.st_mode)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=staging directory is unavailable";
+        }
+        return false;
+    }
+
+    std::string canonicalBase;
+    if (!canonicalPath(projectsBase, &canonicalBase)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=staging directory cannot be resolved";
+        }
+        return false;
+    }
+
     struct stat rootInfo {};
     if (lstat(root.c_str(), &rootInfo) != 0 || !S_ISDIR(rootInfo.st_mode)) {
         if (failure != nullptr) {
@@ -799,26 +825,26 @@ bool validateExecutionSpec(
 
     std::string componentFailure;
     bool ignoredMissing = false;
-    if (!validatePathComponents(root, false, &ignoredMissing, &componentFailure)) {
+    if (!pathWithin(projectsBase, root)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=execution root is outside staging path";
+        }
+        return false;
+    }
+    if (!validatePathComponents(
+            root,
+            projectsBase,
+            false,
+            &ignoredMissing,
+            &componentFailure)) {
         if (failure != nullptr) {
             *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=" + componentFailure;
         }
         return false;
     }
 
-    const std::string projectsBase = parentDirectory(session->home) + "/projects";
-    struct stat projectsInfo {};
-    if (lstat(projectsBase.c_str(), &projectsInfo) != 0 ||
-        !S_ISDIR(projectsInfo.st_mode)) {
-        if (failure != nullptr) {
-            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=staging directory is unavailable";
-        }
-        return false;
-    }
-    std::string canonicalBase;
     std::string canonicalRoot;
-    if (!canonicalPath(projectsBase, &canonicalBase) ||
-        !canonicalPath(root, &canonicalRoot) ||
+    if (!canonicalPath(root, &canonicalRoot) ||
         !pathWithin(canonicalBase, canonicalRoot)) {
         if (failure != nullptr) {
             *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=execution root is outside app-private staging";
@@ -836,6 +862,7 @@ bool validateExecutionSpec(
     componentFailure.clear();
     if (!validatePathComponents(
             entrypoint,
+            projectsBase,
             true,
             &missingEntrypoint,
             &componentFailure)) {
@@ -877,6 +904,7 @@ bool validateExecutionSpec(
     componentFailure.clear();
     if (!validatePathComponents(
             workingDirectory,
+            projectsBase,
             false,
             &ignoredMissing,
             &componentFailure)) {
