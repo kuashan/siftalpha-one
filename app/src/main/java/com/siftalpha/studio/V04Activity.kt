@@ -28,9 +28,10 @@ import com.siftalpha.studio.presentation.ProjectActionPolicy
 import com.siftalpha.studio.presentation.ProjectUiSnapshot
 import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
 import com.siftalpha.studio.runtime.ProjectRuntimeController
-import com.siftalpha.studio.runtime.ProjectRuntimeExecutionPlanner
 import com.siftalpha.studio.runtime.ProjectSecretStore
 import com.siftalpha.studio.runtime.RuntimeCommand
+import com.siftalpha.studio.runtime.RuntimeControlPath
+import com.siftalpha.studio.runtime.RuntimeControlRequest
 import com.siftalpha.studio.runtime.RuntimeFailureReason
 import com.siftalpha.studio.runtime.RuntimeLifecycleOperation
 import com.siftalpha.studio.runtime.RuntimeLifecycleResolver
@@ -43,7 +44,6 @@ import com.siftalpha.studio.runtime.RuntimeWebStateStore
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
 import com.siftalpha.studio.runtime.RuntimeWebUrl
 import com.siftalpha.studio.runtime.TermuxBackend
-import com.siftalpha.studio.runtime.RuntimeKind
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSnapshot
 import com.siftalpha.studio.siftalphax.EmbeddedPythonState
@@ -484,7 +484,7 @@ open class V04Activity : StudioActivity() {
         }
         val embeddedRuntimeState = embeddedSnapshot?.let { EmbeddedPythonRuntimeStateMapping.toRuntimeState(it) }
         val typedState = embeddedRuntimeState ?: typedStates[stateKey] ?: RuntimeState.UNKNOWN
-        val embeddedEligible = supportsEmbeddedPython(project)
+        val embeddedEligible = supportsEmbeddedPython(project, configurationSnapshot)
         val embeddedActive = embeddedSnapshot?.let(::isEmbeddedActive) == true
         val webSnapshot = webStateStore.snapshot(stateKey)
         val configuredWebUrl = webProfile.configuredLocalUrl()
@@ -721,7 +721,7 @@ open class V04Activity : StudioActivity() {
                 }
                 ProjectActionPolicy.Action.STOP -> {
                     box.addView(button(getString(R.string.runtime_button_stop)) {
-                        if (embeddedActive) requestEmbeddedStop(project) else dispatch(project, ProjectRuntimeController.Action.STOP)
+                        dispatch(project, ProjectRuntimeController.Action.STOP)
                     })
                 }
                 ProjectActionPolicy.Action.CONFIGURE -> {
@@ -767,7 +767,7 @@ open class V04Activity : StudioActivity() {
             setPadding(0, dp(5), 0, 0)
         }
         val stopButton = smallButton(getString(R.string.runtime_button_stop)) {
-                if (embeddedActive) requestEmbeddedStop(project) else dispatch(project, ProjectRuntimeController.Action.STOP)
+                dispatch(project, ProjectRuntimeController.Action.STOP)
             }.apply { isEnabled = embeddedActive || policy.isEnabled(ProjectActionPolicy.Action.STOP) }
         row2.addView(stopButton, weight())
         val statusButton = smallButton(getString(R.string.runtime_button_status)) {
@@ -970,6 +970,7 @@ open class V04Activity : StudioActivity() {
     private fun canDispatch(
         project: V04ProjectGateway.RuntimeProject,
         action: ProjectRuntimeController.Action,
+        controlPath: RuntimeControlPath = RuntimeControlPath.EXTERNAL_PROVIDER,
     ): Boolean {
         val stateKey = project.summary.documentId
         if (pending.values.any { item ->
@@ -983,12 +984,14 @@ open class V04Activity : StudioActivity() {
         }
         val currentState = typedStates[stateKey] ?: RuntimeState.UNKNOWN
         if (action == ProjectRuntimeController.Action.START) {
-            if (environmentStates[stateKey] != true) return false
             if (currentState in ACTIVE_RUNTIME_STATES) return false
-            val configuration = configurationUi.snapshot(stateKey, project.folderName)
-            if (configuration.preflight.missingRequired.isNotEmpty()) {
-                refresh()
-                return false
+            if (controlPath == RuntimeControlPath.EXTERNAL_PROVIDER) {
+                if (environmentStates[stateKey] != true) return false
+                val configuration = configurationUi.snapshot(stateKey, project.folderName)
+                if (configuration.preflight.missingRequired.isNotEmpty()) {
+                    refresh()
+                    return false
+                }
             }
         }
         if (action == ProjectRuntimeController.Action.PREPARE &&
@@ -1134,6 +1137,7 @@ open class V04Activity : StudioActivity() {
     private fun startProject(
         project: V04ProjectGateway.RuntimeProject,
         webProfile: WebProjectInspector.Profile? = null,
+        controlRequest: RuntimeControlRequest = RuntimeControlRequest.EXTERNAL_PROVIDER,
     ) {
         val profile = webProfile ?: runCatching {
             webInspector.inspect(project.summary.documentId)
@@ -1143,6 +1147,7 @@ open class V04Activity : StudioActivity() {
             action = ProjectRuntimeController.Action.START,
             browserConfiguredUrl = profile?.configuredLocalUrl(),
             browserFramework = profile?.framework,
+            controlRequest = controlRequest,
         )
     }
 
@@ -1167,7 +1172,11 @@ open class V04Activity : StudioActivity() {
     }
 
     private fun confirmEmbeddedRun(project: V04ProjectGateway.RuntimeProject) {
-        if (!supportsEmbeddedPython(project)) return
+        val configurationSnapshot = configurationUi.snapshot(
+            project.summary.documentId,
+            project.folderName,
+        )
+        if (!supportsEmbeddedPython(project, configurationSnapshot)) return
         if (project.summary.documentId in embeddedStartInFlight || !runtime.embeddedPythonCanStart()) {
             toast(getString(R.string.runtime_embedded_r_active))
             return
@@ -1177,14 +1186,42 @@ open class V04Activity : StudioActivity() {
             .setMessage(getString(R.string.runtime_embedded_r_message))
             .setNegativeButton(getString(R.string.common_cancel), null)
             .setPositiveButton(getString(R.string.runtime_button_run_embedded_r)) { _, _ ->
-                startEmbeddedProject(project)
+                startProject(
+                    project = project,
+                    controlRequest = RuntimeControlRequest.EMBEDDED_R,
+                )
             }
             .show()
     }
 
-    private fun startEmbeddedProject(project: V04ProjectGateway.RuntimeProject) {
+    private fun startEmbeddedProject(
+        project: V04ProjectGateway.RuntimeProject,
+        requiredConfiguration: Boolean = false,
+    ) {
         val stateKey = project.summary.documentId
-        if (!supportsEmbeddedPython(project) || stateKey in embeddedStartInFlight) return
+        val route = runCatching {
+            runtime.resolveControlPath(
+                project = project,
+                action = ProjectRuntimeController.Action.START,
+                request = RuntimeControlRequest.EMBEDDED_R,
+                requiredConfiguration = requiredConfiguration,
+            )
+        }.getOrElse {
+            errorDialog(
+                getString(R.string.runtime_embedded_r_start_failed),
+                it.message ?: getString(R.string.runtime_unavailable),
+            )
+            return
+        }
+        if (route.path != RuntimeControlPath.EMBEDDED_R || stateKey in embeddedStartInFlight) {
+            if (route.path != RuntimeControlPath.EMBEDDED_R) {
+                errorDialog(
+                    getString(R.string.runtime_embedded_r_start_failed),
+                    route.reason.name,
+                )
+            }
+            return
+        }
         if (!runtime.embeddedPythonCanStart()) {
             toast(getString(R.string.runtime_embedded_r_active))
             return
@@ -1204,7 +1241,12 @@ open class V04Activity : StudioActivity() {
         )
         refresh()
         embeddedStartExecutor.execute {
-            val result = runCatching { runtime.startEmbeddedPython(project) }
+            val result = runCatching {
+                runtime.startEmbeddedPython(
+                    project = project,
+                    requiredConfiguration = requiredConfiguration,
+                )
+            }
             runOnUiThread {
                 embeddedStartInFlight.remove(stateKey)
                 if (isFinishing || isDestroyed) return@runOnUiThread
@@ -1308,10 +1350,25 @@ open class V04Activity : StudioActivity() {
     private fun isEmbeddedActive(snapshot: EmbeddedPythonSnapshot): Boolean =
         snapshot.state == EmbeddedPythonState.STARTING || snapshot.state == EmbeddedPythonState.RUNNING
 
-    private fun supportsEmbeddedPython(project: V04ProjectGateway.RuntimeProject): Boolean {
-        val selection = project.runtimeSelection
-        return selection is ProjectRuntimeExecutionPlanner.Selection.Resolved &&
-            selection.primary == RuntimeKind.PYTHON
+    private fun supportsEmbeddedPython(
+        project: V04ProjectGateway.RuntimeProject,
+        configurationSnapshot: ProjectConfigurationUiController.Snapshot? = null,
+    ): Boolean {
+        val configurationRequired = configurationSnapshot?.preflight?.requiredCount?.let { it > 0 }
+            ?: runCatching {
+                configurationUi.snapshot(
+                    project.summary.documentId,
+                    project.folderName,
+                ).preflight.requiredCount > 0
+            }.getOrDefault(true)
+        return runCatching {
+            runtime.resolveControlPath(
+                project = project,
+                action = ProjectRuntimeController.Action.START,
+                request = RuntimeControlRequest.EMBEDDED_R,
+                requiredConfiguration = configurationRequired,
+            ).path == RuntimeControlPath.EMBEDDED_R
+        }.getOrDefault(false)
     }
 
     private fun embeddedStartErrorMessage(error: Throwable?): String =
@@ -1328,9 +1385,50 @@ open class V04Activity : StudioActivity() {
         browserConfiguredUrl: String? = null,
         browserFramework: String? = null,
         silentRecovery: Boolean = false,
+        controlRequest: RuntimeControlRequest = RuntimeControlRequest.EXTERNAL_PROVIDER,
     ) {
-        if (!ensureRuntime()) return
         val stateKey = project.summary.documentId
+        val requiredConfiguration = action == ProjectRuntimeController.Action.START &&
+            controlRequest == RuntimeControlRequest.EMBEDDED_R &&
+            runCatching {
+                configurationUi.snapshot(
+                    project.summary.documentId,
+                    project.folderName,
+                ).preflight.requiredCount > 0
+            }.getOrDefault(true)
+        val route = try {
+            runtime.resolveControlPath(
+                project = project,
+                action = action,
+                request = controlRequest,
+                requiredConfiguration = requiredConfiguration,
+            )
+        } catch (e: Throwable) {
+            errorDialog(
+                getString(R.string.runtime_command_generation_failed),
+                e.message ?: getString(R.string.runtime_unavailable),
+            )
+            return
+        }
+        if (route.path == RuntimeControlPath.REJECTED) {
+            errorDialog(
+                getString(R.string.runtime_embedded_r_start_failed),
+                route.reason.name,
+            )
+            return
+        }
+        if (!canDispatch(project, action, route.path)) return
+        if (route.path == RuntimeControlPath.EMBEDDED_R) {
+            when (action) {
+                ProjectRuntimeController.Action.START ->
+                    startEmbeddedProject(project, requiredConfiguration)
+                ProjectRuntimeController.Action.STOP ->
+                    requestEmbeddedStop(project)
+                else -> Unit
+            }
+            return
+        }
+        if (!ensureRuntime()) return
         // The card is rebuilt after every state transition, but an old dialog or click callback can
         // still arrive after that rebuild. Re-check the stable project identity at the side-effect
         // boundary so one project cannot acquire two mutable Runtime operations.

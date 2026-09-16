@@ -27,6 +27,7 @@ class V04ProjectGateway(private val context: Context) {
         val declaredType: String?,
         val declaredRun: String?,
         val declaredEntry: String?,
+        val hasExternalDependencyRequirement: Boolean = false,
     )
 
     private data class Child(
@@ -57,11 +58,13 @@ class V04ProjectGateway(private val context: Context) {
      */
     fun runtimeFacts(projectDocumentId: String): RuntimeFacts {
         val objectValue = metadata(projectDocumentId)
+        val nodes = projectStore.listProjectTree(projectDocumentId)
         return RuntimeFacts(
-            relativePaths = projectStore.listProjectTree(projectDocumentId).map { it.relativePath },
+            relativePaths = nodes.map { it.relativePath },
             declaredType = objectValue?.optString("type")?.takeIf { it.isNotBlank() },
             declaredRun = objectValue?.optString("run")?.takeIf { it.isNotBlank() },
             declaredEntry = objectValue?.optString("entry")?.takeIf { it.isNotBlank() },
+            hasExternalDependencyRequirement = requiresExternalPythonEnvironment(nodes),
         )
     }
 
@@ -460,6 +463,47 @@ class V04ProjectGateway(private val context: Context) {
         return uri
     }
 
+    private fun requiresExternalPythonEnvironment(nodes: List<ProjectStore.FileNode>): Boolean {
+        val rootFiles = nodes.filter { !it.isDirectory && '/' !in it.relativePath }
+        val rootNames = rootFiles.map { it.name.lowercase() }.toSet()
+        if (rootNames.any { it in EMBEDDED_R_UNSUPPORTED_PYTHON_MANIFESTS }) return true
+
+        val otherRootManifest = rootFiles.firstOrNull {
+            isPythonDependencyManifest(it.name) &&
+                !it.name.equals("requirements.txt", ignoreCase = true)
+        }
+        if (otherRootManifest != null) return true
+
+        val nestedDependencyManifest = nodes.any { node ->
+            !node.isDirectory &&
+                '/' in node.relativePath &&
+                isPythonDependencyManifest(node.name)
+        }
+        if (nestedDependencyManifest) return true
+
+        val requirements = rootFiles.firstOrNull { it.name.equals("requirements.txt", ignoreCase = true) }
+            ?: return false
+        val bytes = runCatching {
+            projectStore.readProjectFileBytes(requirements, MAX_DEPENDENCY_PROBE_BYTES + 1)
+        }.getOrNull() ?: return true
+        if (bytes.size > MAX_DEPENDENCY_PROBE_BYTES) return true
+        return bytes.toString(Charsets.UTF_8).lineSequence().any { line ->
+            val value = line.trim()
+            value.isNotBlank() && !value.startsWith("#")
+        }
+    }
+
+    private fun isPythonDependencyManifest(name: String): Boolean {
+        val lower = name.lowercase()
+        return lower == "pyproject.toml" ||
+            lower == "setup.py" ||
+            lower == "setup.cfg" ||
+            lower == "pipfile" ||
+            lower == "pipfile.lock" ||
+            lower == "poetry.lock" ||
+            (lower.startsWith("requirements") && lower.endsWith(".txt"))
+    }
+
     private fun displayName(uri: Uri): String? {
         resolver.query(
             uri,
@@ -556,5 +600,14 @@ class V04ProjectGateway(private val context: Context) {
         private const val MAX_ZIP_FILES = 4000
         private const val MAX_ZIP_FILE_BYTES = 64L * 1024 * 1024
         private const val MAX_ZIP_TOTAL_BYTES = 256L * 1024 * 1024
+        private const val MAX_DEPENDENCY_PROBE_BYTES = 64 * 1024
+        private val EMBEDDED_R_UNSUPPORTED_PYTHON_MANIFESTS = setOf(
+            "pyproject.toml",
+            "setup.py",
+            "setup.cfg",
+            "pipfile",
+            "pipfile.lock",
+            "poetry.lock",
+        )
     }
 }

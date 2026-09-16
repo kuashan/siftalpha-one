@@ -65,10 +65,71 @@ class ProjectRuntimeController(
         }
     }
 
+    /**
+     * Resolves the M control action to the existing Embedded R or External Provider path.
+     *
+     * The default request remains External Provider so the experimental Embedded R path is explicit.
+     * STOP is selected from the active R snapshot, never from Python detection or a guessed process ID.
+     */
+    fun resolveControlPath(
+        project: V04ProjectGateway.RuntimeProject,
+        action: Action,
+        request: RuntimeControlRequest = RuntimeControlRequest.EXTERNAL_PROVIDER,
+        requiredConfiguration: Boolean = false,
+    ): RuntimeControlDecision {
+        if (action == Action.STOP) {
+            val snapshot = embeddedPythonSnapshotFor(project.summary.documentId)
+            if (snapshot != null && EmbeddedPythonStatePolicy.canStop(snapshot.state)) {
+                return RuntimeControlDecision(
+                    path = RuntimeControlPath.EMBEDDED_R,
+                    reason = RuntimeControlReason.ACTIVE_EMBEDDED_SESSION,
+                )
+            }
+        }
+
+        if (action != Action.START || request != RuntimeControlRequest.EMBEDDED_R) {
+            return RuntimeControlDecision(
+                path = RuntimeControlPath.EXTERNAL_PROVIDER,
+                reason = RuntimeControlReason.EXPLICIT_EXTERNAL_PROVIDER,
+            )
+        }
+
+        val facts = gateway.runtimeFacts(project.summary.documentId)
+        val selection = ProjectRuntimeExecutionPlanner.select(
+            relativePaths = facts.relativePaths,
+            declaredType = facts.declaredType,
+        )
+        return EmbeddedPythonCapabilityRouting.resolve(
+            facts = EmbeddedPythonCapabilityFacts(
+                selection = selection,
+                relativePaths = facts.relativePaths,
+                declaredRun = facts.declaredRun,
+                resolvedEntrypoint = gateway.resolveEmbeddedPythonEntrypoint(project.summary.documentId),
+                hasExternalDependencyRequirement = facts.hasExternalDependencyRequirement,
+                hasProtectedConfigurationRequirement = requiredConfiguration,
+                embeddedRuntimeAvailable = embeddedPythonSession != null &&
+                    embeddedPythonProjectStager != null,
+            ),
+            request = request,
+        )
+    }
+
     /** M-only control entry for an explicitly selected Python project; Termux is not involved. */
-    fun startEmbeddedPython(project: V04ProjectGateway.RuntimeProject): EmbeddedPythonSnapshot {
+    fun startEmbeddedPython(
+        project: V04ProjectGateway.RuntimeProject,
+        requiredConfiguration: Boolean = false,
+    ): EmbeddedPythonSnapshot {
         val session = checkNotNull(embeddedPythonSession) { "Embedded R is unavailable" }
         val stager = checkNotNull(embeddedPythonProjectStager) { "Embedded R staging is unavailable" }
+        val route = resolveControlPath(
+            project = project,
+            action = Action.START,
+            request = RuntimeControlRequest.EMBEDDED_R,
+            requiredConfiguration = requiredConfiguration,
+        )
+        check(route.path == RuntimeControlPath.EMBEDDED_R) {
+            "Embedded R route rejected: ${route.reason}"
+        }
         val selection = project.runtimeSelection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
         check(selection?.primary == RuntimeKind.PYTHON) {
             "Embedded R requires a resolved Python project"
