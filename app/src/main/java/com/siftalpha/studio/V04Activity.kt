@@ -1320,7 +1320,7 @@ open class V04Activity : StudioActivity() {
         } else {
             error?.message ?: getString(R.string.runtime_unavailable)
         }
-    }
+
     private fun dispatch(
         project: V04ProjectGateway.RuntimeProject,
         action: ProjectRuntimeController.Action,
