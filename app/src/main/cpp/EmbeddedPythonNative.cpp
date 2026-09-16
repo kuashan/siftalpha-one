@@ -697,8 +697,6 @@ bool pathWithin(const std::string& root, const std::string& candidate) {
         candidate[root.size()] == '/';
 }
 
-bool pathWithin(const std::string& root, const std::string& candidate);
-
 bool validatePathComponents(
     const std::string& path,
     const std::string& symlinkProtectedRoot,
@@ -1230,6 +1228,28 @@ void runSession(const std::shared_ptr<Session>& session) {
     std::string tmpDirectory = session->home + "/tmp";
     mkdir(tmpDirectory.c_str(), 0700);
     ScopedEnvironmentVariable temporaryDirectory("TMPDIR", tmpDirectory);
+    auto publishPrePythonFailure = [&](const std::string& message) {
+        setFailure(session.get(), message);
+        setRuntimePhase(session.get(), RuntimePhase::TERMINAL);
+        publishTerminalSession(session);
+        logSessionResult(session.get());
+        setRuntimePhase(session.get(), RuntimePhase::WORKER_EXIT);
+    };
+
+    // Validate the entire execution specification and read the explicit target before
+    // changing the process cwd. A rejected project path must never be entered first.
+    std::string specFailure;
+    if (!validateExecutionSpec(session, &specFailure)) {
+        publishPrePythonFailure(specFailure);
+        return;
+    }
+
+    std::string source;
+    if (!readProjectSource(session->entrypoint, &source, &specFailure)) {
+        publishPrePythonFailure(specFailure);
+        return;
+    }
+
     WorkingDirectoryGuard workingDirectory(session->workingDirectory);
     auto finishBeforePython = [&](const std::string& message) {
         workingDirectory.restore();
@@ -1241,18 +1261,6 @@ void runSession(const std::shared_ptr<Session>& session) {
     };
     if (!workingDirectory.changed()) {
         finishBeforePython("SIFTALPHA_X_CWD_ERROR=unable to enter project working directory");
-        return;
-    }
-
-    std::string specFailure;
-    if (!validateExecutionSpec(session, &specFailure)) {
-        finishBeforePython(specFailure);
-        return;
-    }
-
-    std::string source;
-    if (!readProjectSource(session->entrypoint, &source, &specFailure)) {
-        finishBeforePython(specFailure);
         return;
     }
 
