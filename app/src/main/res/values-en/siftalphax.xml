@@ -12,4 +12,6 @@
     <string name="siftalpha_x_stdout">stdout</string>
     <string name="siftalpha_x_stderr">stderr</string>
     <string name="siftalpha_x_no_output">No output yet</string>
+    <string name="siftalpha_x_copy_all">Copy all</string>
+    <string name="siftalpha_x_copied">Copied</string>
 </resources>

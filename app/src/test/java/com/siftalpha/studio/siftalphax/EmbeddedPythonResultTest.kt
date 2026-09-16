@@ -35,6 +35,25 @@ class EmbeddedPythonResultTest {
     }
 
     @Test
+    fun parsesRuntimePhaseAndBuildsCopyableDiagnostics() {
+        val snapshot = EmbeddedPythonSnapshotParser.parse(
+            """
+            {"sessionId":"siftalpha-x-phase","generation":4,"state":"FAILED",
+             "runtimePhase":"TERMINAL","startedAtEpochMs":30,
+             "finishedAtEpochMs":40,"exitCode":1,
+             "stdout":"out","stderr":"traceback"}
+            """.replace("\n", ""),
+        )
+
+        assertEquals(EmbeddedPythonRuntimePhase.TERMINAL, snapshot.runtimePhase)
+        val diagnostics = EmbeddedPythonDiagnosticText.copyAll(snapshot)
+        assertTrue(diagnostics.contains("SIFTALPHA_X_SESSION_ID=siftalpha-x-phase"))
+        assertTrue(diagnostics.contains("SIFTALPHA_X_RUNTIME_PHASE=TERMINAL"))
+        assertTrue(diagnostics.contains("stdout:\nout"))
+        assertTrue(diagnostics.contains("stderr:\ntraceback"))
+    }
+
+    @Test
     fun preservesFailureOutputAndNullableRunningFields() {
         val snapshot = EmbeddedPythonSnapshotParser.parse(
             """

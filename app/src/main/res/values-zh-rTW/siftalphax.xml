@@ -12,4 +12,6 @@
     <string name="siftalpha_x_stdout">stdout</string>
     <string name="siftalpha_x_stderr">stderr</string>
     <string name="siftalpha_x_no_output">尚無輸出</string>
+    <string name="siftalpha_x_copy_all">複製全部</string>
+    <string name="siftalpha_x_copied">已複製</string>
 </resources>

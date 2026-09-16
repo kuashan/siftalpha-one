@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <limits.h>
 #include <memory>
 #include <mutex>
@@ -63,6 +64,60 @@ const char* resultName(SessionState state) {
             return "NOT_FINISHED";
     }
     return "FAILED";
+}
+
+enum class RuntimePhase {
+    IDLE,
+    SESSION_CREATED,
+    WORKER_ENTERED,
+    RUNTIME_INIT_BEGIN,
+    CPYTHON_READY,
+    GIL_ACQUIRE_BEGIN,
+    GIL_ACQUIRED,
+    THREAD_STATE_READY,
+    RUNNING,
+    PYTHON_EXEC_BEGIN,
+    PYTHON_EXEC_END,
+    GIL_RELEASE_BEGIN,
+    GIL_RELEASED,
+    TERMINAL,
+    WORKER_EXIT,
+};
+
+const char* runtimePhaseName(RuntimePhase phase) {
+    switch (phase) {
+        case RuntimePhase::IDLE:
+            return "IDLE";
+        case RuntimePhase::SESSION_CREATED:
+            return "SESSION_CREATED";
+        case RuntimePhase::WORKER_ENTERED:
+            return "WORKER_ENTERED";
+        case RuntimePhase::RUNTIME_INIT_BEGIN:
+            return "RUNTIME_INIT_BEGIN";
+        case RuntimePhase::CPYTHON_READY:
+            return "CPYTHON_READY";
+        case RuntimePhase::GIL_ACQUIRE_BEGIN:
+            return "GIL_ACQUIRE_BEGIN";
+        case RuntimePhase::GIL_ACQUIRED:
+            return "GIL_ACQUIRED";
+        case RuntimePhase::THREAD_STATE_READY:
+            return "THREAD_STATE_READY";
+        case RuntimePhase::RUNNING:
+            return "RUNNING";
+        case RuntimePhase::PYTHON_EXEC_BEGIN:
+            return "PYTHON_EXEC_BEGIN";
+        case RuntimePhase::PYTHON_EXEC_END:
+            return "PYTHON_EXEC_END";
+        case RuntimePhase::GIL_RELEASE_BEGIN:
+            return "GIL_RELEASE_BEGIN";
+        case RuntimePhase::GIL_RELEASED:
+            return "GIL_RELEASED";
+        case RuntimePhase::TERMINAL:
+            return "TERMINAL";
+        case RuntimePhase::WORKER_EXIT:
+            return "WORKER_EXIT";
+    }
+    return "IDLE";
 }
 
 std::int64_t nowEpochMillis() {
@@ -132,6 +187,7 @@ struct SessionSnapshot {
     std::int64_t startedAtEpochMs = 0;
     std::int64_t finishedAtEpochMs = 0;
     SessionState state = SessionState::IDLE;
+    RuntimePhase runtimePhase = RuntimePhase::IDLE;
     int exitCode = 0;
     bool hasExitCode = false;
     std::string stdoutText;
@@ -147,6 +203,7 @@ struct Session {
     std::int64_t startedAtEpochMs = 0;
     std::int64_t finishedAtEpochMs = 0;
     SessionState state = SessionState::IDLE;
+    RuntimePhase runtimePhase = RuntimePhase::IDLE;
     int exitCode = 0;
     bool hasExitCode = false;
     std::string stdoutText;
@@ -160,6 +217,32 @@ struct Session {
 std::mutex gSessionMutex;
 std::shared_ptr<Session> gSession;
 SessionSnapshot gLastTerminalSnapshot;
+
+// CPython is initialized once for the process. Py_InitializeFromConfig() creates
+// the main thread state on the calling worker and returns with it attached. The
+// bootstrap state is detached immediately with PyEval_SaveThread() and retained
+// for the process lifetime; it is never reused for an execution session and
+// there is deliberately no Py_FinalizeEx() in this Android process.
+std::once_flag gPythonRuntimeOnce;
+std::mutex gPythonRuntimeMutex;
+bool gPythonRuntimeReady = false;
+std::string gPythonRuntimeError;
+PyThreadState* gPythonBootstrapThreadState = nullptr;
+
+void setRuntimePhase(Session* session, RuntimePhase phase) {
+    {
+        std::lock_guard<std::mutex> lock(session->mutex);
+        session->runtimePhase = phase;
+    }
+    __android_log_print(
+        ANDROID_LOG_INFO,
+        kLogTag,
+        "SIFTALPHA_X_RUNTIME_PHASE=%s SIFTALPHA_X_SESSION_ID=%s "
+        "SIFTALPHA_X_GENERATION=%lld",
+        runtimePhaseName(phase),
+        session->sessionId.c_str(),
+        static_cast<long long>(session->generation));
+}
 
 void setState(Session* session, SessionState state) {
     std::lock_guard<std::mutex> lock(session->mutex);
@@ -198,6 +281,7 @@ SessionSnapshot snapshotData(Session* session) {
     snapshot.startedAtEpochMs = session->startedAtEpochMs;
     snapshot.finishedAtEpochMs = session->finishedAtEpochMs;
     snapshot.state = session->state;
+    snapshot.runtimePhase = session->runtimePhase;
     snapshot.exitCode = session->exitCode;
     snapshot.hasExitCode = session->hasExitCode;
     snapshot.stdoutText = session->stdoutText;
@@ -218,10 +302,12 @@ void publishTerminalSession(const std::shared_ptr<Session>& session) {
 
 void logSessionResult(Session* session) {
     SessionState finalState;
+    RuntimePhase runtimePhase;
     std::string sessionId;
     {
         std::lock_guard<std::mutex> lock(session->mutex);
         finalState = session->state;
+        runtimePhase = session->runtimePhase;
         sessionId = session->sessionId;
     }
     __android_log_print(ANDROID_LOG_INFO, kLogTag,
@@ -233,8 +319,12 @@ void logSessionResult(Session* session) {
                         sessionId.c_str());
     __android_log_print(ANDROID_LOG_INFO, kLogTag, "SIFTALPHA_X_STDERR_END");
     __android_log_print(ANDROID_LOG_INFO, kLogTag,
-                        "SIFTALPHA_X_STATE=%s SIFTALPHA_X_RESULT=%s SIFTALPHA_X_SESSION_ID=%s",
-                        stateName(finalState), resultName(finalState), sessionId.c_str());
+                        "SIFTALPHA_X_STATE=%s SIFTALPHA_X_RESULT=%s "
+                        "SIFTALPHA_X_RUNTIME_PHASE=%s SIFTALPHA_X_SESSION_ID=%s",
+                        stateName(finalState),
+                        resultName(finalState),
+                        runtimePhaseName(runtimePhase),
+                        sessionId.c_str());
 }
 
 std::string jstringToUtf8(JNIEnv* env, jstring value) {
@@ -344,7 +434,95 @@ private:
     bool changed_ = false;
 };
 
+
+bool ensurePythonRuntime(const std::string& home, std::string* failure) {
+    std::call_once(gPythonRuntimeOnce, [&]() {
+        if (Py_IsInitialized()) {
+            std::lock_guard<std::mutex> lock(gPythonRuntimeMutex);
+            gPythonRuntimeReady = true;
+            return;
+        }
+
+        PyThreadState* bootstrapState = nullptr;
+        std::string initializationError;
+        try {
+            // Keep the initialization-created main thread state off every execution
+            // worker. The temporary bootstrap thread exits only after SaveThread has
+            // detached the state and released the GIL.
+            std::thread bootstrapThread([&]() {
+                PyConfig config;
+                PyConfig_InitPythonConfig(&config);
+                config.use_environment = 0;
+                config.user_site_directory = 0;
+                config.install_signal_handlers = 0;
+                config.parse_argv = 0;
+
+                char program[] = "siftalpha-x";
+                char* argv[] = {program, nullptr};
+                PyStatus status = PyConfig_SetBytesArgv(&config, 1, argv);
+                if (PyStatus_Exception(status)) {
+                    initializationError =
+                        status.err_msg == nullptr ? "CPython argv setup failed" : status.err_msg;
+                    PyConfig_Clear(&config);
+                    return;
+                }
+
+                status = PyConfig_SetBytesString(&config, &config.home, home.c_str());
+                if (PyStatus_Exception(status)) {
+                    initializationError =
+                        status.err_msg == nullptr ? "CPython home setup failed" : status.err_msg;
+                    PyConfig_Clear(&config);
+                    return;
+                }
+
+                status = Py_InitializeFromConfig(&config);
+                PyConfig_Clear(&config);
+                if (PyStatus_Exception(status)) {
+                    initializationError =
+                        status.err_msg == nullptr ? "CPython initialization failed" : status.err_msg;
+                    return;
+                }
+
+                // Py_InitializeFromConfig() created and attached the main thread
+                // state to this temporary bootstrap thread. Release the GIL and
+                // detach it before that thread exits.
+                bootstrapState = PyEval_SaveThread();
+                if (bootstrapState == nullptr) {
+                    initializationError = "CPython bootstrap thread state was not created";
+                }
+            });
+            bootstrapThread.join();
+        } catch (const std::exception& exception) {
+            initializationError = std::string("CPython bootstrap thread failed: ") + exception.what();
+        }
+
+        std::lock_guard<std::mutex> lock(gPythonRuntimeMutex);
+        if (bootstrapState != nullptr && initializationError.empty()) {
+            // This detached main thread state is retained for the process lifetime.
+            // It is the state required by a future Py_FinalizeEx(), which this
+            // Android process deliberately never performs.
+            gPythonBootstrapThreadState = bootstrapState;
+            gPythonRuntimeReady = true;
+        } else {
+            gPythonRuntimeError = initializationError.empty()
+                ? "SIFTALPHA_X_CPYTHON_RUNTIME_INIT_FAILED"
+                : initializationError;
+        }
+    });
+
+    std::lock_guard<std::mutex> lock(gPythonRuntimeMutex);
+    if (gPythonRuntimeReady) {
+        return true;
+    }
+    if (failure != nullptr) {
+        *failure = gPythonRuntimeError.empty()
+            ? "SIFTALPHA_X_CPYTHON_RUNTIME_INIT_FAILED"
+            : gPythonRuntimeError;
+    }
+    return false;
+}
 void runSession(const std::shared_ptr<Session>& session) {
+    setRuntimePhase(session.get(), RuntimePhase::WORKER_ENTERED);
     __android_log_print(ANDROID_LOG_INFO, kLogTag,
                         "SIFTALPHA_X_ENGINE=CPYTHON SIFTALPHA_X_TERMUX=NOT_USED "
                         "SIFTALPHA_X_RUN_COMMAND=NOT_USED SIFTALPHA_X_PROOT=NOT_USED "
@@ -358,56 +536,43 @@ void runSession(const std::shared_ptr<Session>& session) {
     mkdir(tmpDirectory.c_str(), 0700);
     setenv("TMPDIR", tmpDirectory.c_str(), 1);
     WorkingDirectoryGuard workingDirectory(session->home);
-    auto failBeforePython = [&](const std::string& message) {
+    auto finishBeforePython = [&](const std::string& message) {
         workingDirectory.restore();
         setFailure(session.get(), message);
+        setRuntimePhase(session.get(), RuntimePhase::TERMINAL);
         publishTerminalSession(session);
         logSessionResult(session.get());
+        setRuntimePhase(session.get(), RuntimePhase::WORKER_EXIT);
     };
     if (!workingDirectory.changed()) {
-        failBeforePython("SIFTALPHA_X_CWD_ERROR=unable to enter app-private runtime directory");
+        finishBeforePython("SIFTALPHA_X_CWD_ERROR=unable to enter app-private runtime directory");
         return;
     }
 
-    if (!Py_IsInitialized()) {
-        PyConfig config;
-        PyConfig_InitPythonConfig(&config);
-        config.use_environment = 0;
-        config.user_site_directory = 0;
-        config.install_signal_handlers = 0;
-        config.parse_argv = 0;
+    setRuntimePhase(session.get(), RuntimePhase::RUNTIME_INIT_BEGIN);
+    std::string runtimeFailure;
+    if (!ensurePythonRuntime(session->home, &runtimeFailure)) {
+        finishBeforePython(runtimeFailure);
+        return;
+    }
+    setRuntimePhase(session.get(), RuntimePhase::CPYTHON_READY);
 
-        char program[] = "siftalpha-x";
-        char* argv[] = {program, nullptr};
-        PyStatus status = PyConfig_SetBytesArgv(&config, 1, argv);
-        if (PyStatus_Exception(status)) {
-            std::string message = status.err_msg == nullptr ? "CPython argv setup failed" : status.err_msg;
-            PyConfig_Clear(&config);
-            failBeforePython(message);
-            return;
-        }
-        status = PyConfig_SetBytesString(&config, &config.home, session->home.c_str());
-        if (PyStatus_Exception(status)) {
-            std::string message = status.err_msg == nullptr ? "CPython home setup failed" : status.err_msg;
-            PyConfig_Clear(&config);
-            failBeforePython(message);
-            return;
-        }
-        status = Py_InitializeFromConfig(&config);
-        PyConfig_Clear(&config);
-        if (PyStatus_Exception(status)) {
-            std::string message = status.err_msg == nullptr ? "CPython initialization failed" : status.err_msg;
-            failBeforePython(message);
-            return;
-        }
+    // PyGILState_Ensure() hangs during finalization in CPython 3.14. Guard the
+    // only supported process-lifetime model before entering the blocking API.
+    if (Py_IsFinalizing()) {
+        finishBeforePython("SIFTALPHA_X_CPYTHON_RUNTIME_FINALIZING");
+        return;
     }
 
+    setRuntimePhase(session.get(), RuntimePhase::GIL_ACQUIRE_BEGIN);
     PyGILState_STATE pythonGilState = PyGILState_Ensure();
+    setRuntimePhase(session.get(), RuntimePhase::GIL_ACQUIRED);
     PyThreadState* threadState = PyThreadState_Get();
     session->pythonThreadId.store(
         static_cast<unsigned long>(PyThreadState_GetID(threadState)),
         std::memory_order_release);
     session->pythonReady.store(true, std::memory_order_release);
+    setRuntimePhase(session.get(), RuntimePhase::THREAD_STATE_READY);
 
     PyObject* sysModule = PyImport_ImportModule("sys");
     PyObject* ioModule = PyImport_ImportModule("io");
@@ -432,11 +597,14 @@ void runSession(const std::shared_ptr<Session>& session) {
         terminalExitCode = 130;
     } else {
         setState(session.get(), SessionState::RUNNING);
+        setRuntimePhase(session.get(), RuntimePhase::RUNNING);
+        setRuntimePhase(session.get(), RuntimePhase::PYTHON_EXEC_BEGIN);
         PyObject* mainModule = PyImport_AddModule("__main__");
         PyObject* mainDict = mainModule == nullptr ? nullptr : PyModule_GetDict(mainModule);
         PyObject* result = mainDict == nullptr
             ? nullptr
             : PyRun_StringFlags(session->script.c_str(), Py_file_input, mainDict, mainDict, nullptr);
+        setRuntimePhase(session.get(), RuntimePhase::PYTHON_EXEC_END);
         if (result != nullptr) {
             Py_DECREF(result);
         } else {
@@ -461,7 +629,9 @@ void runSession(const std::shared_ptr<Session>& session) {
     Py_XDECREF(sysModule);
     Py_XDECREF(ioModule);
     session->pythonReady.store(false, std::memory_order_release);
+    setRuntimePhase(session.get(), RuntimePhase::GIL_RELEASE_BEGIN);
     PyGILState_Release(pythonGilState);
+    setRuntimePhase(session.get(), RuntimePhase::GIL_RELEASED);
     workingDirectory.restore();
 
     if (!failureMessage.empty()) {
@@ -469,8 +639,10 @@ void runSession(const std::shared_ptr<Session>& session) {
     } else {
         finishSession(session.get(), terminalState, terminalExitCode, stdoutText, stderrText);
     }
+    setRuntimePhase(session.get(), RuntimePhase::TERMINAL);
     publishTerminalSession(session);
     logSessionResult(session.get());
+    setRuntimePhase(session.get(), RuntimePhase::WORKER_EXIT);
 }
 
 std::string snapshotJson(const SessionSnapshot& snapshot) {
@@ -478,6 +650,7 @@ std::string snapshotJson(const SessionSnapshot& snapshot) {
     json += "\"sessionId\":" + jsonString(snapshot.sessionId);
     json += ",\"generation\":" + jsonLong(snapshot.generation);
     json += ",\"state\":" + jsonString(stateName(snapshot.state));
+    json += ",\"runtimePhase\":" + jsonString(runtimePhaseName(snapshot.runtimePhase));
     json += ",\"startedAtEpochMs\":" + jsonLong(snapshot.startedAtEpochMs);
     if (snapshot.finishedAtEpochMs == 0) {
         json += ",\"finishedAtEpochMs\":null";
@@ -569,6 +742,7 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeStart(
         session->state = SessionState::STARTING;
         gSession = session;
     }
+    setRuntimePhase(session.get(), RuntimePhase::SESSION_CREATED);
     std::thread([session]() {
         runSession(session);
     }).detach();

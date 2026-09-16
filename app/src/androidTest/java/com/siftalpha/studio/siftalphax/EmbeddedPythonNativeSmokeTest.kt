@@ -40,6 +40,7 @@ class EmbeddedPythonNativeSmokeTest {
         assertEquals(130, snapshot.exitCode)
         assertTrue(snapshot.stdout.contains("SIFTALPHA_X_TEST_C_STARTED"))
         assertTrue(snapshot.stdout.contains("SIFTALPHA_X_TEST_C_COOPERATIVE_STOP"))
+        assertEquals(EmbeddedPythonRuntimePhase.TERMINAL, snapshot.runtimePhase)
     }
 
     @Test
@@ -72,6 +73,19 @@ class EmbeddedPythonNativeSmokeTest {
         assertTrue(snapshotB.stdout.contains("SIFTALPHA_X_TEST_B_STDOUT"))
         assertTrue(snapshotB.stderr.contains("SIFTALPHA_X_TEST_B_STDERR"))
         assertTrue(snapshotB.stderr.contains("SIFTALPHA_X_TEST_B_FAILURE"))
+        assertEquals(EmbeddedPythonRuntimePhase.TERMINAL, snapshotA.runtimePhase)
+        assertEquals(EmbeddedPythonRuntimePhase.TERMINAL, snapshotB.runtimePhase)
+
+        session.start(EmbeddedPythonScenario.NORMAL)
+        awaitState(session, EmbeddedPythonState.SUCCEEDED, 5_000L)
+        val snapshotAAgain = session.snapshot()
+
+        assertNotEquals(snapshotB.sessionId, snapshotAAgain.sessionId)
+        assertTrue(snapshotA.generation < snapshotB.generation)
+        assertTrue(snapshotB.generation < snapshotAAgain.generation)
+        assertEquals(EmbeddedPythonState.SUCCEEDED, snapshotAAgain.state)
+        assertEquals(EmbeddedPythonRuntimePhase.TERMINAL, snapshotAAgain.runtimePhase)
+        assertTrue(snapshotAAgain.stdout.contains("SIFTALPHA_X_PYTHON_OK"))
     }
 
     private fun awaitState(

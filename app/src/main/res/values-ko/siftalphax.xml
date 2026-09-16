@@ -12,4 +12,6 @@
     <string name="siftalpha_x_stdout">stdout</string>
     <string name="siftalpha_x_stderr">stderr</string>
     <string name="siftalpha_x_no_output">아직 출력이 없습니다</string>
+    <string name="siftalpha_x_copy_all">모두 복사</string>
+    <string name="siftalpha_x_copied">복사했습니다</string>
 </resources>

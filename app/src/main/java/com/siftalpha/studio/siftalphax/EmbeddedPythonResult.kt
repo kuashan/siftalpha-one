@@ -18,10 +18,29 @@ enum class EmbeddedPythonState {
     STOPPED,
 }
 
+enum class EmbeddedPythonRuntimePhase {
+    IDLE,
+    SESSION_CREATED,
+    WORKER_ENTERED,
+    RUNTIME_INIT_BEGIN,
+    CPYTHON_READY,
+    GIL_ACQUIRE_BEGIN,
+    GIL_ACQUIRED,
+    THREAD_STATE_READY,
+    RUNNING,
+    PYTHON_EXEC_BEGIN,
+    PYTHON_EXEC_END,
+    GIL_RELEASE_BEGIN,
+    GIL_RELEASED,
+    TERMINAL,
+    WORKER_EXIT,
+}
+
 data class EmbeddedPythonSnapshot(
     val sessionId: String = "",
     val generation: Long = 0L,
     val state: EmbeddedPythonState = EmbeddedPythonState.IDLE,
+    val runtimePhase: EmbeddedPythonRuntimePhase = EmbeddedPythonRuntimePhase.IDLE,
     val startedAtEpochMs: Long? = null,
     val finishedAtEpochMs: Long? = null,
     val exitCode: Int? = null,
@@ -35,10 +54,18 @@ object EmbeddedPythonSnapshotParser {
         val stateName = json.requiredString("state")
         val state = EmbeddedPythonState.entries.firstOrNull { it.name == stateName }
             ?: error("Unknown embedded Python state: $stateName")
+        val runtimePhaseName = json.stringOrEmpty("runtimePhase")
+        val runtimePhase = if (runtimePhaseName.isBlank()) {
+            EmbeddedPythonRuntimePhase.IDLE
+        } else {
+            EmbeddedPythonRuntimePhase.entries.firstOrNull { it.name == runtimePhaseName }
+                ?: error("Unknown embedded Python runtime phase: $runtimePhaseName")
+        }
         return EmbeddedPythonSnapshot(
             sessionId = json.stringOrEmpty("sessionId"),
             generation = json.longOrDefault("generation", 0L),
             state = state,
+            runtimePhase = runtimePhase,
             startedAtEpochMs = json.nullableLong("startedAtEpochMs"),
             finishedAtEpochMs = json.nullableLong("finishedAtEpochMs"),
             exitCode = json.nullableInt("exitCode"),
@@ -62,6 +89,27 @@ object EmbeddedPythonSnapshotParser {
 
     private fun JsonObject.nullableInt(key: String): Int? =
         this[key]?.jsonPrimitive?.intOrNull
+}
+
+object EmbeddedPythonDiagnosticText {
+    fun session(snapshot: EmbeddedPythonSnapshot): String = listOf(
+        "SIFTALPHA_X_ENGINE=CPYTHON",
+        "SIFTALPHA_X_TERMUX=NOT_USED",
+        "SIFTALPHA_X_PROOT=NOT_USED",
+        "SIFTALPHA_X_SESSION_ID=${snapshot.sessionId.ifBlank { "-" }}",
+        "SIFTALPHA_X_GENERATION=${snapshot.generation}",
+        "SIFTALPHA_X_STATE=${snapshot.state}",
+        "SIFTALPHA_X_RUNTIME_PHASE=${snapshot.runtimePhase}",
+        "exitCode=${snapshot.exitCode ?: "-"}",
+    ).joinToString("\n")
+
+    fun copyAll(snapshot: EmbeddedPythonSnapshot): String = buildString {
+        append(session(snapshot))
+        append("\n\nstdout:\n")
+        append(snapshot.stdout)
+        append("\n\nstderr:\n")
+        append(snapshot.stderr)
+    }
 }
 
 object EmbeddedPythonStatePolicy {
