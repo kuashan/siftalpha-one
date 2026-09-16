@@ -706,3 +706,46 @@ Android 路径可能以 `/data/user/0/...` 或 `/data/data/...` 表示；alpha30
 - 本次 alpha31 只修正版本 metadata，不包含新的 Runtime behavior change；其 Runtime behavior lineage 来自已经通过 Run #90 真机验收的修复后 source。
 - Run #90 的 alpha30 历史证据保持原样：Run #90 / ID `35083943639`、source HEAD `0e2b069d93a0a8cd87df4f57f0e97da1cf918643`、artifact `siftalpha-w0-90`、版本 `106 / 0.8.0-alpha30` 及其真实设备 A → B → C cooperative STOP → A re-entry 结果均不改写。
 - 后续新的 Runtime source behavior changes 必须从 `107 / 0.8.0-alpha31` 之后继续单调递增。
+
+## 2026-09-16 · alpha32 M → R Embedded CPython First Integration
+
+### 目标
+
+在不重构 M、R 或 Termux provider 的前提下，让 M 当前管理的 SAF Python project 通过一条明确、最小的边界交给 Embedded R 执行。alpha32 只建立 first integration，不宣称 R complete 或 X complete。
+
+### M → R 闭环
+
+本轮源码形成：
+
+`M Project (SAF documentId)`
+→ `M deterministic entrypoint resolution`
+→ `EmbeddedPythonProjectStager`
+→ `app-private bounded staging root`
+→ `EmbeddedPythonSession`
+→ `EmbeddedPythonExecutionSpec`
+→ `Embedded CPython`
+→ `EmbeddedPythonSnapshot`
+→ `RuntimeState / Project Output / STOP`。
+
+M 只在现有 Runtime selection 已明确为 Python 时显示显式 Embedded R 入口。M 不伪造 sessionId 或 generation；R 继续自行分配并维护它们。Embedded R 使用既有 CPython/native execution path，不通过 RuntimeCommand、Termux、RUN_COMMAND、PRoot 或 Ubuntu。既有 Termux Run/Prepare/Status/Logs/STOP 路径保持为独立的默认路径。
+
+### SAF staging boundary
+
+- source-of-record 是 SAF project directory，Project Identity 使用 documentId；
+- stager 将整个可见项目树复制到 app-private `files/siftalphax/projects/session-<uuid>`，不把 content URI 当作 POSIX native path；
+- source 相对路径在复制前验证，entrypoint 必须来自已复制的 regular file；
+- staging 限制为最多 1,024 nodes、512 files、单文件 4 MiB、总大小 32 MiB；ProjectStore 的既有递归深度/节点上限也作为完整性边界；
+- SAF 读取失败、路径不安全、入口缺失、冲突或大小超限都会使本次 staging 失败，并清理不完整 app-private 根目录；不会删除 SAF source；
+- terminal 后由 Controller 清理本次 session 关联的 staging root；本轮不引入 cache manager 或并发 staging。
+
+### Entrypoint / result contract
+
+M 优先使用 `.project.json` 的 entry；没有声明时只接受确定性 conventional root entry（main.py、app.py、run.py、manage.py），或唯一的 root-level `.py`。声明入口不安全、缺失或无法唯一解析时，不启动 R。workingDirectory 固定为 staged project root，arguments/environment/dependency installation 不在本轮实现。
+
+EmbeddedPythonSnapshot 直接映射到 M `RuntimeState`：IDLE→UNKNOWN、STARTING→STARTING、RUNNING→RUNNING、SUCCEEDED→EXITED_SUCCESS、FAILED→EXITED_ERROR、STOPPED→STOPPED_BY_USER。stdout、stderr、exitCode、sessionId、generation 和 runtime facts 通过现有 project output/UI 展示；M 不将 snapshot 回编码为 Termux markers，也不制造假的 Termux executionId。STOP request accepted 仍不等于 STOPPED，只有 R terminal snapshot 才改变 M 的终态。
+
+### 验证范围
+
+本轮增加了 staging/entrypoint/state mapping JVM coverage，并更新了 Embedded R instrumentation source，继续保留 alpha29/alpha30 re-entry、failure、STOP、path-validation 和 file-backed regression。CI 没有真实 Android device 时，instrumentation 只能记录为 source/compiled/not executed；alpha32 真机验收仍需人工执行。
+
+已知未覆盖：pip、venv、third-party dependency installation、native wheels/arbitrary C extensions、blocking native/syscall hard-stop、SAF arbitrary project compatibility、并发、process-death recovery、Web/Browser integration、production M ↔ R integration。

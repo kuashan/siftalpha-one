@@ -1,11 +1,11 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-16（R Project Script Execution Boundary，alpha30 CI readiness）
+最后更新：2026-09-16（M → R Embedded CPython First Integration，alpha32 source/CI readiness）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
 产品基线分支：`main`（当前 main HEAD：`dff275575a9cdbd0564d394c4626cd7d9bb22637`）  
-当前 alpha30 source HEAD：`328ff10222a4fb188d5932130a16c04a3c0ccabb`  
+alpha30 source / real-device evidence remains historical; current branch continues from the alpha31 version-identity baseline。  
 M / R / X 架构与 Runtime prototype 工作分支：`codex/siftalpha-x-embedded-cpython-spike`  
-当前验证版本：0.8.0-alpha30 / versionCode 106（Embedded CPython file-backed project-script boundary；Run #83 CI 已通过，等待 alpha30 真实设备验收）  
+当前版本：0.8.0-alpha32 / versionCode 108（M-managed SAF Python project → app-private staging → Embedded R；等待本提交 CI 与真实设备验收）  
 当前文档定义：`M = Management System`，`R = Runtime System`，`X = M + R`  
 规范架构定义：[ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)  
 Production baseline merge：[893229c](https://github.com/kuashan/siftalpha-one/commit/893229ce26d49a6ea22c79d6e2be85290cb8b0c3)（历史基线记录）  
@@ -85,13 +85,13 @@ M
 
 当前 production `ProjectRuntimeController` 仍通过 `RuntimeCommandHost` / `TermuxProotRuntimeHost` 使用外部 Termux provider；`RuntimeBackend`、`RuntimeAdapter`、`ManagedProcessRuntime`、`RuntimeIdentity` 和 lifecycle models 提供可复用的 runtime-neutral seam。
 
-当前 Embedded CPython alpha29 prototype 位于隔离的 `siftalphax` implementation path，使用 process-scoped CPython initialization、per-session worker attach/detach、single active session 和固定实验脚本。它尚未接入 production `ProjectRuntimeController`，不能把 prototype 验收写成 R production 或 X acceptance。
+当前 Embedded CPython alpha32 implementation 仍位于隔离的 `siftalphax` implementation path，保持 process-scoped CPython initialization、per-session worker attach/detach、single active session 和已验证的 cooperative STOP。alpha32 增加了由 M 显式触发的最小 SAF project staging bridge：M 解析明确入口，stager 复制到 app-private execution root，R 继续负责 Session/generation/native execution。该桥接仍是实验性 source/CI readiness，不等于 R production 或 X acceptance。
 
 ### 2.6 M ↔ R Interface 原则
 
 M 向 R 表达结构化 Management Intent，例如 `prepare`、`start`、`stop`、`status`、`logs`、`restart`。R 向 M 返回 Runtime Facts，例如 runtime/session identity、generation、lifecycle state、runtime/stop phase、stop result、exit code、stdout/stderr、structured failure、capability 和 availability。
 
-M 不应依赖 CPython/JNI internals；R 不应依赖 Activity、Compose 或 Browser UI。Web Discovery、Endpoint Probe、Browser policy 和 UI 属于 M；R 可以提供 Runtime Identity、Session Identity、process facts 和 endpoint facts。接口本轮只定义，不实现。
+M 不应依赖 CPython/JNI internals；R 不应依赖 Activity、Compose 或 Browser UI。Web Discovery、Endpoint Probe、Browser policy 和 UI 属于 M；R 可以提供 Runtime Identity、Session Identity、process facts 和 endpoint facts。alpha32 只实现一条最小、显式的 M → R project-script bridge，不建立通用 Provider Framework，也不把 R 伪装成 Termux shell host。
 
 ### 2.7 R Core Independence Principle
 
@@ -356,3 +356,15 @@ Run #90（ID `35083943639`）对应源码 HEAD `0e2b069d93a0a8cd87df4f57f0e97da1
 设备确认 CPython `3.14.7`、Android `aarch64`、`sys.platform=android`，且该测试路径 `TERMUX=NOT_USED`、`PROOT=NOT_USED`。Test A 的 app-private path validation 错误未复现；Test B 的 stdout/stderr 和真实 `main.py` traceback、Test C 的 cooperative STOP 以及 STOP 后 re-entry 均 PASS。
 
 因此：**SiftAlpha R Embedded CPython alpha30 Project Script Execution Boundary real-device acceptance = PASS（仅针对上述 app-private、file-backed、pure-Python fixture 范围）**。这不表示 R 或 X 完成，也不证明 arbitrary external/SAF projects、dependency installation、arbitrary third-party/native packages、blocking native/syscall hard-stop、concurrent Sessions、process-death recovery 或 production M ↔ R / Web / Browser integration。
+
+## 14. alpha32 M → R Embedded CPython First Integration
+
+alpha32 在既有 alpha30 file-backed R boundary 之上，建立第一条真实的 M → R 接线：
+
+`M-managed SAF Project → bounded app-private staging → explicit project execution input → R Session → Embedded CPython → structured Snapshot → M RuntimeState/output/STOP`。
+
+M 使用 SAF project directory 的 documentId 作为 Project Identity；R 自己生成 sessionId 和 generation。Project、Session、Generation 保持三个不同事实。M 只在项目被确定为 Python 且入口已经由 metadata 或确定性规则解析成功时显示显式的“使用内置 R 运行”入口；Termux 的既有 Run/Prepare/STOP 路径仍是默认路径，没有被静默切换。
+
+`EmbeddedPythonProjectStager` 只负责 SAF → app-private `files/siftalphax/projects/session-<uuid>` 的 bounded copy，保留相对目录，限制节点/文件数和单文件/总大小；复制失败会清理不完整根目录，不修改或删除 SAF source。R 的现有 `EmbeddedPythonSession`、CPython lifecycle、stdout/stderr、structured snapshot、cooperative STOP 和 re-entry 路径被复用。Embedded R 不经过 `RuntimeCommand`、Termux、RUN_COMMAND、PRoot 或 Ubuntu。
+
+当前 alpha32 是 source/CI readiness boundary，尚未声称任意 Python 项目、依赖安装、SAF arbitrary integration、Web/Browser integration、并发、process-death recovery 或 universal hard-stop 已完成。

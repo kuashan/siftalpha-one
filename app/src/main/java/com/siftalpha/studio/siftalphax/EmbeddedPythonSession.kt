@@ -30,13 +30,44 @@ class EmbeddedPythonSession private constructor(context: Context) {
         }
         val sessionId = "siftalpha-x-" + UUID.randomUUID()
         val generation = nextGeneration.incrementAndGet()
-        val home = EmbeddedPythonFiles.prepare(appContext)
+        val home = prepareRuntime()
         val stagedRoot = EmbeddedPythonFiles.stageProjectFixture(appContext, fixture, sessionId)
         val spec = EmbeddedPythonExecutionSpec(
             projectIdentity = fixture.projectIdentity,
             executionRoot = stagedRoot,
             entrypoint = fixture.entrypoint,
             workingDirectory = fixture.workingDirectory,
+            runtimeKind = EmbeddedPythonRuntimeKind.CPYTHON,
+            sessionId = sessionId,
+            generation = generation,
+        )
+        return start(spec, home)
+    }
+
+    /** Prepare the process-scoped CPython assets before M creates a project staging copy. */
+    @Synchronized
+    fun prepareRuntime(): File = EmbeddedPythonFiles.prepare(appContext)
+
+    /** Start an explicit M-provided project target using the same R/native path as fixtures. */
+    @Synchronized
+    fun start(
+        projectIdentity: String,
+        executionRoot: File,
+        entrypoint: String,
+        workingDirectory: String = ".",
+    ): EmbeddedPythonSnapshot {
+        val current = snapshot()
+        check(EmbeddedPythonStatePolicy.canStart(current.state)) {
+            "Only one embedded Python session may be active; current state is " + current.state
+        }
+        val sessionId = "siftalpha-x-" + UUID.randomUUID()
+        val generation = nextGeneration.incrementAndGet()
+        val home = prepareRuntime()
+        val spec = EmbeddedPythonExecutionSpec(
+            projectIdentity = projectIdentity,
+            executionRoot = executionRoot,
+            entrypoint = entrypoint,
+            workingDirectory = workingDirectory,
             runtimeKind = EmbeddedPythonRuntimeKind.CPYTHON,
             sessionId = sessionId,
             generation = generation,

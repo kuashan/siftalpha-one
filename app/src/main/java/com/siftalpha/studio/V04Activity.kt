@@ -19,13 +19,16 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.siftalpha.studio.project.EmbeddedPythonProjectStager
 import com.siftalpha.studio.project.ProjectConfigurationInspector
 import com.siftalpha.studio.project.ProjectSecretPolicyInspector
 import com.siftalpha.studio.project.V04ProjectGateway
 import com.siftalpha.studio.project.WebProjectInspector
 import com.siftalpha.studio.presentation.ProjectActionPolicy
 import com.siftalpha.studio.presentation.ProjectUiSnapshot
+import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
 import com.siftalpha.studio.runtime.ProjectRuntimeController
+import com.siftalpha.studio.runtime.ProjectRuntimeExecutionPlanner
 import com.siftalpha.studio.runtime.ProjectSecretStore
 import com.siftalpha.studio.runtime.RuntimeCommand
 import com.siftalpha.studio.runtime.RuntimeFailureReason
@@ -40,6 +43,10 @@ import com.siftalpha.studio.runtime.RuntimeWebStateStore
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
 import com.siftalpha.studio.runtime.RuntimeWebUrl
 import com.siftalpha.studio.runtime.TermuxBackend
+import com.siftalpha.studio.runtime.RuntimeKind
+import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
+import com.siftalpha.studio.siftalphax.EmbeddedPythonSnapshot
+import com.siftalpha.studio.siftalphax.EmbeddedPythonState
 import com.siftalpha.studio.runtime.TermuxResultBus
 import java.util.concurrent.Executors
 
@@ -95,6 +102,27 @@ open class V04Activity : StudioActivity() {
     private var refreshInFlight = false
     private var refreshGeneration = 0L
     private var activityStarted = false
+    private val embeddedStartExecutor = Executors.newSingleThreadExecutor()
+    private val embeddedProjects = mutableSetOf<String>()
+    private val embeddedStartInFlight = mutableSetOf<String>()
+    private val embeddedLastSnapshots = mutableMapOf<String, EmbeddedPythonSnapshot>()
+    private var embeddedPollProject: V04ProjectGateway.RuntimeProject? = null
+    private val embeddedPollRunnable = object : Runnable {
+        override fun run() {
+            val project = embeddedPollProject ?: return
+            if (!activityStarted || isFinishing || isDestroyed) return
+            val snapshot = runCatching {
+                runtime.embeddedPythonSnapshotFor(project.summary.documentId)
+            }.getOrNull() ?: return
+            val changed = syncEmbeddedSnapshot(project, snapshot)
+            if (changed) refresh()
+            if (isEmbeddedActive(snapshot)) {
+                refreshHandler.postDelayed(this, EMBEDDED_POLL_INTERVAL_MS)
+            } else {
+                embeddedPollProject = null
+            }
+        }
+    }
     private lateinit var rootState: TextView
     private lateinit var projectList: LinearLayout
     private lateinit var output: TextView
@@ -146,7 +174,11 @@ open class V04Activity : StudioActivity() {
         clearLocalizedStateCacheIfNeeded()
         backend = TermuxBackend(this)
         gateway = V04ProjectGateway(this)
-        runtime = ProjectRuntimeController(gateway)
+        runtime = ProjectRuntimeController(
+            gateway = gateway,
+            embeddedPythonSession = EmbeddedPythonSession.shared(this),
+            embeddedPythonProjectStager = EmbeddedPythonProjectStager(this),
+        )
         secretStore = ProjectSecretStore(this)
         lifecycleStore = RuntimeLifecycleStore(this)
         secretPolicyInspector = ProjectSecretPolicyInspector(this)
@@ -197,10 +229,12 @@ open class V04Activity : StudioActivity() {
     override fun onResume() {
         super.onResume()
         if (::projectList.isInitialized) refresh()
+        embeddedPollProject?.let(::scheduleEmbeddedPolling)
     }
 
     override fun onStop() {
         activityStarted = false
+        refreshHandler.removeCallbacks(embeddedPollRunnable)
         refreshHandler.removeCallbacksAndMessages(null)
         if (::webAvailability.isInitialized) webAvailability.pause()
         if (::prepareLiveProgress.isInitialized) prepareLiveProgress.pause()
@@ -210,6 +244,8 @@ open class V04Activity : StudioActivity() {
 
     override fun onDestroy() {
         refreshHandler.removeCallbacksAndMessages(null)
+        embeddedPollProject = null
+        embeddedStartExecutor.shutdownNow()
         refreshExecutor.shutdownNow()
         super.onDestroy()
     }
@@ -390,6 +426,12 @@ open class V04Activity : StudioActivity() {
         }
 
         val projects = result.cards.map { it.project }
+        result.cards.firstOrNull { data ->
+            val snapshot = runCatching {
+                runtime.embeddedPythonSnapshotFor(data.project.summary.documentId)
+            }.getOrNull()
+            snapshot != null && isEmbeddedActive(snapshot)
+        }?.project?.let(::scheduleEmbeddedPolling)
         projectOutputs.retainOnly(projects.map { it.folderName }.toSet())
         if (result.cards.isEmpty()) {
             replaceProjectViews(listOf(hint(getString(R.string.runtime_center_projects_empty))))
@@ -434,8 +476,17 @@ open class V04Activity : StudioActivity() {
         val summary = project.summary
         val stateKey = summary.documentId
         restoreStoredState(stateKey)
+        val embeddedCandidate = runCatching {
+            runtime.embeddedPythonSnapshotFor(stateKey)
+        }.getOrNull()
+        val embeddedSnapshot = embeddedCandidate?.takeIf {
+            isEmbeddedActive(it) || stateKey in embeddedProjects || stateKey in embeddedStartInFlight
+        }
+        val embeddedRuntimeState = embeddedSnapshot?.let { EmbeddedPythonRuntimeStateMapping.toRuntimeState(it) }
+        val typedState = embeddedRuntimeState ?: typedStates[stateKey] ?: RuntimeState.UNKNOWN
+        val embeddedEligible = supportsEmbeddedPython(project)
+        val embeddedActive = embeddedSnapshot?.let(::isEmbeddedActive) == true
         val webSnapshot = webStateStore.snapshot(stateKey)
-        val typedState = typedStates[stateKey] ?: RuntimeState.UNKNOWN
         val configuredWebUrl = webProfile.configuredLocalUrl()
         val candidateWebUrls = listOfNotNull(webSnapshot.candidateUrl, configuredWebUrl).distinct()
         val endpointReachable = if (::webAvailability.isInitialized) {
@@ -670,7 +721,7 @@ open class V04Activity : StudioActivity() {
                 }
                 ProjectActionPolicy.Action.STOP -> {
                     box.addView(button(getString(R.string.runtime_button_stop)) {
-                        dispatch(project, ProjectRuntimeController.Action.STOP)
+                        if (embeddedActive) requestEmbeddedStop(project) else dispatch(project, ProjectRuntimeController.Action.STOP)
                     })
                 }
                 ProjectActionPolicy.Action.CONFIGURE -> {
@@ -685,7 +736,7 @@ open class V04Activity : StudioActivity() {
                 }
                 ProjectActionPolicy.Action.STATUS -> {
                     box.addView(button(getString(R.string.runtime_button_status)) {
-                        dispatch(project, ProjectRuntimeController.Action.STATUS)
+                        if (embeddedSnapshot != null) refreshEmbeddedProject(project) else dispatch(project, ProjectRuntimeController.Action.STATUS)
                     })
                 }
                 null,
@@ -716,16 +767,16 @@ open class V04Activity : StudioActivity() {
             setPadding(0, dp(5), 0, 0)
         }
         val stopButton = smallButton(getString(R.string.runtime_button_stop)) {
-                dispatch(project, ProjectRuntimeController.Action.STOP)
-            }.apply { isEnabled = policy.isEnabled(ProjectActionPolicy.Action.STOP) }
+                if (embeddedActive) requestEmbeddedStop(project) else dispatch(project, ProjectRuntimeController.Action.STOP)
+            }.apply { isEnabled = embeddedActive || policy.isEnabled(ProjectActionPolicy.Action.STOP) }
         row2.addView(stopButton, weight())
         val statusButton = smallButton(getString(R.string.runtime_button_status)) {
-                dispatch(project, ProjectRuntimeController.Action.STATUS)
-            }.apply { isEnabled = policy.isEnabled(ProjectActionPolicy.Action.STATUS) }
+                if (embeddedSnapshot != null) refreshEmbeddedProject(project) else dispatch(project, ProjectRuntimeController.Action.STATUS)
+            }.apply { isEnabled = embeddedSnapshot != null || policy.isEnabled(ProjectActionPolicy.Action.STATUS) }
         row2.addView(statusButton, weight().apply { marginStart = dp(5) })
         val logsButton = smallButton(getString(R.string.runtime_button_refresh_logs)) {
-                dispatch(project, ProjectRuntimeController.Action.LOGS)
-            }.apply { isEnabled = policy.isEnabled(ProjectActionPolicy.Action.LOGS) }
+                if (embeddedSnapshot != null) refreshEmbeddedProject(project) else dispatch(project, ProjectRuntimeController.Action.LOGS)
+            }.apply { isEnabled = embeddedSnapshot != null || policy.isEnabled(ProjectActionPolicy.Action.LOGS) }
         row2.addView(logsButton, weight().apply { marginStart = dp(5) })
         box.addView(row2)
 
@@ -760,6 +811,19 @@ open class V04Activity : StudioActivity() {
             weight().apply { marginStart = dp(5) },
         )
         box.addView(row3)
+
+        if (embeddedEligible) {
+            box.addView(smallButton(getString(R.string.runtime_button_run_embedded_r)) {
+                confirmEmbeddedRun(project)
+            }.apply {
+                isEnabled = !embeddedActive && stateKey !in embeddedStartInFlight &&
+                    typedState !in ACTIVE_RUNTIME_STATES && runtime.embeddedPythonCanStart()
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = dp(5) }
+            })
+        }
 
         box.addView(smallButton(getString(R.string.runtime_button_clean)) { confirmClean(project) }.apply {
             isEnabled = policy.isEnabled(ProjectActionPolicy.Action.CLEAN)
@@ -1086,7 +1150,9 @@ open class V04Activity : StudioActivity() {
         if (!ensureRuntime()) return
         val webProfile = runCatching { webInspector.inspect(project.summary.documentId) }.getOrNull()
 
-        val configurationNote = "\n\n${configurationUi.summaryText(configurationUi.snapshot(project.summary.documentId, project.folderName))}"
+        val configurationNote = "\n\n" + configurationUi.summaryText(
+            configurationUi.snapshot(project.summary.documentId, project.folderName),
+        )
         val webNote = if (webProfile?.enabled == true) {
             getString(R.string.runtime_run_web_detected)
         } else {
@@ -1100,6 +1166,161 @@ open class V04Activity : StudioActivity() {
             .show()
     }
 
+    private fun confirmEmbeddedRun(project: V04ProjectGateway.RuntimeProject) {
+        if (!supportsEmbeddedPython(project)) return
+        if (project.summary.documentId in embeddedStartInFlight || !runtime.embeddedPythonCanStart()) {
+            toast(getString(R.string.runtime_embedded_r_active))
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.runtime_embedded_r_title, project.summary.name))
+            .setMessage(getString(R.string.runtime_embedded_r_message))
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .setPositiveButton(getString(R.string.runtime_button_run_embedded_r)) { _, _ ->
+                startEmbeddedProject(project)
+            }
+            .show()
+    }
+
+    private fun startEmbeddedProject(project: V04ProjectGateway.RuntimeProject) {
+        val stateKey = project.summary.documentId
+        if (!supportsEmbeddedPython(project) || stateKey in embeddedStartInFlight) return
+        if (!runtime.embeddedPythonCanStart()) {
+            toast(getString(R.string.runtime_embedded_r_active))
+            return
+        }
+        embeddedStartInFlight += stateKey
+        typedStates[stateKey] = RuntimeState.STARTING
+        states[stateKey] = getString(R.string.runtime_action_starting)
+        failureReasons.remove(stateKey)
+        projectOutputs.write(
+            project.folderName,
+            listOf(
+                "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                "SIFTALPHA_X_STAGE=STARTING",
+            ).joinToString("\n"),
+            expand = true,
+        )
+        refresh()
+        embeddedStartExecutor.execute {
+            val result = runCatching { runtime.startEmbeddedPython(project) }
+            runOnUiThread {
+                embeddedStartInFlight.remove(stateKey)
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                val snapshot = result.getOrNull()
+                if (snapshot != null) {
+                    embeddedProjects += stateKey
+                    embeddedLastSnapshots.remove(stateKey)
+                    syncEmbeddedSnapshot(project, snapshot)
+                    if (isEmbeddedActive(snapshot)) scheduleEmbeddedPolling(project)
+                    refresh()
+                } else {
+                    embeddedProjects.remove(stateKey)
+                    typedStates[stateKey] = RuntimeState.ENVIRONMENT_ERROR
+                    states[stateKey] = getString(R.string.runtime_start_failed)
+                    val error = result.exceptionOrNull()
+                    val message = embeddedStartErrorMessage(error)
+                    projectOutputs.write(
+                        project.folderName,
+                        listOf(
+                            "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                            "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                            "SIFTALPHA_X_STAGE=FAILED",
+                            message,
+                        ).joinToString("\n"),
+                        expand = true,
+                    )
+                    refresh()
+                    errorDialog(getString(R.string.runtime_embedded_r_start_failed), message)
+                }
+            }
+        }
+    }
+
+    private fun requestEmbeddedStop(project: V04ProjectGateway.RuntimeProject) {
+        val accepted = runCatching {
+            runtime.requestEmbeddedPythonStop(project.summary.documentId)
+        }.getOrDefault(false)
+        if (!accepted) {
+            toast(getString(R.string.runtime_stop_failed))
+            refreshEmbeddedProject(project)
+            return
+        }
+        states[project.summary.documentId] = getString(R.string.runtime_action_stopping)
+        projectOutputs.write(
+            project.folderName,
+            listOf(
+                "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                "SIFTALPHA_X_PROJECT_ID=" + project.summary.documentId,
+                "SIFTALPHA_X_STOP_REQUEST=ACCEPTED",
+            ).joinToString("\n"),
+            expand = true,
+        )
+        refresh()
+        scheduleEmbeddedPolling(project)
+    }
+
+    private fun refreshEmbeddedProject(project: V04ProjectGateway.RuntimeProject) {
+        val snapshot = runCatching {
+            runtime.embeddedPythonSnapshotFor(project.summary.documentId)
+        }.getOrNull() ?: return
+        embeddedProjects += project.summary.documentId
+        val changed = syncEmbeddedSnapshot(project, snapshot)
+        if (changed) refresh()
+        if (isEmbeddedActive(snapshot)) scheduleEmbeddedPolling(project)
+    }
+
+    private fun syncEmbeddedSnapshot(
+        project: V04ProjectGateway.RuntimeProject,
+        snapshot: EmbeddedPythonSnapshot,
+    ): Boolean {
+        val stateKey = project.summary.documentId
+        val previous = embeddedLastSnapshots[stateKey]
+        if (previous == snapshot) return false
+        embeddedLastSnapshots[stateKey] = snapshot
+        val mappedState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot)
+        typedStates[stateKey] = mappedState
+        states[stateKey] = mappedState.uiLabel(this)
+        if (mappedState == RuntimeState.EXITED_ERROR && snapshot.stderr.isNotBlank()) {
+            failureReasons[stateKey] = snapshot.stderr.trim().lineSequence().lastOrNull().orEmpty()
+        } else {
+            failureReasons.remove(stateKey)
+        }
+        if (::projectOutputs.isInitialized) {
+            projectOutputs.write(
+                project.folderName,
+                EmbeddedPythonRuntimeStateMapping.outputText(snapshot),
+                expand = true,
+                forceFollowTail = isEmbeddedActive(snapshot),
+            )
+        }
+        return true
+    }
+
+    private fun scheduleEmbeddedPolling(project: V04ProjectGateway.RuntimeProject) {
+        embeddedPollProject = project
+        if (!activityStarted) return
+        refreshHandler.removeCallbacks(embeddedPollRunnable)
+        refreshHandler.post(embeddedPollRunnable)
+    }
+
+    private fun isEmbeddedActive(snapshot: EmbeddedPythonSnapshot): Boolean =
+        snapshot.state == EmbeddedPythonState.STARTING || snapshot.state == EmbeddedPythonState.RUNNING
+
+    private fun supportsEmbeddedPython(project: V04ProjectGateway.RuntimeProject): Boolean {
+        val selection = project.runtimeSelection
+        return selection is ProjectRuntimeExecutionPlanner.Selection.Resolved &&
+            selection.primary == RuntimeKind.PYTHON
+    }
+
+    private fun embeddedStartErrorMessage(error: Throwable?): String =
+        if (error?.message == "EMBEDDED_R_ENTRYPOINT_UNRESOLVED") {
+            getString(R.string.runtime_embedded_r_entrypoint_unresolved)
+        } else {
+            error?.message ?: getString(R.string.runtime_unavailable)
+        }
+    }
     private fun dispatch(
         project: V04ProjectGateway.RuntimeProject,
         action: ProjectRuntimeController.Action,
@@ -1114,6 +1335,10 @@ open class V04Activity : StudioActivity() {
         // still arrive after that rebuild. Re-check the stable project identity at the side-effect
         // boundary so one project cannot acquire two mutable Runtime operations.
         if (!canDispatch(project, action)) return
+        if (action == ProjectRuntimeController.Action.START) {
+            embeddedProjects.remove(stateKey)
+            embeddedLastSnapshots.remove(stateKey)
+        }
         if (silentRecovery) recoveryProjects += stateKey
         val command = try {
             when (action) {
@@ -2069,6 +2294,7 @@ open class V04Activity : StudioActivity() {
             RuntimeState.RUNNING,
         )
         private const val REFRESH_DEBOUNCE_MS = 120L
+        private const val EMBEDDED_POLL_INTERVAL_MS = 180L
         private var RUNTIME_STATES_LANGUAGE_TAG: String? = null
     }
 }

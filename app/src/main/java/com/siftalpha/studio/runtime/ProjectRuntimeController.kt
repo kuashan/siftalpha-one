@@ -1,6 +1,11 @@
 package com.siftalpha.studio.runtime
 
+import com.siftalpha.studio.project.EmbeddedPythonProjectStager
 import com.siftalpha.studio.project.V04ProjectGateway
+import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
+import com.siftalpha.studio.siftalphax.EmbeddedPythonSnapshot
+import com.siftalpha.studio.siftalphax.EmbeddedPythonStatePolicy
+import java.io.File
 
 /**
  * Runtime-neutral project execution coordinator.
@@ -9,7 +14,11 @@ import com.siftalpha.studio.project.V04ProjectGateway
  * resolved into one executable primary Runtime; Python may still compose the accepted supplemental
  * Vite/Node build path, while a Node-primary project now owns its complete lifecycle directly.
  */
-class ProjectRuntimeController(private val gateway: V04ProjectGateway) {
+class ProjectRuntimeController(
+    private val gateway: V04ProjectGateway,
+    private val embeddedPythonSession: EmbeddedPythonSession? = null,
+    private val embeddedPythonProjectStager: EmbeddedPythonProjectStager? = null,
+) {
 
     enum class Action {
         PREPARE,
@@ -37,8 +46,83 @@ class ProjectRuntimeController(private val gateway: V04ProjectGateway) {
     private val pythonAdapter: ExecutableRuntimeAdapter = PythonRuntimeAdapter(host)
     private val nodeExecutableAdapter: ExecutableRuntimeAdapter = ExecutableNodeJsRuntimeAdapter(host)
     private val supplementalNodeAdapter = NodeJsRuntimeAdapter(host)
+    private val embeddedStagingRoots = mutableMapOf<String, File>()
 
     fun runtimeSupported(): Boolean = host.runtimeSupported()
+
+    fun embeddedPythonCanStart(): Boolean {
+        val session = embeddedPythonSession ?: return false
+        return runCatching { EmbeddedPythonStatePolicy.canStart(session.snapshot().state) }
+            .getOrDefault(false)
+    }
+
+    fun embeddedPythonSnapshotFor(projectDocumentId: String): EmbeddedPythonSnapshot? {
+        val session = embeddedPythonSession ?: return null
+        val snapshot = runCatching { session.snapshot() }.getOrNull() ?: return null
+        cleanupEmbeddedStaging(snapshot)
+        return snapshot.takeIf {
+            it.sessionId.isNotBlank() && it.projectIdentity == projectDocumentId
+        }
+    }
+
+    /** M-only control entry for an explicitly selected Python project; Termux is not involved. */
+    fun startEmbeddedPython(project: V04ProjectGateway.RuntimeProject): EmbeddedPythonSnapshot {
+        val session = checkNotNull(embeddedPythonSession) { "Embedded R is unavailable" }
+        val stager = checkNotNull(embeddedPythonProjectStager) { "Embedded R staging is unavailable" }
+        val selection = project.runtimeSelection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
+        check(selection?.primary == RuntimeKind.PYTHON) {
+            "Embedded R requires a resolved Python project"
+        }
+        val projectId = project.summary.documentId
+        val current = session.snapshot()
+        check(EmbeddedPythonStatePolicy.canStart(current.state)) {
+            "Only one embedded Python session may be active; current state is " + current.state
+        }
+        cleanupEmbeddedStaging(current)
+        val entrypoint = gateway.resolveEmbeddedPythonEntrypoint(projectId)
+            ?: error("EMBEDDED_R_ENTRYPOINT_UNRESOLVED")
+        // prepare() can recover an incomplete CPython asset root; do it before creating a staging copy.
+        session.prepareRuntime()
+        val stagedRoot = stager.stage(projectId, entrypoint)
+        return try {
+            val snapshot = session.start(
+                projectIdentity = projectId,
+                executionRoot = stagedRoot,
+                entrypoint = entrypoint,
+                workingDirectory = ".",
+            )
+            synchronized(embeddedStagingRoots) {
+                embeddedStagingRoots[snapshot.sessionId] = stagedRoot
+            }
+            cleanupEmbeddedStaging(snapshot)
+            snapshot
+        } catch (error: Throwable) {
+            stager.cleanup(stagedRoot)
+            throw error
+        }
+    }
+
+    /** A successful return only means the stop request was accepted; terminal state is polled. */
+    fun requestEmbeddedPythonStop(projectDocumentId: String): Boolean {
+        val session = embeddedPythonSession ?: return false
+        val snapshot = embeddedPythonSnapshotFor(projectDocumentId) ?: return false
+        if (!EmbeddedPythonStatePolicy.canStop(snapshot.state)) return false
+        return session.requestStop()
+    }
+
+    private fun cleanupEmbeddedStaging(snapshot: EmbeddedPythonSnapshot) {
+        if (!EmbeddedPythonStatePolicy.isTerminal(snapshot.state)) return
+        val root = synchronized(embeddedStagingRoots) {
+            embeddedStagingRoots[snapshot.sessionId]
+        } ?: return
+        val stager = embeddedPythonProjectStager ?: return
+        runCatching { stager.cleanup(root) }
+            .onSuccess {
+                synchronized(embeddedStagingRoots) {
+                    embeddedStagingRoots.remove(snapshot.sessionId)
+                }
+            }
+    }
 
     fun runtimeUnsupportedReason(): String = host.runtimeUnsupportedReason()
 

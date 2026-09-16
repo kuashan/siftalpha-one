@@ -1,10 +1,10 @@
 # SiftAlpha M / R / X Architecture Definition
 
 最后更新：2026-09-16  
-alpha30 实现起始基线：`36b0175248a491b85560d68fcfd12889dbf5d0d7`  
-当前 alpha30 source HEAD：`328ff10222a4fb188d5932130a16c04a3c0ccabb`  
+alpha30 实现起始基线与 Run #90 真实设备证据仍为历史记录。  
+当前 alpha32 source baseline：本分支 alpha31 version-identity baseline 之后的 M → R integration commit。  
 工作分支：`codex/siftalpha-x-embedded-cpython-spike`  
-当前 Runtime prototype：`versionCode 106` / `versionName 0.8.0-alpha30`
+当前 Runtime prototype：`versionCode 108` / `versionName 0.8.0-alpha32`
 
 本文件是 SiftAlpha M / R / X 的规范架构定义。它取代当前术语中的：
 
@@ -407,15 +407,15 @@ alpha29 不表示 R 已完成，也不表示 X 已达到 acceptance。以下能�
 
 ## 12. 当前变更边界与维护规则
 
-alpha30 在保留 alpha29 lifecycle acceptance 的前提下，增加了实验性 file-backed project-script boundary。Run #83 完成 source/CI 验证后，Run #90 已完成真实 Android device acceptance；该验收仅在 app-private、file-backed、pure-Python fixture 范围内 PASS，详细证据见 DEV_LOG.md 和 TEST_MATRIX.md。
+alpha30 在保留 alpha29 lifecycle acceptance 的前提下，增加了实验性 file-backed project-script boundary；Run #90 的真实设备证据仍是已归档的 alpha30 事实。alpha32 在此基础上增加第一条最小 M → R 接线：M 以 SAF documentId 管理项目，解析明确 Python entrypoint，将受限项目树复制到 app-private staging，再调用既有 Embedded R Session/native path。alpha32 的真实设备验收须另行记录，不得与 alpha30 Run #90 事实混写。
 
 本轮变更边界：
 
-- 当前版本为 `versionCode=106`、`versionName=0.8.0-alpha30`；alpha29 real-device evidence 仍作为历史 accepted baseline 保留；
-- 不修改 production Termux Runtime path、Runtime Identity、Web Discovery 或 M ↔ R production integration；Embedded CPython/JNI/Session 的 alpha30 变更仅属于实验性 R project-script boundary；
-- 不实现 M ↔ R integration，不开始 project import、dependency、SAF、Web、Browser、PRoot 或 Node 新功能；
-- alpha29 real-device evidence 是 user-confirmed evidence，与 CI/build evidence 分开；
-- 新的行为变化、生产实现和真机验收应在后续任务中单独记录。
+- 当前版本为 `versionCode=108`、`versionName=0.8.0-alpha32`；alpha30/Run #90 的 real-device evidence 仍作为历史 accepted baseline 保留；
+- 不修改 production Termux Runtime path、Runtime Identity、Web Discovery 或既有 M 管理路径的默认行为；alpha32 只增加明确 opt-in 的 Embedded R bridge；
+- alpha32 实现的是受限的 M-managed SAF project → app-private staging → Embedded R execution boundary，不实现完整 M ↔ R production integration、依赖安装、Web、Browser、PRoot 或 Node 新功能；
+- alpha29/alpha30 real-device evidence 是 user-confirmed evidence，与 CI/build evidence 分开；
+- alpha32 的 CI 和后续真实设备验收必须以新的 source/version identity 单独记录。
 
 相关入口：
 
@@ -423,3 +423,19 @@ alpha30 在保留 alpha29 lifecycle acceptance 的前提下，增加了实验性
 - [DEV_LOG.md](DEV_LOG.md)：按时间追加的工程和验收记录；
 - [TEST_MATRIX.md](TEST_MATRIX.md)：Regression / Verification Evidence；
 - [README.md](README.md)：文档维护规则。
+
+## 13. alpha32 First M → R Integration Boundary
+
+alpha32 的架构闭环是：
+
+`SiftAlpha M (SAF Project/documentId)`
+→ `deterministic entrypoint resolution`
+→ `bounded app-private staging`
+→ `SiftAlpha R EmbeddedPythonSession`
+→ `Embedded CPython`
+→ `structured Snapshot`
+→ `M RuntimeState / output / STOP`。
+
+这不是新的 Runtime Provider Framework。M 继续由 `ProjectRuntimeController` 协调，R 继续由现有 `EmbeddedPythonSession` 管理 Session/generation/native lifecycle；本轮只增加一个业务边界组件 `EmbeddedPythonProjectStager` 和必要的纯策略/状态映射 helper。R 不实现 Termux shell semantics，M 的 Embedded R 入口也不调用 `RuntimeCommandHost`、`RuntimeBackend.execute`、RUN_COMMAND、PRoot 或 Ubuntu。
+
+SAF source project 与 execution staging root 是不同的 ownership boundary：M/ProjectStore 读取 source，stager 创建和清理 app-private copy，R 只接收 explicit execution input。M 不伪造 sessionId/generation，R 不读取 Activity/Compose/Browser 状态。未实现 pip、venv、依赖安装、Web/Browser integration、并发、process-death recovery 或 universal hard-stop；alpha32 仍不表示 R 或 X 已完成。

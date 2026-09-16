@@ -79,6 +79,12 @@
     <string name="runtime_button_edit">편집</string>
     <string name="runtime_button_prepare">환경 준비</string>
     <string name="runtime_button_run">실행</string>
+    <string name="runtime_button_run_embedded_r">내장 R로 실행</string>
+    <string name="runtime_embedded_r_title">내장 R로 %1$s을(를) 실행할까요?</string>
+    <string name="runtime_embedded_r_message">SAF 프로젝트를 앱 전용 임시 디렉터리로 복사한 뒤 확인된 Python 진입점으로 실행합니다. 이 실험 경로는 Termux를 사용하지 않습니다.</string>
+    <string name="runtime_embedded_r_active">내장 R에서 이미 실행 중인 프로젝트가 있습니다.</string>
+    <string name="runtime_embedded_r_start_failed">내장 R 시작 실패</string>
+    <string name="runtime_embedded_r_entrypoint_unresolved">Python 프로젝트 진입점을 확인할 수 없습니다. 프로젝트 메타데이터에 entry를 설정하거나 프로젝트 루트에 명확한 Python 진입점 하나만 남겨 주세요.</string>
     <string name="runtime_button_stop">중지</string>
     <string name="runtime_button_status">상태 확인</string>
     <string name="runtime_button_logs">로그</string>

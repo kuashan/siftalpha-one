@@ -79,6 +79,12 @@
     <string name="runtime_button_edit">编辑</string>
     <string name="runtime_button_prepare">准备环境</string>
     <string name="runtime_button_run">运行</string>
+    <string name="runtime_button_run_embedded_r">使用内置 R 运行</string>
+    <string name="runtime_embedded_r_title">使用内置 R 运行 %1$s？</string>
+    <string name="runtime_embedded_r_message">将从 SAF 读取项目文件，复制到应用私有暂存目录，并以已确定的 Python 入口运行。此实验路径不使用 Termux。</string>
+    <string name="runtime_embedded_r_active">内置 R 当前已有运行中的项目。</string>
+    <string name="runtime_embedded_r_start_failed">内置 R 启动失败</string>
+    <string name="runtime_embedded_r_entrypoint_unresolved">无法确定 Python 项目入口。请在项目元数据中设置 entry，或确保项目根目录只有一个明确的 Python 入口。</string>
     <string name="runtime_button_stop">停止</string>
     <string name="runtime_button_status">状态检测</string>
     <string name="runtime_button_logs">日志</string>

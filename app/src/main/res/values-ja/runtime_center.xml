@@ -79,6 +79,12 @@
     <string name="runtime_button_edit">編集</string>
     <string name="runtime_button_prepare">環境を準備</string>
     <string name="runtime_button_run">実行</string>
+    <string name="runtime_button_run_embedded_r">内蔵 R で実行</string>
+    <string name="runtime_embedded_r_title">内蔵 R で %1$s を実行しますか？</string>
+    <string name="runtime_embedded_r_message">SAF プロジェクトをアプリ専用の一時領域へコピーし、解決済みの Python エントリポイントで実行します。この実験経路では Termux を使用しません。</string>
+    <string name="runtime_embedded_r_active">内蔵 R ではすでにプロジェクトを実行中です。</string>
+    <string name="runtime_embedded_r_start_failed">内蔵 R の起動に失敗しました</string>
+    <string name="runtime_embedded_r_entrypoint_unresolved">Python プロジェクトのエントリポイントを特定できません。メタデータに entry を設定するか、プロジェクトルートに明確な Python エントリポイントを 1 つだけ置いてください。</string>
     <string name="runtime_button_stop">停止</string>
     <string name="runtime_button_status">状態を確認</string>
     <string name="runtime_button_logs">ログ</string>

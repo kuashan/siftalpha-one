@@ -65,6 +65,17 @@ class V04ProjectGateway(private val context: Context) {
         )
     }
 
+    /** Resolve the one entrypoint M is willing to hand to Embedded R. R never scans or guesses. */
+    fun resolveEmbeddedPythonEntrypoint(projectDocumentId: String): String? {
+        val objectValue = metadata(projectDocumentId)
+        val declaredEntry = objectValue?.optString("entry")?.takeIf { it.isNotBlank() }
+        val filePaths = projectStore
+            .listProjectTreeForStaging(projectDocumentId)
+            .filterNot { it.isDirectory }
+            .map { it.relativePath }
+        return EmbeddedPythonEntrypointPolicy.resolve(declaredEntry, filePaths)
+    }
+
     fun runtimeSharedRootRelativePath(): String? {
         val tree = rootUri() ?: return null
         val treeId = runCatching { DocumentsContract.getTreeDocumentId(tree) }.getOrNull()

@@ -168,14 +168,41 @@ if __name__ == "__main__":
     /**
      * 全项目递归扫描只用于搜索 / 最近文件 / 精确定位等需要完整视图的后台操作。
      */
-    fun listProjectTree(projectDocumentId: String): List<FileNode> {
+    fun listProjectTree(projectDocumentId: String): List<FileNode> =
+        collectProjectTree(projectDocumentId).nodes
+
+    /**
+     * Staging must never silently execute a truncated SAF tree. The ordinary tree API preserves its
+     * historical bounded behavior; the Embedded R boundary rejects an incomplete source tree.
+     */
+    fun listProjectTreeForStaging(projectDocumentId: String): List<FileNode> {
+        val collected = collectProjectTree(projectDocumentId)
+        check(!collected.truncated) {
+            "项目文件树超过内置 R 暂存边界，未启动运行"
+        }
+        return collected.nodes
+    }
+
+    private data class ProjectTreeCollection(
+        val nodes: List<FileNode>,
+        val truncated: Boolean,
+    )
+
+    private fun collectProjectTree(projectDocumentId: String): ProjectTreeCollection {
         val treeUri = rootUri() ?: error("项目目录不可用")
         val result = mutableListOf<FileNode>()
+        var truncated = false
 
         fun walk(parentId: String, depth: Int, parentPath: String) {
-            if (depth > MAX_TREE_DEPTH || result.size >= MAX_TREE_ITEMS) return
+            if (depth > MAX_TREE_DEPTH) {
+                truncated = true
+                return
+            }
             for (child in sortedVisibleChildren(treeUri, parentId)) {
-                if (result.size >= MAX_TREE_ITEMS) break
+                if (result.size >= MAX_TREE_ITEMS) {
+                    truncated = true
+                    return
+                }
                 val relativePath = joinPath(parentPath, child.name)
                 val isDirectory = child.mimeType == DocumentsContract.Document.MIME_TYPE_DIR
                 result += FileNode(
@@ -191,9 +218,8 @@ if __name__ == "__main__":
         }
 
         walk(projectDocumentId, 0, "")
-        return result
+        return ProjectTreeCollection(result, truncated)
     }
-
     fun findProjectNode(
         projectDocumentId: String,
         documentId: String,
@@ -329,6 +355,12 @@ if __name__ == "__main__":
         return bytes.toString(Charsets.UTF_8)
     }
 
+    /** Read a bounded SAF file payload for a controlled execution staging copy. */
+    fun readProjectFileBytes(file: FileNode, maxBytes: Int): ByteArray {
+        require(!file.isDirectory) { "目录不能作为运行文件读取" }
+        require(maxBytes > 0) { "读取上限必须为正数" }
+        return readFileBytes(file, maxBytes)
+    }
     fun writeProjectTextFile(file: FileNode, content: String) {
         require(!file.isDirectory) { "目录不能写入文本" }
         require(isEditableTextFile(file)) { "当前文件类型暂不支持文本编辑" }

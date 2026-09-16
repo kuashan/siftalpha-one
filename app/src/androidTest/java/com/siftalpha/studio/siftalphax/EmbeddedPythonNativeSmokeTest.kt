@@ -291,6 +291,42 @@ class EmbeddedPythonNativeSmokeTest {
         }
     }
 
+    @Test
+    fun explicitProjectSpecUsesMProjectIdentityAndSharedRPath() {
+        assumeArm64()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val session = readySession(context)
+        val home = EmbeddedPythonFiles.prepare(context)
+        val root = File(home.parentFile, "projects/m-managed-" + UUID.randomUUID())
+        check(root.mkdirs())
+        File(root, "helper.py").writeText("VALUE = 'M_PROJECT_HELPER'\n")
+        File(root, "main.py").writeText(
+            "from helper import VALUE\n" +
+                "print('SIFTALPHA_X_M_PROJECT_SUCCESS')\n" +
+                "print(__name__)\n" +
+                "print(__file__)\n" +
+                "print(VALUE)\n",
+        )
+        try {
+            session.start(
+                projectIdentity = "saf-document-id",
+                executionRoot = root,
+                entrypoint = "main.py",
+                workingDirectory = ".",
+            )
+            awaitState(session, EmbeddedPythonState.SUCCEEDED, 5_000L)
+            val snapshot = session.snapshot()
+            assertEquals("saf-document-id", snapshot.projectIdentity)
+            assertTrue(snapshot.executionRoot.endsWith(root.name))
+            assertTrue(snapshot.entrypoint.endsWith("/main.py"))
+            assertEquals(snapshot.executionRoot, snapshot.workingDirectory)
+            assertTrue(snapshot.stdout.contains("SIFTALPHA_X_M_PROJECT_SUCCESS"))
+            assertTrue(snapshot.stdout.contains("M_PROJECT_HELPER"))
+            assertTrue(snapshot.stdout.contains("__main__"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
     private fun assertNativePathFailure(
         context: android.content.Context,
         executionRoot: File,

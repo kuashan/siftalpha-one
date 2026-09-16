@@ -79,6 +79,12 @@
     <string name="runtime_button_edit">Edit</string>
     <string name="runtime_button_prepare">Prepare environment</string>
     <string name="runtime_button_run">Run</string>
+    <string name="runtime_button_run_embedded_r">Run with Embedded R</string>
+    <string name="runtime_embedded_r_title">Run %1$s with Embedded R?</string>
+    <string name="runtime_embedded_r_message">The SAF project will be copied into an app-private staging directory and run through its resolved Python entrypoint. This experimental path does not use Termux.</string>
+    <string name="runtime_embedded_r_active">Embedded R already has an active project.</string>
+    <string name="runtime_embedded_r_start_failed">Embedded R start failed</string>
+    <string name="runtime_embedded_r_entrypoint_unresolved">Could not determine the Python project entrypoint. Set entry in project metadata or leave one clear Python entrypoint at the project root.</string>
     <string name="runtime_button_stop">Stop</string>
     <string name="runtime_button_status">Check status</string>
     <string name="runtime_button_logs">Logs</string>

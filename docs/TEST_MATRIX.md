@@ -16,10 +16,11 @@
 
 本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
 
-## A. 当前 alpha30 版本信息
+## A. 当前 alpha32 版本信息
 
-- 当前 Runtime prototype 版本：`0.8.0-alpha30`
-- versionCode：`106`
+- 当前 Runtime prototype 版本：`0.8.0-alpha32`
+- versionCode：`108`
+- alpha32 目标：M-managed SAF Python project → bounded app-private staging → explicit Embedded R execution
 - 包名：`com.siftalpha.studio`
 - 当前 docs/runtime prototype branch：`codex/siftalpha-x-embedded-cpython-spike`
 - alpha30 implementation starting HEAD：`36b0175248a491b85560d68fcfd12889dbf5d0d7`
@@ -321,3 +322,25 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 正式结论：**SiftAlpha R Embedded CPython alpha30 Project Script Execution Boundary real-device acceptance = PASS（仅针对 app-private、file-backed、pure-Python fixture 测试范围）**。这不表示 R 或 X 已完成。
 
 本证据仍不证明：arbitrary external/SAF project import、pip/dependencies/venv、arbitrary third-party packages/native wheels、arbitrary C extensions、blocking native/syscall hard-stop、concurrent Sessions、process-death recovery、production M ↔ R integration、R Web Discovery/Browser integration 或完整 filesystem sandbox。Android `/data/user/0/...` 与 `/data/data/...` 可能是不同字符串表示；当前结论只依赖 canonical containment 的 app-private staging 语义。
+
+## J. alpha32 M → R Embedded CPython First Integration
+
+本轮新增的验证边界是：
+
+`SAF Project documentId → bounded app-private staging → explicit entrypoint → EmbeddedPythonSession → structured Snapshot → M RuntimeState/output/STOP`。
+
+### J.1 JVM/source checks
+
+- `EmbeddedPythonEntrypointPolicyTest`：覆盖显式嵌套入口、确定性 conventional entry、歧义入口和不安全/缺失入口。
+- `EmbeddedPythonProjectStagerTest`：覆盖相对目录复制、helper 文件、unsafe relative path、文件数/单文件/总大小限制和 SAF 读取失败后的 partial staging cleanup。
+- `EmbeddedPythonRuntimeStateMappingTest`：覆盖 IDLE/STARTING/RUNNING/SUCCEEDED/FAILED/STOPPED 的结构化映射、Project/Session/Generation 与 stdout/stderr 保留。
+- `EmbeddedPythonExecutionSpecTest` 与既有 R lifecycle tests：继续覆盖路径、SystemExit、namespace、STOP 和 re-entry 回归。
+- Android instrumentation source 增加 explicit project execution input 测试；没有 Android device 时不得将其写成 executed/pass。
+
+### J.2 alpha32 行为边界
+
+- Embedded R 只能通过 M 的显式 opt-in 入口启动已解析为 Python 的项目。
+- R 不扫描或猜测入口；M 无法得到唯一安全入口时不启动。
+- SAF source 与 app-private staging root 分离；staging 有界且失败清理。
+- Termux provider、RUN_COMMAND、PRoot、Ubuntu 和生产 M path 保持既有行为。
+- 本节的 CI 与真实设备状态以提交后的实际执行证据为准；source/CI readiness 不等于 real-device acceptance。
