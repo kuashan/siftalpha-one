@@ -1,10 +1,10 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-16（M / R / X Architecture Definition + alpha29 Real-Device Evidence Consolidation）
+最后更新：2026-09-16（R Project Script Execution Boundary，alpha30 source/CI readiness）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
 产品基线分支：`main`（当前 main HEAD：`dff275575a9cdbd0564d394c4626cd7d9bb22637`）  
 M / R / X 架构与 Runtime prototype 工作分支：`codex/siftalpha-x-embedded-cpython-spike`  
-当前验证版本：0.8.0-alpha29 / versionCode 105（Embedded CPython Runtime prototype；alpha29 real-device evidence 已记录）  
+当前验证版本：0.8.0-alpha30 / versionCode 106（Embedded CPython file-backed project-script boundary；alpha29 real-device evidence 已记录，alpha30 等待真实设备验收）  
 当前文档定义：`M = Management System`，`R = Runtime System`，`X = M + R`  
 规范架构定义：[ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)  
 Production baseline merge：[893229c](https://github.com/kuashan/siftalpha-one/commit/893229ce26d49a6ea22c79d6e2be85290cb8b0c3)（历史基线记录）  
@@ -329,3 +329,14 @@ Coordinator 是渐进式实现手段：第一阶段建立最小 `RuntimeSession`
 如果当前只允许再做一个开发任务，优先完成 **Runtime Session Ownership Boundary**。它直接补齐当前最重要的 correctness/ownership 缺口，并为后续 Web candidate 清理、Recovery、Restart 和 coordinator 抽取提供统一边界；`V04Activity` 过大是后续结构表现，不是第一理由。
 
 当前结论：当前产品基线已经形成，但 `Project → Runtime Session → Web Candidate` 的 ownership chain 尚未完整闭合；这属于普通的产品 backlog / hardening，不再使用阶段完成或阻塞语义。未来 Roadmap 尚待重新定义。
+
+
+## 13. alpha30 R Project Script Execution Boundary
+
+alpha30 把 Embedded CPython prototype 从 fixed source fixtures 推进到 file-backed project-script execution boundary。当前实验路径使用 APK 内置、可审查的纯 Python project fixtures，并为每个 session 在 app-private siftalphax/projects/<sessionId> 下建立独立 staging root。
+
+R 接收显式的 Project Execution Specification：project identity、execution root、relative entrypoint、relative working directory、CPython runtime kind、session identity 和 generation。Project identity 与 Runtime Session identity 分离；R 不扫描文件、不猜测 entrypoint，也不把 SAF URI 当作普通 native path。当前不实现任意 SAF imported project 的 M ↔ R production integration。
+
+native R 重复执行 root containment、canonical path、regular-file、directory 和 symlink 校验。执行期间 cwd、TMPDIR、sys.path、sys.argv、temporary __main__ module、stdout/stderr capture 具有 session-scoped 生命周期，并在 terminal cleanup 中恢复。当前 file-backed Python 语义覆盖真实 __name__、__file__、sys.argv[0]、project-local sibling import、真实 traceback filename、SystemExit mapping、Python exception mapping、cooperative STOP 和 post-STOP re-entry。
+
+这不是 arbitrary Python project support、dependency installation、venv、native wheel、C extension interruption、universal hard-stop、并发 Runtime 或生产级 sandbox。alpha30 的状态是 source/CI ready for real-device acceptance；真实设备需要验证 PROJECT A/B/C、namespace isolation、SystemExit 和 STOP 后 re-entry。

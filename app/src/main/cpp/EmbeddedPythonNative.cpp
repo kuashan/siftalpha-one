@@ -3,17 +3,24 @@
 #include <jni.h>
 #include <android/log.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <cerrno>
 #include <exception>
+#include <fstream>
+#include <iterator>
+#include <limits>
 #include <limits.h>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -22,6 +29,7 @@ namespace {
 
 constexpr char kLogTag[] = "SiftAlphaX";
 constexpr std::size_t kOutputLimit = 32 * 1024;
+constexpr std::size_t kSourceLimit = 8 * 1024 * 1024;
 
 enum class SessionState {
     IDLE,
@@ -69,6 +77,8 @@ const char* resultName(SessionState state) {
 enum class RuntimePhase {
     IDLE,
     SESSION_CREATED,
+    PROJECT_SPEC_VALIDATE_BEGIN,
+    PROJECT_SPEC_VALIDATED,
     WORKER_ENTERED,
     RUNTIME_INIT_BEGIN,
     CPYTHON_READY,
@@ -90,6 +100,10 @@ const char* runtimePhaseName(RuntimePhase phase) {
             return "IDLE";
         case RuntimePhase::SESSION_CREATED:
             return "SESSION_CREATED";
+        case RuntimePhase::PROJECT_SPEC_VALIDATE_BEGIN:
+            return "PROJECT_SPEC_VALIDATE_BEGIN";
+        case RuntimePhase::PROJECT_SPEC_VALIDATED:
+            return "PROJECT_SPEC_VALIDATED";
         case RuntimePhase::WORKER_ENTERED:
             return "WORKER_ENTERED";
         case RuntimePhase::RUNTIME_INIT_BEGIN:
@@ -252,6 +266,10 @@ std::string jsonLong(std::int64_t value) {
 
 struct SessionSnapshot {
     std::string sessionId;
+    std::string projectIdentity;
+    std::string executionRoot;
+    std::string entrypoint;
+    std::string workingDirectory;
     std::int64_t generation = 0;
     std::int64_t startedAtEpochMs = 0;
     std::int64_t finishedAtEpochMs = 0;
@@ -269,7 +287,10 @@ struct Session {
     std::mutex mutex;
     std::string sessionId;
     std::string home;
-    std::string script;
+    std::string projectIdentity;
+    std::string executionRoot;
+    std::string entrypoint;
+    std::string workingDirectory;
     std::int64_t generation = 0;
     std::int64_t startedAtEpochMs = 0;
     std::int64_t finishedAtEpochMs = 0;
@@ -386,6 +407,10 @@ SessionSnapshot snapshotData(Session* session) {
     std::lock_guard<std::mutex> lock(session->mutex);
     SessionSnapshot snapshot;
     snapshot.sessionId = session->sessionId;
+    snapshot.projectIdentity = session->projectIdentity;
+    snapshot.executionRoot = session->executionRoot;
+    snapshot.entrypoint = session->entrypoint;
+    snapshot.workingDirectory = session->workingDirectory;
     snapshot.generation = session->generation;
     snapshot.startedAtEpochMs = session->startedAtEpochMs;
     snapshot.finishedAtEpochMs = session->finishedAtEpochMs;
@@ -652,21 +677,532 @@ bool ensurePythonRuntime(const std::string& home, std::string* failure) {
     }
     return false;
 }
+std::string parentDirectory(const std::string& path) {
+    const std::size_t separator = path.find_last_of('/');
+    if (separator == std::string::npos) {
+        return {};
+    }
+    if (separator == 0) {
+        return "/";
+    }
+    return path.substr(0, separator);
+}
+
+bool pathWithin(const std::string& root, const std::string& candidate) {
+    if (root == candidate) {
+        return true;
+    }
+    return candidate.size() > root.size() &&
+        candidate.compare(0, root.size(), root) == 0 &&
+        candidate[root.size()] == '/';
+}
+
+bool validatePathComponents(
+    const std::string& path,
+    bool allowMissingLeaf,
+    bool* missingLeaf,
+    std::string* failure) {
+    if (missingLeaf != nullptr) {
+        *missingLeaf = false;
+    }
+    if (path.empty() || path.front() != '/') {
+        if (failure != nullptr) {
+            *failure = "absolute path required";
+        }
+        return false;
+    }
+
+    std::size_t position = 1;
+    std::string current = "/";
+    while (position < path.size()) {
+        while (position < path.size() && path[position] == '/') {
+            ++position;
+        }
+        if (position >= path.size()) {
+            break;
+        }
+        const std::size_t end = path.find('/', position);
+        const std::size_t componentEnd =
+            end == std::string::npos ? path.size() : end;
+        const std::string component = path.substr(position, componentEnd - position);
+        if (component.empty() || component == ".") {
+            position = componentEnd;
+            continue;
+        }
+        if (component == "..") {
+            if (failure != nullptr) {
+                *failure = "path traversal is not allowed";
+            }
+            return false;
+        }
+        if (current.size() > 1) {
+            current.append("/");
+        }
+        current.append(component);
+
+        struct stat info {};
+        if (lstat(current.c_str(), &info) != 0) {
+            if (errno == ENOENT && allowMissingLeaf && current == path) {
+                if (missingLeaf != nullptr) {
+                    *missingLeaf = true;
+                }
+                return true;
+            }
+            if (failure != nullptr) {
+                *failure = "missing or inaccessible path component: " + current;
+            }
+            return false;
+        }
+        if (S_ISLNK(info.st_mode)) {
+            if (failure != nullptr) {
+                *failure = "symlink path components are not supported: " + current;
+            }
+            return false;
+        }
+        position = componentEnd;
+    }
+    return true;
+}
+
+bool canonicalPath(const std::string& path, std::string* result) {
+    char resolved[PATH_MAX];
+    if (realpath(path.c_str(), resolved) == nullptr) {
+        return false;
+    }
+    if (result != nullptr) {
+        *result = resolved;
+    }
+    return true;
+}
+
+bool validateExecutionSpec(
+    const std::shared_ptr<Session>& session,
+    std::string* failure) {
+    setRuntimePhase(session.get(), RuntimePhase::PROJECT_SPEC_VALIDATE_BEGIN);
+    const std::string root = session->executionRoot;
+    const std::string entrypoint = session->entrypoint;
+    const std::string workingDirectory = session->workingDirectory;
+    if (root.empty() || entrypoint.empty() || workingDirectory.empty()) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=required field is empty";
+        }
+        return false;
+    }
+
+    struct stat rootInfo {};
+    if (lstat(root.c_str(), &rootInfo) != 0 || !S_ISDIR(rootInfo.st_mode)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=execution root is not a directory";
+        }
+        return false;
+    }
+
+    std::string componentFailure;
+    bool ignoredMissing = false;
+    if (!validatePathComponents(root, false, &ignoredMissing, &componentFailure)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=" + componentFailure;
+        }
+        return false;
+    }
+
+    const std::string projectsBase = parentDirectory(session->home) + "/projects";
+    struct stat projectsInfo {};
+    if (lstat(projectsBase.c_str(), &projectsInfo) != 0 ||
+        !S_ISDIR(projectsInfo.st_mode)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=staging directory is unavailable";
+        }
+        return false;
+    }
+    std::string canonicalBase;
+    std::string canonicalRoot;
+    if (!canonicalPath(projectsBase, &canonicalBase) ||
+        !canonicalPath(root, &canonicalRoot) ||
+        !pathWithin(canonicalBase, canonicalRoot)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=execution root is outside app-private staging";
+        }
+        return false;
+    }
+
+    if (entrypoint.front() != '/' || !pathWithin(root, entrypoint)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=entrypoint is outside execution root";
+        }
+        return false;
+    }
+    bool missingEntrypoint = false;
+    componentFailure.clear();
+    if (!validatePathComponents(
+            entrypoint,
+            true,
+            &missingEntrypoint,
+            &componentFailure)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=" + componentFailure;
+        }
+        return false;
+    }
+    if (missingEntrypoint) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_ENTRYPOINT_ERROR=missing entrypoint";
+        }
+        return false;
+    }
+    struct stat entrypointInfo {};
+    if (lstat(entrypoint.c_str(), &entrypointInfo) != 0 ||
+        !S_ISREG(entrypointInfo.st_mode)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_ENTRYPOINT_ERROR=entrypoint is not a regular file";
+        }
+        return false;
+    }
+    std::string canonicalEntrypoint;
+    if (!canonicalPath(entrypoint, &canonicalEntrypoint) ||
+        !pathWithin(canonicalRoot, canonicalEntrypoint)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_ENTRYPOINT_ERROR=entrypoint escapes execution root";
+        }
+        return false;
+    }
+
+    if (workingDirectory.front() != '/' ||
+        !pathWithin(root, workingDirectory)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=working directory is outside execution root";
+        }
+        return false;
+    }
+    componentFailure.clear();
+    if (!validatePathComponents(
+            workingDirectory,
+            false,
+            &ignoredMissing,
+            &componentFailure)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=" + componentFailure;
+        }
+        return false;
+    }
+    struct stat workingDirectoryInfo {};
+    if (lstat(workingDirectory.c_str(), &workingDirectoryInfo) != 0 ||
+        !S_ISDIR(workingDirectoryInfo.st_mode)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=working directory is not a directory";
+        }
+        return false;
+    }
+    std::string canonicalWorkingDirectory;
+    if (!canonicalPath(workingDirectory, &canonicalWorkingDirectory) ||
+        !pathWithin(canonicalRoot, canonicalWorkingDirectory)) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=working directory escapes execution root";
+        }
+        return false;
+    }
+
+    setRuntimePhase(session.get(), RuntimePhase::PROJECT_SPEC_VALIDATED);
+    return true;
+}
+
+bool readProjectSource(
+    const std::string& path,
+    std::string* source,
+    std::string* failure) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input.is_open()) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_ENTRYPOINT_ERROR=unable to open entrypoint";
+        }
+        return false;
+    }
+    input.seekg(0, std::ios::end);
+    const std::streamoff size = input.tellg();
+    if (size < 0 || static_cast<std::uint64_t>(size) > kSourceLimit) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_ENTRYPOINT_ERROR=entrypoint exceeds source limit";
+        }
+        return false;
+    }
+    input.seekg(0, std::ios::beg);
+    source->assign(
+        std::istreambuf_iterator<char>(input),
+        std::istreambuf_iterator<char>());
+    if (input.bad()) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_ENTRYPOINT_ERROR=unable to read entrypoint";
+        }
+        return false;
+    }
+    if (source->find('\0') != std::string::npos) {
+        if (failure != nullptr) {
+            *failure = "SIFTALPHA_X_ENTRYPOINT_ERROR=NUL byte is not valid Python source";
+        }
+        return false;
+    }
+    return true;
+}
+
+class ScopedEnvironmentVariable {
+public:
+    ScopedEnvironmentVariable(const char* name, const std::string& value)
+        : name_(name) {
+        const char* previous = getenv(name);
+        if (previous != nullptr) {
+            hadPrevious_ = true;
+            previous_ = previous;
+        }
+        setenv(name, value.c_str(), 1);
+    }
+
+    ~ScopedEnvironmentVariable() {
+        if (hadPrevious_) {
+            setenv(name_.c_str(), previous_.c_str(), 1);
+        } else {
+            unsetenv(name_.c_str());
+        }
+    }
+
+private:
+    std::string name_;
+    std::string previous_;
+    bool hadPrevious_ = false;
+};
+
+bool dictSetUnicode(PyObject* dictionary, const char* key, const std::string& value) {
+    PyObject* object = PyUnicode_FromString(value.c_str());
+    if (object == nullptr) {
+        return false;
+    }
+    const int result = PyDict_SetItemString(dictionary, key, object);
+    Py_DECREF(object);
+    return result == 0;
+}
+
+bool dictSetNone(PyObject* dictionary, const char* key) {
+    return PyDict_SetItemString(dictionary, key, Py_None) == 0;
+}
+
+bool installExecutionMain(
+    PyObject* sysModule,
+    PyObject** originalMain,
+    PyObject** executionMain,
+    PyObject** globals) {
+    PyObject* modules = PyObject_GetAttrString(sysModule, "modules");
+    if (modules == nullptr || !PyDict_Check(modules)) {
+        Py_XDECREF(modules);
+        return false;
+    }
+
+    *originalMain = PyDict_GetItemString(modules, "__main__");
+    Py_XINCREF(*originalMain);
+    *executionMain = PyModule_New("__main__");
+    if (*executionMain == nullptr) {
+        Py_DECREF(modules);
+        return false;
+    }
+    if (PyDict_SetItemString(modules, "__main__", *executionMain) != 0) {
+        Py_DECREF(modules);
+        Py_DECREF(*executionMain);
+        *executionMain = nullptr;
+        Py_XDECREF(*originalMain);
+        *originalMain = nullptr;
+        return false;
+    }
+
+    *globals = PyModule_GetDict(*executionMain);
+    const bool initialized =
+        *globals != nullptr &&
+        dictSetUnicode(*globals, "__name__", "__main__") &&
+        dictSetNone(*globals, "__package__") &&
+        dictSetNone(*globals, "__loader__") &&
+        dictSetNone(*globals, "__spec__") &&
+        dictSetNone(*globals, "__cached__") &&
+        PyDict_SetItemString(*globals, "__builtins__", PyEval_GetBuiltins()) == 0;
+    Py_DECREF(modules);
+    return initialized;
+}
+
+bool initializeExecutionGlobals(
+    PyObject* globals,
+    const std::string& entrypoint) {
+    return globals != nullptr &&
+        dictSetUnicode(globals, "__file__", entrypoint);
+}
+
+bool configureExecutionSys(
+    PyObject* sysModule,
+    PyObject* originalPath,
+    PyObject* originalArgv,
+    const std::string& executionRoot,
+    const std::string& entrypoint) {
+    PyObject* newPath = PySequence_List(originalPath);
+    if (newPath == nullptr) {
+        return false;
+    }
+    const std::string entrypointDirectory = parentDirectory(entrypoint);
+    PyObject* entrypointDirectoryObject =
+        PyUnicode_FromString(entrypointDirectory.c_str());
+    PyObject* executionRootObject =
+        PyUnicode_FromString(executionRoot.c_str());
+    bool success =
+        entrypointDirectoryObject != nullptr &&
+        executionRootObject != nullptr &&
+        PyList_Insert(newPath, 0, executionRootObject) == 0 &&
+        PyList_Insert(newPath, 0, entrypointDirectoryObject) == 0;
+    Py_XDECREF(entrypointDirectoryObject);
+    Py_XDECREF(executionRootObject);
+    if (success) {
+        success = PyObject_SetAttrString(sysModule, "path", newPath) == 0;
+    }
+    Py_DECREF(newPath);
+    if (!success) {
+        return false;
+    }
+
+    PyObject* newArgv = PyList_New(1);
+    if (newArgv == nullptr) {
+        return false;
+    }
+    PyObject* entrypointObject = PyUnicode_FromString(entrypoint.c_str());
+    if (entrypointObject == nullptr) {
+        Py_DECREF(newArgv);
+        return false;
+    }
+    PyList_SET_ITEM(newArgv, 0, entrypointObject);
+    success = PyObject_SetAttrString(sysModule, "argv", newArgv) == 0;
+    Py_DECREF(newArgv);
+    return success;
+}
+
+void restoreExecutionMain(
+    PyObject* sysModule,
+    PyObject* originalMain) {
+    PyObject* modules = PyObject_GetAttrString(sysModule, "modules");
+    if (modules != nullptr && PyDict_Check(modules)) {
+        if (originalMain != nullptr) {
+            PyDict_SetItemString(modules, "__main__", originalMain);
+        } else {
+            PyDict_DelItemString(modules, "__main__");
+        }
+    }
+    Py_XDECREF(modules);
+    if (PyErr_Occurred()) {
+        PyErr_Clear();
+    }
+}
+
+void clearProjectModules(PyObject* modules, const std::string& projectsBase) {
+    if (modules == nullptr || !PyDict_Check(modules)) {
+        return;
+    }
+    PyObject* keys = PyDict_Keys(modules);
+    if (keys == nullptr) {
+        PyErr_Clear();
+        return;
+    }
+    const Py_ssize_t keyCount = PyList_Size(keys);
+    for (Py_ssize_t index = 0; index < keyCount; ++index) {
+        PyObject* key = PyList_GetItem(keys, index);
+        PyObject* module = PyDict_GetItem(modules, key);
+        if (module == nullptr) {
+            continue;
+        }
+        PyObject* moduleFile = PyObject_GetAttrString(module, "__file__");
+        if (moduleFile != nullptr && PyUnicode_Check(moduleFile)) {
+            const char* fileName = PyUnicode_AsUTF8(moduleFile);
+            if (fileName != nullptr && pathWithin(projectsBase, fileName)) {
+                PyDict_DelItem(modules, key);
+                PyErr_Clear();
+            }
+        }
+        Py_XDECREF(moduleFile);
+        PyErr_Clear();
+    }
+    Py_DECREF(keys);
+}
+
+bool consumeSystemExit(
+    PyObject* stderrCapture,
+    int* exitCode) {
+    if (!PyErr_ExceptionMatches(PyExc_SystemExit)) {
+        return false;
+    }
+
+    PyObject* exceptionType = nullptr;
+    PyObject* exceptionValue = nullptr;
+    PyObject* traceback = nullptr;
+    PyErr_Fetch(&exceptionType, &exceptionValue, &traceback);
+    PyErr_NormalizeException(&exceptionType, &exceptionValue, &traceback);
+
+    PyObject* codeObject = exceptionValue == nullptr
+        ? nullptr
+        : PyObject_GetAttrString(exceptionValue, "code");
+    if (codeObject == nullptr) {
+        PyErr_Clear();
+    }
+
+    bool integerCode = codeObject == nullptr || codeObject == Py_None;
+    long requestedCode = 0;
+    if (!integerCode) {
+        if (PyLong_Check(codeObject)) {
+            requestedCode = PyLong_AsLong(codeObject);
+            if (PyErr_Occurred()) {
+                PyErr_Clear();
+                integerCode = false;
+            }
+        } else {
+            integerCode = false;
+        }
+    }
+    if (integerCode) {
+        if (requestedCode > std::numeric_limits<int>::max() ||
+            requestedCode < std::numeric_limits<int>::min()) {
+            *exitCode = 1;
+        } else {
+            *exitCode = static_cast<int>(requestedCode);
+        }
+    } else {
+        *exitCode = 1;
+        if (stderrCapture != nullptr) {
+            PyFile_WriteObject(
+                codeObject == nullptr ? Py_None : codeObject,
+                stderrCapture,
+                Py_PRINT_RAW);
+            PyFile_WriteString("\n", stderrCapture);
+            PyErr_Clear();
+        }
+    }
+
+    Py_XDECREF(codeObject);
+    Py_XDECREF(exceptionType);
+    Py_XDECREF(exceptionValue);
+    Py_XDECREF(traceback);
+    return true;
+}
+
 void runSession(const std::shared_ptr<Session>& session) {
     setRuntimePhase(session.get(), RuntimePhase::WORKER_ENTERED);
     __android_log_print(ANDROID_LOG_INFO, kLogTag,
                         "SIFTALPHA_X_ENGINE=CPYTHON SIFTALPHA_X_TERMUX=NOT_USED "
                         "SIFTALPHA_X_RUN_COMMAND=NOT_USED SIFTALPHA_X_PROOT=NOT_USED "
                         "SIFTALPHA_X_UBUNTU=NOT_USED SIFTALPHA_X_ABI=arm64-v8a "
-                        "SIFTALPHA_X_PYTHON_VERSION=3.14.7 SIFTALPHA_X_SESSION_ID=%s "
-                        "SIFTALPHA_X_GENERATION=%lld",
+                        "SIFTALPHA_X_PYTHON_VERSION=3.14.7 SIFTALPHA_X_PROJECT_ID=%s "
+                        "SIFTALPHA_X_EXECUTION_ROOT=%s SIFTALPHA_X_ENTRYPOINT=%s "
+                        "SIFTALPHA_X_WORKING_DIRECTORY=%s "
+                        "SIFTALPHA_X_SESSION_ID=%s SIFTALPHA_X_GENERATION=%lld",
+                        session->projectIdentity.c_str(),
+                        session->executionRoot.c_str(),
+                        session->entrypoint.c_str(),
+                        session->workingDirectory.c_str(),
                         session->sessionId.c_str(),
                         static_cast<long long>(session->generation));
 
     std::string tmpDirectory = session->home + "/tmp";
     mkdir(tmpDirectory.c_str(), 0700);
-    setenv("TMPDIR", tmpDirectory.c_str(), 1);
-    WorkingDirectoryGuard workingDirectory(session->home);
+    ScopedEnvironmentVariable temporaryDirectory("TMPDIR", tmpDirectory);
+    WorkingDirectoryGuard workingDirectory(session->workingDirectory);
     auto finishBeforePython = [&](const std::string& message) {
         workingDirectory.restore();
         setFailure(session.get(), message);
@@ -676,7 +1212,19 @@ void runSession(const std::shared_ptr<Session>& session) {
         setRuntimePhase(session.get(), RuntimePhase::WORKER_EXIT);
     };
     if (!workingDirectory.changed()) {
-        finishBeforePython("SIFTALPHA_X_CWD_ERROR=unable to enter app-private runtime directory");
+        finishBeforePython("SIFTALPHA_X_CWD_ERROR=unable to enter project working directory");
+        return;
+    }
+
+    std::string specFailure;
+    if (!validateExecutionSpec(session, &specFailure)) {
+        finishBeforePython(specFailure);
+        return;
+    }
+
+    std::string source;
+    if (!readProjectSource(session->entrypoint, &source, &specFailure)) {
+        finishBeforePython(specFailure);
         return;
     }
 
@@ -688,8 +1236,6 @@ void runSession(const std::shared_ptr<Session>& session) {
     }
     setRuntimePhase(session.get(), RuntimePhase::CPYTHON_READY);
 
-    // PyGILState_Ensure() hangs during finalization in CPython 3.14. Guard the
-    // only supported process-lifetime model before entering the blocking API.
     if (Py_IsFinalizing()) {
         finishBeforePython("SIFTALPHA_X_CPYTHON_RUNTIME_FINALIZING");
         return;
@@ -710,71 +1256,180 @@ void runSession(const std::shared_ptr<Session>& session) {
     PyObject* originalStderr = nullptr;
     PyObject* capturedStdout = nullptr;
     PyObject* capturedStderr = nullptr;
-    bool captureInstalled = sysModule != nullptr && ioModule != nullptr &&
-        installCapture(sysModule, ioModule, &originalStdout, &originalStderr,
-                       &capturedStdout, &capturedStderr);
+    const bool captureInstalled = sysModule != nullptr &&
+        ioModule != nullptr &&
+        installCapture(
+            sysModule,
+            ioModule,
+            &originalStdout,
+            &originalStderr,
+            &capturedStdout,
+            &capturedStderr);
 
     SessionState terminalState = SessionState::FAILED;
     int terminalExitCode = 1;
     std::string stdoutText;
     std::string stderrText;
     std::string failureMessage;
+    PyObject* sysModules = nullptr;
+    PyObject* originalPath = nullptr;
+    PyObject* originalArgv = nullptr;
+    PyObject* originalMain = nullptr;
+    PyObject* executionMain = nullptr;
+    PyObject* globals = nullptr;
+    bool mainInstalled = false;
+    bool executionContextReady = false;
+
     if (!captureInstalled) {
-        appendPythonTraceback();
+        if (PyErr_Occurred()) {
+            appendPythonTraceback();
+        }
         failureMessage = "SIFTALPHA_X_CAPTURE_ERROR=unable to install stdout/stderr capture";
     } else if (session->stopRequested.load(std::memory_order_acquire)) {
         terminalState = SessionState::STOPPED;
         terminalExitCode = 130;
     } else {
-        setState(session.get(), SessionState::RUNNING);
-        setRuntimePhase(session.get(), RuntimePhase::RUNNING);
-        setRuntimePhase(session.get(), RuntimePhase::PYTHON_EXEC_BEGIN);
-        PyObject* mainModule = PyImport_AddModule("__main__");
-        PyObject* mainDict = mainModule == nullptr ? nullptr : PyModule_GetDict(mainModule);
-        PyObject* result = mainDict == nullptr
-            ? nullptr
-            : PyRun_StringFlags(session->script.c_str(), Py_file_input, mainDict, mainDict, nullptr);
-        setRuntimePhase(session.get(), RuntimePhase::PYTHON_EXEC_END);
-        const bool controlledStop = session->stopDelivered.load(std::memory_order_acquire);
-        if (result != nullptr) {
-            Py_DECREF(result);
-        } else if (controlledStop) {
-            // A SiftAlpha STOP-induced KeyboardInterrupt is a controlled stop, not a
-            // user-code failure. Clear it without printing a traceback.
-            PyErr_Clear();
+        sysModules = PyObject_GetAttrString(sysModule, "modules");
+        originalPath = PyObject_GetAttrString(sysModule, "path");
+        originalArgv = PyObject_GetAttrString(sysModule, "argv");
+        if (sysModules == nullptr || originalPath == nullptr || originalArgv == nullptr) {
+            if (PyErr_Occurred()) {
+                appendPythonTraceback();
+            }
+            failureMessage = "SIFTALPHA_X_CONTEXT_ERROR=unable to read Python execution context";
         } else {
-            appendPythonTraceback();
-        }
+            const std::string projectsBase = parentDirectory(session->home) + "/projects";
+            clearProjectModules(sysModules, projectsBase);
+            mainInstalled = installExecutionMain(
+                sysModule,
+                &originalMain,
+                &executionMain,
+                &globals);
+            executionContextReady = mainInstalled &&
+                configureExecutionSys(
+                    sysModule,
+                    originalPath,
+                    originalArgv,
+                    session->executionRoot,
+                    session->entrypoint) &&
+                initializeExecutionGlobals(globals, session->entrypoint);
+            if (!executionContextReady) {
+                if (PyErr_Occurred()) {
+                    appendPythonTraceback();
+                }
+                failureMessage = "SIFTALPHA_X_CONTEXT_ERROR=unable to prepare isolated Python namespace";
+            } else {
+                setState(session.get(), SessionState::RUNNING);
+                setRuntimePhase(session.get(), RuntimePhase::RUNNING);
+                setRuntimePhase(session.get(), RuntimePhase::PYTHON_EXEC_BEGIN);
+                PyObject* filename = PyUnicode_FromString(session->entrypoint.c_str());
+                PyObject* code = filename == nullptr
+                    ? nullptr
+                    : Py_CompileStringObject(
+                        source.c_str(),
+                        filename,
+                        Py_file_input,
+                        nullptr,
+                        -1);
+                Py_XDECREF(filename);
+                PyObject* result = code == nullptr
+                    ? nullptr
+                    : PyEval_EvalCode(code, globals, globals);
+                Py_XDECREF(code);
+                setRuntimePhase(session.get(), RuntimePhase::PYTHON_EXEC_END);
 
-        stdoutText = stringIoValue(capturedStdout);
-        stderrText = stringIoValue(capturedStderr);
-        if (controlledStop) {
-            stderrText = boundedOutput(stderrText + "SIFTALPHA_X_STOP=COOPERATIVE\n");
-            terminalState = SessionState::STOPPED;
-            terminalExitCode = 130;
-        } else if (result != nullptr) {
-            terminalState = SessionState::SUCCEEDED;
-            terminalExitCode = 0;
-        } else {
-            terminalState = SessionState::FAILED;
-            terminalExitCode = 1;
+                const bool controlledStop =
+                    session->stopDelivered.load(std::memory_order_acquire);
+                int systemExitCode = 1;
+                const bool systemExit =
+                    result == nullptr &&
+                    consumeSystemExit(capturedStderr, &systemExitCode);
+                if (result != nullptr) {
+                    terminalState = controlledStop
+                        ? SessionState::STOPPED
+                        : SessionState::SUCCEEDED;
+                    terminalExitCode = controlledStop ? 130 : 0;
+                    Py_DECREF(result);
+                } else if (controlledStop) {
+                    PyErr_Clear();
+                    terminalState = SessionState::STOPPED;
+                    terminalExitCode = 130;
+                } else if (systemExit) {
+                    terminalState = systemExitCode == 0
+                        ? SessionState::SUCCEEDED
+                        : SessionState::FAILED;
+                    terminalExitCode = systemExitCode;
+                } else {
+                    appendPythonTraceback();
+                    terminalState = SessionState::FAILED;
+                    terminalExitCode = 1;
+                }
+
+                stdoutText = stringIoValue(capturedStdout);
+                stderrText = stringIoValue(capturedStderr);
+                if (controlledStop) {
+                    stderrText = boundedOutput(
+                        stderrText + "SIFTALPHA_X_STOP=COOPERATIVE\n");
+                }
+            }
         }
     }
 
-    restoreCapture(sysModule, originalStdout, originalStderr, capturedStdout, capturedStderr);
+    if (captureInstalled) {
+        if (sysModules != nullptr) {
+            clearProjectModules(
+                sysModules,
+                parentDirectory(session->home) + "/projects");
+        }
+        if (originalPath != nullptr) {
+            PyObject_SetAttrString(sysModule, "path", originalPath);
+        }
+        if (originalArgv != nullptr) {
+            PyObject_SetAttrString(sysModule, "argv", originalArgv);
+        }
+        if (mainInstalled) {
+            restoreExecutionMain(sysModule, originalMain);
+        }
+        if (stdoutText.empty() && capturedStdout != nullptr) {
+            stdoutText = stringIoValue(capturedStdout);
+        }
+        if (stderrText.empty() && capturedStderr != nullptr) {
+            stderrText = stringIoValue(capturedStderr);
+        }
+    }
+    if (!failureMessage.empty()) {
+        stderrText = boundedOutput(stderrText + failureMessage + "\n");
+    }
+    Py_XDECREF(sysModules);
+    Py_XDECREF(originalPath);
+    Py_XDECREF(originalArgv);
+    Py_XDECREF(originalMain);
+    Py_XDECREF(executionMain);
+    restoreCapture(
+        sysModule,
+        originalStdout,
+        originalStderr,
+        capturedStdout,
+        capturedStderr);
     Py_XDECREF(sysModule);
     Py_XDECREF(ioModule);
+    if (PyErr_Occurred()) {
+        PyErr_Clear();
+    }
+
     session->pythonReady.store(false, std::memory_order_release);
     setRuntimePhase(session.get(), RuntimePhase::GIL_RELEASE_BEGIN);
     PyGILState_Release(pythonGilState);
     setRuntimePhase(session.get(), RuntimePhase::GIL_RELEASED);
+    session->pythonThreadId.store(0, std::memory_order_release);
     workingDirectory.restore();
 
-    if (!failureMessage.empty()) {
-        setFailure(session.get(), failureMessage);
-    } else {
-        finishSession(session.get(), terminalState, terminalExitCode, stdoutText, stderrText);
-    }
+    finishSession(
+        session.get(),
+        terminalState,
+        terminalExitCode,
+        stdoutText,
+        stderrText);
     setRuntimePhase(session.get(), RuntimePhase::TERMINAL);
     publishTerminalSession(session);
     logSessionResult(session.get());
@@ -784,6 +1439,10 @@ void runSession(const std::shared_ptr<Session>& session) {
 std::string snapshotJson(const SessionSnapshot& snapshot) {
     std::string json = "{";
     json += "\"sessionId\":" + jsonString(snapshot.sessionId);
+    json += ",\"projectIdentity\":" + jsonString(snapshot.projectIdentity);
+    json += ",\"executionRoot\":" + jsonString(snapshot.executionRoot);
+    json += ",\"entrypoint\":" + jsonString(snapshot.entrypoint);
+    json += ",\"workingDirectory\":" + jsonString(snapshot.workingDirectory);
     json += ",\"generation\":" + jsonLong(snapshot.generation);
     json += ",\"state\":" + jsonString(stateName(snapshot.state));
     json += ",\"runtimePhase\":" + jsonString(runtimePhaseName(snapshot.runtimePhase));
@@ -871,13 +1530,21 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeStart(
     JNIEnv* env,
     jclass,
     jstring home,
-    jstring script,
+    jstring projectIdentity,
+    jstring executionRoot,
+    jstring entrypoint,
+    jstring workingDirectory,
     jstring sessionId,
     jlong generation) {
     const std::string homePath = jstringToUtf8(env, home);
-    const std::string scriptText = jstringToUtf8(env, script);
+    const std::string projectId = jstringToUtf8(env, projectIdentity);
+    const std::string rootPath = jstringToUtf8(env, executionRoot);
+    const std::string entrypointPath = jstringToUtf8(env, entrypoint);
+    const std::string workingDirectoryPath = jstringToUtf8(env, workingDirectory);
     const std::string id = jstringToUtf8(env, sessionId);
-    if (homePath.empty() || scriptText.empty() || id.empty() || generation <= 0) {
+    if (homePath.empty() || projectId.empty() || rootPath.empty() ||
+        entrypointPath.empty() || workingDirectoryPath.empty() ||
+        id.empty() || generation <= 0) {
         return JNI_FALSE;
     }
 
@@ -904,7 +1571,10 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeStart(
         session = std::make_shared<Session>();
         session->sessionId = id;
         session->home = homePath;
-        session->script = scriptText;
+        session->projectIdentity = projectId;
+        session->executionRoot = rootPath;
+        session->entrypoint = entrypointPath;
+        session->workingDirectory = workingDirectoryPath;
         session->generation = static_cast<std::int64_t>(generation);
         session->startedAtEpochMs = nowEpochMillis();
         session->state = SessionState::STARTING;

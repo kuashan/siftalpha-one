@@ -21,6 +21,8 @@ enum class EmbeddedPythonState {
 enum class EmbeddedPythonRuntimePhase {
     IDLE,
     SESSION_CREATED,
+    PROJECT_SPEC_VALIDATE_BEGIN,
+    PROJECT_SPEC_VALIDATED,
     WORKER_ENTERED,
     RUNTIME_INIT_BEGIN,
     CPYTHON_READY,
@@ -61,6 +63,10 @@ enum class EmbeddedPythonStopResult {
 
 data class EmbeddedPythonSnapshot(
     val sessionId: String = "",
+    val projectIdentity: String = "",
+    val executionRoot: String = "",
+    val entrypoint: String = "",
+    val workingDirectory: String = "",
     val generation: Long = 0L,
     val state: EmbeddedPythonState = EmbeddedPythonState.IDLE,
     val runtimePhase: EmbeddedPythonRuntimePhase = EmbeddedPythonRuntimePhase.IDLE,
@@ -102,6 +108,10 @@ object EmbeddedPythonSnapshotParser {
         }
         return EmbeddedPythonSnapshot(
             sessionId = json.stringOrEmpty("sessionId"),
+            projectIdentity = json.stringOrEmpty("projectIdentity"),
+            executionRoot = json.stringOrEmpty("executionRoot"),
+            entrypoint = json.stringOrEmpty("entrypoint"),
+            workingDirectory = json.stringOrEmpty("workingDirectory"),
             generation = json.longOrDefault("generation", 0L),
             state = state,
             runtimePhase = runtimePhase,
@@ -137,6 +147,10 @@ object EmbeddedPythonDiagnosticText {
         "SIFTALPHA_X_ENGINE=CPYTHON",
         "SIFTALPHA_X_TERMUX=NOT_USED",
         "SIFTALPHA_X_PROOT=NOT_USED",
+        "SIFTALPHA_X_PROJECT_ID=${snapshot.projectIdentity.ifBlank { "-" }}",
+        "SIFTALPHA_X_EXECUTION_ROOT=${snapshot.executionRoot.ifBlank { "-" }}",
+        "SIFTALPHA_X_ENTRYPOINT=${snapshot.entrypoint.ifBlank { "-" }}",
+        "SIFTALPHA_X_WORKING_DIRECTORY=${snapshot.workingDirectory.ifBlank { "-" }}",
         "SIFTALPHA_X_SESSION_ID=${snapshot.sessionId.ifBlank { "-" }}",
         "SIFTALPHA_X_GENERATION=${snapshot.generation}",
         "SIFTALPHA_X_STATE=${snapshot.state}",

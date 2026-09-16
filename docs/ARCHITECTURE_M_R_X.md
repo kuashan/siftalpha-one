@@ -1,9 +1,9 @@
 # SiftAlpha M / R / X Architecture Definition
 
 最后更新：2026-09-16  
-适用源码基线：`a5691fff049a6be25ccade78f1ef23ce869543bf`  
+alpha30 实现起始基线：`36b0175248a491b85560d68fcfd12889dbf5d0d7`  
 工作分支：`codex/siftalpha-x-embedded-cpython-spike`  
-当前 Runtime prototype：`versionCode 105` / `versionName 0.8.0-alpha29`
+当前 Runtime prototype：`versionCode 106` / `versionName 0.8.0-alpha30`
 
 本文件是 SiftAlpha M / R / X 的规范架构定义。它取代当前术语中的：
 
@@ -141,6 +141,34 @@ alpha29 分支中的 Embedded CPython prototype 具有以下源码边界：
 - `EmbeddedPythonScripts` 只提供固定、可审查的 A/B/C 脚本；prototype 当前不接受任意项目代码、SAF imported project 或依赖安装；
 - `EmbeddedPythonBridge` 与 production `RuntimeCommandHost`、`TermuxBackend`、`RuntimeAdapter` hierarchy 保持隔离；
 - 因此 alpha29 证明的是 Embedded CPython Runtime prototype 的当前生命周期测试范围，不是“整个 R 已完成”，也不是 M ↔ R production integration 已完成。
+
+## 4.1 R Project Script Execution Boundary（alpha30）
+
+alpha30 在实验性 Embedded CPython 路径建立了最小的 file-backed Python project-script execution boundary。它是 SiftAlpha R 的当前实现增量，不表示任意 Python 项目、完整导入或生产 M ↔ R 集成已经完成。
+
+### 4.1.1 显式 Project Execution Specification
+
+每次执行由明确的 Project Execution Specification 描述：project identity、app-private execution root、relative entrypoint、relative working directory、runtime kind、session identity 和 generation。R 执行这个显式 target，不扫描或猜测用户想运行的文件。Project identity 与 Runtime Session identity 分离；同一项目的每次运行都创建新的 session/generation。
+
+当前实验页面使用 APK 内置的可审查 project fixtures。M/experimental controller 将 fixture materialize 到 app-private 的 siftalphax/projects/<sessionId> 目录，再把绝对 staging paths 连同其他 spec facts 交给 Embedded R。SAF URI 不直接伪装成 native filesystem path；任意 SAF imported-project integration 不在 alpha30 范围内。
+
+### 4.1.2 Root、entrypoint 与 working directory
+
+R 要求 execution root 是 app-private staging root 的目录；entrypoint 必须是 root 内的 regular file；working directory 必须是 root 内的目录。Kotlin boundary 拒绝 absolute/traversal relative values，native boundary 再做 canonical containment、parent-component、regular-file、directory 和 symlink checks。缺少 entrypoint 会成为带有明确诊断的 FAILED terminal result；不会 fallback 到其他 Python 文件。
+
+working directory 是本次 session 的 cwd，不使用 Android app process 的默认 cwd。native execution 临时切换到该目录，并在 session 结束时恢复原 cwd；当前仍保持 single active session，因此不宣称并发 cwd 安全。TMPDIR 同样在 session 内临时设置并恢复。
+
+### 4.1.3 Python file execution semantics
+
+R 从 staged entrypoint 读取 source bytes，以真实 entrypoint filename 编译，再用独立的 temporary __main__ module 和 globals 执行。__name__ 是 __main__，__file__ 是 entrypoint absolute path，sys.argv[0] 是 entrypoint，sys.path 在执行期间把 entrypoint directory 和 execution root 放在前面，因此当前 scope 支持 project-local sibling imports。执行后恢复原来的 sys.path、sys.argv、sys.modules[__main__]、stdout 和 stderr。
+
+每个 session 都新建 __main__ namespace，并清理位于 app-private project staging base 下的 project modules，避免 tested fixture 的 helper module 或 globals 泄漏到下一 session。stdout/stderr 仍由当前 Session 捕获并绑定到 session ID/generation；uncaught exception 的 traceback 使用真实 entrypoint filename，而不是 <string>。
+
+normal completion 与 SystemExit(0) 映射为 SUCCEEDED/exitCode 0；SystemExit(nonzero) 映射为 FAILED 并保留可表示的非零 exit code；普通 Python exception 映射为 FAILED/exitCode 1 并保留 traceback；alpha29 的 cooperative STOP 仍映射为 STOPPED/exitCode 130，并不把受控 KeyboardInterrupt 显示成普通 FAILED traceback。每条路径都恢复 Python capture/context，随后允许新的 CPython session re-entry。
+
+### 4.1.4 当前边界
+
+alpha30 的实现和 fixtures 只覆盖 app-private、file-backed、pure-Python project script execution。它没有实现 pip、requirements/pyproject dependency installation、venv、native wheels、arbitrary C extensions、blocking native/syscall hard-stop、SAF project import through R、并发 sessions、production sandbox 或 M ↔ R production integration。STOP 仍是 cooperative / limited interruption behavior，不是 universal hard-stop。
 
 ## 5. Runtime Provider 与 SiftAlpha R
 
@@ -361,10 +389,12 @@ alpha29 不表示 R 已完成，也不表示 X 已达到 acceptance。以下能�
 
 ## 12. 当前变更边界与维护规则
 
-本轮是 architecture/documentation consolidation：
+alpha30 在保留 alpha29 lifecycle acceptance 的前提下，增加了实验性 file-backed project-script boundary。当前文档记录的是 source/CI readiness；真实 Android device acceptance 仍需单独执行。
 
-- 保持 `versionCode=105`、`versionName=0.8.0-alpha29`；
-- 不修改 production Runtime、Embedded CPython、cooperative STOP、JNI、Session lifecycle、Runtime Identity、Web Discovery、Termux path 或 workflow；
+本轮变更边界：
+
+- 当前版本为 `versionCode=106`、`versionName=0.8.0-alpha30`；alpha29 real-device evidence 仍作为历史 accepted baseline 保留；
+- 不修改 production Termux Runtime path、Runtime Identity、Web Discovery 或 M ↔ R production integration；Embedded CPython/JNI/Session 的 alpha30 变更仅属于实验性 R project-script boundary；
 - 不实现 M ↔ R integration，不开始 project import、dependency、SAF、Web、Browser、PRoot 或 Node 新功能；
 - alpha29 real-device evidence 是 user-confirmed evidence，与 CI/build evidence 分开；
 - 新的行为变化、生产实现和真机验收应在后续任务中单独记录。

@@ -16,13 +16,13 @@
 
 本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
 
-## A. 当前 alpha29 版本信息
+## A. 当前 alpha30 版本信息
 
-- 当前 Runtime prototype 版本：`0.8.0-alpha29`
-- versionCode：`105`
+- 当前 Runtime prototype 版本：`0.8.0-alpha30`
+- versionCode：`106`
 - 包名：`com.siftalpha.studio`
 - 当前 docs/runtime prototype branch：`codex/siftalpha-x-embedded-cpython-spike`
-- source HEAD：`a5691fff049a6be25ccade78f1ef23ce869543bf`
+- alpha30 implementation starting HEAD：`36b0175248a491b85560d68fcfd12889dbf5d0d7`
 - main HEAD：`dff275575a9cdbd0564d394c4626cd7d9bb22637`
 - canonical architecture：[ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)
 - GitHub Actions [Run #80](https://github.com/kuashan/siftalpha-one/actions/runs/35060381162)，Run ID `35060381162`；artifact `siftalpha-w0-80`（ID `10432576095`），digest `sha256:94cf4d1ead49e8500f9b2467765a983b8e0164be354c1e59083670763945eaba`。
@@ -281,3 +281,19 @@ Coordinator 不是一次性大规模 UI 重构的要求，而是渐进实现该 
 如果当前只允许再做一个开发任务，优先完成 **Runtime Session Ownership Boundary**。它直接补齐当前最重要的 correctness/ownership 缺口，并为后续 Web candidate 清理、Recovery、Restart 和 coordinator 抽取提供统一边界；`V04Activity` 过大是后续结构表现，不是第一理由。
 
 当前结论：当前产品基线已经形成，但 `Project → Runtime Session → Web Candidate` 的 ownership chain 尚未完整闭合；这属于普通的产品 backlog / hardening，不再使用阶段完成或阻塞语义。未来 Roadmap 尚待重新定义。
+
+
+## I. alpha30 R Project Script Execution Boundary
+
+| ID | 场景 | 期望 | 状态 |
+|---|---|---|---|
+| R-14 | Project Execution Specification validation | 明确 project identity、app-private execution root、entrypoint、working directory、runtime kind、session/generation；拒绝 traversal/absolute relative target | unit-test source added；CI pending |
+| R-15 | File-backed PROJECT A | SUCCEEDED/exitCode 0；project-local helper import；真实 __name__、__file__、cwd、sys.argv[0] | instrumentation source added；未执行 |
+| R-16 | File-backed PROJECT B | FAILED；保留 stdout/stderr；exitCode 1；traceback 含真实 main.py，不含 <string> | instrumentation source added；未执行 |
+| R-17 | File-backed PROJECT C cooperative STOP | RUNNING → STOPPED/exitCode 130；STOP diagnostics 保留；stdout/stderr cleanup 正确 | instrumentation source added；未执行 |
+| R-18 | PROJECT D namespace/module isolation | 新 Session 不继承前一 Session 的 __main__ global 或 helper module | instrumentation source added；未执行 |
+| R-19 | SystemExit mapping | SystemExit(0) → SUCCEEDED/0；SystemExit(7) → FAILED/7；Runtime 可继续 re-entry | instrumentation source added；未执行 |
+| R-20 | Post-STOP project re-entry | STOP terminal cleanup 后新 session/generation 可再次执行 PROJECT A | instrumentation source added；未执行 |
+| R-21 | alpha30 real-device acceptance | 不重启 App：PROJECT A → PROJECT B → PROJECT C RUNNING → STOPPED/130 → PROJECT D/E/F as needed → PROJECT A again；session IDs 不复用、generation 单调 | 待 alpha30 真机 |
+
+alpha30 的 instrumentation tests 已加入源码，但当前 workflow 没有 Android emulator/device；没有将这些行标记为 real-device PASS。alpha29 H 节的真实设备证据仍是 accepted baseline，不被 alpha30 source/CI status 替代。

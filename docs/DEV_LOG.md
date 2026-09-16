@@ -514,3 +514,38 @@ SiftAlpha X 的第一项工程工作是 Runtime Architecture Audit，而不是�
 现有 production `RuntimeWebStateStore` 的 projectKey-only candidate ownership 仍是重要的 M/R hardening backlog；它应与未来 M ↔ R Session facts contract 协调，但本轮不实现。
 
 本次文档 consolidation 没有修改生产行为或版本，没有创建 PR、merge、tag、release。
+
+
+## 2026-09-16 · R Project Script Execution Boundary — alpha30
+
+### 目标
+
+在不修改生产 Termux-based External Runtime Provider 的前提下，让 SiftAlpha R 的 Embedded CPython prototype 从 fixed built-in source 进入明确的 file-backed Python project-script boundary。
+
+### 实施结果
+
+- 版本从 0.8.0-alpha29 / versionCode 105 升级为 0.8.0-alpha30 / versionCode 106。
+- 增加显式 Project Execution Specification：project identity、execution root、entrypoint、working directory、runtime kind、session identity 和 generation。
+- APK 内置可重复的 project A/B/C/D/SystemExit fixtures；每次执行先 materialize 到 app-private siftalphax/projects/<sessionId> staging root。
+- Embedded R native boundary 重复校验 staging containment、canonical path、symlink、regular-file、working-directory 和 source size/NUL 限制；缺少 entrypoint 产生明确 FAILED 结果，不静默 fallback。
+- 真实文件 source 通过 CPython compile/eval 执行，建立临时 __main__ namespace，设置真实 __file__、__name__、sys.argv[0] 和 project-local sys.path，并恢复 Python context、cwd、TMPDIR、stdout/stderr。
+- project-local module cleanup 加入 session terminal 路径；A/D fixture 用不同 helper 值验证 namespace/module isolation。
+- SystemExit(0)、SystemExit(nonzero)、ordinary exception 和现有 cooperative STOP 保持明确 result mapping；alpha29 re-entry/STOP lifecycle 没有被替换。
+- snapshot 与 Copy all diagnostics 扩展 project identity、execution root、entrypoint 和 working directory；既有 A/B/C/STOP diagnostics keys 保留。
+- instrumentation source 扩展 file semantics、traceback filename、namespace isolation、SystemExit、STOP 和 post-STOP re-entry；当前 CI 无 emulator/device，因此不把 instrumentation 标记为 executed/pass。
+
+### SAF 与生产路径边界
+
+当前 fixture staging 是可重复的 app-private test asset strategy，不是完整 SAF import implementation。SAF URI 未直接交给 native；TermuxBackend、TermuxProotRuntimeHost、RuntimeCommandHost、PythonRuntimeAdapter production path、ProjectRuntimeController production execution、Runtime Identity 和 Web Discovery 未修改。
+
+### 当前验证状态
+
+本提交完成后应由 GitHub Actions 执行 CPython preparation、JVM tests、CMake/native、assembleDebug、signing 和 artifact evidence。alpha30 在 CI 成功后状态为 source/CI ready for real-device acceptance；真实设备验收仍需单独记录，不能由 instrumentation source 或 cloud build 替代。
+
+### 已知限制
+
+当前 boundary 只覆盖 app-private file-backed pure-Python scope。未实现 pip、dependency installation、venv、native wheels、arbitrary C extension support、blocking native/syscall interruption、universal hard-stop、SAF imported projects、并发 sessions、production sandbox 或 M ↔ R production integration。STOP 仍是 cooperative / limited interruption behavior。
+
+### 下一步建议（只推荐）
+
+优先研究 R Environment Model 与 Dependency Model 的边界，或在真实设备验收后研究 R Session Isolation hardening；不要把当前 fixture boundary 误称为 arbitrary project support。下一任务仍需单独决策，本记录不实施后续方向。

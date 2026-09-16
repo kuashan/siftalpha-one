@@ -15,7 +15,10 @@ internal object EmbeddedPythonBridge {
     @JvmStatic
     external fun nativeStart(
         home: String,
-        script: String,
+        projectIdentity: String,
+        executionRoot: String,
+        entrypoint: String,
+        workingDirectory: String,
         sessionId: String,
         generation: Long,
     ): Boolean

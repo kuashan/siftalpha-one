@@ -13,18 +13,26 @@ class EmbeddedPythonResultTest {
             """
             {
               "sessionId":"siftalpha-x-a",
+              "projectIdentity":"fixture-project-a",
+              "executionRoot":"/data/user/0/com.siftalpha.studio/files/siftalphax/projects/siftalpha-x-a",
+              "entrypoint":"/data/user/0/com.siftalpha.studio/files/siftalphax/projects/siftalpha-x-a/main.py",
+              "workingDirectory":"/data/user/0/com.siftalpha.studio/files/siftalphax/projects/siftalpha-x-a",
               "generation":1,
               "state":"SUCCEEDED",
               "startedAtEpochMs":10,
               "finishedAtEpochMs":20,
               "exitCode":0,
-              "stdout":"SIFTALPHA_X_PYTHON_OK\\n",
+              "stdout":"SIFTALPHA_X_PYTHON_OK\n",
               "stderr":""
             }
             """.trimIndent(),
         )
 
         assertEquals("siftalpha-x-a", snapshot.sessionId)
+        assertEquals("fixture-project-a", snapshot.projectIdentity)
+        assertTrue(snapshot.executionRoot.endsWith("/projects/siftalpha-x-a"))
+        assertTrue(snapshot.entrypoint.endsWith("/projects/siftalpha-x-a/main.py"))
+        assertTrue(snapshot.workingDirectory.endsWith("/projects/siftalpha-x-a"))
         assertEquals(1L, snapshot.generation)
         assertEquals(EmbeddedPythonState.SUCCEEDED, snapshot.state)
         assertEquals(EmbeddedPythonStopPhase.IDLE, snapshot.stopPhase)
@@ -40,7 +48,11 @@ class EmbeddedPythonResultTest {
     fun parsesRuntimePhaseAndBuildsCopyableDiagnostics() {
         val snapshot = EmbeddedPythonSnapshotParser.parse(
             """
-            {"sessionId":"siftalpha-x-phase","generation":4,"state":"FAILED",
+            {"sessionId":"siftalpha-x-phase","projectIdentity":"fixture-project-b",
+             "executionRoot":"/data/user/0/com.siftalpha.studio/files/siftalphax/projects/siftalpha-x-phase",
+             "entrypoint":"/data/user/0/com.siftalpha.studio/files/siftalphax/projects/siftalpha-x-phase/main.py",
+             "workingDirectory":"/data/user/0/com.siftalpha.studio/files/siftalphax/projects/siftalpha-x-phase",
+             "generation":4,"state":"FAILED",
              "runtimePhase":"TERMINAL",
              "stopPhase":"STOP_REQUEST_RETURNED",
              "stopResult":"INTERRUPT_DELIVERED",
@@ -54,6 +66,10 @@ class EmbeddedPythonResultTest {
         assertEquals(EmbeddedPythonStopPhase.STOP_REQUEST_RETURNED, snapshot.stopPhase)
         assertEquals(EmbeddedPythonStopResult.INTERRUPT_DELIVERED, snapshot.stopResult)
         val diagnostics = EmbeddedPythonDiagnosticText.copyAll(snapshot)
+        assertTrue(diagnostics.contains("SIFTALPHA_X_PROJECT_ID=fixture-project-b"))
+        assertTrue(diagnostics.contains("SIFTALPHA_X_EXECUTION_ROOT=/data/user/0/com.siftalpha.studio/files/siftalphax/projects/siftalpha-x-phase"))
+        assertTrue(diagnostics.contains("SIFTALPHA_X_ENTRYPOINT=/data/user/0/com.siftalpha.studio/files/siftalphax/projects/siftalpha-x-phase/main.py"))
+        assertTrue(diagnostics.contains("SIFTALPHA_X_WORKING_DIRECTORY=/data/user/0/com.siftalpha.studio/files/siftalphax/projects/siftalpha-x-phase"))
         assertTrue(diagnostics.contains("SIFTALPHA_X_SESSION_ID=siftalpha-x-phase"))
         assertTrue(diagnostics.contains("SIFTALPHA_X_RUNTIME_PHASE=TERMINAL"))
         assertTrue(diagnostics.contains("SIFTALPHA_X_STOP_PHASE=STOP_REQUEST_RETURNED"))
@@ -77,6 +93,7 @@ class EmbeddedPythonResultTest {
         assertEquals("out", snapshot.stdout)
         assertEquals("traceback", snapshot.stderr)
         assertNull(snapshot.finishedAtEpochMs)
+        assertEquals("", snapshot.projectIdentity)
     }
 
     @Test

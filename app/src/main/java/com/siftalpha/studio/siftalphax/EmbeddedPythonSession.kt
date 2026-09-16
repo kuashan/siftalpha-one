@@ -2,6 +2,7 @@ package com.siftalpha.studio.siftalphax
 
 import android.content.Context
 import android.util.Log
+import java.io.File
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
@@ -18,22 +19,59 @@ class EmbeddedPythonSession private constructor(context: Context) {
         EmbeddedPythonSnapshotParser.parse(EmbeddedPythonBridge.nativeSnapshot())
 
     @Synchronized
-    fun start(scenario: EmbeddedPythonScenario): EmbeddedPythonSnapshot {
+    fun start(scenario: EmbeddedPythonScenario): EmbeddedPythonSnapshot =
+        start(scenario.fixture)
+
+    @Synchronized
+    fun start(fixture: EmbeddedPythonProjectFixture): EmbeddedPythonSnapshot {
         val current = snapshot()
         check(EmbeddedPythonStatePolicy.canStart(current.state)) {
-            "Only one embedded Python session may be active; current state is ${current.state}"
+            "Only one embedded Python session may be active; current state is " + current.state
         }
-        val home = EmbeddedPythonFiles.prepare(appContext)
-        val sessionId = "siftalpha-x-${UUID.randomUUID()}"
+        val sessionId = "siftalpha-x-" + UUID.randomUUID()
         val generation = nextGeneration.incrementAndGet()
-        check(EmbeddedPythonBridge.nativeStart(home.absolutePath, scenario.script, sessionId, generation)) {
+        val home = EmbeddedPythonFiles.prepare(appContext)
+        val stagedRoot = EmbeddedPythonFiles.stageProjectFixture(appContext, fixture, sessionId)
+        val spec = EmbeddedPythonExecutionSpec(
+            projectIdentity = fixture.projectIdentity,
+            executionRoot = stagedRoot,
+            entrypoint = fixture.entrypoint,
+            workingDirectory = fixture.workingDirectory,
+            runtimeKind = EmbeddedPythonRuntimeKind.CPYTHON,
+            sessionId = sessionId,
+            generation = generation,
+        )
+        return start(spec, home)
+    }
+
+    private fun start(
+        spec: EmbeddedPythonExecutionSpec,
+        home: File,
+    ): EmbeddedPythonSnapshot {
+        val invalid = spec.nativeValidationErrors()
+        check(invalid.isEmpty()) {
+            "Invalid embedded Python execution specification: " + invalid.joinToString(",")
+        }
+        check(
+            EmbeddedPythonBridge.nativeStart(
+                home.absolutePath,
+                spec.projectIdentity,
+                spec.executionRoot.absolutePath,
+                spec.entrypointFile.absolutePath,
+                spec.workingDirectoryFile.absolutePath,
+                spec.sessionId,
+                spec.generation,
+            ),
+        ) {
             "Embedded CPython did not accept the session"
         }
         Log.i(
             TAG,
             "SIFTALPHA_X_ENGINE=CPYTHON SIFTALPHA_X_TERMUX=NOT_USED " +
                 "SIFTALPHA_X_RUN_COMMAND=NOT_USED SIFTALPHA_X_PROOT=NOT_USED " +
-                "SIFTALPHA_X_SESSION_ID=$sessionId SIFTALPHA_X_GENERATION=$generation",
+                "SIFTALPHA_X_PROJECT_ID=" + spec.projectIdentity + " " +
+                "SIFTALPHA_X_SESSION_ID=" + spec.sessionId + " " +
+                "SIFTALPHA_X_GENERATION=" + spec.generation,
         )
         return snapshot()
     }

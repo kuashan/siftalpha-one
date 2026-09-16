@@ -33,6 +33,30 @@ object EmbeddedPythonFiles {
         return home
     }
 
+    fun stageProjectFixture(
+        context: Context,
+        fixture: EmbeddedPythonProjectFixture,
+        sessionId: String,
+    ): File {
+        val projectsRoot = File(context.filesDir, "$PRIVATE_ROOT/projects")
+        check(projectsRoot.mkdirs() || projectsRoot.isDirectory) {
+            "Unable to create private project staging directory"
+        }
+        val root = File(projectsRoot, sessionId)
+        val canonicalProjectsRoot = projectsRoot.canonicalFile
+        check(root.parentFile?.canonicalFile == canonicalProjectsRoot) {
+            "Project session staging escaped the app-private root"
+        }
+        if (root.exists()) {
+            check(root.deleteRecursively()) { "Unable to clear existing project staging" }
+        }
+        check(root.mkdirs() || root.isDirectory) {
+            "Unable to create project staging root"
+        }
+        copyAssetTree(context, fixture.assetPath, root)
+        return root
+    }
+
     fun provenance(context: Context): String =
         context.assets.open("siftalphax/cpython/PROVENANCE.md").bufferedReader().use { it.readText() }
 
