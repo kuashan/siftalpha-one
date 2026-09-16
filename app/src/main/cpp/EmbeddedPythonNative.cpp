@@ -484,8 +484,7 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeStart(
     session->startedAtEpochMs = nowEpochMillis();
     session->state = SessionState::STARTING;
     gSession = session;
-    session->worker = std::thread(runSession, session);
-    session->worker.detach();
+    std::thread(runSession, session).detach();
     return JNI_TRUE;
 }
 
