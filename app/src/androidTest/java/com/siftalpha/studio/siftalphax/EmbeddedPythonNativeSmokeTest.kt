@@ -99,24 +99,71 @@ class EmbeddedPythonNativeSmokeTest {
     }
 
     @Test
-    fun namespaceIsolationUsesFreshMainAndProjectModuleState() {
+    fun canonicalCleanupRemovesAliasedProjectModulesAndPreservesStdlib() {
         assumeArm64()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val session = readySession(context)
+        val rootA = EmbeddedPythonFiles.stageProjectFixture(
+            context,
+            EmbeddedPythonProjectFixture.PROJECT_A,
+            "module-isolation-a-${UUID.randomUUID()}",
+        )
+        val aliasedRootA = androidAppPrivateAlias(rootA)
+        val rootD = EmbeddedPythonFiles.stageProjectFixture(
+            context,
+            EmbeddedPythonProjectFixture.PROJECT_D_ISOLATION,
+            "module-isolation-d-${UUID.randomUUID()}",
+        )
+        assertTrue("Expected Android app-private alias to resolve: $aliasedRootA", aliasedRootA.isDirectory)
+        File(rootA, "main.py").appendText(
+            "\njson.SIFTALPHA_X_EXTERNAL_MODULE_MARKER = 'KEEP'\n",
+        )
+        File(rootD, "main.py").writeText(
+            "import json\n" +
+                "if getattr(json, 'SIFTALPHA_X_EXTERNAL_MODULE_MARKER', None) != 'KEEP':\n" +
+                "    raise RuntimeError('SIFTALPHA_X_EXTERNAL_MODULE_NOT_PRESERVED')\n" +
+                "print('SIFTALPHA_X_STDLIB_MODULE_PRESERVED')\n" +
+                "import sys\n" +
+                "if 'SIFTALPHA_X_PROJECT_A_GLOBAL' in globals():\n" +
+                "    raise RuntimeError('SIFTALPHA_X_NAMESPACE_LEAK')\n" +
+                "import helper\n" +
+                "print('SIFTALPHA_X_PROJECT_D_ISOLATION_OK')\n" +
+                "print('SIFTALPHA_X_PROJECT_HELPER=' + helper.VALUE)\n" +
+                "print('SIFTALPHA_X_PROJECT_NAME=' + __name__)\n" +
+                "print('SIFTALPHA_X_PROJECT_FILE=' + __file__)\n" +
+                "print('SIFTALPHA_X_PROJECT_ARGV0=' + sys.argv[0])\n" +
+                "sys.stdout.flush()\n",
+        )
+        try {
+            session.start(
+                projectIdentity = "fixture-project-a-aliased",
+                executionRoot = aliasedRootA,
+                entrypoint = "main.py",
+                workingDirectory = ".",
+            )
+            awaitState(session, EmbeddedPythonState.SUCCEEDED, 5_000L)
+            val snapshotA = session.snapshot()
 
-        session.start(EmbeddedPythonProjectFixture.PROJECT_A)
-        awaitState(session, EmbeddedPythonState.SUCCEEDED, 5_000L)
-        val snapshotA = session.snapshot()
+            session.start(
+                projectIdentity = "fixture-project-d-isolation",
+                executionRoot = rootD,
+                entrypoint = "main.py",
+                workingDirectory = ".",
+            )
+            awaitState(session, EmbeddedPythonState.SUCCEEDED, 5_000L)
+            val snapshotD = session.snapshot()
 
-        session.start(EmbeddedPythonProjectFixture.PROJECT_D_ISOLATION)
-        awaitState(session, EmbeddedPythonState.SUCCEEDED, 5_000L)
-        val snapshotD = session.snapshot()
-
-        assertNotEquals(snapshotA.sessionId, snapshotD.sessionId)
-        assertTrue(snapshotA.generation < snapshotD.generation)
-        assertTrue(snapshotD.stdout.contains("SIFTALPHA_X_PROJECT_D_ISOLATION_OK"))
-        assertTrue(snapshotD.stdout.contains("SIFTALPHA_X_PROJECT_HELPER=PROJECT_D_HELPER"))
-        assertFalse(snapshotD.stdout.contains("PROJECT_A_HELPER"))
+            assertNotEquals(snapshotA.sessionId, snapshotD.sessionId)
+            assertTrue(snapshotA.generation < snapshotD.generation)
+            assertTrue(snapshotA.stdout.contains("SIFTALPHA_X_PROJECT_HELPER=PROJECT_A_HELPER"))
+            assertTrue(snapshotD.stdout.contains("SIFTALPHA_X_STDLIB_MODULE_PRESERVED"))
+            assertTrue(snapshotD.stdout.contains("SIFTALPHA_X_PROJECT_D_ISOLATION_OK"))
+            assertTrue(snapshotD.stdout.contains("SIFTALPHA_X_PROJECT_HELPER=PROJECT_D_HELPER"))
+            assertFalse(snapshotD.stdout.contains("PROJECT_A_HELPER"))
+        } finally {
+            rootA.deleteRecursively()
+            rootD.deleteRecursively()
+        }
     }
 
     @Test

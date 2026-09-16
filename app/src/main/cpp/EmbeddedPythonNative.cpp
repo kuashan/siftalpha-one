@@ -1125,6 +1125,15 @@ void clearProjectModules(PyObject* modules, const std::string& projectsBase) {
     if (modules == nullptr || !PyDict_Check(modules)) {
         return;
     }
+
+    // Module ownership follows canonical filesystem identity so Android's
+    // /data/data and /data/user/0 spellings cannot leave staged modules behind.
+    std::string canonicalProjectsBase;
+    if (!canonicalPath(projectsBase, &canonicalProjectsBase)) {
+        PyErr_Clear();
+        return;
+    }
+
     PyObject* keys = PyDict_Keys(modules);
     if (keys == nullptr) {
         PyErr_Clear();
@@ -1140,11 +1149,17 @@ void clearProjectModules(PyObject* modules, const std::string& projectsBase) {
         PyObject* moduleFile = PyObject_GetAttrString(module, "__file__");
         if (moduleFile != nullptr && PyUnicode_Check(moduleFile)) {
             const char* fileName = PyUnicode_AsUTF8(moduleFile);
-            if (fileName != nullptr && pathWithin(projectsBase, fileName)) {
-                PyDict_DelItem(modules, key);
-                PyErr_Clear();
+            std::string canonicalModuleFile;
+            if (fileName != nullptr &&
+                canonicalPath(fileName, &canonicalModuleFile) &&
+                pathWithin(canonicalProjectsBase, canonicalModuleFile)) {
+                if (PyDict_DelItem(modules, key) != 0) {
+                    PyErr_Clear();
+                }
             }
         }
+        // Missing/invalid module origins and canonicalization failures are
+        // retained conservatively; they must not widen cleanup ownership.
         Py_XDECREF(moduleFile);
         PyErr_Clear();
     }
