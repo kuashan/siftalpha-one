@@ -160,7 +160,7 @@ class EmbeddedPythonNativeSmokeTest {
         assumeArm64()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val home = EmbeddedPythonFiles.prepare(context)
-        val outsideRoot = File(home.parentFile, "path-validation-outside-root-\${UUID.randomUUID()}")
+        val outsideRoot = File(home.parentFile, "path-validation-outside-root-${UUID.randomUUID()}")
         check(outsideRoot.mkdirs())
         File(outsideRoot, "main.py").writeText("print('must not run')")
         try {
@@ -181,19 +181,19 @@ class EmbeddedPythonNativeSmokeTest {
         assumeArm64()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val home = EmbeddedPythonFiles.prepare(context)
-        val fixtureSessionId = "path-validation-\${UUID.randomUUID()}"
+        val fixtureSessionId = "path-validation-${UUID.randomUUID()}"
         val root = EmbeddedPythonFiles.stageProjectFixture(
             context,
             EmbeddedPythonProjectFixture.PROJECT_A,
             fixtureSessionId,
         )
-        val outside = File(home.parentFile, "path-validation-outside-\${UUID.randomUUID()}.py")
+        val outside = File(home.parentFile, "path-validation-outside-${UUID.randomUUID()}.py")
         outside.writeText("print('must not run')")
         try {
             assertNativePathFailure(
                 context = context,
                 executionRoot = root,
-                entrypoint = File(root, "../\${outside.name}"),
+                entrypoint = File(root, "../${outside.name}"),
                 workingDirectory = root,
                 expectedError = "path traversal is not allowed",
             )
@@ -208,20 +208,20 @@ class EmbeddedPythonNativeSmokeTest {
         assumeArm64()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val home = EmbeddedPythonFiles.prepare(context)
-        val fixtureSessionId = "path-validation-\${UUID.randomUUID()}"
+        val fixtureSessionId = "path-validation-${UUID.randomUUID()}"
         val root = EmbeddedPythonFiles.stageProjectFixture(
             context,
             EmbeddedPythonProjectFixture.PROJECT_A,
             fixtureSessionId,
         )
-        val outside = File(home.parentFile, "path-validation-outside-dir-\${UUID.randomUUID()}")
+        val outside = File(home.parentFile, "path-validation-outside-dir-${UUID.randomUUID()}")
         check(outside.mkdirs())
         try {
             assertNativePathFailure(
                 context = context,
                 executionRoot = root,
                 entrypoint = File(root, "main.py"),
-                workingDirectory = File(root, "../\${outside.name}"),
+                workingDirectory = File(root, "../${outside.name}"),
                 expectedError = "path traversal is not allowed",
             )
         } finally {
@@ -235,13 +235,13 @@ class EmbeddedPythonNativeSmokeTest {
         assumeArm64()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val home = EmbeddedPythonFiles.prepare(context)
-        val fixtureSessionId = "path-validation-\${UUID.randomUUID()}"
+        val fixtureSessionId = "path-validation-${UUID.randomUUID()}"
         val root = EmbeddedPythonFiles.stageProjectFixture(
             context,
             EmbeddedPythonProjectFixture.PROJECT_A,
             fixtureSessionId,
         )
-        val outside = File(home.parentFile, "path-validation-outside-\${UUID.randomUUID()}.py")
+        val outside = File(home.parentFile, "path-validation-outside-${UUID.randomUUID()}.py")
         outside.writeText("print('must not run')")
         val entrypoint = File(root, "main.py")
         check(entrypoint.delete())
@@ -266,13 +266,13 @@ class EmbeddedPythonNativeSmokeTest {
         assumeArm64()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val home = EmbeddedPythonFiles.prepare(context)
-        val fixtureSessionId = "path-validation-\${UUID.randomUUID()}"
+        val fixtureSessionId = "path-validation-${UUID.randomUUID()}"
         val root = EmbeddedPythonFiles.stageProjectFixture(
             context,
             EmbeddedPythonProjectFixture.PROJECT_A,
             fixtureSessionId,
         )
-        val outside = File(home.parentFile, "path-validation-outside-dir-\${UUID.randomUUID()}")
+        val outside = File(home.parentFile, "path-validation-outside-dir-${UUID.randomUUID()}")
         check(outside.mkdirs())
         val workingDirectory = File(root, "work")
         Files.createSymbolicLink(workingDirectory.toPath(), outside.toPath())
@@ -303,7 +303,7 @@ class EmbeddedPythonNativeSmokeTest {
         awaitState(session, EmbeddedPythonState.SUCCEEDED, 5_000L)
         val previous = session.snapshot()
         val home = EmbeddedPythonFiles.prepare(context)
-        val sessionId = "siftalpha-x-path-validation-\${UUID.randomUUID()}"
+        val sessionId = "siftalpha-x-path-validation-${UUID.randomUUID()}"
         assertTrue(
             EmbeddedPythonBridge.nativeStart(
                 home.absolutePath,
@@ -319,7 +319,7 @@ class EmbeddedPythonNativeSmokeTest {
         val snapshot = session.snapshot()
         assertEquals(1, snapshot.exitCode)
         assertTrue(
-            "Expected native path validation error \$expectedError, got: \${snapshot.stderr}",
+            "Expected native path validation error $expectedError, got: ${snapshot.stderr}",
             snapshot.stderr.contains(expectedError),
         )
     }
