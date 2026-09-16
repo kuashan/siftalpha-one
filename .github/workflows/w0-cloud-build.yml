@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - main
+      - codex/siftalpha-x-embedded-cpython-spike
   workflow_dispatch:
 
 permissions:
