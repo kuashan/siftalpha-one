@@ -1,6 +1,7 @@
 package com.siftalpha.studio.siftalphax
 
 import java.io.File
+import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -88,6 +89,71 @@ class EmbeddedPythonExecutionSpecTest {
         }
         root.deleteRecursively()
     }
+
+
+    @Test
+    fun acceptsAppPrivateStylePathThroughSymlinkedAncestor() {
+        val base = Files.createTempDirectory("siftalpha-app-private").toFile()
+        val realUserRoot = File(base, "real/data/user/0")
+        val aliasUserRoot = File(base, "alias/data/user/0")
+        realUserRoot.mkdirs()
+        aliasUserRoot.parentFile.mkdirs()
+        Files.createSymbolicLink(aliasUserRoot.toPath(), realUserRoot.toPath())
+        val root = File(aliasUserRoot, "com.siftalpha.studio/files/siftalphax/projects/session")
+        root.mkdirs()
+        File(root, "main.py").writeText("print('ok')")
+        try {
+            val spec = specFor(root, "main.py", ".")
+            assertEquals(emptyList<String>(), spec.validationErrors())
+        } finally {
+            Files.deleteIfExists(aliasUserRoot.toPath())
+            base.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun rejectsEntrypointSymlinkThatEscapesExecutionRoot() {
+        val base = Files.createTempDirectory("siftalpha-entrypoint-link").toFile()
+        val root = File(base, "project").apply { mkdirs() }
+        val outside = File(base, "outside.py").apply { writeText("print('must not run')") }
+        val entrypoint = File(root, "main.py")
+        Files.createSymbolicLink(entrypoint.toPath(), outside.toPath())
+        try {
+            val errors = specFor(root, "main.py", ".").validationErrors()
+            assertTrue(errors.contains("ENTRYPOINT_OUTSIDE_ROOT"))
+        } finally {
+            Files.deleteIfExists(entrypoint.toPath())
+            base.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun rejectsWorkingDirectorySymlinkThatEscapesExecutionRoot() {
+        val base = Files.createTempDirectory("siftalpha-working-link").toFile()
+        val root = File(base, "project").apply { mkdirs() }
+        val outside = File(base, "outside").apply { mkdirs() }
+        val workingDirectory = File(root, "work")
+        Files.createSymbolicLink(workingDirectory.toPath(), outside.toPath())
+        File(root, "main.py").writeText("print('ok')")
+        try {
+            val errors = specFor(root, "main.py", "work").validationErrors()
+            assertTrue(errors.contains("WORKING_DIRECTORY_OUTSIDE_ROOT"))
+        } finally {
+            Files.deleteIfExists(workingDirectory.toPath())
+            base.deleteRecursively()
+        }
+    }
+
+    private fun specFor(root: File, entrypoint: String, workingDirectory: String): EmbeddedPythonExecutionSpec =
+        EmbeddedPythonExecutionSpec(
+            projectIdentity = "fixture-project-path-test",
+            executionRoot = root,
+            entrypoint = entrypoint,
+            workingDirectory = workingDirectory,
+            runtimeKind = EmbeddedPythonRuntimeKind.CPYTHON,
+            sessionId = "siftalpha-x-path-test",
+            generation = 1L,
+        )
 
     private fun assertRejects(block: () -> Unit) {
         try {
