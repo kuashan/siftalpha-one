@@ -25,6 +25,9 @@ secrets/
 signing.properties
 **/signing.properties
 
+# Build-time official CPython Android component; no binary is committed.
+app/build/generated/cpython/
+
 # Local-only workflow variants
 .github/workflows/*-local.yml
 .github/workflows/*.secret.yml

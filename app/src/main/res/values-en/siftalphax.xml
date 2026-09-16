@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_siftalpha_x_experimental">SiftAlpha X Experimental</string>
+    <string name="siftalpha_x_title">SiftAlpha X Experimental</string>
+    <string name="siftalpha_x_subtitle">Runs fixed embedded CPython scripts in app-private storage.</string>
+    <string name="siftalpha_x_one_session_notice">This PoC supports one session per app process. Stop is cooperative, not a forced thread kill.</string>
+    <string name="siftalpha_x_test_a">TEST A · Normal execution</string>
+    <string name="siftalpha_x_test_b">TEST B · stdout / stderr / failure</string>
+    <string name="siftalpha_x_test_c">TEST C · Long-running session</string>
+    <string name="siftalpha_x_stop">Request cooperative stop</string>
+    <string name="siftalpha_x_refresh_status">Refresh status</string>
+    <string name="siftalpha_x_stdout">stdout</string>
+    <string name="siftalpha_x_stderr">stderr</string>
+    <string name="siftalpha_x_no_output">No output yet</string>
+</resources>

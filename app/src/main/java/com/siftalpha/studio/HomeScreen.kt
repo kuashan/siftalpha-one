@@ -100,6 +100,7 @@ fun HomeScreen(
     onShowDetails: (ProjectStore.ProjectSummary) -> Unit,
     onDeleteProject: (ProjectStore.ProjectSummary) -> Unit,
     onRuntimeCenter: () -> Unit,
+    onEmbeddedPython: () -> Unit,
     onEnvironment: () -> Unit,
     onTerminal: () -> Unit,
     onProbeEnvironment: () -> Unit,
@@ -313,6 +314,12 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(text = stringResource(R.string.home_terminal))
+                    }
+                    OutlinedButton(
+                        onClick = onEmbeddedPython,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = stringResource(R.string.home_siftalpha_x_experimental))
                     }
                 }
             }

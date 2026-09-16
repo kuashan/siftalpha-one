@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_siftalpha_x_experimental">SiftAlpha X 실험 기능</string>
+    <string name="siftalpha_x_title">SiftAlpha X Experimental</string>
+    <string name="siftalpha_x_subtitle">앱 전용 저장소에서 고정된 내장 CPython 스크립트를 실행합니다.</string>
+    <string name="siftalpha_x_one_session_notice">이 PoC는 앱 프로세스당 하나의 세션만 지원합니다. 중지는 협력적이며 스레드를 강제 종료하지 않습니다.</string>
+    <string name="siftalpha_x_test_a">TEST A · 정상 실행</string>
+    <string name="siftalpha_x_test_b">TEST B · stdout / stderr / 실패</string>
+    <string name="siftalpha_x_test_c">TEST C · 장시간 세션</string>
+    <string name="siftalpha_x_stop">협력적 중지 요청</string>
+    <string name="siftalpha_x_refresh_status">상태 새로 고침</string>
+    <string name="siftalpha_x_stdout">stdout</string>
+    <string name="siftalpha_x_stderr">stderr</string>
+    <string name="siftalpha_x_no_output">아직 출력이 없습니다</string>
+</resources>

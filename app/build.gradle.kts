@@ -1,6 +1,22 @@
+import org.gradle.api.tasks.Exec
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+val embeddedCpythonOutput = layout.buildDirectory
+    .dir("generated/cpython/arm64-v8a")
+    .get()
+    .asFile
+val embeddedCpythonPrefix = embeddedCpythonOutput.resolve("prefix")
+val embeddedCpythonAssets = embeddedCpythonOutput.resolve("assets")
+val embeddedCpythonJniLibs = embeddedCpythonOutput.resolve("jniLibs")
+val prepareEmbeddedCpython = tasks.register<Exec>("prepareEmbeddedCpython") {
+    commandLine(
+        rootProject.file("tools/prepare_embedded_cpython_android.sh").absolutePath,
+        embeddedCpythonOutput.absolutePath,
+    )
 }
 
 val trustedKeystorePayload = providers.gradleProperty("SIFTALPHA_DEBUG_KEYSTORE_B64")
@@ -28,13 +44,42 @@ val trustedSigningEnabled = listOf(
 android {
     namespace = "com.siftalpha.studio"
     compileSdk = 36
+    ndkVersion = "27.3.13750724"
 
     defaultConfig {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        versionCode = 101
-        versionName = "0.8.0-alpha25"
+        versionCode = 102
+        versionName = "0.8.0-alpha26"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments += listOf(
+                    "-DCPYTHON_PREFIX_DIR=${embeddedCpythonPrefix.absolutePath}",
+                    "-DCPYTHON_VERSION=3.14",
+                )
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
+    sourceSets {
+        getByName("main") {
+            assets.srcDir(embeddedCpythonAssets)
+            jniLibs.srcDir(embeddedCpythonJniLibs)
+        }
     }
 
     buildFeatures {
@@ -74,8 +119,23 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }
 
 tasks.matching { it.name == "assembleDebug" }.configureEach {
     dependsOn("testDebugUnitTest")
+    dependsOn(prepareEmbeddedCpython)
+}
+
+tasks.configureEach {
+    if (
+        name == "preDebugBuild" ||
+        name == "externalNativeBuildDebug" ||
+        name.contains("CMake", ignoreCase = true) ||
+        name.contains("mergeDebugAssets", ignoreCase = true)
+    ) {
+        dependsOn(prepareEmbeddedCpython)
+    }
 }

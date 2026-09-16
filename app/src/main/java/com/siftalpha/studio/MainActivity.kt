@@ -97,6 +97,14 @@ class MainActivity : StudioComposeActivity() {
                     onRuntimeCenter = {
                         startActivity(Intent(this, V04Activity::class.java))
                     },
+                    onEmbeddedPython = {
+                        startActivity(
+                            Intent(
+                                this,
+                                com.siftalpha.studio.siftalphax.EmbeddedPythonTestActivity::class.java,
+                            ),
+                        )
+                    },
                     onEnvironment = {
                         startActivity(Intent(this, RuntimeStorageActivity::class.java))
                     },
