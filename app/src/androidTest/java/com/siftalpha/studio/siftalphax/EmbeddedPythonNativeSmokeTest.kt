@@ -2,6 +2,9 @@ package com.siftalpha.studio.siftalphax
 
 import android.os.Build
 import android.os.SystemClock
+import java.io.File
+import java.nio.file.Files
+import java.util.UUID
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
@@ -149,6 +152,176 @@ class EmbeddedPythonNativeSmokeTest {
         val nonzero = session.snapshot()
         assertEquals(7, nonzero.exitCode)
         assertTrue(nonzero.stdout.contains("SIFTALPHA_X_SYSTEM_EXIT_NONZERO"))
+    }
+
+
+    @Test
+    fun rejectsExecutionRootOutsideAppPrivateStaging() {
+        assumeArm64()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val home = EmbeddedPythonFiles.prepare(context)
+        val outsideRoot = File(home.parentFile, "path-validation-outside-root-\${UUID.randomUUID()}")
+        check(outsideRoot.mkdirs())
+        File(outsideRoot, "main.py").writeText("print('must not run')")
+        try {
+            assertNativePathFailure(
+                context = context,
+                executionRoot = outsideRoot,
+                entrypoint = File(outsideRoot, "main.py"),
+                workingDirectory = outsideRoot,
+                expectedError = "execution root is outside staging path",
+            )
+        } finally {
+            outsideRoot.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun rejectsEntrypointTraversalOutsideExecutionRoot() {
+        assumeArm64()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val home = EmbeddedPythonFiles.prepare(context)
+        val fixtureSessionId = "path-validation-\${UUID.randomUUID()}"
+        val root = EmbeddedPythonFiles.stageProjectFixture(
+            context,
+            EmbeddedPythonProjectFixture.PROJECT_A,
+            fixtureSessionId,
+        )
+        val outside = File(home.parentFile, "path-validation-outside-\${UUID.randomUUID()}.py")
+        outside.writeText("print('must not run')")
+        try {
+            assertNativePathFailure(
+                context = context,
+                executionRoot = root,
+                entrypoint = File(root, "../\${outside.name}"),
+                workingDirectory = root,
+                expectedError = "path traversal is not allowed",
+            )
+        } finally {
+            root.deleteRecursively()
+            outside.delete()
+        }
+    }
+
+    @Test
+    fun rejectsWorkingDirectoryTraversalOutsideExecutionRoot() {
+        assumeArm64()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val home = EmbeddedPythonFiles.prepare(context)
+        val fixtureSessionId = "path-validation-\${UUID.randomUUID()}"
+        val root = EmbeddedPythonFiles.stageProjectFixture(
+            context,
+            EmbeddedPythonProjectFixture.PROJECT_A,
+            fixtureSessionId,
+        )
+        val outside = File(home.parentFile, "path-validation-outside-dir-\${UUID.randomUUID()}")
+        check(outside.mkdirs())
+        try {
+            assertNativePathFailure(
+                context = context,
+                executionRoot = root,
+                entrypoint = File(root, "main.py"),
+                workingDirectory = File(root, "../\${outside.name}"),
+                expectedError = "path traversal is not allowed",
+            )
+        } finally {
+            root.deleteRecursively()
+            outside.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun rejectsProjectControlledEntrypointSymlinkEscape() {
+        assumeArm64()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val home = EmbeddedPythonFiles.prepare(context)
+        val fixtureSessionId = "path-validation-\${UUID.randomUUID()}"
+        val root = EmbeddedPythonFiles.stageProjectFixture(
+            context,
+            EmbeddedPythonProjectFixture.PROJECT_A,
+            fixtureSessionId,
+        )
+        val outside = File(home.parentFile, "path-validation-outside-\${UUID.randomUUID()}.py")
+        outside.writeText("print('must not run')")
+        val entrypoint = File(root, "main.py")
+        check(entrypoint.delete())
+        Files.createSymbolicLink(entrypoint.toPath(), outside.toPath())
+        try {
+            assertNativePathFailure(
+                context = context,
+                executionRoot = root,
+                entrypoint = entrypoint,
+                workingDirectory = root,
+                expectedError = "symlink path components are not supported",
+            )
+        } finally {
+            Files.deleteIfExists(entrypoint.toPath())
+            root.deleteRecursively()
+            outside.delete()
+        }
+    }
+
+    @Test
+    fun rejectsProjectControlledWorkingDirectorySymlinkEscape() {
+        assumeArm64()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val home = EmbeddedPythonFiles.prepare(context)
+        val fixtureSessionId = "path-validation-\${UUID.randomUUID()}"
+        val root = EmbeddedPythonFiles.stageProjectFixture(
+            context,
+            EmbeddedPythonProjectFixture.PROJECT_A,
+            fixtureSessionId,
+        )
+        val outside = File(home.parentFile, "path-validation-outside-dir-\${UUID.randomUUID()}")
+        check(outside.mkdirs())
+        val workingDirectory = File(root, "work")
+        Files.createSymbolicLink(workingDirectory.toPath(), outside.toPath())
+        try {
+            assertNativePathFailure(
+                context = context,
+                executionRoot = root,
+                entrypoint = File(root, "main.py"),
+                workingDirectory = workingDirectory,
+                expectedError = "symlink path components are not supported",
+            )
+        } finally {
+            Files.deleteIfExists(workingDirectory.toPath())
+            root.deleteRecursively()
+            outside.deleteRecursively()
+        }
+    }
+
+    private fun assertNativePathFailure(
+        context: android.content.Context,
+        executionRoot: File,
+        entrypoint: File,
+        workingDirectory: File,
+        expectedError: String,
+    ) {
+        val session = readySession(context)
+        session.start(EmbeddedPythonProjectFixture.PROJECT_A)
+        awaitState(session, EmbeddedPythonState.SUCCEEDED, 5_000L)
+        val previous = session.snapshot()
+        val home = EmbeddedPythonFiles.prepare(context)
+        val sessionId = "siftalpha-x-path-validation-\${UUID.randomUUID()}"
+        assertTrue(
+            EmbeddedPythonBridge.nativeStart(
+                home.absolutePath,
+                "fixture-path-validation",
+                executionRoot.absolutePath,
+                entrypoint.absolutePath,
+                workingDirectory.absolutePath,
+                sessionId,
+                previous.generation + 1L,
+            ),
+        )
+        awaitState(session, EmbeddedPythonState.FAILED, 5_000L)
+        val snapshot = session.snapshot()
+        assertEquals(1, snapshot.exitCode)
+        assertTrue(
+            "Expected native path validation error \$expectedError, got: \${snapshot.stderr}",
+            snapshot.stderr.contains(expectedError),
+        )
     }
 
     private fun readySession(context: android.content.Context): EmbeddedPythonSession {
