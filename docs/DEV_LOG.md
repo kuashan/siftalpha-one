@@ -697,3 +697,12 @@ STOP 完成后不重启 Android application process，创建新的 Session：
 
 Android 路径可能以 `/data/user/0/...` 或 `/data/data/...` 表示；alpha30 通过 canonical containment 处理当前 app-private staging 场景，但这不是完整 filesystem sandbox。
 
+## 2026-09-16 · Version Identity Correction — alpha31 baseline
+
+### 纠正内容
+
+- alpha30 app-private path validation 修复后的 Runtime source 曾继续沿用 `versionCode=106`、`versionName=0.8.0-alpha30`，与“新 Runtime source → 新 APK → 新版本身份”的规则不一致。
+- 为恢复严格单调且唯一的 APK/source version identity，当前基线提升为 `versionCode=107`、`versionName=0.8.0-alpha31`。
+- 本次 alpha31 只修正版本 metadata，不包含新的 Runtime behavior change；其 Runtime behavior lineage 来自已经通过 Run #90 真机验收的修复后 source。
+- Run #90 的 alpha30 历史证据保持原样：Run #90 / ID `35083943639`、source HEAD `0e2b069d93a0a8cd87df4f57f0e97da1cf918643`、artifact `siftalpha-w0-90`、版本 `106 / 0.8.0-alpha30` 及其真实设备 A → B → C cooperative STOP → A re-entry 结果均不改写。
+- 后续新的 Runtime source behavior changes 必须从 `107 / 0.8.0-alpha31` 之后继续单调递增。
