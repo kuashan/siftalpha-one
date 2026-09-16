@@ -40,6 +40,8 @@ import com.siftalpha.studio.runtime.RuntimeLifecycleOperation
 import com.siftalpha.studio.runtime.RuntimeLifecycleResolver
 import com.siftalpha.studio.runtime.RuntimeLifecycleState
 import com.siftalpha.studio.runtime.RuntimeLifecycleStore
+import com.siftalpha.studio.runtime.RuntimeOwnership
+import com.siftalpha.studio.runtime.RuntimeOwnershipPolicy
 import com.siftalpha.studio.runtime.RuntimeResult
 import com.siftalpha.studio.runtime.RuntimeState
 import com.siftalpha.studio.runtime.RuntimeWebAvailabilityTracker
@@ -107,14 +109,19 @@ open class V04Activity : StudioActivity() {
     private var refreshGeneration = 0L
     private var activityStarted = false
     private val embeddedStartExecutor = Executors.newSingleThreadExecutor()
-    private val embeddedProjects = mutableSetOf<String>()
     private val embeddedStartInFlight = mutableSetOf<String>()
     private val embeddedLastSnapshots = mutableMapOf<String, EmbeddedPythonSnapshot>()
+    private val embeddedRuntimeOwnership = mutableMapOf<String, RuntimeOwnership>()
     private var embeddedPollProject: V04ProjectGateway.RuntimeProject? = null
     private val embeddedPollRunnable = object : Runnable {
         override fun run() {
             val project = embeddedPollProject ?: return
             if (!activityStarted || isFinishing || isDestroyed) return
+            val stateKey = project.summary.documentId
+            if (embeddedRuntimeOwnership[stateKey] == RuntimeOwnership.EXTERNAL_PROVIDER) {
+                embeddedPollProject = null
+                return
+            }
             val snapshot = runCatching {
                 runtime.embeddedPythonSnapshotFor(project.summary.documentId)
             }.getOrNull() ?: return
@@ -435,7 +442,9 @@ open class V04Activity : StudioActivity() {
             val snapshot = runCatching {
                 runtime.embeddedPythonSnapshotFor(data.project.summary.documentId)
             }.getOrNull()
-            snapshot != null && isEmbeddedActive(snapshot)
+            snapshot != null &&
+                ownsEmbeddedObservation(data.project.summary.documentId, snapshot) &&
+                isEmbeddedActive(snapshot)
         }?.project?.let(::scheduleEmbeddedPolling)
         projectOutputs.retainOnly(projects.map { it.folderName }.toSet())
         if (result.cards.isEmpty()) {
@@ -485,11 +494,12 @@ open class V04Activity : StudioActivity() {
             runtime.embeddedPythonSnapshotFor(stateKey)
         }.getOrNull()
         val embeddedSnapshot = embeddedCandidate?.takeIf {
-            isEmbeddedActive(it) || stateKey in embeddedProjects || stateKey in embeddedStartInFlight
+            ownsEmbeddedObservation(stateKey, it)
         }
         val embeddedRuntimeState = embeddedSnapshot?.let { EmbeddedPythonRuntimeStateMapping.toRuntimeState(it) }
         val typedState = embeddedRuntimeState ?: typedStates[stateKey] ?: RuntimeState.UNKNOWN
         val runtimeSelection = projectRuntimeSelectionStore.read(stateKey)
+        val embeddedObservationOwned = embeddedSnapshot != null
         val embeddedActive = embeddedSnapshot?.let(::isEmbeddedActive) == true
         val webSnapshot = webStateStore.snapshot(stateKey)
         val configuredWebUrl = webProfile.configuredLocalUrl()
@@ -763,7 +773,7 @@ open class V04Activity : StudioActivity() {
                 }
                 ProjectActionPolicy.Action.STATUS -> {
                     box.addView(button(getString(R.string.runtime_button_status)) {
-                        if (embeddedSnapshot != null) refreshEmbeddedProject(project) else dispatch(project, ProjectRuntimeController.Action.STATUS)
+                        if (embeddedObservationOwned) refreshEmbeddedProject(project) else dispatch(project, ProjectRuntimeController.Action.STATUS)
                     })
                 }
                 null,
@@ -798,12 +808,12 @@ open class V04Activity : StudioActivity() {
             }.apply { isEnabled = embeddedActive || policy.isEnabled(ProjectActionPolicy.Action.STOP) }
         row2.addView(stopButton, weight())
         val statusButton = smallButton(getString(R.string.runtime_button_status)) {
-                if (embeddedSnapshot != null) refreshEmbeddedProject(project) else dispatch(project, ProjectRuntimeController.Action.STATUS)
-            }.apply { isEnabled = embeddedSnapshot != null || policy.isEnabled(ProjectActionPolicy.Action.STATUS) }
+                if (embeddedObservationOwned) refreshEmbeddedProject(project) else dispatch(project, ProjectRuntimeController.Action.STATUS)
+            }.apply { isEnabled = embeddedObservationOwned || policy.isEnabled(ProjectActionPolicy.Action.STATUS) }
         row2.addView(statusButton, weight().apply { marginStart = dp(5) })
         val logsButton = smallButton(getString(R.string.runtime_button_refresh_logs)) {
-                if (embeddedSnapshot != null) refreshEmbeddedProject(project) else dispatch(project, ProjectRuntimeController.Action.LOGS)
-            }.apply { isEnabled = embeddedSnapshot != null || policy.isEnabled(ProjectActionPolicy.Action.LOGS) }
+                if (embeddedObservationOwned) refreshEmbeddedProject(project) else dispatch(project, ProjectRuntimeController.Action.LOGS)
+            }.apply { isEnabled = embeddedObservationOwned || policy.isEnabled(ProjectActionPolicy.Action.LOGS) }
         row2.addView(logsButton, weight().apply { marginStart = dp(5) })
         box.addView(row2)
 
@@ -1295,13 +1305,14 @@ open class V04Activity : StudioActivity() {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 val snapshot = result.getOrNull()
                 if (snapshot != null) {
-                    embeddedProjects += stateKey
+                    embeddedRuntimeOwnership[stateKey] = RuntimeOwnershipPolicy.afterAcceptedStart(
+                        RuntimeControlRequest.EMBEDDED_R,
+                    )
                     embeddedLastSnapshots.remove(stateKey)
                     syncEmbeddedSnapshot(project, snapshot)
                     if (isEmbeddedActive(snapshot)) scheduleEmbeddedPolling(project)
                     refresh()
                 } else {
-                    embeddedProjects.remove(stateKey)
                     typedStates[stateKey] = RuntimeState.ENVIRONMENT_ERROR
                     states[stateKey] = getString(R.string.runtime_start_failed)
                     val error = result.exceptionOrNull()
@@ -1347,10 +1358,16 @@ open class V04Activity : StudioActivity() {
     }
 
     private fun refreshEmbeddedProject(project: V04ProjectGateway.RuntimeProject) {
+        val stateKey = project.summary.documentId
         val snapshot = runCatching {
-            runtime.embeddedPythonSnapshotFor(project.summary.documentId)
+            runtime.embeddedPythonSnapshotFor(stateKey)
         }.getOrNull() ?: return
-        embeddedProjects += project.summary.documentId
+        if (!ownsEmbeddedObservation(stateKey, snapshot)) return
+        if (embeddedRuntimeOwnership[stateKey] != RuntimeOwnership.EXTERNAL_PROVIDER) {
+            embeddedRuntimeOwnership[stateKey] = RuntimeOwnershipPolicy.afterAcceptedStart(
+                RuntimeControlRequest.EMBEDDED_R,
+            )
+        }
         val changed = syncEmbeddedSnapshot(project, snapshot)
         if (changed) refresh()
         if (isEmbeddedActive(snapshot)) scheduleEmbeddedPolling(project)
@@ -1388,6 +1405,25 @@ open class V04Activity : StudioActivity() {
         if (!activityStarted) return
         refreshHandler.removeCallbacks(embeddedPollRunnable)
         refreshHandler.post(embeddedPollRunnable)
+    }
+
+    private fun ownsEmbeddedObservation(
+        projectDocumentId: String,
+        snapshot: EmbeddedPythonSnapshot,
+    ): Boolean = RuntimeOwnershipPolicy.ownsEmbeddedSnapshot(
+        ownership = embeddedRuntimeOwnership[projectDocumentId] ?: RuntimeOwnership.UNKNOWN,
+        state = snapshot.state,
+    )
+
+    private fun markExternalRuntimeOwner(projectDocumentId: String) {
+        embeddedRuntimeOwnership[projectDocumentId] = RuntimeOwnershipPolicy.afterAcceptedStart(
+            RuntimeControlRequest.EXTERNAL_PROVIDER,
+        )
+        embeddedLastSnapshots.remove(projectDocumentId)
+        if (embeddedPollProject?.summary?.documentId == projectDocumentId) {
+            embeddedPollProject = null
+            refreshHandler.removeCallbacks(embeddedPollRunnable)
+        }
     }
 
     private fun isEmbeddedActive(snapshot: EmbeddedPythonSnapshot): Boolean =
@@ -1468,10 +1504,6 @@ open class V04Activity : StudioActivity() {
         // still arrive after that rebuild. Re-check the stable project identity at the side-effect
         // boundary so one project cannot acquire two mutable Runtime operations.
         if (!canDispatch(project, action)) return
-        if (action == ProjectRuntimeController.Action.START) {
-            embeddedProjects.remove(stateKey)
-            embeddedLastSnapshots.remove(stateKey)
-        }
         if (silentRecovery) recoveryProjects += stateKey
         val command = try {
             when (action) {
@@ -1500,6 +1532,9 @@ open class V04Activity : StudioActivity() {
                 refresh()
             }
             return
+        }
+        if (action == ProjectRuntimeController.Action.START) {
+            markExternalRuntimeOwner(stateKey)
         }
         if (
             ::webAvailability.isInitialized &&
