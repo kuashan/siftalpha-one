@@ -4,7 +4,7 @@
 
 ## 文档入口
 
-- [ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)：SiftAlpha M / R / X 的规范架构定义、M ↔ R Interface 原则、Termux/Runtime Provider 分类和 alpha29 evidence scope。
+- [ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)：SiftAlpha M / R / X 的规范架构定义、M ↔ R Interface 原则、Termux/Runtime Provider 分类以及 alpha29/alpha30 evidence scope。
 - [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)：项目目标、基线、架构边界、关键决策和当前状态。
 - [DEV_LOG.md](DEV_LOG.md)：按时间追加的开发、修复、构建、发布和用户验收记录。
 - [TEST_MATRIX.md](TEST_MATRIX.md)：云端验证、APK 安装和真机测试场景的状态。

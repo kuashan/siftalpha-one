@@ -171,6 +171,23 @@ normal completion 与 SystemExit(0) 映射为 SUCCEEDED/exitCode 0；SystemExit(
 
 alpha30 的实现和 fixtures 只覆盖 app-private、file-backed、pure-Python project script execution。它没有实现 pip、requirements/pyproject dependency installation、venv、native wheels、arbitrary C extensions、blocking native/syscall hard-stop、SAF project import through R、并发 sessions、production sandbox 或 M ↔ R production integration。STOP 仍是 cooperative / limited interruption behavior，不是 universal hard-stop。
 
+
+### 4.1.5 alpha30 Real-Device Acceptance Status
+
+Run #90（ID `35083943639`）使用版本 `versionCode=106`、`versionName=0.8.0-alpha30`、source HEAD `0e2b069d93a0a8cd87df4f57f0e97da1cf918643` 和 artifact `siftalpha-w0-90`（ID `10441785815`，digest `sha256:afc012248071e5b43884aa8985ee07e94a4e23e1f7ecf4a5c4a960f01ff228da`）。真实 Android 设备在不重启 App process 的情况下完成：
+
+`Generation 1 PROJECT A success`
+→ `Generation 2 PROJECT B intentional failure`
+→ `Generation 3 PROJECT C running`
+→ `cooperative STOP → STOPPED/exitCode 130`
+→ `Generation 4 PROJECT A new-session re-entry success`。
+
+Test A 确认 CPython `3.14.7`、Android `aarch64`、`sys.platform=android`、`TERMUX=NOT_USED`、`PROOT=NOT_USED`，且此前 `/data/user/0` symlink-component validation error 未复现；Test B 确认 stdout/stderr 和真实 staged `main.py` traceback；Test C 确认当前纯 Python project 的 cooperative STOP。结论为：
+
+**SiftAlpha R Embedded CPython alpha30 Project Script Execution Boundary real-device acceptance = PASS（仅针对 app-private、file-backed、pure-Python fixture 测试范围）。**
+
+这更新了 alpha30 从 source/CI ready 到真实设备验收通过的状态，但不把 R 或 X 写成已完成，也不扩展对 arbitrary external/SAF projects、dependencies、native packages、blocking native/syscall hard-stop、concurrency、process-death recovery、production M ↔ R 或 Web/Browser integration 的承诺。完整设备证据见 [DEV_LOG.md](DEV_LOG.md) 和 [TEST_MATRIX.md](TEST_MATRIX.md)。
+
 ## 5. Runtime Provider 与 SiftAlpha R
 
 ### 5.1 术语区分
@@ -390,7 +407,7 @@ alpha29 不表示 R 已完成，也不表示 X 已达到 acceptance。以下能�
 
 ## 12. 当前变更边界与维护规则
 
-alpha30 在保留 alpha29 lifecycle acceptance 的前提下，增加了实验性 file-backed project-script boundary。当前文档记录的是 source/CI readiness；Run #83 已完成，真实 Android device acceptance 仍需单独执行。
+alpha30 在保留 alpha29 lifecycle acceptance 的前提下，增加了实验性 file-backed project-script boundary。Run #83 完成 source/CI 验证后，Run #90 已完成真实 Android device acceptance；该验收仅在 app-private、file-backed、pure-Python fixture 范围内 PASS，详细证据见 DEV_LOG.md 和 TEST_MATRIX.md。
 
 本轮变更边界：
 

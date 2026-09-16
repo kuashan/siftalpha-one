@@ -289,16 +289,35 @@ Coordinator 不是一次性大规模 UI 重构的要求，而是渐进实现该 
 
 | ID | 场景 | 期望 | 状态 |
 |---|---|---|---|
-| R-14 | Project Execution Specification validation | 明确 project identity、app-private execution root、entrypoint、working directory、runtime kind、session/generation；拒绝 traversal/absolute relative target | unit-test source added；CI pending |
-| R-15 | File-backed PROJECT A | SUCCEEDED/exitCode 0；project-local helper import；真实 __name__、__file__、cwd、sys.argv[0] | instrumentation source added；未执行 |
-| R-16 | File-backed PROJECT B | FAILED；保留 stdout/stderr；exitCode 1；traceback 含真实 main.py，不含 <string> | instrumentation source added；未执行 |
-| R-17 | File-backed PROJECT C cooperative STOP | RUNNING → STOPPED/exitCode 130；STOP diagnostics 保留；stdout/stderr cleanup 正确 | instrumentation source added；未执行 |
+| R-14 | Project Execution Specification validation | 明确 project identity、app-private execution root、entrypoint、working directory、runtime kind、session/generation；拒绝 traversal/absolute relative target | JVM/CI verified（Run #83；Run #90 build success）；instrumentation 未执行 |
+| R-15 | File-backed PROJECT A | SUCCEEDED/exitCode 0；project-local helper import；真实 __name__、__file__、cwd、sys.argv[0] | REAL-DEVICE PASS（Generation 1；Generation 4 re-entry） |
+| R-16 | File-backed PROJECT B | FAILED；保留 stdout/stderr；exitCode 1；traceback 含真实 main.py，不含 <string> | REAL-DEVICE PASS（Generation 2；intentional failure） |
+| R-17 | File-backed PROJECT C cooperative STOP | RUNNING → STOPPED/exitCode 130；STOP diagnostics 保留；stdout/stderr cleanup 正确 | REAL-DEVICE PASS（Generation 3） |
 | R-18 | PROJECT D namespace/module isolation | 新 Session 不继承前一 Session 的 __main__ global 或 helper module | instrumentation source added；未执行 |
 | R-19 | SystemExit mapping | SystemExit(0) → SUCCEEDED/0；SystemExit(7) → FAILED/7；Runtime 可继续 re-entry | instrumentation source added；未执行 |
-| R-20 | Post-STOP project re-entry | STOP terminal cleanup 后新 session/generation 可再次执行 PROJECT A | instrumentation source added；未执行 |
-| R-21 | alpha30 real-device acceptance | 不重启 App：PROJECT A → PROJECT B → PROJECT C RUNNING → STOPPED/130 → PROJECT D/E/F as needed → PROJECT A again；session IDs 不复用、generation 单调 | 待 alpha30 真机 |
+| R-20 | Post-STOP project re-entry | STOP terminal cleanup 后新 session/generation 可再次执行 PROJECT A | REAL-DEVICE PASS（Generation 3 STOP → Generation 4 re-entry） |
+| R-21 | alpha30 real-device acceptance | 不重启 App：PROJECT A → PROJECT B → PROJECT C RUNNING → cooperative STOPPED/130 → PROJECT A again；new Session IDs 不复用、generation 1 → 2 → 3 → 4 单调 | REAL-DEVICE PASS（Run #90；tested fixture scope） |
 
-alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，但 workflow 没有 Android emulator/device，因此没有将这些行标记为 real-device PASS。alpha29 H 节的真实设备证据仍是 accepted baseline，不被 alpha30 source/CI status 替代。
+alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 也完成 CI/build/artifact 验证，但 workflow 没有 Android emulator/device，因此 instrumentation 仍未执行。下方新增的 alpha30 real-device acceptance 仅依据用户提供的真实 Android 设备证据；没有把 source 或 cloud build 写成设备 PASS。alpha29 H 节的历史证据仍作为 accepted baseline 保留。
 
 
 | R-22 | Missing file-backed entrypoint | staging root 中缺失显式 entrypoint 时，R 发布 FAILED/exitCode 1 和明确 entrypoint error；不 fallback | instrumentation source added；未执行 |
+
+
+### I.1 alpha30 Real-Device Acceptance Evidence
+
+证据类别：**REAL-DEVICE EVIDENCE**。以下结果来自同一 Android application process 的连续操作，不是 CI/JVM 推断；instrumentation source 在当前 workflow 中未执行。
+
+构建身份：版本 `106 / 0.8.0-alpha30`；branch `codex/siftalpha-x-embedded-cpython-spike`；source HEAD `0e2b069d93a0a8cd87df4f57f0e97da1cf918643`；Run #90 / ID `35083943639`；artifact `siftalpha-w0-90` / ID `10441785815` / digest `sha256:afc012248071e5b43884aa8985ee07e94a4e23e1f7ecf4a5c4a960f01ff228da`；APK `app-debug.apk` / SHA-256 `d9bdeac5a0df867cc52b5b71226e90a560a831a3097e9341af0f2e1898e2a547`。
+
+| 连续步骤 | 真实设备观察 | 结论 |
+|---|---|---|
+| Generation 1 — PROJECT A | `SUCCEEDED` / `TERMINAL` / STOP `IDLE/NONE` / exit 0；CPython 3.14.7、Android/aarch64、`TERMUX=NOT_USED`、`PROOT=NOT_USED`；project marker、helper import、`__name__=__main__`、真实 staged `__file__`、argv[0]、cwd、stdlib json 均确认；旧 `/data/user/0` symlink-component error 未复现 | PASS |
+| Generation 2 — PROJECT B | `FAILED` / `TERMINAL` / STOP `IDLE/NONE` / exit 1；stdout/stderr marker 保留；traceback 指向真实 `main.py` 第 8 行并以预期 `RuntimeError: SIFTALPHA_X_TEST_B_FAILURE` 结束 | PASS（intentional failure） |
+| Generation 3 — PROJECT C running | `RUNNING` / `RUNTIME_PHASE=PYTHON_EXEC_BEGIN`；STOP `IDLE/NONE` | PASS（STOP 前置条件） |
+| Generation 3 — cooperative STOP | 同一 Session/generation；`STOPPED` / `TERMINAL` / `STOP_REQUEST_RETURNED` / `INTERRUPT_DELIVERED` / exit 130；stdout 含 started、real project file、ticks 和 cooperative-stop marker；stderr `SIFTALPHA_X_STOP=COOPERATIVE`；无普通 FAILED traceback | PASS |
+| Generation 4 — PROJECT A re-entry | STOP 后不重启 App process；new Session；`SUCCEEDED` / `TERMINAL` / STOP `IDLE/NONE` / exit 0；再次确认 CPython 3.14.7、Android/aarch64、project-local import、真实文件语义、正确 cwd、stdlib json、空 stderr | PASS |
+
+正式结论：**SiftAlpha R Embedded CPython alpha30 Project Script Execution Boundary real-device acceptance = PASS（仅针对 app-private、file-backed、pure-Python fixture 测试范围）**。这不表示 R 或 X 已完成。
+
+本证据仍不证明：arbitrary external/SAF project import、pip/dependencies/venv、arbitrary third-party packages/native wheels、arbitrary C extensions、blocking native/syscall hard-stop、concurrent Sessions、process-death recovery、production M ↔ R integration、R Web Discovery/Browser integration 或完整 filesystem sandbox。Android `/data/user/0/...` 与 `/data/data/...` 可能是不同字符串表示；当前结论只依赖 canonical containment 的 app-private staging 语义。

@@ -340,4 +340,19 @@ R 接收显式的 Project Execution Specification：project identity、execution
 
 native R 重复执行 root containment、canonical path、regular-file、directory 和 symlink 校验。执行期间 cwd、TMPDIR、sys.path、sys.argv、temporary __main__ module、stdout/stderr capture 具有 session-scoped 生命周期，并在 terminal cleanup 中恢复。当前 file-backed Python 语义覆盖真实 __name__、__file__、sys.argv[0]、project-local sibling import、真实 traceback filename、SystemExit mapping、Python exception mapping、cooperative STOP 和 post-STOP re-entry。
 
-这不是 arbitrary Python project support、dependency installation、venv、native wheel、C extension interruption、universal hard-stop、并发 Runtime 或生产级 sandbox。alpha30 的状态是 source/CI ready for real-device acceptance；真实设备需要验证 PROJECT A/B/C、missing entrypoint、namespace isolation、SystemExit 和 STOP 后 re-entry。
+这不是 arbitrary Python project support、dependency installation、venv、native wheel、C extension interruption、universal hard-stop、并发 Runtime 或生产级 sandbox。在真实设备验收前，alpha30 曾处于 source/CI ready；随后 Run #90 已对当前测试范围完成真实设备验收，详细证据见 [DEV_LOG.md](DEV_LOG.md) 和 [TEST_MATRIX.md](TEST_MATRIX.md)。
+
+
+### 13.1 alpha30 Real-Device Acceptance Evidence
+
+Run #90（ID `35083943639`）对应源码 HEAD `0e2b069d93a0a8cd87df4f57f0e97da1cf918643`、版本 `106 / 0.8.0-alpha30` 和 artifact `siftalpha-w0-90`（ID `10441785815`，digest `sha256:afc012248071e5b43884aa8985ee07e94a4e23e1f7ecf4a5c4a960f01ff228da`；APK SHA-256 `d9bdeac5a0df867cc52b5b71226e90a560a831a3097e9341af0f2e1898e2a547`）。用户在真实 Android 设备上确认了连续链：
+
+`generation 1 PROJECT A → SUCCEEDED`
+→ `generation 2 PROJECT B → intentional FAILED/exitCode 1`
+→ `generation 3 PROJECT C → RUNNING`
+→ `cooperative STOP → STOPPED/exitCode 130`
+→ `generation 4 PROJECT A → new Session / SUCCEEDED`。
+
+设备确认 CPython `3.14.7`、Android `aarch64`、`sys.platform=android`，且该测试路径 `TERMUX=NOT_USED`、`PROOT=NOT_USED`。Test A 的 app-private path validation 错误未复现；Test B 的 stdout/stderr 和真实 `main.py` traceback、Test C 的 cooperative STOP 以及 STOP 后 re-entry 均 PASS。
+
+因此：**SiftAlpha R Embedded CPython alpha30 Project Script Execution Boundary real-device acceptance = PASS（仅针对上述 app-private、file-backed、pure-Python fixture 范围）**。这不表示 R 或 X 完成，也不证明 arbitrary external/SAF projects、dependency installation、arbitrary third-party/native packages、blocking native/syscall hard-stop、concurrent Sessions、process-death recovery 或 production M ↔ R / Web / Browser integration。

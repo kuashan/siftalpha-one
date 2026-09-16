@@ -540,7 +540,7 @@ SiftAlpha X 的第一项工程工作是 Runtime Architecture Audit，而不是�
 
 ### 当前验证状态
 
-本提交完成后应由 GitHub Actions 执行 CPython preparation、JVM tests、CMake/native、assembleDebug、signing 和 artifact evidence。alpha30 在 CI 成功后状态为 source/CI ready for real-device acceptance；真实设备验收仍需单独记录，不能由 instrumentation source 或 cloud build 替代。
+该段记录 alpha30 实现提交时的 source/CI 状态；随后 Run #90 的真实 Android 设备验收已在本日志后续条目中单独记录。instrumentation source 和 cloud build 仍不能替代真实设备证据。
 
 ### 已知限制
 
@@ -569,4 +569,131 @@ SiftAlpha X 的第一项工程工作是 Runtime Architecture Audit，而不是�
 - Gradle task：testDebugUnitTest assembleDebug；当前源码 49 个 JVM test files、323 个 @Test methods；任务成功。
 - instrumentation：source 已加入，但当前 workflow 没有编译 androidTest target、Android emulator/device；未执行，不标记 PASS。
 - APK 内含 A/B/C/D、SystemExit 和 missing-entrypoint fixtures；这只证明打包，不替代真实设备执行。
+
+
+
+## 2026-09-16 · alpha30 Real-Device Acceptance Evidence Consolidation
+
+### 证据分类与构建身份
+
+本条归档的是用户在真实 Android 设备上连续执行得到的 **REAL-DEVICE EVIDENCE**，不是 instrumentation source 或 CI 推断。CI / JVM / APK 构建证据单独记录；没有把 instrumentation source 写成已执行。
+
+- 版本：`versionCode=106`、`versionName=0.8.0-alpha30`；
+- 测试分支：`codex/siftalpha-x-embedded-cpython-spike`；
+- 测试源码 HEAD：`0e2b069d93a0a8cd87df4f57f0e97da1cf918643`；
+- GitHub Actions：SiftAlpha W0 Cloud Build Run #90，Run ID `35083943639`；
+- artifact：`siftalpha-w0-90`，Artifact ID `10441785815`；
+- artifact digest：`sha256:afc012248071e5b43884aa8985ee07e94a4e23e1f7ecf4a5c4a960f01ff228da`；
+- APK：`app-debug.apk`；
+- APK SHA-256：`d9bdeac5a0df867cc52b5b71226e90a560a831a3097e9341af0f2e1898e2a547`。
+
+### Generation 1 — Test A（真实设备）
+
+- `PROJECT_ID=fixture-project-a`；
+- `GENERATION=1`；
+- `STATE=SUCCEEDED`、`RUNTIME_PHASE=TERMINAL`；
+- `STOP_PHASE=IDLE`、`STOP_RESULT=NONE`；
+- `exitCode=0`；
+- Embedded CPython `3.14.7`、`sys.platform=android`、`platform.machine=aarch64`；
+- `TERMUX=NOT_USED`、`PROOT=NOT_USED`；
+- stdout 确认 `SIFTALPHA_X_PROJECT_A_SUCCESS`、helper import 的 `PROJECT_A_HELPER`、`__name__=__main__`、真实 staged `__file__`、真实 staged `argv[0]`、app-private staged working directory 和 stdlib `json PASS`；
+- stderr 为空。
+
+此前的 Android app-private path 错误 `SIFTALPHA_X_PROJECT_SPEC_ERROR=symlink path components are not supported: /data/user/0` 未再次出现，Python 已真正开始并完成 file-backed project execution。因此 Android App-private Path Validation Repair 的真实设备 Test A = PASS。
+
+### Generation 2 — Test B（真实设备）
+
+- `PROJECT_ID=fixture-project-b`；
+- `GENERATION=2`；
+- `STATE=FAILED`、`RUNTIME_PHASE=TERMINAL`；
+- `STOP_PHASE=IDLE`、`STOP_RESULT=NONE`；
+- `exitCode=1`；
+- stdout：`SIFTALPHA_X_TEST_B_STDOUT`、`SIFTALPHA_X_PROJECT_B_FAILURE`；
+- stderr：`SIFTALPHA_X_TEST_B_STDERR`；
+- traceback 指向真实 staged `.../main.py` 第 8 行，并以 `RuntimeError: SIFTALPHA_X_TEST_B_FAILURE` 结束，不是 `<string>`。
+
+这是预期的 intentional Python failure；stdout、stderr 和真实文件 traceback 行为 = PASS。
+
+### Generation 3 — Test C running（真实设备）
+
+- `PROJECT_ID=fixture-project-c`；
+- `GENERATION=3`；
+- `STATE=RUNNING`；
+- `RUNTIME_PHASE=PYTHON_EXEC_BEGIN`；
+- `STOP_PHASE=IDLE`、`STOP_RESULT=NONE`；
+- exit code 当时尚不可用。
+
+这证明真实 project script 已进入 active Python execution，是 STOP 验收前置条件 = PASS。
+
+### Generation 3 — Test C cooperative STOP（真实设备）
+
+STOP 使用与 running Test C 相同的 Session ID 和 generation 3。最终观察为：
+
+- `STATE=STOPPED`、`RUNTIME_PHASE=TERMINAL`；
+- `STOP_PHASE=STOP_REQUEST_RETURNED`；
+- `STOP_RESULT=INTERRUPT_DELIVERED`；
+- `exitCode=130`；
+- stdout 含 `SIFTALPHA_X_TEST_C_STARTED`、`PROJECT_C_FILE`、多次 `SIFTALPHA_X_TEST_C_TICK` 和最终 `SIFTALPHA_X_TEST_C_COOPERATIVE_STOP`；
+- stderr：`SIFTALPHA_X_STOP=COOPERATIVE`；
+- 未观察到普通 FAILED traceback。
+
+Python-layer cooperative STOP for the tested long-running project = PASS。该结果不扩展为 blocking native code、blocking native extension、任意 C extension 或 uninterruptible syscall 的 hard-stop 保证。
+
+### Generation 4 — Test A re-entry（真实设备）
+
+STOP 完成后不重启 Android application process，创建新的 Session：
+
+- `PROJECT_ID=fixture-project-a`；
+- `GENERATION=4`；
+- `STATE=SUCCEEDED`、`RUNTIME_PHASE=TERMINAL`；
+- `STOP_PHASE=IDLE`、`STOP_RESULT=NONE`；
+- `exitCode=0`；
+- 再次确认 CPython `3.14.7`、`sys.platform=android`、`aarch64`、`TERMUX=NOT_USED`、`PROOT=NOT_USED`、stdlib `json PASS`、project success/helper import、`__name__=__main__`、真实 `__file__`、真实 `argv[0]`、正确 project working directory 和空 stderr。
+
+### 正式验收结论
+
+连续真实设备生命周期为：
+
+`Generation 1 PROJECT A success`
+→ `Generation 2 PROJECT B intentional failure`
+→ `Generation 3 PROJECT C running`
+→ `cooperative STOP`
+→ `Generation 4 PROJECT A new-session re-entry success`。
+
+结论：
+
+**SiftAlpha R Embedded CPython alpha30 Project Script Execution Boundary real-device acceptance = PASS（仅针对上述 app-private、file-backed、pure-Python fixture 测试范围）。**
+
+这形成了当前测试范围内的：
+
+`Project Identity`
+→ `Execution Specification`
+→ `app-private staged project root`
+→ `real Python entrypoint`
+→ `Session`
+→ `Generation`
+→ `Success / Failure`
+→ `cooperative STOP`
+→ `cleanup`
+→ `re-entry`
+
+闭环。该结论不表示 R 已完成，也不表示 X 已完成。
+
+### alpha30 未被本证据证明的能力
+
+仍未实现或未被本验收证明的能力包括：
+
+- arbitrary external project import；
+- SAF project import/integration；
+- pip、requirements/pyproject dependency installation、venv；
+- arbitrary third-party packages、native wheels；
+- arbitrary C extensions；
+- blocking native code/syscalls 的 hard-stop；
+- concurrent Sessions、多项目并发；
+- full process-death recovery；
+- production M ↔ R integration；
+- R Web Discovery / Browser integration；
+- production-grade sandboxing。
+
+Android 路径可能以 `/data/user/0/...` 或 `/data/data/...` 表示；alpha30 通过 canonical containment 处理当前 app-private staging 场景，但这不是完整 filesystem sandbox。
 
