@@ -3,7 +3,7 @@
     <string name="home_siftalpha_x_experimental">SiftAlpha X 实验功能</string>
     <string name="siftalpha_x_title">SiftAlpha X Experimental</string>
     <string name="siftalpha_x_subtitle">在应用私有目录中运行固定的内置 CPython 脚本。</string>
-    <string name="siftalpha_x_one_session_notice">本概念验证每个应用进程只支持一个会话；停止是协作式的，不是强制终止线程。</string>
+    <string name="siftalpha_x_one_session_notice">同一时刻只运行一个会话；终态结果会保留到下一次运行。停止是协作式的，不是强制终止线程。</string>
     <string name="siftalpha_x_test_a">TEST A · 正常执行</string>
     <string name="siftalpha_x_test_b">TEST B · stdout / stderr / 失败</string>
     <string name="siftalpha_x_test_c">TEST C · 长时间会话</string>

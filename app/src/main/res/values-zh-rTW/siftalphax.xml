@@ -3,7 +3,7 @@
     <string name="home_siftalpha_x_experimental">SiftAlpha X 實驗功能</string>
     <string name="siftalpha_x_title">SiftAlpha X Experimental</string>
     <string name="siftalpha_x_subtitle">在應用程式私有儲存空間中執行固定的內嵌 CPython 指令碼。</string>
-    <string name="siftalpha_x_one_session_notice">此 PoC 每個應用程式程序只支援一個工作階段；停止是協作式的，不是強制終止執行緒。</string>
+    <string name="siftalpha_x_one_session_notice">同一時間只執行一個工作階段；終端結果會保留到下一次執行。停止是協作式的，不是強制終止執行緒。</string>
     <string name="siftalpha_x_test_a">TEST A · 正常執行</string>
     <string name="siftalpha_x_test_b">TEST B · stdout / stderr / 失敗</string>
     <string name="siftalpha_x_test_c">TEST C · 長時間工作階段</string>

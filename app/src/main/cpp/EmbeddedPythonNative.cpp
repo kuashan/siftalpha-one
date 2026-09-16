@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits.h>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -125,6 +126,18 @@ std::string jsonLong(std::int64_t value) {
     return std::to_string(value);
 }
 
+struct SessionSnapshot {
+    std::string sessionId;
+    std::int64_t generation = 0;
+    std::int64_t startedAtEpochMs = 0;
+    std::int64_t finishedAtEpochMs = 0;
+    SessionState state = SessionState::IDLE;
+    int exitCode = 0;
+    bool hasExitCode = false;
+    std::string stdoutText;
+    std::string stderrText;
+};
+
 struct Session {
     std::mutex mutex;
     std::string sessionId;
@@ -145,7 +158,8 @@ struct Session {
 };
 
 std::mutex gSessionMutex;
-Session* gSession = nullptr;
+std::shared_ptr<Session> gSession;
+SessionSnapshot gLastTerminalSnapshot;
 
 void setState(Session* session, SessionState state) {
     std::lock_guard<std::mutex> lock(session->mutex);
@@ -159,6 +173,47 @@ void setFailure(Session* session, const std::string& message) {
     session->exitCode = 1;
     session->stderrText = boundedOutput(session->stderrText + message + "\n");
     session->finishedAtEpochMs = nowEpochMillis();
+}
+
+void finishSession(
+    Session* session,
+    SessionState state,
+    int exitCode,
+    const std::string& stdoutText,
+    const std::string& stderrText) {
+    std::lock_guard<std::mutex> lock(session->mutex);
+    session->stdoutText = stdoutText;
+    session->stderrText = stderrText;
+    session->state = state;
+    session->hasExitCode = true;
+    session->exitCode = exitCode;
+    session->finishedAtEpochMs = nowEpochMillis();
+}
+
+SessionSnapshot snapshotData(Session* session) {
+    std::lock_guard<std::mutex> lock(session->mutex);
+    SessionSnapshot snapshot;
+    snapshot.sessionId = session->sessionId;
+    snapshot.generation = session->generation;
+    snapshot.startedAtEpochMs = session->startedAtEpochMs;
+    snapshot.finishedAtEpochMs = session->finishedAtEpochMs;
+    snapshot.state = session->state;
+    snapshot.exitCode = session->exitCode;
+    snapshot.hasExitCode = session->hasExitCode;
+    snapshot.stdoutText = session->stdoutText;
+    snapshot.stderrText = session->stderrText;
+    return snapshot;
+}
+
+void publishTerminalSession(const std::shared_ptr<Session>& session) {
+    std::lock_guard<std::mutex> lock(gSessionMutex);
+    const SessionSnapshot terminal = snapshotData(session.get());
+    if (terminal.generation >= gLastTerminalSnapshot.generation) {
+        gLastTerminalSnapshot = terminal;
+    }
+    if (gSession.get() == session.get()) {
+        gSession.reset();
+    }
 }
 
 void logSessionResult(Session* session) {
@@ -270,9 +325,14 @@ public:
     }
 
     ~WorkingDirectoryGuard() {
+        restore();
+    }
+
+    void restore() {
         if (changed_ && !previous_.empty()) {
             chdir(previous_.c_str());
         }
+        changed_ = false;
     }
 
     bool changed() const {
@@ -284,7 +344,7 @@ private:
     bool changed_ = false;
 };
 
-void runSession(Session* session) {
+void runSession(const std::shared_ptr<Session>& session) {
     __android_log_print(ANDROID_LOG_INFO, kLogTag,
                         "SIFTALPHA_X_ENGINE=CPYTHON SIFTALPHA_X_TERMUX=NOT_USED "
                         "SIFTALPHA_X_RUN_COMMAND=NOT_USED SIFTALPHA_X_PROOT=NOT_USED "
@@ -298,46 +358,51 @@ void runSession(Session* session) {
     mkdir(tmpDirectory.c_str(), 0700);
     setenv("TMPDIR", tmpDirectory.c_str(), 1);
     WorkingDirectoryGuard workingDirectory(session->home);
+    auto failBeforePython = [&](const std::string& message) {
+        workingDirectory.restore();
+        setFailure(session.get(), message);
+        publishTerminalSession(session);
+        logSessionResult(session.get());
+    };
     if (!workingDirectory.changed()) {
-        setFailure(session, "SIFTALPHA_X_CWD_ERROR=unable to enter app-private runtime directory");
-        logSessionResult(session);
+        failBeforePython("SIFTALPHA_X_CWD_ERROR=unable to enter app-private runtime directory");
         return;
     }
 
-    PyConfig config;
-    PyConfig_InitPythonConfig(&config);
-    config.use_environment = 0;
-    config.user_site_directory = 0;
-    config.install_signal_handlers = 0;
-    config.parse_argv = 0;
+    if (!Py_IsInitialized()) {
+        PyConfig config;
+        PyConfig_InitPythonConfig(&config);
+        config.use_environment = 0;
+        config.user_site_directory = 0;
+        config.install_signal_handlers = 0;
+        config.parse_argv = 0;
 
-    char program[] = "siftalpha-x";
-    char* argv[] = {program, nullptr};
-    PyStatus status = PyConfig_SetBytesArgv(&config, 1, argv);
-    if (PyStatus_Exception(status)) {
-        std::string message = status.err_msg == nullptr ? "CPython argv setup failed" : status.err_msg;
+        char program[] = "siftalpha-x";
+        char* argv[] = {program, nullptr};
+        PyStatus status = PyConfig_SetBytesArgv(&config, 1, argv);
+        if (PyStatus_Exception(status)) {
+            std::string message = status.err_msg == nullptr ? "CPython argv setup failed" : status.err_msg;
+            PyConfig_Clear(&config);
+            failBeforePython(message);
+            return;
+        }
+        status = PyConfig_SetBytesString(&config, &config.home, session->home.c_str());
+        if (PyStatus_Exception(status)) {
+            std::string message = status.err_msg == nullptr ? "CPython home setup failed" : status.err_msg;
+            PyConfig_Clear(&config);
+            failBeforePython(message);
+            return;
+        }
+        status = Py_InitializeFromConfig(&config);
         PyConfig_Clear(&config);
-        setFailure(session, message);
-        logSessionResult(session);
-        return;
-    }
-    status = PyConfig_SetBytesString(&config, &config.home, session->home.c_str());
-    if (PyStatus_Exception(status)) {
-        std::string message = status.err_msg == nullptr ? "CPython home setup failed" : status.err_msg;
-        PyConfig_Clear(&config);
-        setFailure(session, message);
-        logSessionResult(session);
-        return;
-    }
-    status = Py_InitializeFromConfig(&config);
-    PyConfig_Clear(&config);
-    if (PyStatus_Exception(status)) {
-        std::string message = status.err_msg == nullptr ? "CPython initialization failed" : status.err_msg;
-        setFailure(session, message);
-        logSessionResult(session);
-        return;
+        if (PyStatus_Exception(status)) {
+            std::string message = status.err_msg == nullptr ? "CPython initialization failed" : status.err_msg;
+            failBeforePython(message);
+            return;
+        }
     }
 
+    PyGILState_STATE pythonGilState = PyGILState_Ensure();
     PyThreadState* threadState = PyThreadState_Get();
     session->pythonThreadId.store(
         static_cast<unsigned long>(PyThreadState_GetID(threadState)),
@@ -354,17 +419,19 @@ void runSession(Session* session) {
         installCapture(sysModule, ioModule, &originalStdout, &originalStderr,
                        &capturedStdout, &capturedStderr);
 
+    SessionState terminalState = SessionState::FAILED;
+    int terminalExitCode = 1;
+    std::string stdoutText;
+    std::string stderrText;
+    std::string failureMessage;
     if (!captureInstalled) {
         appendPythonTraceback();
-        setFailure(session, "SIFTALPHA_X_CAPTURE_ERROR=unable to install stdout/stderr capture");
+        failureMessage = "SIFTALPHA_X_CAPTURE_ERROR=unable to install stdout/stderr capture";
     } else if (session->stopRequested.load(std::memory_order_acquire)) {
-        std::lock_guard<std::mutex> lock(session->mutex);
-        session->state = SessionState::STOPPED;
-        session->hasExitCode = true;
-        session->exitCode = 130;
-        session->finishedAtEpochMs = nowEpochMillis();
+        terminalState = SessionState::STOPPED;
+        terminalExitCode = 130;
     } else {
-        setState(session, SessionState::RUNNING);
+        setState(session.get(), SessionState::RUNNING);
         PyObject* mainModule = PyImport_AddModule("__main__");
         PyObject* mainDict = mainModule == nullptr ? nullptr : PyModule_GetDict(mainModule);
         PyObject* result = mainDict == nullptr
@@ -376,24 +443,17 @@ void runSession(Session* session) {
             appendPythonTraceback();
         }
 
-        std::string stdoutText = stringIoValue(capturedStdout);
-        std::string stderrText = stringIoValue(capturedStderr);
-        {
-            std::lock_guard<std::mutex> lock(session->mutex);
-            session->stdoutText = stdoutText;
-            session->stderrText = stderrText;
-            session->hasExitCode = true;
-            if (session->stopDelivered.load(std::memory_order_acquire)) {
-                session->state = SessionState::STOPPED;
-                session->exitCode = 130;
-            } else if (result != nullptr) {
-                session->state = SessionState::SUCCEEDED;
-                session->exitCode = 0;
-            } else {
-                session->state = SessionState::FAILED;
-                session->exitCode = 1;
-            }
-            session->finishedAtEpochMs = nowEpochMillis();
+        stdoutText = stringIoValue(capturedStdout);
+        stderrText = stringIoValue(capturedStderr);
+        if (session->stopDelivered.load(std::memory_order_acquire)) {
+            terminalState = SessionState::STOPPED;
+            terminalExitCode = 130;
+        } else if (result != nullptr) {
+            terminalState = SessionState::SUCCEEDED;
+            terminalExitCode = 0;
+        } else {
+            terminalState = SessionState::FAILED;
+            terminalExitCode = 1;
         }
     }
 
@@ -401,28 +461,36 @@ void runSession(Session* session) {
     Py_XDECREF(sysModule);
     Py_XDECREF(ioModule);
     session->pythonReady.store(false, std::memory_order_release);
-    logSessionResult(session);
+    PyGILState_Release(pythonGilState);
+    workingDirectory.restore();
+
+    if (!failureMessage.empty()) {
+        setFailure(session.get(), failureMessage);
+    } else {
+        finishSession(session.get(), terminalState, terminalExitCode, stdoutText, stderrText);
+    }
+    publishTerminalSession(session);
+    logSessionResult(session.get());
 }
 
-std::string snapshotJson(Session* session) {
-    std::lock_guard<std::mutex> lock(session->mutex);
+std::string snapshotJson(const SessionSnapshot& snapshot) {
     std::string json = "{";
-    json += "\"sessionId\":" + jsonString(session->sessionId);
-    json += ",\"generation\":" + jsonLong(session->generation);
-    json += ",\"state\":" + jsonString(stateName(session->state));
-    json += ",\"startedAtEpochMs\":" + jsonLong(session->startedAtEpochMs);
-    if (session->finishedAtEpochMs == 0) {
+    json += "\"sessionId\":" + jsonString(snapshot.sessionId);
+    json += ",\"generation\":" + jsonLong(snapshot.generation);
+    json += ",\"state\":" + jsonString(stateName(snapshot.state));
+    json += ",\"startedAtEpochMs\":" + jsonLong(snapshot.startedAtEpochMs);
+    if (snapshot.finishedAtEpochMs == 0) {
         json += ",\"finishedAtEpochMs\":null";
     } else {
-        json += ",\"finishedAtEpochMs\":" + jsonLong(session->finishedAtEpochMs);
+        json += ",\"finishedAtEpochMs\":" + jsonLong(snapshot.finishedAtEpochMs);
     }
-    if (session->hasExitCode) {
-        json += ",\"exitCode\":" + std::to_string(session->exitCode);
+    if (snapshot.hasExitCode) {
+        json += ",\"exitCode\":" + std::to_string(snapshot.exitCode);
     } else {
         json += ",\"exitCode\":null";
     }
-    json += ",\"stdout\":" + jsonString(session->stdoutText);
-    json += ",\"stderr\":" + jsonString(session->stderrText);
+    json += ",\"stdout\":" + jsonString(snapshot.stdoutText);
+    json += ",\"stderr\":" + jsonString(snapshot.stderrText);
     json += "}";
     return json;
 }
@@ -472,19 +540,38 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeStart(
         return JNI_FALSE;
     }
 
-    std::lock_guard<std::mutex> lock(gSessionMutex);
-    if (gSession != nullptr) {
-        return JNI_FALSE;
+    std::shared_ptr<Session> session;
+    {
+        std::lock_guard<std::mutex> lock(gSessionMutex);
+        if (gSession != nullptr) {
+            SessionState state;
+            {
+                std::lock_guard<std::mutex> sessionLock(gSession->mutex);
+                state = gSession->state;
+            }
+            if (state != SessionState::SUCCEEDED &&
+                state != SessionState::FAILED &&
+                state != SessionState::STOPPED) {
+                return JNI_FALSE;
+            }
+            const SessionSnapshot terminal = snapshotData(gSession.get());
+            if (terminal.generation >= gLastTerminalSnapshot.generation) {
+                gLastTerminalSnapshot = terminal;
+            }
+            gSession.reset();
+        }
+        session = std::make_shared<Session>();
+        session->sessionId = id;
+        session->home = homePath;
+        session->script = scriptText;
+        session->generation = static_cast<std::int64_t>(generation);
+        session->startedAtEpochMs = nowEpochMillis();
+        session->state = SessionState::STARTING;
+        gSession = session;
     }
-    Session* session = new Session();
-    session->sessionId = id;
-    session->home = homePath;
-    session->script = scriptText;
-    session->generation = static_cast<std::int64_t>(generation);
-    session->startedAtEpochMs = nowEpochMillis();
-    session->state = SessionState::STARTING;
-    gSession = session;
-    std::thread(runSession, session).detach();
+    std::thread([session]() {
+        runSession(session);
+    }).detach();
     return JNI_TRUE;
 }
 
@@ -492,11 +579,14 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeRequestStop(
     JNIEnv*,
     jclass) {
-    std::lock_guard<std::mutex> lock(gSessionMutex);
-    if (gSession == nullptr) {
+    std::shared_ptr<Session> session;
+    {
+        std::lock_guard<std::mutex> lock(gSessionMutex);
+        session = gSession;
+    }
+    if (session == nullptr) {
         return JNI_FALSE;
     }
-    Session* session = gSession;
     SessionState state;
     {
         std::lock_guard<std::mutex> sessionLock(session->mutex);
@@ -509,20 +599,24 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeRequestStop(
     if (!session->pythonReady.load(std::memory_order_acquire)) {
         return JNI_TRUE;
     }
-    return requestPythonStop(session) == 0 ? JNI_TRUE : JNI_FALSE;
+    return requestPythonStop(session.get()) == 0 ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeSnapshot(
     JNIEnv* env,
     jclass) {
-    std::lock_guard<std::mutex> lock(gSessionMutex);
-    if (gSession == nullptr) {
-        return env->NewStringUTF(
-            "{\"sessionId\":\"\",\"generation\":0,\"state\":\"IDLE\","
-            "\"startedAtEpochMs\":null,\"finishedAtEpochMs\":null,\"exitCode\":null,"
-            "\"stdout\":\"\",\"stderr\":\"\"}");
+    std::shared_ptr<Session> session;
+    SessionSnapshot terminal;
+    {
+        std::lock_guard<std::mutex> lock(gSessionMutex);
+        session = gSession;
+        if (session == nullptr) {
+            terminal = gLastTerminalSnapshot;
+        }
     }
-    const std::string json = snapshotJson(gSession);
+    const std::string json = session == nullptr
+        ? snapshotJson(terminal)
+        : snapshotJson(snapshotData(session.get()));
     return env->NewStringUTF(json.c_str());
 }

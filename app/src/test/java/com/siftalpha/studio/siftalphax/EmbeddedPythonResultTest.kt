@@ -52,8 +52,12 @@ class EmbeddedPythonResultTest {
     }
 
     @Test
-    fun policyAllowsOnlyIdleStartAndRunningStop() {
+    fun policyAllowsOnlyOneActiveSessionAndRunningStop() {
         assertTrue(EmbeddedPythonStatePolicy.canStart(EmbeddedPythonState.IDLE))
+        assertTrue(EmbeddedPythonStatePolicy.canStart(EmbeddedPythonState.SUCCEEDED))
+        assertTrue(EmbeddedPythonStatePolicy.canStart(EmbeddedPythonState.FAILED))
+        assertTrue(EmbeddedPythonStatePolicy.canStart(EmbeddedPythonState.STOPPED))
+        assertFalse(EmbeddedPythonStatePolicy.canStart(EmbeddedPythonState.STARTING))
         assertFalse(EmbeddedPythonStatePolicy.canStart(EmbeddedPythonState.RUNNING))
         assertTrue(EmbeddedPythonStatePolicy.canStop(EmbeddedPythonState.STARTING))
         assertTrue(EmbeddedPythonStatePolicy.canStop(EmbeddedPythonState.RUNNING))

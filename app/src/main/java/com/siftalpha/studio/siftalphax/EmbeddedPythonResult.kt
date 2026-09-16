@@ -8,7 +8,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
-/** The deliberately small state model used by the experimental single-session CPython PoC. */
+/** The deliberately small state model used by the experimental single-active-session PoC. */
 enum class EmbeddedPythonState {
     IDLE,
     STARTING,
@@ -65,7 +65,8 @@ object EmbeddedPythonSnapshotParser {
 }
 
 object EmbeddedPythonStatePolicy {
-    fun canStart(state: EmbeddedPythonState): Boolean = state == EmbeddedPythonState.IDLE
+    fun canStart(state: EmbeddedPythonState): Boolean =
+        state == EmbeddedPythonState.IDLE || isTerminal(state)
 
     fun canStop(state: EmbeddedPythonState): Boolean =
         state == EmbeddedPythonState.STARTING || state == EmbeddedPythonState.RUNNING

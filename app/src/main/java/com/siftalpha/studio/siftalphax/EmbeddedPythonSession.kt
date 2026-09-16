@@ -6,8 +6,8 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Process-scoped manager for the PoC. It intentionally supports one interpreter session per app
- * process because this spike does not claim a general multi-interpreter or forced-kill model.
+ * Process-scoped manager for the PoC. It allows one active interpreter session at a time and
+ * retains the last terminal result while the app process remains alive.
  */
 class EmbeddedPythonSession private constructor(context: Context) {
     private val appContext = context.applicationContext
@@ -21,7 +21,7 @@ class EmbeddedPythonSession private constructor(context: Context) {
     fun start(scenario: EmbeddedPythonScenario): EmbeddedPythonSnapshot {
         val current = snapshot()
         check(EmbeddedPythonStatePolicy.canStart(current.state)) {
-            "This PoC supports one session per app process; current state is ${current.state}"
+            "Only one embedded Python session may be active; current state is ${current.state}"
         }
         val home = EmbeddedPythonFiles.prepare(appContext)
         val sessionId = "siftalpha-x-${UUID.randomUUID()}"
