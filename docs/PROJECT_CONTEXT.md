@@ -1,10 +1,11 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-16（R Project Script Execution Boundary，alpha30 source/CI readiness）
+最后更新：2026-09-16（R Project Script Execution Boundary，alpha30 CI readiness）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
 产品基线分支：`main`（当前 main HEAD：`dff275575a9cdbd0564d394c4626cd7d9bb22637`）  
+当前 alpha30 source HEAD：`328ff10222a4fb188d5932130a16c04a3c0ccabb`  
 M / R / X 架构与 Runtime prototype 工作分支：`codex/siftalpha-x-embedded-cpython-spike`  
-当前验证版本：0.8.0-alpha30 / versionCode 106（Embedded CPython file-backed project-script boundary；alpha29 real-device evidence 已记录，alpha30 等待真实设备验收）  
+当前验证版本：0.8.0-alpha30 / versionCode 106（Embedded CPython file-backed project-script boundary；Run #83 CI 已通过，等待 alpha30 真实设备验收）  
 当前文档定义：`M = Management System`，`R = Runtime System`，`X = M + R`  
 规范架构定义：[ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)  
 Production baseline merge：[893229c](https://github.com/kuashan/siftalpha-one/commit/893229ce26d49a6ea22c79d6e2be85290cb8b0c3)（历史基线记录）  
@@ -339,4 +340,4 @@ R 接收显式的 Project Execution Specification：project identity、execution
 
 native R 重复执行 root containment、canonical path、regular-file、directory 和 symlink 校验。执行期间 cwd、TMPDIR、sys.path、sys.argv、temporary __main__ module、stdout/stderr capture 具有 session-scoped 生命周期，并在 terminal cleanup 中恢复。当前 file-backed Python 语义覆盖真实 __name__、__file__、sys.argv[0]、project-local sibling import、真实 traceback filename、SystemExit mapping、Python exception mapping、cooperative STOP 和 post-STOP re-entry。
 
-这不是 arbitrary Python project support、dependency installation、venv、native wheel、C extension interruption、universal hard-stop、并发 Runtime 或生产级 sandbox。alpha30 的状态是 source/CI ready for real-device acceptance；真实设备需要验证 PROJECT A/B/C、namespace isolation、SystemExit 和 STOP 后 re-entry。
+这不是 arbitrary Python project support、dependency installation、venv、native wheel、C extension interruption、universal hard-stop、并发 Runtime 或生产级 sandbox。alpha30 的状态是 source/CI ready for real-device acceptance；真实设备需要验证 PROJECT A/B/C、missing entrypoint、namespace isolation、SystemExit 和 STOP 后 re-entry。

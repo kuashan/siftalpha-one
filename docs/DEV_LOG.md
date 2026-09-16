@@ -554,3 +554,19 @@ SiftAlpha X 的第一项工程工作是 Runtime Architecture Audit，而不是�
 ### alpha30 deterministic boundary coverage follow-up
 
 补充 PROJECT_MISSING_ENTRYPOINT fixture（staged root 中故意没有 entrypoint），instrumentation source 会验证 native R 发布明确 FAILED/exitCode 1，并保留 SIFTALPHA_X_ENTRYPOINT_ERROR=missing entrypoint。该测试仍等待真实 Android device，不在 CI 中宣称执行通过。
+
+
+### alpha30 CI / artifact evidence
+
+- Workflow：SiftAlpha W0 Cloud Build。
+- Run：#83；Run ID：35078323509；结果：success。
+- Source HEAD：328ff10222a4fb188d5932130a16c04a3c0ccabb。
+- Artifact：siftalpha-w0-83；Artifact ID：10439551021；size：55,813,639 bytes；digest：sha256:0dcdede705ee6e27e0a646704ab0376d5ac490ad3f5119ae9f0970cefcc9777a。
+- APK：siftalpha-studio-debug.apk；size：46,651,177 bytes；SHA-256：18800bd47c4ebfccb5fcb3f6cff531e812e0f79cc48486e9c8d6013dd9204247。
+- APK badging 确认 package com.siftalpha.studio、versionCode 106、versionName 0.8.0-alpha30、native-code arm64-v8a。
+- signing verification：APK Signature Scheme v2=true；1 signer；certificate DN 为 SiftAlpha Studio Test；其余签名摘要见 workflow evidence。
+- CPython preparation：YES；CPython 3.14.7、arm64-v8a、官方组件 SHA-256 6d50cc3aa66e414a439594089bcdfb5f1264358155c70c1f00471c24cfb477fb。
+- Gradle task：testDebugUnitTest assembleDebug；当前源码 49 个 JVM test files、323 个 @Test methods；任务成功。
+- instrumentation：source added/compiled as part of the source tree, but Run #83 没有 Android emulator/device；未执行，不标记 PASS。
+- APK 内含 A/B/C/D、SystemExit 和 missing-entrypoint fixtures；这只证明打包，不替代真实设备执行。
+

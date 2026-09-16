@@ -23,6 +23,7 @@
 - 包名：`com.siftalpha.studio`
 - 当前 docs/runtime prototype branch：`codex/siftalpha-x-embedded-cpython-spike`
 - alpha30 implementation starting HEAD：`36b0175248a491b85560d68fcfd12889dbf5d0d7`
+- alpha30 source HEAD：`328ff10222a4fb188d5932130a16c04a3c0ccabb`
 - main HEAD：`dff275575a9cdbd0564d394c4626cd7d9bb22637`
 - canonical architecture：[ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)
 - GitHub Actions [Run #80](https://github.com/kuashan/siftalpha-one/actions/runs/35060381162)，Run ID `35060381162`；artifact `siftalpha-w0-80`（ID `10432576095`），digest `sha256:94cf4d1ead49e8500f9b2467765a983b8e0164be354c1e59083670763945eaba`。
@@ -49,6 +50,7 @@
 | C-13 | Web Discovery Diagnostic Enhancement 云端验证（历史工作项） | 仓库校验、单元测试、APK 组装、签名和证据收集通过；不发布 Release | PASS | [Actions Run #49](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920/artifacts/10379489647) |
 | C-14 | 合并后正式 main 构建（历史基线证据） | validators、`testDebugUnitTest`、`assembleDebug`、APK metadata 和签名证据收集通过 | PASS | [Actions Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426/artifacts/10405122896) |
 | C-15 | alpha29 Embedded CPython Runtime prototype CI | CPython preparation、validators、JVM unit tests、CMake/native build、`assembleDebug`、signing verification 和 evidence collection 通过 | PASS | [Actions Run #80](https://github.com/kuashan/siftalpha-one/actions/runs/35060381162) / [artifact `siftalpha-w0-80`](https://github.com/kuashan/siftalpha-one/actions/runs/35060381162/artifacts/10432576095) |
+| C-16 | alpha30 R Project Script Execution Boundary CI | CPython preparation、validators、JVM unit tests、CMake/native build、`assembleDebug`、APK evidence 和 signing verification 通过；无 Android device | PASS（CI；instrumentation 未执行） | [Actions Run #83](https://github.com/kuashan/siftalpha-one/actions/runs/35078323509) / [artifact `siftalpha-w0-83`](https://github.com/kuashan/siftalpha-one/actions/runs/35078323509/artifacts/10439551021) |
 
 ## C. 安装与升级矩阵
 
@@ -296,7 +298,7 @@ Coordinator 不是一次性大规模 UI 重构的要求，而是渐进实现该 
 | R-20 | Post-STOP project re-entry | STOP terminal cleanup 后新 session/generation 可再次执行 PROJECT A | instrumentation source added；未执行 |
 | R-21 | alpha30 real-device acceptance | 不重启 App：PROJECT A → PROJECT B → PROJECT C RUNNING → STOPPED/130 → PROJECT D/E/F as needed → PROJECT A again；session IDs 不复用、generation 单调 | 待 alpha30 真机 |
 
-alpha30 的 instrumentation tests 已加入源码，但当前 workflow 没有 Android emulator/device；没有将这些行标记为 real-device PASS。alpha29 H 节的真实设备证据仍是 accepted baseline，不被 alpha30 source/CI status 替代。
+alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，但 workflow 没有 Android emulator/device，因此没有将这些行标记为 real-device PASS。alpha29 H 节的真实设备证据仍是 accepted baseline，不被 alpha30 source/CI status 替代。
 
 
 | R-22 | Missing file-backed entrypoint | staging root 中缺失显式 entrypoint 时，R 发布 FAILED/exitCode 1 和明确 entrypoint error；不 fallback | instrumentation source added；未执行 |

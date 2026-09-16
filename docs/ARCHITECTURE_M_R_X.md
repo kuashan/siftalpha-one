@@ -2,6 +2,7 @@
 
 最后更新：2026-09-16  
 alpha30 实现起始基线：`36b0175248a491b85560d68fcfd12889dbf5d0d7`  
+当前 alpha30 source HEAD：`328ff10222a4fb188d5932130a16c04a3c0ccabb`  
 工作分支：`codex/siftalpha-x-embedded-cpython-spike`  
 当前 Runtime prototype：`versionCode 106` / `versionName 0.8.0-alpha30`
 
@@ -389,7 +390,7 @@ alpha29 不表示 R 已完成，也不表示 X 已达到 acceptance。以下能�
 
 ## 12. 当前变更边界与维护规则
 
-alpha30 在保留 alpha29 lifecycle acceptance 的前提下，增加了实验性 file-backed project-script boundary。当前文档记录的是 source/CI readiness；真实 Android device acceptance 仍需单独执行。
+alpha30 在保留 alpha29 lifecycle acceptance 的前提下，增加了实验性 file-backed project-script boundary。当前文档记录的是 source/CI readiness；Run #83 已完成，真实 Android device acceptance 仍需单独执行。
 
 本轮变更边界：
 
