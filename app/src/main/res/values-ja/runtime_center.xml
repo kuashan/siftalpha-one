@@ -79,6 +79,14 @@
     <string name="runtime_button_edit">編集</string>
     <string name="runtime_button_prepare">環境を準備</string>
     <string name="runtime_button_run">実行</string>
+    <string name="runtime_selection_current">ランタイム：%1$s</string>
+    <string name="runtime_selection_change">ランタイムを選択</string>
+    <string name="runtime_selection_title">%1$s のランタイムを選択</string>
+    <string name="runtime_selection_embedded_r">SiftAlpha R（内蔵ランタイム）</string>
+    <string name="runtime_selection_termux">Termux（外部ランタイム）</string>
+    <string name="runtime_selection_saved">ランタイムを保存しました：%1$s</string>
+    <string name="runtime_selection_active">実行中はランタイムを変更できません。先に停止してください。</string>
+    <string name="runtime_embedded_r_capability_unavailable">このプロジェクトは SiftAlpha R の現在サポート範囲外です（%1$s）。選択は保持されています。実行するには Termux に切り替えてください。</string>
     <string name="runtime_button_run_embedded_r">内蔵 R で実行</string>
     <string name="runtime_embedded_r_title">内蔵 R で %1$s を実行しますか？</string>
     <string name="runtime_embedded_r_message">SAF プロジェクトをアプリ専用の一時領域へコピーし、解決済みの Python エントリポイントで実行します。この実験経路では Termux を使用しません。</string>

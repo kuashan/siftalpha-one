@@ -1,5 +1,6 @@
 package com.siftalpha.studio.presentation
 
+import com.siftalpha.studio.runtime.ProjectRuntimeSelection
 import com.siftalpha.studio.runtime.RuntimeKind
 import com.siftalpha.studio.runtime.RuntimeState
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
@@ -297,6 +298,54 @@ class ProjectActionPolicyTest {
 
         assertNotEquals(first.identity.stableKey, second.identity.stableKey)
         assertNotEquals(first.identity, second.identity)
+    }
+
+    @Test
+    fun embeddedRSelectionCanStartWithoutExternalEnvironmentPreparation() {
+        val policy = ProjectActionPolicy.resolve(
+            snapshot(
+                runtime = ProjectUiSnapshot.Runtime(
+                    selection = ProjectUiSnapshot.Runtime.Selection(
+                        status = ProjectUiSnapshot.Runtime.SelectionStatus.RESOLVED,
+                        primary = RuntimeKind.PYTHON,
+                    ),
+                    supported = false,
+                ),
+                environment = ProjectUiSnapshot.Environment(ProjectUiSnapshot.Readiness.NOT_READY),
+                configuration = ProjectUiSnapshot.Configuration(
+                    requiredCount = 1,
+                    configuredRequiredCount = 0,
+                    missingRequiredNames = listOf("TOKEN"),
+                ),
+            ),
+            runtimeSelection = ProjectRuntimeSelection.EMBEDDED_R,
+        )
+
+        assertEquals(ProjectActionPolicy.Action.START, policy.primaryAction)
+        assertTrue(policy.isEnabled(ProjectActionPolicy.Action.START))
+        assertFalse(policy.isEnabled(ProjectActionPolicy.Action.PREPARE))
+    }
+
+    @Test
+    fun embeddedRSelectionDoesNotOfferStartForNonPythonProject() {
+        val policy = ProjectActionPolicy.resolve(
+            snapshot(
+                runtime = ProjectUiSnapshot.Runtime(
+                    selection = ProjectUiSnapshot.Runtime.Selection(
+                        status = ProjectUiSnapshot.Runtime.SelectionStatus.RESOLVED,
+                        primary = RuntimeKind.NODE_JS,
+                    ),
+                    supported = true,
+                ),
+            ),
+            runtimeSelection = ProjectRuntimeSelection.EMBEDDED_R,
+        )
+
+        assertFalse(policy.isEnabled(ProjectActionPolicy.Action.START))
+        assertEquals(
+            ProjectActionPolicy.DisableReason.RUNTIME_SELECTION_REQUIRED,
+            policy.reasonFor(ProjectActionPolicy.Action.START),
+        )
     }
 
     private fun snapshot(

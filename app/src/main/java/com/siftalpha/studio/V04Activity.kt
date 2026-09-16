@@ -28,9 +28,12 @@ import com.siftalpha.studio.presentation.ProjectActionPolicy
 import com.siftalpha.studio.presentation.ProjectUiSnapshot
 import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
 import com.siftalpha.studio.runtime.ProjectRuntimeController
+import com.siftalpha.studio.runtime.ProjectRuntimeSelection
+import com.siftalpha.studio.runtime.ProjectRuntimeSelectionStore
 import com.siftalpha.studio.runtime.ProjectSecretStore
 import com.siftalpha.studio.runtime.RuntimeCommand
 import com.siftalpha.studio.runtime.RuntimeControlPath
+import com.siftalpha.studio.runtime.RuntimeControlReason
 import com.siftalpha.studio.runtime.RuntimeControlRequest
 import com.siftalpha.studio.runtime.RuntimeFailureReason
 import com.siftalpha.studio.runtime.RuntimeLifecycleOperation
@@ -94,6 +97,7 @@ open class V04Activity : StudioActivity() {
     private lateinit var projectOutputs: ProjectOutputPanelController
     private lateinit var prepareLiveProgress: PrepareLiveProgressController
     private lateinit var lifecycleStore: RuntimeLifecycleStore
+    private lateinit var projectRuntimeSelectionStore: ProjectRuntimeSelectionStore
     private val recoveryProjects = mutableSetOf<String>()
     private val failureReasons = mutableMapOf<String, String>()
     private val refreshHandler = Handler(Looper.getMainLooper())
@@ -174,6 +178,7 @@ open class V04Activity : StudioActivity() {
         clearLocalizedStateCacheIfNeeded()
         backend = TermuxBackend(this)
         gateway = V04ProjectGateway(this)
+        projectRuntimeSelectionStore = ProjectRuntimeSelectionStore(this)
         runtime = ProjectRuntimeController(
             gateway = gateway,
             embeddedPythonSession = EmbeddedPythonSession.shared(this),
@@ -484,7 +489,7 @@ open class V04Activity : StudioActivity() {
         }
         val embeddedRuntimeState = embeddedSnapshot?.let { EmbeddedPythonRuntimeStateMapping.toRuntimeState(it) }
         val typedState = embeddedRuntimeState ?: typedStates[stateKey] ?: RuntimeState.UNKNOWN
-        val embeddedEligible = supportsEmbeddedPython(project, configurationSnapshot)
+        val runtimeSelection = projectRuntimeSelectionStore.read(stateKey)
         val embeddedActive = embeddedSnapshot?.let(::isEmbeddedActive) == true
         val webSnapshot = webStateStore.snapshot(stateKey)
         val configuredWebUrl = webProfile.configuredLocalUrl()
@@ -590,7 +595,7 @@ open class V04Activity : StudioActivity() {
             recoveryInProgress = recoveryProjects.contains(stateKey),
             failureReason = failureReasons[stateKey],
         )
-        val policy = ProjectActionPolicy.resolve(snapshot)
+        val policy = ProjectActionPolicy.resolve(snapshot, runtimeSelection)
         val presentationState = snapshot.displayedLifecycle
 
         val box = LinearLayout(this).apply {
@@ -614,6 +619,28 @@ open class V04Activity : StudioActivity() {
         box.addView(text(getString(R.string.runtime_center_source, summary.source), 12f, false).apply {
             setTextColor(Color.rgb(150, 157, 169))
             setPadding(0, dp(3), 0, 0)
+        })
+        box.addView(text(
+            getString(R.string.runtime_selection_current, runtimeSelectionLabel(runtimeSelection)),
+            12f,
+            false,
+        ).apply {
+            setTextColor(Color.rgb(170, 204, 235))
+            setPadding(0, dp(2), 0, 0)
+        })
+        box.addView(smallButton(getString(R.string.runtime_selection_change)) {
+            showRuntimeSelectionDialog(project)
+        }.apply {
+            isEnabled = typedState !in ACTIVE_RUNTIME_STATES &&
+                !pending.values.any { item ->
+                    item.documentId == stateKey ||
+                        (item.documentId == null && item.folderName == project.folderName)
+                } &&
+                stateKey !in embeddedStartInFlight
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(4) }
         })
         box.addView(text("▶ ${summary.run}", 12f, false).apply {
             setTextColor(Color.rgb(150, 157, 169))
@@ -812,19 +839,6 @@ open class V04Activity : StudioActivity() {
         )
         box.addView(row3)
 
-        if (embeddedEligible) {
-            box.addView(smallButton(getString(R.string.runtime_button_run_embedded_r)) {
-                confirmEmbeddedRun(project)
-            }.apply {
-                isEnabled = !embeddedActive && stateKey !in embeddedStartInFlight &&
-                    typedState !in ACTIVE_RUNTIME_STATES && runtime.embeddedPythonCanStart()
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(5) }
-            })
-        }
-
         box.addView(smallButton(getString(R.string.runtime_button_clean)) { confirmClean(project) }.apply {
             isEnabled = policy.isEnabled(ProjectActionPolicy.Action.CLEAN)
             layoutParams = LinearLayout.LayoutParams(
@@ -847,6 +861,19 @@ open class V04Activity : StudioActivity() {
         projectOutputs.attach(project.folderName, box)
         return box
     }
+
+    private fun selectedRuntimeSelection(project: V04ProjectGateway.RuntimeProject): ProjectRuntimeSelection =
+        projectRuntimeSelectionStore.read(project.summary.documentId)
+
+    private fun selectedRuntimeControlRequest(project: V04ProjectGateway.RuntimeProject): RuntimeControlRequest =
+        selectedRuntimeSelection(project).controlRequest
+
+    private fun runtimeSelectionLabel(selection: ProjectRuntimeSelection): String = getString(
+        when (selection) {
+            ProjectRuntimeSelection.EMBEDDED_R -> R.string.runtime_selection_embedded_r
+            ProjectRuntimeSelection.TERMUX -> R.string.runtime_selection_termux
+        },
+    )
 
     private fun webProfileLabel(uiStatus: RuntimeWebUiStatus): String =
         getString(R.string.runtime_web_label, uiStatus.uiLabel(this))
@@ -1137,7 +1164,7 @@ open class V04Activity : StudioActivity() {
     private fun startProject(
         project: V04ProjectGateway.RuntimeProject,
         webProfile: WebProjectInspector.Profile? = null,
-        controlRequest: RuntimeControlRequest = RuntimeControlRequest.EXTERNAL_PROVIDER,
+        controlRequest: RuntimeControlRequest? = null,
     ) {
         val profile = webProfile ?: runCatching {
             webInspector.inspect(project.summary.documentId)
@@ -1147,12 +1174,15 @@ open class V04Activity : StudioActivity() {
             action = ProjectRuntimeController.Action.START,
             browserConfiguredUrl = profile?.configuredLocalUrl(),
             browserFramework = profile?.framework,
-            controlRequest = controlRequest,
+            controlRequest = controlRequest ?: selectedRuntimeControlRequest(project),
         )
     }
 
     private fun confirmRun(project: V04ProjectGateway.RuntimeProject) {
-        if (!ensureRuntime()) return
+        val controlRequest = selectedRuntimeControlRequest(project)
+        if (!ensureRuntime(requireExternalProvider = controlRequest == RuntimeControlRequest.EXTERNAL_PROVIDER)) {
+            return
+        }
         val webProfile = runCatching { webInspector.inspect(project.summary.documentId) }.getOrNull()
 
         val configurationNote = "\n\n" + configurationUi.summaryText(
@@ -1167,30 +1197,43 @@ open class V04Activity : StudioActivity() {
             .setTitle(getString(R.string.runtime_run_title, project.summary.name))
             .setMessage(getString(R.string.runtime_run_message, project.summary.run, configurationNote, webNote))
             .setNegativeButton(getString(R.string.common_cancel), null)
-            .setPositiveButton(getString(R.string.runtime_button_run)) { _, _ -> startProject(project, webProfile) }
+            .setPositiveButton(getString(R.string.runtime_button_run)) { _, _ ->
+                startProject(project, webProfile, controlRequest)
+            }
             .show()
     }
 
-    private fun confirmEmbeddedRun(project: V04ProjectGateway.RuntimeProject) {
-        val configurationSnapshot = configurationUi.snapshot(
-            project.summary.documentId,
-            project.folderName,
-        )
-        if (!supportsEmbeddedPython(project, configurationSnapshot)) return
-        if (project.summary.documentId in embeddedStartInFlight || !runtime.embeddedPythonCanStart()) {
-            toast(getString(R.string.runtime_embedded_r_active))
+    private fun showRuntimeSelectionDialog(project: V04ProjectGateway.RuntimeProject) {
+        val stateKey = project.summary.documentId
+        val busy = typedStates[stateKey] in ACTIVE_RUNTIME_STATES ||
+            pending.values.any { item ->
+                item.documentId == stateKey ||
+                    (item.documentId == null && item.folderName == project.folderName)
+            } ||
+            stateKey in embeddedStartInFlight
+        if (busy) {
+            toast(getString(R.string.runtime_selection_active))
             return
         }
+
+        val choices = arrayOf(
+            ProjectRuntimeSelection.EMBEDDED_R,
+            ProjectRuntimeSelection.TERMUX,
+        )
+        val labels = choices.map(::runtimeSelectionLabel).toTypedArray()
+        val checked = choices.indexOf(selectedRuntimeSelection(project))
         AlertDialog.Builder(this)
-            .setTitle(getString(R.string.runtime_embedded_r_title, project.summary.name))
-            .setMessage(getString(R.string.runtime_embedded_r_message))
-            .setNegativeButton(getString(R.string.common_cancel), null)
-            .setPositiveButton(getString(R.string.runtime_button_run_embedded_r)) { _, _ ->
-                startProject(
-                    project = project,
-                    controlRequest = RuntimeControlRequest.EMBEDDED_R,
-                )
+            .setTitle(getString(R.string.runtime_selection_title, project.summary.name))
+            .setSingleChoiceItems(labels, checked) { dialog, which ->
+                if (which in choices.indices) {
+                    val selected = choices[which]
+                    projectRuntimeSelectionStore.write(stateKey, selected)
+                    toast(getString(R.string.runtime_selection_saved, runtimeSelectionLabel(selected)))
+                    dialog.dismiss()
+                    refresh()
+                }
             }
+            .setNegativeButton(getString(R.string.common_cancel), null)
             .show()
     }
 
@@ -1217,7 +1260,7 @@ open class V04Activity : StudioActivity() {
             if (route.path != RuntimeControlPath.EMBEDDED_R) {
                 errorDialog(
                     getString(R.string.runtime_embedded_r_start_failed),
-                    route.reason.name,
+                    embeddedControlReasonMessage(route.reason),
                 )
             }
             return
@@ -1350,33 +1393,18 @@ open class V04Activity : StudioActivity() {
     private fun isEmbeddedActive(snapshot: EmbeddedPythonSnapshot): Boolean =
         snapshot.state == EmbeddedPythonState.STARTING || snapshot.state == EmbeddedPythonState.RUNNING
 
-    private fun supportsEmbeddedPython(
-        project: V04ProjectGateway.RuntimeProject,
-        configurationSnapshot: ProjectConfigurationUiController.Snapshot? = null,
-    ): Boolean {
-        val configurationRequired = configurationSnapshot?.preflight?.requiredCount?.let { it > 0 }
-            ?: runCatching {
-                configurationUi.snapshot(
-                    project.summary.documentId,
-                    project.folderName,
-                ).preflight.requiredCount > 0
-            }.getOrDefault(true)
-        return runCatching {
-            runtime.resolveControlPath(
-                project = project,
-                action = ProjectRuntimeController.Action.START,
-                request = RuntimeControlRequest.EMBEDDED_R,
-                requiredConfiguration = configurationRequired,
-            ).path == RuntimeControlPath.EMBEDDED_R
-        }.getOrDefault(false)
-    }
-
     private fun embeddedStartErrorMessage(error: Throwable?): String =
         if (error?.message == "EMBEDDED_R_ENTRYPOINT_UNRESOLVED") {
             getString(R.string.runtime_embedded_r_entrypoint_unresolved)
         } else {
             error?.message ?: getString(R.string.runtime_unavailable)
         }
+
+    private fun embeddedControlReasonMessage(reason: RuntimeControlReason): String = when (reason) {
+        RuntimeControlReason.ENTRYPOINT_UNRESOLVED ->
+            getString(R.string.runtime_embedded_r_entrypoint_unresolved)
+        else -> getString(R.string.runtime_embedded_r_capability_unavailable, reason.name)
+    }
 
     private fun dispatch(
         project: V04ProjectGateway.RuntimeProject,
@@ -1385,11 +1413,18 @@ open class V04Activity : StudioActivity() {
         browserConfiguredUrl: String? = null,
         browserFramework: String? = null,
         silentRecovery: Boolean = false,
-        controlRequest: RuntimeControlRequest = RuntimeControlRequest.EXTERNAL_PROVIDER,
+        controlRequest: RuntimeControlRequest? = null,
     ) {
         val stateKey = project.summary.documentId
+        val effectiveControlRequest = controlRequest ?: if (
+            action == ProjectRuntimeController.Action.START
+        ) {
+            selectedRuntimeControlRequest(project)
+        } else {
+            RuntimeControlRequest.EXTERNAL_PROVIDER
+        }
         val requiredConfiguration = action == ProjectRuntimeController.Action.START &&
-            controlRequest == RuntimeControlRequest.EMBEDDED_R &&
+            effectiveControlRequest == RuntimeControlRequest.EMBEDDED_R &&
             runCatching {
                 configurationUi.snapshot(
                     project.summary.documentId,
@@ -1400,7 +1435,7 @@ open class V04Activity : StudioActivity() {
             runtime.resolveControlPath(
                 project = project,
                 action = action,
-                request = controlRequest,
+                request = effectiveControlRequest,
                 requiredConfiguration = requiredConfiguration,
             )
         } catch (e: Throwable) {
@@ -1413,7 +1448,7 @@ open class V04Activity : StudioActivity() {
         if (route.path == RuntimeControlPath.REJECTED) {
             errorDialog(
                 getString(R.string.runtime_embedded_r_start_failed),
-                route.reason.name,
+                embeddedControlReasonMessage(route.reason),
             )
             return
         }
@@ -2248,11 +2283,12 @@ open class V04Activity : StudioActivity() {
         }.start()
     }
 
-    private fun ensureRuntime(): Boolean {
+    private fun ensureRuntime(requireExternalProvider: Boolean = true): Boolean {
         if (gateway.rootUri() == null) {
             toast(getString(R.string.runtime_choose_root_first))
             return false
         }
+        if (!requireExternalProvider) return true
         if (!runtime.runtimeSupported()) {
             errorDialog(
                 getString(R.string.runtime_current_directory_unsupported),

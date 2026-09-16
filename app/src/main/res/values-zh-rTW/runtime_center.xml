@@ -79,6 +79,14 @@
     <string name="runtime_button_edit">編輯</string>
     <string name="runtime_button_prepare">準備環境</string>
     <string name="runtime_button_run">執行</string>
+    <string name="runtime_selection_current">執行環境：%1$s</string>
+    <string name="runtime_selection_change">選擇執行環境</string>
+    <string name="runtime_selection_title">選擇 %1$s 的執行環境</string>
+    <string name="runtime_selection_embedded_r">SiftAlpha R（內建執行環境）</string>
+    <string name="runtime_selection_termux">Termux（外部執行環境）</string>
+    <string name="runtime_selection_saved">已儲存執行環境：%1$s</string>
+    <string name="runtime_selection_active">請先停止目前執行，再切換執行環境。</string>
+    <string name="runtime_embedded_r_capability_unavailable">此專案不符合 SiftAlpha R 目前支援的能力範圍（%1$s）。選擇會保留；如需執行，請切換到 Termux。</string>
     <string name="runtime_button_run_embedded_r">使用內建 R 執行</string>
     <string name="runtime_embedded_r_title">使用內建 R 執行 %1$s？</string>
     <string name="runtime_embedded_r_message">系統會將 SAF 專案複製到應用程式私有暫存目錄，並使用已解析的 Python 入口執行。此實驗路徑不使用 Termux。</string>

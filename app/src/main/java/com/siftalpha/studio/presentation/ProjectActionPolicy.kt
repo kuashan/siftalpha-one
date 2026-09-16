@@ -1,5 +1,7 @@
 package com.siftalpha.studio.presentation
 
+import com.siftalpha.studio.runtime.ProjectRuntimeSelection
+import com.siftalpha.studio.runtime.RuntimeKind
 import com.siftalpha.studio.runtime.RuntimeState
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
 
@@ -111,7 +113,11 @@ object ProjectActionPolicy {
         fun reasonFor(action: Action): DisableReason? = decision(action).disableReason
     }
 
-    fun resolve(snapshot: ProjectUiSnapshot): Result {
+    fun resolve(
+        snapshot: ProjectUiSnapshot,
+        runtimeSelection: ProjectRuntimeSelection = ProjectRuntimeSelection.TERMUX,
+    ): Result {
+        val embeddedRSelected = runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R
         val actions = linkedMapOf<Action, ActionDecision>()
         actions[Action.EDIT] = enabled()
         // Configuration is a project-level operation, not a runtime-discovery result. It remains
@@ -132,7 +138,7 @@ object ProjectActionPolicy {
             Action.LOGS,
             Action.CLEAN,
         )
-        if (!snapshot.runtime.supported) {
+        if (!snapshot.runtime.supported && !embeddedRSelected) {
             runtimeActions.forEach { actions[it] = disabled(DisableReason.RUNTIME_HOST_UNAVAILABLE) }
             actions[Action.OPEN_BROWSER] = disabled(DisableReason.WEB_NOT_AVAILABLE)
             return result(
@@ -173,25 +179,38 @@ object ProjectActionPolicy {
             )
         }
 
-        val selectionReason = when (snapshot.runtime.selection.status) {
-            ProjectUiSnapshot.Runtime.SelectionStatus.RESOLVED -> null
-            ProjectUiSnapshot.Runtime.SelectionStatus.AMBIGUOUS,
-            ProjectUiSnapshot.Runtime.SelectionStatus.UNSUPPORTED,
-            -> DisableReason.RUNTIME_SELECTION_REQUIRED
+        val selectionReason = when {
+            snapshot.runtime.selection.status != ProjectUiSnapshot.Runtime.SelectionStatus.RESOLVED ->
+                DisableReason.RUNTIME_SELECTION_REQUIRED
+            embeddedRSelected && snapshot.runtime.selection.primary != RuntimeKind.PYTHON ->
+                DisableReason.RUNTIME_SELECTION_REQUIRED
+            else -> null
         }
-
-        actions[Action.STATUS] = enabled()
-        actions[Action.LOGS] = enabled()
-        actions[Action.CLEAN] = enabled()
-        actions[Action.PREPARE] = if (selectionReason == null) {
+        val embeddedObservationAvailable = embeddedRSelected && snapshot.processMayBeActive
+        actions[Action.STATUS] = if (snapshot.runtime.supported || embeddedObservationAvailable) {
             enabled()
         } else {
-            disabled(selectionReason)
+            disabled(DisableReason.RUNTIME_HOST_UNAVAILABLE)
         }
-        actions[Action.START] = if (selectionReason == null) {
+        actions[Action.LOGS] = if (snapshot.runtime.supported || embeddedObservationAvailable) {
             enabled()
         } else {
-            disabled(selectionReason)
+            disabled(DisableReason.RUNTIME_HOST_UNAVAILABLE)
+        }
+        actions[Action.CLEAN] = if (snapshot.runtime.supported) {
+            enabled()
+        } else {
+            disabled(DisableReason.RUNTIME_HOST_UNAVAILABLE)
+        }
+        actions[Action.PREPARE] = when {
+            selectionReason != null -> disabled(selectionReason)
+            snapshot.runtime.supported -> enabled()
+            else -> disabled(DisableReason.RUNTIME_HOST_UNAVAILABLE)
+        }
+        actions[Action.START] = when {
+            selectionReason != null -> disabled(selectionReason)
+            embeddedRSelected || snapshot.runtime.supported -> enabled()
+            else -> disabled(DisableReason.RUNTIME_HOST_UNAVAILABLE)
         }
 
         val active = snapshot.processMayBeActive
@@ -224,13 +243,14 @@ object ProjectActionPolicy {
             actions[Action.STOP] = disabled(DisableReason.PROCESS_NOT_ACTIVE)
             when {
                 selectionReason != null -> {
-                    primaryAction = Action.STATUS
-                    secondaryAction = Action.CLEAN
+                    primaryAction = if (actions.getValue(Action.STATUS).enabled) Action.STATUS else null
+                    secondaryAction = if (actions.getValue(Action.CLEAN).enabled) Action.CLEAN else null
                     message = MessageKey.RUNTIME_SELECTION_REQUIRED
                     disableReason = selectionReason
                     detailEntry = DetailEntry.RUNTIME
                 }
-                snapshot.environment.readiness == ProjectUiSnapshot.Readiness.NOT_READY -> {
+                !embeddedRSelected &&
+                    snapshot.environment.readiness == ProjectUiSnapshot.Readiness.NOT_READY -> {
                     actions[Action.START] = disabled(DisableReason.ENVIRONMENT_NOT_READY)
                     primaryAction = Action.PREPARE
                     secondaryAction = Action.STATUS
@@ -238,7 +258,8 @@ object ProjectActionPolicy {
                     disableReason = DisableReason.ENVIRONMENT_NOT_READY
                     detailEntry = DetailEntry.ENVIRONMENT
                 }
-                snapshot.environment.readiness == ProjectUiSnapshot.Readiness.UNKNOWN -> {
+                !embeddedRSelected &&
+                    snapshot.environment.readiness == ProjectUiSnapshot.Readiness.UNKNOWN -> {
                     actions[Action.START] = disabled(DisableReason.ENVIRONMENT_UNKNOWN)
                     primaryAction = Action.STATUS
                     secondaryAction = Action.PREPARE
@@ -246,7 +267,7 @@ object ProjectActionPolicy {
                     disableReason = DisableReason.ENVIRONMENT_UNKNOWN
                     detailEntry = DetailEntry.ENVIRONMENT
                 }
-                snapshot.configuration.needsConfiguration -> {
+                !embeddedRSelected && snapshot.configuration.needsConfiguration -> {
                     actions[Action.START] = disabled(DisableReason.REQUIRED_CONFIGURATION_MISSING)
                     primaryAction = Action.CONFIGURE
                     secondaryAction = Action.STATUS
@@ -256,7 +277,9 @@ object ProjectActionPolicy {
                 }
                 else -> {
                     primaryAction = Action.START
-                    secondaryAction = Action.STATUS
+                    secondaryAction = Action.STATUS.takeIf {
+                        actions.getValue(Action.STATUS).enabled
+                    }
                     message = MessageKey.READY_TO_RUN
                     disableReason = null
                     detailEntry = DetailEntry.RUNTIME
