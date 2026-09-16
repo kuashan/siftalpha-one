@@ -1,6 +1,12 @@
 package com.siftalpha.studio.siftalphax
 
-import org.json.JSONObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 /** The deliberately small state model used by the experimental single-session CPython PoC. */
 enum class EmbeddedPythonState {
@@ -25,27 +31,37 @@ data class EmbeddedPythonSnapshot(
 
 object EmbeddedPythonSnapshotParser {
     fun parse(raw: String): EmbeddedPythonSnapshot {
-        val json = JSONObject(raw)
-        val stateName = json.getString("state")
+        val json = Json.parseToJsonElement(raw).jsonObject
+        val stateName = json.requiredString("state")
         val state = EmbeddedPythonState.entries.firstOrNull { it.name == stateName }
             ?: error("Unknown embedded Python state: $stateName")
         return EmbeddedPythonSnapshot(
-            sessionId = json.optString("sessionId"),
-            generation = json.optLong("generation", 0L),
+            sessionId = json.stringOrEmpty("sessionId"),
+            generation = json.longOrDefault("generation", 0L),
             state = state,
-            startedAtEpochMs = json.optNullableLong("startedAtEpochMs"),
-            finishedAtEpochMs = json.optNullableLong("finishedAtEpochMs"),
-            exitCode = json.optNullableInt("exitCode"),
-            stdout = json.optString("stdout"),
-            stderr = json.optString("stderr"),
+            startedAtEpochMs = json.nullableLong("startedAtEpochMs"),
+            finishedAtEpochMs = json.nullableLong("finishedAtEpochMs"),
+            exitCode = json.nullableInt("exitCode"),
+            stdout = json.stringOrEmpty("stdout"),
+            stderr = json.stringOrEmpty("stderr"),
         )
     }
 
-    private fun JSONObject.optNullableLong(key: String): Long? =
-        if (!has(key) || isNull(key)) null else optLong(key)
+    private fun JsonObject.requiredString(key: String): String =
+        this[key]?.jsonPrimitive?.contentOrNull
+            ?: error("Missing JSON string field: $key")
 
-    private fun JSONObject.optNullableInt(key: String): Int? =
-        if (!has(key) || isNull(key)) null else optInt(key)
+    private fun JsonObject.stringOrEmpty(key: String): String =
+        this[key]?.jsonPrimitive?.contentOrNull.orEmpty()
+
+    private fun JsonObject.longOrDefault(key: String, default: Long): Long =
+        this[key]?.jsonPrimitive?.longOrNull ?: default
+
+    private fun JsonObject.nullableLong(key: String): Long? =
+        this[key]?.jsonPrimitive?.longOrNull
+
+    private fun JsonObject.nullableInt(key: String): Int? =
+        this[key]?.jsonPrimitive?.intOrNull
 }
 
 object EmbeddedPythonStatePolicy {
