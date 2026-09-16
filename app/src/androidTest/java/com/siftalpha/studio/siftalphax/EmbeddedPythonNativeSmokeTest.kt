@@ -117,6 +117,22 @@ class EmbeddedPythonNativeSmokeTest {
     }
 
     @Test
+    fun missingEntrypointPublishesExplicitFailedResult() {
+        assumeArm64()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val session = readySession(context)
+
+        session.start(EmbeddedPythonProjectFixture.PROJECT_MISSING_ENTRYPOINT)
+        awaitState(session, EmbeddedPythonState.FAILED, 5_000L)
+        val snapshot = session.snapshot()
+
+        assertEquals(EmbeddedPythonState.FAILED, snapshot.state)
+        assertEquals(1, snapshot.exitCode)
+        assertEquals(EmbeddedPythonRuntimePhase.TERMINAL, snapshot.runtimePhase)
+        assertTrue(snapshot.stderr.contains("SIFTALPHA_X_ENTRYPOINT_ERROR=missing entrypoint"))
+    }
+
+    @Test
     fun systemExitIsMappedWithoutKillingTheRuntime() {
         assumeArm64()
         val context = InstrumentationRegistry.getInstrumentation().targetContext

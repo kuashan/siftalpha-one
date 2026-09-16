@@ -297,3 +297,6 @@ Coordinator 不是一次性大规模 UI 重构的要求，而是渐进实现该 
 | R-21 | alpha30 real-device acceptance | 不重启 App：PROJECT A → PROJECT B → PROJECT C RUNNING → STOPPED/130 → PROJECT D/E/F as needed → PROJECT A again；session IDs 不复用、generation 单调 | 待 alpha30 真机 |
 
 alpha30 的 instrumentation tests 已加入源码，但当前 workflow 没有 Android emulator/device；没有将这些行标记为 real-device PASS。alpha29 H 节的真实设备证据仍是 accepted baseline，不被 alpha30 source/CI status 替代。
+
+
+| R-22 | Missing file-backed entrypoint | staging root 中缺失显式 entrypoint 时，R 发布 FAILED/exitCode 1 和明确 entrypoint error；不 fallback | instrumentation source added；未执行 |

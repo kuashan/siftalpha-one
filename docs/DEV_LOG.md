@@ -549,3 +549,8 @@ SiftAlpha X 的第一项工程工作是 Runtime Architecture Audit，而不是�
 ### 下一步建议（只推荐）
 
 优先研究 R Environment Model 与 Dependency Model 的边界，或在真实设备验收后研究 R Session Isolation hardening；不要把当前 fixture boundary 误称为 arbitrary project support。下一任务仍需单独决策，本记录不实施后续方向。
+
+
+### alpha30 deterministic boundary coverage follow-up
+
+补充 PROJECT_MISSING_ENTRYPOINT fixture（staged root 中故意没有 entrypoint），instrumentation source 会验证 native R 发布明确 FAILED/exitCode 1，并保留 SIFTALPHA_X_ENTRYPOINT_ERROR=missing entrypoint。该测试仍等待真实 Android device，不在 CI 中宣称执行通过。
