@@ -567,6 +567,6 @@ SiftAlpha X 的第一项工程工作是 Runtime Architecture Audit，而不是�
 - signing verification：APK Signature Scheme v2=true；1 signer；certificate DN 为 SiftAlpha Studio Test；其余签名摘要见 workflow evidence。
 - CPython preparation：YES；CPython 3.14.7、arm64-v8a、官方组件 SHA-256 6d50cc3aa66e414a439594089bcdfb5f1264358155c70c1f00471c24cfb477fb。
 - Gradle task：testDebugUnitTest assembleDebug；当前源码 49 个 JVM test files、323 个 @Test methods；任务成功。
-- instrumentation：source added/compiled as part of the source tree, but Run #83 没有 Android emulator/device；未执行，不标记 PASS。
+- instrumentation：source 已加入，但当前 workflow 没有编译 androidTest target、Android emulator/device；未执行，不标记 PASS。
 - APK 内含 A/B/C/D、SystemExit 和 missing-entrypoint fixtures；这只证明打包，不替代真实设备执行。
 
