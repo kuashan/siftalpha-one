@@ -169,7 +169,7 @@ class EmbeddedPythonNativeSmokeTest {
                 executionRoot = outsideRoot,
                 entrypoint = File(outsideRoot, "main.py"),
                 workingDirectory = outsideRoot,
-                expectedError = "execution root is outside staging path",
+                expectedError = "execution root is outside app-private staging",
             )
         } finally {
             outsideRoot.deleteRecursively()
@@ -292,6 +292,72 @@ class EmbeddedPythonNativeSmokeTest {
     }
 
     @Test
+    fun acceptsAndroidAppPrivateAliasForExecutionRoot() {
+        assumeArm64()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val session = readySession(context)
+        val canonicalRoot = EmbeddedPythonFiles.stageProjectFixture(
+            context,
+            EmbeddedPythonProjectFixture.PROJECT_A,
+            "path-validation-alias-${UUID.randomUUID()}",
+        )
+        val aliasedRoot = androidAppPrivateAlias(canonicalRoot)
+        assertTrue(
+            "Expected Android app-private alias to resolve: $aliasedRoot",
+            aliasedRoot.isDirectory,
+        )
+        try {
+            session.start(
+                projectIdentity = "android-app-private-alias",
+                executionRoot = aliasedRoot,
+                entrypoint = "main.py",
+                workingDirectory = ".",
+            )
+            awaitState(session, EmbeddedPythonState.SUCCEEDED, 5_000L)
+            val snapshot = session.snapshot()
+            assertEquals("android-app-private-alias", snapshot.projectIdentity)
+            assertEquals(0, snapshot.exitCode)
+            assertEquals(aliasedRoot.absolutePath, snapshot.executionRoot)
+            assertEquals(snapshot.executionRoot, snapshot.workingDirectory)
+            assertTrue(snapshot.stdout.contains("SIFTALPHA_X_PROJECT_A_SUCCESS"))
+        } finally {
+            canonicalRoot.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun rejectsProjectControlledSymlinkEscapeThroughAndroidPathAlias() {
+        assumeArm64()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val fixtureSessionId = "path-validation-alias-symlink-${UUID.randomUUID()}"
+        val canonicalRoot = EmbeddedPythonFiles.stageProjectFixture(
+            context,
+            EmbeddedPythonProjectFixture.PROJECT_A,
+            fixtureSessionId,
+        )
+        val aliasedRoot = androidAppPrivateAlias(canonicalRoot)
+        assertTrue(aliasedRoot.isDirectory)
+        val outside = File(canonicalRoot.parentFile, "path-validation-alias-outside-${UUID.randomUUID()}.py")
+        outside.writeText("print('must not run')")
+        val aliasedEntrypoint = File(aliasedRoot, "main.py")
+        check(aliasedEntrypoint.delete())
+        Files.createSymbolicLink(aliasedEntrypoint.toPath(), outside.toPath())
+        try {
+            assertNativePathFailure(
+                context = context,
+                executionRoot = aliasedRoot,
+                entrypoint = aliasedEntrypoint,
+                workingDirectory = aliasedRoot,
+                expectedError = "symlink path components are not supported",
+            )
+        } finally {
+            Files.deleteIfExists(aliasedEntrypoint.toPath())
+            canonicalRoot.deleteRecursively()
+            outside.delete()
+        }
+    }
+
+    @Test
     fun explicitProjectSpecUsesMProjectIdentityAndSharedRPath() {
         assumeArm64()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -327,6 +393,17 @@ class EmbeddedPythonNativeSmokeTest {
             root.deleteRecursively()
         }
     }
+    private fun androidAppPrivateAlias(file: File): File {
+        val path = file.absolutePath
+        val userPrefix = "/data/user/0/"
+        val dataPrefix = "/data/data/"
+        return when {
+            path.startsWith(userPrefix) -> File(dataPrefix + path.removePrefix(userPrefix))
+            path.startsWith(dataPrefix) -> File(userPrefix + path.removePrefix(dataPrefix))
+            else -> error("Not an Android app-private path: $path")
+        }
+    }
+
     private fun assertNativePathFailure(
         context: android.content.Context,
         executionRoot: File,

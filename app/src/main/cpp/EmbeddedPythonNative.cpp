@@ -697,6 +697,8 @@ bool pathWithin(const std::string& root, const std::string& candidate) {
         candidate[root.size()] == '/';
 }
 
+bool canonicalPath(const std::string& path, std::string* result);
+
 bool validatePathComponents(
     const std::string& path,
     const std::string& symlinkProtectedRoot,
@@ -755,15 +757,20 @@ bool validatePathComponents(
             return false;
         }
         // Android may expose app-private paths through framework-managed symlink
-        // ancestors such as /data/user/0. Only the project/staging subtree is
+        // ancestors such as /data/data. Only the project/staging subtree is
         // controlled by this execution boundary; canonical containment checks below
-        // still apply to every final target.
-        if (S_ISLNK(info.st_mode) &&
-            pathWithin(symlinkProtectedRoot, current)) {
-            if (failure != nullptr) {
-                *failure = "symlink path components are not supported: " + current;
+        // still apply to every final target. The protected root is canonicalized by
+        // validateExecutionSpec(), so an alias spelling cannot disable this guard.
+        if (S_ISLNK(info.st_mode)) {
+            const std::string parent = parentDirectory(current);
+            std::string canonicalParent;
+            if (canonicalPath(parent, &canonicalParent) &&
+                pathWithin(symlinkProtectedRoot, canonicalParent)) {
+                if (failure != nullptr) {
+                    *failure = "symlink path components are not supported: " + current;
+                }
+                return false;
             }
-            return false;
         }
         position = componentEnd;
     }
@@ -823,15 +830,11 @@ bool validateExecutionSpec(
 
     std::string componentFailure;
     bool ignoredMissing = false;
-    if (!pathWithin(projectsBase, root)) {
-        if (failure != nullptr) {
-            *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=execution root is outside staging path";
-        }
-        return false;
-    }
+    // Android may spell the same app-private directory as /data/data or /data/user/0.
+    // The canonical containment check is the security boundary; raw spelling is not.
     if (!validatePathComponents(
             root,
-            projectsBase,
+            canonicalBase,
             false,
             &ignoredMissing,
             &componentFailure)) {
@@ -850,7 +853,7 @@ bool validateExecutionSpec(
         return false;
     }
 
-    if (entrypoint.front() != '/' || !pathWithin(root, entrypoint)) {
+    if (entrypoint.front() != '/') {
         if (failure != nullptr) {
             *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=entrypoint is outside execution root";
         }
@@ -860,7 +863,7 @@ bool validateExecutionSpec(
     componentFailure.clear();
     if (!validatePathComponents(
             entrypoint,
-            projectsBase,
+            canonicalBase,
             true,
             &missingEntrypoint,
             &componentFailure)) {
@@ -892,8 +895,7 @@ bool validateExecutionSpec(
         return false;
     }
 
-    if (workingDirectory.front() != '/' ||
-        !pathWithin(root, workingDirectory)) {
+    if (workingDirectory.front() != '/') {
         if (failure != nullptr) {
             *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=working directory is outside execution root";
         }
@@ -902,7 +904,7 @@ bool validateExecutionSpec(
     componentFailure.clear();
     if (!validatePathComponents(
             workingDirectory,
-            projectsBase,
+            canonicalBase,
             false,
             &ignoredMissing,
             &componentFailure)) {
