@@ -439,3 +439,78 @@ SiftAlpha X 的第一项工程工作是 Runtime Architecture Audit，而不是�
 正式原则为：“可靠运行优先于盲目兼容；明确失败优先于错误猜测。”SiftAlpha X 不承诺任意桌面项目都能直接在 Android 上运行；遇到 Runtime、CPU architecture、native dependencies、operating-system dependencies 或 Android platform restrictions 导致的不兼容，应明确报告失败，不进行危险猜测或静默降级。
 
 本次只建立产品定义和下一项研究任务。没有修改 Production Code、Test Code、build configuration、GitHub Actions workflow、versionCode、versionName 或 Runtime behavior；没有删除 Termux 支持，也没有开始 Embedded Runtime 实现。
+
+
+## 2026-09-16 · M / R / X Architecture Definition + alpha29 Real-Device Evidence Consolidation
+
+### Baseline
+
+- Repository：`kuashan/siftalpha-one`
+- Branch：`codex/siftalpha-x-embedded-cpython-spike`
+- Source HEAD：`a5691fff049a6be25ccade78f1ef23ce869543bf`
+- Expected main HEAD：`dff275575a9cdbd0564d394c4626cd7d9bb22637`
+- Runtime prototype：`versionCode=105`、`versionName=0.8.0-alpha29`
+- `AGENTS.md`：在目标提交的完整仓库树中未找到；本轮遵循现有 docs maintenance rules 和用户的 docs-only scope。
+- 本轮开始前已重新读取目标 branch、main ref、版本文件、当前 workflow 和关键 Runtime / Embedded CPython 源码；workspace 通过 GitHub remote tree/API 校验为 clean，scratch 当前目录本身不是 checkout 的 Git worktree。
+
+### 规范架构决策
+
+从本记录起，当前架构术语为：
+
+- **SiftAlpha M — Management System**：Import、Detect、Project Management、Project Identity、Configuration、Prepare orchestration、Runtime selection/coordination、START、STOP、STATUS、LOGS、Restart orchestration、Monitor、Web Discovery、Endpoint Probe、Browser、UI 和 M 与 Runtime 的控制协调。M 管。
+- **SiftAlpha R — Runtime System**：Runtime initialization/environment、language runtime hosting、Session、session identity、generation、execution lifecycle、project execution、stdout/stderr、result、STOP semantics、restart/re-entry、ownership、environment/dependency execution、failure isolation、recovery、capability reporting。R 跑。
+- **SiftAlpha X = M + R**：加上稳定的 M ↔ R Interface 和完整产品级集成/验收。M 完成、R prototype 成功或 Embedded CPython 成功，都不等于 X achieved。
+- [`docs/ARCHITECTURE_M_R_X.md`](ARCHITECTURE_M_R_X.md) 是规范定义；旧 DEV_LOG/历史审计中的 “SiftAlpha X = SiftAlpha Execution Runtime / Execution System” 保留为历史事实并标记 superseded，不做机械历史改写。
+
+### 源码审计结论
+
+- Production `ProjectRuntimeController` 当前通过 `RuntimeCommandHost` / `TermuxProotRuntimeHost` 生成 Python/Node 的外部 provider 命令；`TermuxBackend` / `TermuxContract` 是现有 Termux control path。
+- `RuntimeBackend`、`RuntimeAdapter`、`ManagedProcessRuntime`、`RuntimeIdentity`、lifecycle models 和 Web discovery/probe 组成可复用的 runtime-neutral seams，但不应被文档宣称为已经完成的独立 R product。
+- `EmbeddedPythonNative.cpp`、`EmbeddedPythonSession.kt`、`EmbeddedPythonResult.kt`、`EmbeddedPythonTestActivity.kt` 和 `EmbeddedPythonScripts.kt` 组成隔离 prototype；process-scoped CPython 与 fixed scripts 的真实边界保持不变。Embedded CPython 是 R 的第一个 Runtime implementation/backend prototype，不是 R 的全部，也不是 X。
+- Termux + PRoot + Ubuntu + Python 正式分类为 External Runtime Provider / External Runtime Environment，不是 M、R 或 X。
+- `RuntimeWebStateStore` 仍主要按 `projectKey` 持久化 Web candidate；Project → Runtime Identity/Generation → Lifecycle → Web Candidate → Recovery ownership chain 仍是后续 hardening backlog。本轮不实现 M ↔ R integration 或 ownership refactor。
+
+### alpha29 构建与真实设备验收证据
+
+构建身份：
+
+- GitHub Actions Run #80，Run ID `35060381162`；
+- artifact `siftalpha-w0-80`，Artifact ID `10432576095`；
+- artifact digest：`sha256:94cf4d1ead49e8500f9b2467765a983b8e0164be354c1e59083670763945eaba`；
+- APK SHA-256：`2a7b7434817ffec53863ad9fd16745bdfef101677c5470a81efdab78aa269cc6`。
+
+用户提供并确认的真实设备事实：
+
+1. **Test A**：`ENGINE=CPYTHON`、`TERMUX=NOT_USED`、`PROOT=NOT_USED`；generation 1；`STATE=SUCCEEDED`、`RUNTIME_PHASE=TERMINAL`；`STOP_PHASE=IDLE`、`STOP_RESULT=NONE`；exitCode 0；CPython 3.14.7；`sys.platform=android`；machine `aarch64`；stdlib `json OK`。结论：PASS。
+2. **Test B**：generation 3；`STATE=FAILED`、`RUNTIME_PHASE=TERMINAL`；`STOP_PHASE=IDLE`、`STOP_RESULT=NONE`；exitCode 1；stdout 为 `SIFTALPHA_X_TEST_B_STDOUT`；stderr 含 `SIFTALPHA_X_TEST_B_STDERR` 和预期 `RuntimeError: SIFTALPHA_X_TEST_B_FAILURE`。结论：PASS（intentional failure）。
+3. **generation gap**：用户提供的 B 证据从 generation 1 到 generation 3；generation 2 未出现在 supplied evidence 中。本记录只写 observed evidence gap / unexplained intermediate generation，不发明原因，也不将其分类为 Runtime failure。
+4. **Test C running**：generation 4；`STATE=RUNNING`；`RUNTIME_PHASE=PYTHON_EXEC_BEGIN`；`STOP_PHASE=IDLE`、`STOP_RESULT=NONE`；exitCode `-`。结论：PASS（证明 STOP 前置条件）。
+5. **Test C cooperative STOP**：同一 session、generation 4；`STATE=STOPPED`、`RUNTIME_PHASE=TERMINAL`；`STOP_PHASE=STOP_REQUEST_RETURNED`、`STOP_RESULT=INTERRUPT_DELIVERED`；exitCode 130；stdout 含 repeated `SIFTALPHA_X_TEST_C_TICK` 和 `SIFTALPHA_X_TEST_C_COOPERATIVE_STOP`；stderr 为 `SIFTALPHA_X_STOP=COOPERATIVE`；没有普通 FAILED traceback。结论：PASS。
+6. **post-stop re-entry**：不重启 Android application process；新的 session；generation 5；`STATE=SUCCEEDED`、`RUNTIME_PHASE=TERMINAL`；`STOP_PHASE=IDLE`、`STOP_RESULT=NONE`；exitCode 0；CPython 3.14.7、Android/aarch64、stdlib json OK。结论：PASS。
+
+这些证据只证明当前 alpha29 Embedded CPython Runtime prototype 的测试范围：真实 Android aarch64 执行、无 Termux/PRoot 的实验路径、process-scoped initialization 下的已测试 multi-Session re-entry、success/failure/output、cooperative interruption、STOPPED/130 和 STOP 后 re-entry。它们不证明 R 已完成或 X 已通过。
+
+### 明确限制
+
+未被 alpha29 证明的能力包括：任意 Python project 兼容性；arbitrary C extension、blocking native code、blocking syscall 或 uninterruptible native code interruption；universal hard-kill；pip/native wheel/numpy/pandas/scipy/venv/dependency installation；SAF imported project execution through R；Web/Browser 与 R 的 production integration；M ↔ R production integration；process/Android lifecycle recovery；concurrency、multi-project execution、完整 isolation 和 production-grade sandboxing。
+
+`PyThreadState_SetAsyncExc` 相关 STOP 只能描述为 cooperative / limited interruption behavior，不能描述为 universal hard-stop mechanism。
+
+### 变更边界
+
+本轮是 docs-only / architecture-only consolidation：
+
+- 新增 canonical `ARCHITECTURE_M_R_X.md`；
+- 更新 `PROJECT_CONTEXT.md`、`DEV_LOG.md`、`TEST_MATRIX.md` 和 `docs/README.md`；
+- 保持 `versionCode=105`、`versionName=0.8.0-alpha29`；
+- 不修改 production Runtime、Embedded CPython、STOP、JNI、Session lifecycle、Runtime Identity、Web Discovery、Termux path、tests、workflow 或 source naming；
+- 不实现 M ↔ R Interface，不做 mass rename，不删除 Termux 支持；
+- alpha29 real-device evidence 与 CI evidence 分开记录。
+
+### 下一项 R 工程方向（只推荐，不在本记录实施）
+
+基于当前源码边界，优先候选为 **R Project Script Execution Boundary**：当前 Embedded CPython prototype 只运行 `EmbeddedPythonScripts.kt` 中固定、可审查的 A/B/C 脚本，尚未定义 imported project 的 root、entry、working directory、environment、stdout/stderr、failure 和 Session ownership 合同。先固化这个边界，再评估 dependency/environment model，能避免把 alpha29 fixed-script evidence 误写成通用 project execution capability。
+
+现有 production `RuntimeWebStateStore` 的 projectKey-only candidate ownership 仍是重要的 M/R hardening backlog；它应与未来 M ↔ R Session facts contract 协调，但本轮不实现。
+
+本次文档 consolidation 没有修改生产行为或版本，没有创建 PR、merge、tag、release。

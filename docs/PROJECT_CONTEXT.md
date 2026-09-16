@@ -1,12 +1,14 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-15（Roadmap Simplification / Planning Model Cleanup）
+最后更新：2026-09-16（M / R / X Architecture Definition + alpha29 Real-Device Evidence Consolidation）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
-产品基线分支：`main`
-SiftAlpha X 产品定义工作分支：`codex/siftalpha-x-product-definition`
-当前实现版本：0.8.0-alpha25 / versionCode 101（Runtime Identity 与 Web Discovery 合并基线，云端构建和真机 04B/04C/04D 已验证）
-Production baseline merge：[893229c](https://github.com/kuashan/siftalpha-one/commit/893229ce26d49a6ea22c79d6e2be85290cb8b0c3)
-上一版历史发布：[W2 test APK · w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)
+产品基线分支：`main`（当前 main HEAD：`dff275575a9cdbd0564d394c4626cd7d9bb22637`）  
+M / R / X 架构与 Runtime prototype 工作分支：`codex/siftalpha-x-embedded-cpython-spike`  
+当前验证版本：0.8.0-alpha29 / versionCode 105（Embedded CPython Runtime prototype；alpha29 real-device evidence 已记录）  
+当前文档定义：`M = Management System`，`R = Runtime System`，`X = M + R`  
+规范架构定义：[ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)  
+Production baseline merge：[893229c](https://github.com/kuashan/siftalpha-one/commit/893229ce26d49a6ea22c79d6e2be85290cb8b0c3)（历史基线记录）  
+上一版历史发布：[W2 test APK · w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)  
 最近一次带 Release 的历史 APK：[W2 test APK · w2-test-4e899c6](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6)；Roadmap/docs base main 构建产物见 [Run #70 artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426/artifacts/10405122896)
 
 ## 1. 项目目标
@@ -23,103 +25,84 @@ SiftAlpha Studio 是一个 Android 端项目工作台，用于在手机上：
 
 项目采用“手机真机使用 + GitHub 云端构建”的工作方式。开发环境不要求本地安装 Gradle、JDK 或 Android SDK。
 
-## 2. 产品定义与 SiftAlpha X
+## 2. 产品定义与 SiftAlpha M / R / X
 
-### 2.1 SiftAlpha Studio 产品定位
+> 当前规范定义见 [ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)。本节保留项目上下文中的摘要；旧的 “SiftAlpha X = Execution Runtime / Execution System” 只在历史记录中保留，不再作为当前定义。
 
-SiftAlpha Studio 是一个面向 Android 的项目运行与管理平台。它的主要目标不是成为 IDE，也不是替代 VS Code、PyCharm、Codex 等外部开发工具。用户可以在任意外部开发环境完成项目开发，再把已经写好的项目导入 SiftAlpha Studio，在 Android 手机上可靠地准备、运行、管理和使用。
+### 2.1 SiftAlpha Studio 与 M
 
-核心用户流程是：
+SiftAlpha Studio 是一个面向 Android 的项目运行与管理平台。它的主要目标不是成为 IDE，也不是替代 VS Code、PyCharm、Codex 等外部开发工具。用户可以在外部开发环境完成项目开发，再把已经写好的项目导入 Studio，在 Android 手机上准备、运行、管理和使用。
+
+当前产品流程是：
 
 Import（导入）→ Detect（识别）→ Prepare（准备）→ Run（运行）→ Monitor（监控）→ Use（使用）→ Stop / Restart（停止 / 重启）。
 
-Editor（编辑器）和 Terminal（终端）可以作为查看、小规模修改、配置和维护的辅助能力存在，但不是产品的主要方向。
+这些管理、控制、协调和用户交互能力在架构上属于：
 
-### 2.2 SiftAlpha X 定义与职责边界
+**SiftAlpha M — Management System**。
 
-正式工作名称：SiftAlpha X
+M 负责 Import、Detect、Project Management、Project Identity、Configuration、Prepare orchestration、Runtime selection / coordination、START、STOP、STATUS、LOGS、Restart orchestration、Monitor、Web Discovery、Endpoint Probe、Browser 和 UI。M 决定运行什么、何时运行、何时停止、向用户显示什么以及 Web 页面是否可以安全打开。M 本身不等于 Python Runtime。
 
-技术定义：SiftAlpha X — SiftAlpha Execution Runtime（SiftAlpha 执行运行系统）。
+### 2.2 SiftAlpha R
 
-SiftAlpha X 是 SiftAlpha Studio 的核心项目执行系统。两者的职责边界如下：
+**SiftAlpha R — Runtime System** 是真正让项目在 Android 上运行，并维护 Runtime / Process / Session / Lifecycle 的系统。
 
-| SiftAlpha Studio | SiftAlpha X |
-|---|---|
-| Import（导入） | Prepare（准备） |
-| Detect（识别） | Execute / Run（执行 / 运行） |
-| Manage（管理） | Status（状态） |
-| Monitor（监控） | Logs（日志） |
-| Use（使用） | Stop（停止） |
-|  | Restart（重启） |
-|  | Recovery（恢复） |
+R 负责 Runtime initialization、environment、language runtime hosting、project execution、Session identity、generation、stdout/stderr、execution result、STOP semantics、restart/re-entry、ownership、dependency/environment execution、failure isolation、recovery 和 capability reporting。
 
-SiftAlpha X 是 Runtime / Execution System（运行 / 执行系统），不是 Android/Linux Kernel（操作系统内核）。Studio 负责项目入口、管理和使用体验，SiftAlpha X 负责项目运行生命周期及其执行边界。
+R 是抽象 Runtime System，不永久等同于 CPython、Linux、PRoot、Ubuntu、Alpine、Termux 或某个 system library。当前已经真实实现并在 alpha29 真机验证的 Embedded CPython，是 R 的第一个 Runtime implementation / backend prototype，不是 R 的完整定义，也不表示整个 R 已完成。
 
-### 2.3 长期 Runtime 方向
+### 2.3 SiftAlpha X
 
-当前实现依赖外部 Termux 提供底层 Android/Linux 运行能力。SiftAlpha X 的长期目标是让 SiftAlpha Studio 不再要求用户安装或操作独立 Termux App。
+**SiftAlpha X = SiftAlpha M + SiftAlpha R**，并需要稳定的 M ↔ R Interface 和完整产品集成/验收。
 
-目标架构方向是：
+因此：
 
-SiftAlpha Studio
-→ SiftAlpha X
-→ Embedded Runtime（内置运行环境）
-→ Project Runtime（项目运行环境）
-→ User Project（用户项目）
+- M 完成 ≠ X 完成；
+- R prototype 成功 ≠ X 完成；
+- Embedded CPython 成功 ≠ X 完成；
+- 只有 M、R、接口集成和产品验收都满足定义，才可称 X achieved / X acceptance passed。
 
-这是正式产品方向，不是当前实现状态。本阶段不决定 Embedded Runtime 的具体技术方案；在 Runtime Architecture Audit 完成前，不预先决定使用 PRoot、Ubuntu、Alpine、Termux fork、Termux bootstrap 或某个第三方 runtime。
+历史 DEV_LOG 和历史审计中的 “SiftAlpha X — SiftAlpha Execution Runtime” 是当时真实使用的旧架构命名，现已 superseded；本文件不改写历史事实。
 
-### 2.4 SiftAlpha X 第一阶段产品目标（Python）
+### 2.4 Termux 与 Runtime Provider
 
-SiftAlpha X 第一阶段只以 Python 项目作为目标 Runtime，不同时扩展 Node.js、Java、Go、Rust 等语言。这是产品验收目标，不是新的历史路线图阶段编号，也不表示当前已经实现。
+Termux is NOT M. Termux is NOT R. Termux is NOT X。
 
-最终目标是在一台没有安装 Termux 的 Android 设备上：
+当前 Termux + PRoot + Ubuntu + Python 属于 **External Runtime Provider / External Runtime Environment**，是 M 可以调用的运行能力来源。Runtime Provider 不等于 SiftAlpha R；它描述“向 M 提供运行能力的实现来源”。
 
-1. 安装 SiftAlpha Studio。
-2. 导入一个已经在外部开发环境完成的 Python 项目。
-3. SiftAlpha X 自动准备 Python Runtime。
-4. 自动建立项目环境。
-5. 自动处理 Python 项目依赖。
-6. START 能启动项目。
-7. STATUS 能确认项目运行状态。
-8. LOGS 能查看项目日志。
-9. STOP 能可靠停止项目。
-10. RESTART 能建立新的可靠运行生命周期。
-11. 如果项目启动本地 Web 服务，SiftAlpha Studio 能发现并打开 Browser。
-12. 整个过程不要求用户安装、打开或操作 Termux。
+迁移期允许：
 
-上述内容定义目标验收边界，不把未来目标伪装成当前能力。
+```
+M
+├── External Runtime Provider → Termux
+└── SiftAlpha R direction → Embedded Runtime implementations
+```
 
-### 2.5 产品原则
+长期目标是 M 通过稳定的 M ↔ R Interface 协调自主的 SiftAlpha R，但本轮只定义边界，不实现 M ↔ R production integration。
 
-可靠运行优先于盲目兼容；明确失败优先于错误猜测。
+### 2.5 当前架构状态
 
-SiftAlpha X 不承诺任意桌面项目都可以直接在 Android 上运行。项目兼容性可能受到 Runtime、CPU architecture、native dependencies、operating-system dependencies 和 Android platform restrictions 等因素限制。如果项目无法可靠运行，应明确报告不兼容或准备失败，而不是错误猜测、静默降级或启动错误项目。
+当前 production `ProjectRuntimeController` 仍通过 `RuntimeCommandHost` / `TermuxProotRuntimeHost` 使用外部 Termux provider；`RuntimeBackend`、`RuntimeAdapter`、`ManagedProcessRuntime`、`RuntimeIdentity` 和 lifecycle models 提供可复用的 runtime-neutral seam。
 
-### 2.6 与当前产品基线的关系
+当前 Embedded CPython alpha29 prototype 位于隔离的 `siftalphax` implementation path，使用 process-scoped CPython initialization、per-session worker attach/detach、single active session 和固定实验脚本。它尚未接入 production `ProjectRuntimeController`，不能把 prototype 验收写成 R production 或 X acceptance。
 
-当前已经实现和验证的 Runtime Identity、Python Runtime lifecycle、PREPARE、START、STATUS、LOGS、STOP、Web Discovery、Endpoint Probe、Browser、Configuration 及其测试证据继续属于 Current Product Baseline。
+### 2.6 M ↔ R Interface 原则
 
-SiftAlpha X 的工作是在这些可靠能力基础上，逐步替换底层外部 Termux 依赖，而不是推倒重写 SiftAlpha Studio。当前任务只建立产品定义，不开始 Runtime 重构、不删除 Termux 支持，也不实现 Embedded Runtime。
+M 向 R 表达结构化 Management Intent，例如 `prepare`、`start`、`stop`、`status`、`logs`、`restart`。R 向 M 返回 Runtime Facts，例如 runtime/session identity、generation、lifecycle state、runtime/stop phase、stop result、exit code、stdout/stderr、structured failure、capability 和 availability。
 
-### 2.7 下一项工程工作：SiftAlpha X Runtime Architecture Audit
+M 不应依赖 CPython/JNI internals；R 不应依赖 Activity、Compose 或 Browser UI。Web Discovery、Endpoint Probe、Browser policy 和 UI 属于 M；R 可以提供 Runtime Identity、Session Identity、process facts 和 endpoint facts。接口本轮只定义，不实现。
 
-SiftAlpha X 的第一项工程工作不是立即重写 Runtime，而是进行 Runtime Architecture Audit（SiftAlpha X 运行架构审计）。审计需要读取当前真实源码，明确：
+### 2.7 R Core Independence Principle
 
-1. Termux coupling points（Termux 耦合点）。
-2. RuntimeCommandHost 当前职责。
-3. PRoot 当前职责。
-4. Ubuntu/Linux userspace 当前职责。
-5. PythonRuntimeAdapter 可复用部分。
-6. Runtime Identity 可复用部分。
-7. Web Discovery / Endpoint Probe 可复用部分。
-8. Process/session ownership 当前实现。
-9. File/path/bind 当前实现。
-10. 哪些属于 SiftAlpha Studio 上层能力。
-11. 哪些属于未来 SiftAlpha X 底层能力。
-12. 是否应该建立 Runtime Provider abstraction（运行环境提供者抽象层）。
+**SiftAlpha R Core Independence Principle**：R 的 Runtime architecture、control layer、Session lifecycle、Runtime/Process ownership、Environment management、Recovery semantics 和 M ↔ R contract 应尽可能由 SiftAlpha 自主定义和控制。
 
-审计完成之前，不选择最终 Embedded Runtime 技术方案。
+这不意味着重新实现 Python interpreter 或所有 system libraries。CPython 等成熟基础组件可以按其许可证使用；不通过 rename / rewrite 规避许可证，也不在项目文档中作未经验证的法律保证。
+
+### 2.8 Legacy Implementation Naming
+
+源码、package、native symbols、diagnostic keys、filesystem paths 和测试仍包含 `SiftAlphaX`、`siftalphax`、`SIFTALPHA_X_*` 等历史命名。本轮不 mass rename，不修改 alpha29 已验证的 Runtime source 或 evidence keys。
+
+这些名称属于 Legacy Implementation Naming，不代表当前 “X = Execution”。未来如需统一 class/package/JNI/native filename/diagnostics/path/test 命名，应另立 M/R/X Naming Migration 任务，并审查 compatibility 与证据可追踪性。
 
 ## 3. 历史基础阶段与当前产品基线
 
@@ -175,24 +158,34 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 
 运行输出、配置值和日志不得泄露密钥。Studio 保存的配置使用 Android Keystore 保护并在运行时注入，不写回项目源码或 GitHub。
 
-## 5. 当前架构基线
+## 5. 当前 M / R / Runtime Provider 架构基线
 
-主要职责分布：
+当前源码处于迁移期：M 的产品管理能力已经存在；production runtime 仍通过外部 Termux provider 执行；Embedded CPython 是隔离的 R Runtime implementation prototype。
 
-- `V04Activity`：Runtime Center 的页面组装、用户动作入口和结果协调；当前仍承担刷新、dispatch、恢复、配置和 Web 协调，需继续拆分。
-- `ProjectUiSnapshot`：单项目不可变 UI 事实快照。
-- `ProjectActionPolicy`：根据快照统一决定 PREPARE、START、STOP、STATUS、LOGS、CONFIGURE、Browser 等动作。
-- ConfigurationModels：统一表达配置严重程度、发现来源、检测证据和脱敏配置项。
-- ProjectConfigurationInspector：读取项目元数据、.env、.env.example 和 Python 环境变量读取，并附带来源证据。
-- ProjectConfigurationUiController：配置列表、必填向导、建议项提示、来源证据、安全保存和运行时配置提示。
-- ProjectConfigurationPreflight：纯配置就绪判断，同时计算 REQUIRED/OPTIONAL 的已配置和缺失数量。
-- `RuntimeConfigurationDiagnostic`：只从运行输出中识别高可信的缺失配置，不猜测变量名。
-- `ProjectSecretStore`：Android Keystore 保护的本地配置存储。
-- `ProjectStore` / `V04ProjectGateway`：SAF 项目树、文件和项目身份访问。
-- `WebProjectInspector`、`RuntimeWebPortDiscovery`、`RuntimeWebLogDiscoveryShell`：项目范围 Web 候选发现。
-- `RuntimeWebEndpointProbe`、`RuntimeWebAvailabilityTracker`、`RuntimeWebStateStore`：候选 URL 的真实端点验证、轮询和持久化。
-- `RuntimeIdentity` / `RuntimeIdentityStore`：START、STATUS、LOGS、STOP、恢复和 Web 发现使用的运行时身份。
-- `ProjectRuntimeController`：生成 Python/Node 等运行命令并维持统一动作入口。
+### 5.1 M 的当前实现
+
+- `V04Activity`：Runtime Center 页面组装、用户动作入口、结果协调和 Web/配置 orchestration。
+- `ProjectUiSnapshot`、`ProjectActionPolicy`：UI 事实快照和动作策略。
+- `ProjectStore` / `V04ProjectGateway`：SAF 项目树、文件和稳定 project identity。
+- `ProjectConfigurationInspector`、`ProjectConfigurationUiController`、`ProjectSecretStore`：配置检测、编辑、安全保存和运行时注入编排。
+- `StudioBrowser`、`RuntimeWebEndpointProbe`、`RuntimeWebAvailabilityTracker`：Browser policy、端点验证和可用性呈现。
+- `RuntimeWebPortDiscovery`、`RuntimeWebLogDiscoveryShell`、`RuntimeWebStateStore`：当前 shared runtime package 中的 Web candidate 发现/持久化实现；产品 ownership 仍属于 M。
+
+### 5.2 R 的当前 seam 与 prototype
+
+- `RuntimeBackend`、`RuntimeAdapter` / `ExecutableRuntimeAdapter`：runtime-neutral command 和 action contract。
+- `ManagedProcessRuntime`：当前 external provider 路径复用的进程树、日志、状态和 stop mechanics。
+- `RuntimeIdentity` / `RuntimeIdentityStore`：host/guest identity、token、start time、PID/PGID 和 ownership facts。
+- `RuntimeLifecycle`、`RuntimeState`、`RuntimeResultLifecycleNormalizer`：生命周期事实、持久化和结果归并。
+- `EmbeddedPythonNative.cpp` 与 `EmbeddedPython*`：alpha29 真实设备验证的隔离 Embedded CPython Runtime prototype。
+
+### 5.3 当前 provider 边界
+
+`ProjectRuntimeController` 当前通过 `TermuxProotRuntimeHost` 生成 Python/Node 命令；`TermuxBackend` / `TermuxContract` 维护 Termux control path。这些是 current external Runtime Provider implementation，不能被写成 R 的永久定义。
+
+当前 alpha29 Embedded CPython prototype 不依赖 Termux/PRoot，并未接入 production `ProjectRuntimeController`。这两个事实可以同时成立：M 已经能使用 External Runtime Provider；R 的第一个 Runtime implementation prototype 正在独立验证。
+
+`RuntimeWebStateStore` 仍主要按 `projectKey` 持久化 candidate，旧 Runtime 的 candidate 与新 Runtime identity/generation 的 ownership chain 尚未完全闭合；这属于后续 hardening backlog，不在本轮实现。
 
 ## 6. 配置语义
 
@@ -224,9 +217,15 @@ Browser 只有在当前项目进程存在、Android 回环端点真实可达并�
 
 `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
 
-alpha25 Production baseline 构建证据：GitHub Actions [Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426)，其 head 为 Production baseline merge `893229ce26d49a6ea22c79d6e2be85290cb8b0c3`；`Build and verify APK` 成功，artifact 为 `siftalpha-w0-70`（ID `10405122896`）。该构建完成仓库校验、`testDebugUnitTest`、`assembleDebug`、APK 元数据和签名证据收集；之后的 Roadmap/docs 变更未修改 Production Code。
+历史 alpha25 Production baseline 构建证据：GitHub Actions [Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426)，其 head 为 Production baseline merge `893229ce26d49a6ea22c79d6e2be85290cb8b0c3`；artifact 为 `siftalpha-w0-70`（ID `10405122896`）。该历史构建完成仓库校验、`testDebugUnitTest`、`assembleDebug`、APK 元数据和签名证据收集。
+
+alpha29 Embedded CPython Runtime prototype 构建证据：GitHub Actions [Run #80](https://github.com/kuashan/siftalpha-one/actions/runs/35060381162)，artifact `siftalpha-w0-80`（ID `10432576095`），artifact digest `sha256:94cf4d1ead49e8500f9b2467765a983b8e0164be354c1e59083670763945eaba`，APK SHA-256 `2a7b7434817ffec53863ad9fd16745bdfef101677c5470a81efdab78aa269cc6`。Run #80 的 preparation、validators、JVM unit tests、CMake/native build、APK assemble、signing verification 和 evidence collection 已完成；alpha29 真实设备结果见 [ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)、[DEV_LOG.md](DEV_LOG.md) 和 [TEST_MATRIX.md](TEST_MATRIX.md)。
+
+本轮架构文档变更不修改 Production Code、Embedded CPython behavior、STOP behavior、workflow 或版本号。
 
 ## 8. 历史 alpha16 验收计划（已过时，仅保留记录）
+
+本节以及后续带“历史记录”标题的内容保留当时真实版本、术语和审计结论。尤其是历史记录中的旧 “SiftAlpha X” 表述不回写为当前架构定义；当前定义以本文件第 2 节和 [ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md) 为准。
 
 历史配置语义实现（alpha16 基线，仅保留记录，不是当前开发计划）：
 

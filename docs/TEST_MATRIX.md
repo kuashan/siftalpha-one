@@ -16,15 +16,19 @@
 
 本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
 
-## A. 当前版本信息
+## A. 当前 alpha29 版本信息
 
-- 当前正式开发版本：`0.8.0-alpha25`
-- versionCode：`101`
+- 当前 Runtime prototype 版本：`0.8.0-alpha29`
+- versionCode：`105`
 - 包名：`com.siftalpha.studio`
-- Roadmap Cleanup base main HEAD：`38fb60af8e4c7a4b09eafb1cad0e305ae56fc353`
-- 本文档所在 docs branch：`codex/remove-w2-w5-roadmap`（尚未合并；branch HEAD 以 GitHub ref 为准）
-- alpha25 主线构建：[GitHub Actions Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426)，artifact 为 `siftalpha-w0-70`（ID `10405122896`）；Run #70 未发布 Release。
-- 最近一次带 Release 的 APK：[w2-test-4e899c6](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6)（历史 alpha19 产物）。
+- 当前 docs/runtime prototype branch：`codex/siftalpha-x-embedded-cpython-spike`
+- source HEAD：`a5691fff049a6be25ccade78f1ef23ce869543bf`
+- main HEAD：`dff275575a9cdbd0564d394c4626cd7d9bb22637`
+- canonical architecture：[ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)
+- GitHub Actions [Run #80](https://github.com/kuashan/siftalpha-one/actions/runs/35060381162)，Run ID `35060381162`；artifact `siftalpha-w0-80`（ID `10432576095`），digest `sha256:94cf4d1ead49e8500f9b2467765a983b8e0164be354c1e59083670763945eaba`。
+- alpha29 APK SHA-256：`2a7b7434817ffec53863ad9fd16745bdfef101677c5470a81efdab78aa269cc6`。
+- Run #80 未包含 Android emulator/device；Embedded CPython instrumentation source 已加入并随源码编译，但没有把 CI 视为 instrumentation executed/pass。
+- 详细 alpha29 real-device evidence 见本文件 H 节和 [DEV_LOG.md](DEV_LOG.md)。
 
 ## B. 云端验证矩阵
 
@@ -43,7 +47,8 @@
 | C-11 | RuntimeLifecycleStore 候选验证（历史工作项） | 单元测试先通过，随后 APK 组装通过 | PASS | [候选 Actions Run #1](https://github.com/kuashan/siftalpha-one/actions/runs/34922851615) |
 | C-12 | RuntimeLifecycleStore 正式 APK 发布（历史工作项） | 正式 main 单元测试、APK 组装、稳定签名和 Release 通过 | PASS | [Actions Run #47](https://github.com/kuashan/siftalpha-one/actions/runs/34923173498) / [Release](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6) |
 | C-13 | Web Discovery Diagnostic Enhancement 云端验证（历史工作项） | 仓库校验、单元测试、APK 组装、签名和证据收集通过；不发布 Release | PASS | [Actions Run #49](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34927655920/artifacts/10379489647) |
-| C-14 | 合并后正式 main 构建（当前基线证据） | validators、`testDebugUnitTest`、`assembleDebug`、APK metadata 和签名证据收集通过 | PASS | [Actions Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426/artifacts/10405122896) |
+| C-14 | 合并后正式 main 构建（历史基线证据） | validators、`testDebugUnitTest`、`assembleDebug`、APK metadata 和签名证据收集通过 | PASS | [Actions Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426/artifacts/10405122896) |
+| C-15 | alpha29 Embedded CPython Runtime prototype CI | CPython preparation、validators、JVM unit tests、CMake/native build、`assembleDebug`、signing verification 和 evidence collection 通过 | PASS | [Actions Run #80](https://github.com/kuashan/siftalpha-one/actions/runs/35060381162) / [artifact `siftalpha-w0-80`](https://github.com/kuashan/siftalpha-one/actions/runs/35060381162/artifacts/10432576095) |
 
 ## C. 安装与升级矩阵
 
@@ -55,6 +60,7 @@
 | I-04 | 在 alpha17 上直接安装 alpha18 | 安装器允许覆盖，版本为 alpha18 / versionCode 94 | 待真机 |
 | I-05 | 在 alpha18 上直接安装 alpha19 | 安装器允许覆盖，版本为 alpha19 / versionCode 95 | 历史记录 |
 | I-06 | 在 alpha24 上直接安装 alpha25 | 安装器允许覆盖，版本为 alpha25 / versionCode 101；签名保持一致 | real-device verified / user-confirmed |
+| I-07 | 在真实 Android aarch64 设备安装并运行 alpha29 Embedded CPython prototype | Experimental 页面可打开；当前设备验收序列见 H 节 | real-device verified / user-confirmed |
 
 ## D. 配置功能矩阵
 
@@ -101,16 +107,16 @@
 | R-07 | 清理操作 | 项目环境、共享工具、缓存和源码删除分别确认 | 待真机 |
 | R-08 | 后台恢复/重新进入 | 运行状态通过 STATUS 等真实结果恢复，不凭旧 UI 判断 | 待真机 |
 
-## F. 当前版本建议测试顺序
+## F. 历史 alpha25 建议测试顺序（历史记录）
 
-1. 先直接覆盖安装，不卸载当前 alpha25。
+1. 先直接覆盖安装，不卸载当时的 alpha25。
 2. 打开两个脚本，点击“配置”，确认直接进入“项目配置编辑”并看到 OPTIONAL 输入框。
 3. 返回后不填写候选项，依次执行 PREPARE 和 START。
 4. 观察项目是否正常运行，配置提醒是否仍然存在但不阻止运行。
 5. 如项目实际会报告缺失密钥或环境变量，确认 Studio 给出配置提示；保存后重新运行。
 6. 回归 STOP → START。
 7. 回归打开网页、从 Chrome 返回 Studio，以及返回后短时间内页面是否保持正常。
-8. 最后确认版本为 alpha25 / versionCode 101，且本地项目数据仍然存在。建议配置缺失时，START 仍然可用；只有必需配置缺失时 START 才应被阻止。
+8. 最后确认当时版本为 alpha25 / versionCode 101，且本地项目数据仍然存在。建议配置缺失时，START 仍然可用；只有必需配置缺失时 START 才应被阻止。
 
 每次真机测试完成后，在对应行把“待真机/回归待确认”改成 PASS 或阻塞，并在 DEV_LOG 追加日期、设备、步骤和结果。
 
@@ -148,6 +154,58 @@
 | W-07 | HTTP 探测成功 | `SIFTALPHA_WEB_DISCOVERY_STATUS=PASS`，并保留原有 PASS/URL 输出 | 云端单元测试通过，待真机 |
 | W-08 | 任一诊断失败场景 | 原有 `SIFTALPHA_WEB_AUTODISCOVERY` 兼容输出仍存在 | 云端构建通过，待真机 |
 | W-09 | Runtime START/PREPARE/STOP 回归 | 生命周期和 Browser 安全条件不受诊断字段影响 | 待后续 APK 真机回归 |
+
+
+
+## H. alpha29 Embedded CPython Runtime Prototype — Real-Device Acceptance
+
+本节是用户提供并确认的真实 Android 设备证据，不由 GitHub Actions instrumentation 推断。该证据只覆盖当前 fixed-script Embedded CPython prototype 的生命周期范围。
+
+### H.1 Build identity
+
+| 字段 | 事实 |
+|---|---|
+| version | `versionCode=105`, `versionName=0.8.0-alpha29` |
+| branch | `codex/siftalpha-x-embedded-cpython-spike` |
+| source HEAD | `a5691fff049a6be25ccade78f1ef23ce869543bf` |
+| workflow | SiftAlpha W0 Cloud Build |
+| Run | #80 |
+| Run ID | `35060381162` |
+| artifact | `siftalpha-w0-80` |
+| Artifact ID | `10432576095` |
+| artifact digest | `sha256:94cf4d1ead49e8500f9b2467765a983b8e0164be354c1e59083670763945eaba` |
+| APK SHA-256 | `2a7b7434817ffec53863ad9fd16745bdfef101677c5470a81efdab78aa269cc6` |
+
+### H.2 Observed device sequence
+
+| Step | Observed facts | Status |
+|---|---|---|
+| Test A | `ENGINE=CPYTHON`; `TERMUX=NOT_USED`; `PROOT=NOT_USED`; generation 1; `STATE=SUCCEEDED`; `RUNTIME_PHASE=TERMINAL`; `STOP_PHASE=IDLE`; `STOP_RESULT=NONE`; exitCode 0; CPython 3.14.7; `sys.platform=android`; machine `aarch64`; stdlib json OK | PASS |
+| Test B | generation 3; `STATE=FAILED`; `RUNTIME_PHASE=TERMINAL`; `STOP_PHASE=IDLE`; `STOP_RESULT=NONE`; exitCode 1; stdout `SIFTALPHA_X_TEST_B_STDOUT`; stderr includes `SIFTALPHA_X_TEST_B_STDERR` and intentional `RuntimeError: SIFTALPHA_X_TEST_B_FAILURE` | PASS（intentional failure） |
+| Evidence gap | Generation 2 was not captured in supplied evidence. No cause is inferred and it is not classified as a Runtime failure. | recorded gap |
+| Test C running | generation 4; `STATE=RUNNING`; `RUNTIME_PHASE=PYTHON_EXEC_BEGIN`; `STOP_PHASE=IDLE`; `STOP_RESULT=NONE`; exitCode `-` | PASS（STOP precondition） |
+| Test C cooperative STOP | Same session ID and generation 4; `STATE=STOPPED`; `RUNTIME_PHASE=TERMINAL`; `STOP_PHASE=STOP_REQUEST_RETURNED`; `STOP_RESULT=INTERRUPT_DELIVERED`; exitCode 130; stdout contains repeated `SIFTALPHA_X_TEST_C_TICK` and `SIFTALPHA_X_TEST_C_COOPERATIVE_STOP`; stderr `SIFTALPHA_X_STOP=COOPERATIVE`; no ordinary FAILED traceback | PASS |
+| Post-stop re-entry | Without restarting Android application process; new session ID; generation 5; `STATE=SUCCEEDED`; `RUNTIME_PHASE=TERMINAL`; `STOP_PHASE=IDLE`; `STOP_RESULT=NONE`; exitCode 0; CPython 3.14.7; Android/aarch64; stdlib json OK | PASS |
+
+### H.3 Limited conclusions
+
+alpha29 真实设备证据支持：
+
+- Embedded CPython 3.14.7 在真实 Android aarch64 设备执行；
+- 当前 prototype 测试路径不依赖 Termux / PRoot；
+- process-scoped CPython initialization 支持当前已测试的 multi-Session re-entry；
+- success、intentional failure、stdout/stderr capture、cooperative interruption、STOPPED/130 和 STOP 后新 Session 执行成立。
+
+alpha29 不证明：
+
+- R 已完成或 X 已 achieved；
+- arbitrary C extension / blocking native code / blocking syscall interruption；
+- universal hard-stop；
+- arbitrary Python project、pip、native wheels、numpy/pandas/scipy、venv、dependency installation；
+- SAF imported project、Web/Browser 与 R 的 production integration；
+- process/lifecycle recovery、concurrent runtimes、multi-project execution、完整 isolation 或 production-grade sandboxing。
+
+`PyThreadState_SetAsyncExc` 相关行为必须描述为 cooperative / limited interruption behavior，不能描述为 universal hard-stop mechanism。
 
 ## G. 合并后产品基线审计记录 — Production baseline merge@893229ce（历史审计）
 
