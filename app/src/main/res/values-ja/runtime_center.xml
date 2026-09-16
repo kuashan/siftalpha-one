@@ -32,6 +32,7 @@
     <string name="runtime_state_environment_error">環境エラー%1$s</string>
     <string name="runtime_state_env_ready">環境準備済み</string>
     <string name="runtime_state_env_not_ready">環境未準備</string>
+    <string name="runtime_embedded_r_environment_ready">内蔵ランタイム：すぐに実行できます</string>
     <string name="runtime_lifecycle_environment_not_prepared">環境未準備</string>
     <string name="runtime_lifecycle_preparing">準備中</string>
     <string name="runtime_lifecycle_ready_to_run">実行可能</string>

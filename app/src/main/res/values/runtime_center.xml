@@ -32,6 +32,7 @@
     <string name="runtime_state_environment_error">环境异常%1$s</string>
     <string name="runtime_state_env_ready">环境就绪</string>
     <string name="runtime_state_env_not_ready">环境未准备</string>
+    <string name="runtime_embedded_r_environment_ready">内置运行环境：可直接运行</string>
     <string name="runtime_lifecycle_environment_not_prepared">环境未准备</string>
     <string name="runtime_lifecycle_preparing">准备中</string>
     <string name="runtime_lifecycle_ready_to_run">可以运行</string>

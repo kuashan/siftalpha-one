@@ -660,14 +660,20 @@ open class V04Activity : StudioActivity() {
         if (selectedProjectDocumentId != null) {
             box.addView(section(getString(R.string.runtime_workspace_environment)))
         }
-        val environmentLabel = when (environmentStates[stateKey]) {
-            true -> getString(R.string.runtime_state_env_ready)
-            false -> getString(R.string.runtime_state_env_not_ready)
-            null -> getString(R.string.runtime_environment_unknown)
+        val environmentLabel = if (runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R) {
+            getString(R.string.runtime_embedded_r_environment_ready)
+        } else {
+            when (environmentStates[stateKey]) {
+                true -> getString(R.string.runtime_state_env_ready)
+                false -> getString(R.string.runtime_state_env_not_ready)
+                null -> getString(R.string.runtime_environment_unknown)
+            }
         }
         box.addView(text(getString(R.string.runtime_environment_label, environmentLabel), 12f, false).apply {
             setTextColor(
-                if (environmentStates[stateKey] == true) {
+                if (runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R ||
+                    environmentStates[stateKey] == true
+                ) {
                     Color.rgb(170, 224, 190)
                 } else {
                     Color.rgb(150, 157, 169)
@@ -792,7 +798,10 @@ open class V04Activity : StudioActivity() {
         val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         row1.addView(smallButton(getString(R.string.runtime_button_edit)) { openEditor(project) }, weight())
         val prepareButton = smallButton(getString(R.string.runtime_button_prepare)) { confirmPrepare(project) }
-            .apply { isEnabled = policy.isEnabled(ProjectActionPolicy.Action.PREPARE) }
+            .apply {
+                isEnabled = runtimeSelection == ProjectRuntimeSelection.TERMUX &&
+                    policy.isEnabled(ProjectActionPolicy.Action.PREPARE)
+            }
         row1.addView(prepareButton, weight().apply { marginStart = dp(5) })
         val runButton = smallButton(getString(R.string.runtime_button_run)) { confirmRun(project) }
             .apply { isEnabled = policy.isEnabled(ProjectActionPolicy.Action.START) }
