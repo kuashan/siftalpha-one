@@ -128,7 +128,7 @@ jobs:
       - name: Run unit tests and assemble debug APK
         run: |
           set -o pipefail
-          gradle --no-daemon --stacktrace --console=plain testDebugUnitTest assembleDebug | tee w0-evidence/gradle-build.txt
+          gradle --no-daemon --stacktrace --console=plain testDebugUnitTest assembleDebug assembleDebugAndroidTest | tee w0-evidence/gradle-build.txt
 
       - name: Collect APK evidence
         run: |

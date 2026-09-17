@@ -93,5 +93,10 @@
         <service
             android:name=".runtime.TermuxResultService"
             android:exported="false" />
+
+        <service
+            android:name=".siftalphax.EmbeddedPythonWorkerService"
+            android:exported="false"
+            android:process=":siftalpha_r_worker" />
     </application>
 </manifest>

@@ -824,3 +824,11 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 **alpha43 real-device acceptance = PASS**
 
 本条记录封存 alpha43 当前基线；不表示 Embedded R 或 M/R/X 已完成，也不启动后续版本开发。
+
+## 2026-09-17 · alpha44 Slice 2 — Dedicated Worker + Typed IPC Handshake
+
+- alpha44 Slice 1 Runtime Load Binding Contract remains complete at version `120 / 0.8.0-alpha44`.
+- Added the R-only `EmbeddedPythonWorkerService` in the dedicated `:siftalpha_r_worker` Android process.
+- Added a typed AIDL handshake that exposes worker identity/PID and validates `RuntimeLoadBindingV1` before applying the process-scoped binding gate.
+- The worker accepts a first valid binding, treats the same binding as idempotent, and deterministically rejects a different binding without replacing the original.
+- Slice 2 does not load CPython or JNI, does not move the existing execution path, and is not connected to normal user flow. Instrumentation is compile-only until a device/emulator run is explicitly performed.
