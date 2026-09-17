@@ -40,7 +40,7 @@
 2. **SiftAlpha-managed wheel installation**：第一阶段只接受经过选择、哈希验证、内容检查的纯 Python wheel；不在手机端执行 arbitrary build backend。
 3. **Pre-resolved / verified manifest**：解析可以在受信任的开发/构建环境完成；设备端只下载或复用明确的 artifact，并进行结构化验证。
 4. **Atomic generation update**：`env-v2` 构建并验证成功后再切换；失败不能破坏当前 READY environment。
-5. **Process boundary gate**：当前 process-scoped CPython 不能被宣称为支持任意不同依赖版本的顺序切换。若需要强隔离，应采用 per-environment process；在此之前必须明确拒绝或回到 External Provider。
+5. **Process boundary gate**：当前 process-scoped CPython 的 gate 必须绑定 project-owned `environmentId` / Project Environment Identity，而不是只比较 dependency fingerprint。即使 Project A 与 Project B 的 dependency fingerprint 相同，B 仍可能通过 `sys.modules` 复用 A 已加载的 module object 和进程级状态；进程已加载 environment A 后，不允许切换到 environment B。若需要强隔离，应采用 per-environment fresh process，或未来经证明的更强 isolation mechanism；在此之前必须明确拒绝或回到 External Provider。
 
 因此推荐的长期方案是 **Hybrid Model**：预解析/预构建的可信分发清单 + SiftAlpha 管理的、仅允许受控 wheel 的设备端安装器。alpha44 的最小真机范围应是 **Pure-Python Project Environment v1**，并带有明确的 process-scoped capability gate；不包括 arbitrary native wheels、source build、完整 `venv`、直接 `pip` 或 concurrent Embedded sessions。
 
@@ -228,6 +228,21 @@ Project Identity + Runtime ABI + Python major/minor + dependency fingerprint
 
 **Recommendation：** 使用两个 identity，而不是一个过载的 hash：
 
+这里必须明确区分两个概念：
+
+- **Dependency Fingerprint** 是 dependency content compatibility identity：描述规范化声明、完整解析 graph、exact artifact/hash 与安装 policy 是否兼容。它可以用于 stale detection、manifest 比较和不可变 artifact cache 命中判断。
+- **Environment Identity / `environmentId`** 是 project-owned runtime environment identity：标识某个项目拥有的 environment binding、其 runtime contract 和 generation/ownership。它不是“只由 dependency fingerprint 得出的共享 key”。不同 Project 即使 fingerprint 完全相同，也必须拥有不同的 `environmentId`；同一个 `environmentId` 也不因此获得 clean-session 语义。
+
+因此，process gate 的最小安全条件是“当前 process 已绑定哪个 `environmentId`”，而不是“当前 fingerprint 是否相等”：
+
+```text
+process loaded environment A
+  → environment B is rejected
+  → even when dependencyFingerprint(A) == dependencyFingerprint(B)
+```
+
+只有在 fresh process/process-per-environment，或已经证明的更强隔离机制下，才可以讨论在同一个 app 生命周期内切换不同 environment。跨项目复用应停留在 immutable artifact/download cache 层，不能借助相同 fingerprint 隐式共享 mutable site-packages 或 module runtime state。
+
 ```text
 ProjectEnvironmentIdentity = SHA-256(
   schemaVersion,
@@ -268,6 +283,8 @@ PackageArtifactIdentity = SHA-256(
 
 不能因为用户 STOP 一次运行，就删除可复用的 environment，也不能因为清理 cache 就破坏当前 READY environment。
 
+**限制：** 顺序 Session 复用同一个 environment 只表示复用同一组已安装文件和 manifest，不保证新的 interpreter/module runtime 是干净的。第三方 module 的 global state、callbacks、logging handlers、threads、monkey patches 或其他 retained references 可能跨 Session 留在同一 process；`environmentId` binding 不能被写成 clean-session guarantee。
+
 ## Dependency Declaration Model
 
 ### 权威来源
@@ -306,6 +323,24 @@ fingerprint 不应只是文件字节 hash。推荐包含：
 - complete resolved graph / lock digest；
 - runtime ABI、Android ABI/API、installer policy version；
 - 不支持的选项、dynamic metadata 或 source build 不能被忽略，应转为 structured failure。
+
+### Resolver authority 是 alpha44 的 blocking decision
+
+Hybrid Model 依赖一个 pre-resolved / trusted manifest，但该 manifest 的权威来源尚未确定。alpha44 implementation 开始前必须明确由谁把 top-level declarations 转成：
+
+1. complete transitive dependency graph；
+2. exact versions；
+3. exact wheel artifacts；
+4. 每个 artifact 的 SHA-256。
+
+候选来源包括：
+
+- trusted CI / trusted build machine；
+- trusted resolution service；
+- explicit SiftAlpha lock manifest；
+- fully pinned and hash-complete project input。
+
+在这个来源和信任边界确定前，设备端 v1 不能悄悄退化为通用 pip resolver，也不能把不完整的 top-level declaration 当成已解析 graph。该决定是 alpha44 的 implementation-blocking design decision，不在本轮实现。
 
 ## Installation Model Options
 
@@ -416,7 +451,9 @@ environment metadata
 - wheel metadata、`RECORD`、distribution name/version 与 declared hash 可验证；
 - transitive dependencies 也必须落在同一允许集合，不能因为 top-level package 是纯 Python 就放行 native child；
 - package 安装到 project-owned environment generation，不修改 Runtime Base 或 Project Source Staging；
-- import verification 可以验证已安装 distribution metadata 和一组声明的 import，但不能把 import scan 变成 dependency declaration；
+- 不能把 prepare 阶段的 `import package` 当作无副作用的验证：import 会填充 `sys.modules`、执行 package top-level code，并可能改变 process-global state（例如 callbacks、logging handlers、threads 或 monkey patches）；
+- alpha44 必须在实现前决定验证策略：**A.** prepare 阶段只做 metadata/file verification；或 **B.** 把 import verification 放进 disposable isolated process。当前审计只记录这个 blocking design decision，不选择实现方式；
+- import scanning 只能作为 diagnostics，不能把 `import PIL` 等名字推断为 dependency declaration；
 - upgrade 生成新 generation，旧 generation 在无 Session 引用后清理。
 
 这类 package 可以覆盖相当一部分纯 Python ecosystem，但不等于所有 PyPI package：
@@ -435,6 +472,8 @@ PyPA 的 platform compatibility tag 形式是：
 
 例如 Python tag 区分 `cp`（CPython），ABI tag 可以是 implementation-specific ABI 或 `abi3`，`none` 表示没有 extension ABI 要求。[Platform compatibility tags](https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/)
 
+PyPA 当前规范明确规定 Android platform tag schema 为 `android_apilevel_abi`，也就是本文使用的 `android_<api level>_<abi>`；`android_27_arm64_v8a` 表示 API level 27 or later 与 `arm64-v8a`。`manylinux_*` 是 glibc Linux contract，`musllinux_*` 是 musl Linux contract；二者都不是 Android platform tag，不能因为架构同为 AArch64 就视为 Android-compatible。alpha44 pure-Python wheels 的主要 allowlist 应是 ABI `none`、platform `any`，例如 `py3-none-any`；未来 native Android wheel 才进入 `android_<api>_<abi>` 兼容性判断。
+
 对当前 Embedded Android 目标，必须同时评估：
 
 | 维度 | 当前/推荐判断 |
@@ -443,6 +482,7 @@ PyPA 的 platform compatibility tag 形式是：
 | Stable ABI | `abi3` 只表达 CPython stable ABI 可能性，不解决 Android libc、动态库依赖或 API floor |
 | Android ABI | `arm64-v8a` / AArch64；Android NDK 文档列出 `arm64-v8a` 对应 AArch64 |
 | OS/libc | Android bionic，不是 glibc Linux；`manylinux` 语义针对 glibc，`musllinux` 语义针对 musl |
+| Android platform tag | PyPA schema 为 `android_<api level>_<abi>`；例如 `android_27_arm64_v8a` 表示 Android API level 27 或更高、`arm64-v8a` ABI |
 | Platform tag | `manylinux`/`musllinux` 不能自动被视为 Android-compatible；Android wheel 必须有明确 Android build/provenance 与真机/模拟器验证 |
 | API floor | 当前 app `minSdk=26`；native artifact 还必须声明并验证自身 Android API floor，不能仅由 wheel filename 推断 |
 | external libs | `DT_NEEDED`、`dlopen`、libpython/OpenSSL 等依赖必须由 Android packaging/linker contract 管理 |
@@ -511,6 +551,8 @@ Dependency installation 本身就是执行第三方代码的攻击面，风险�
 | dependency metadata | 以 structured facts/manifest 为 state source，不从 pip stdout 猜 READY |
 
 第一版默认应拒绝 source-build scripts，直到 SiftAlpha 具备更完整的 process/sandbox/credential isolation。即使只装 pure-Python wheel，也不能承诺 arbitrary untrusted Python code 的 sandbox；“pure”是 native compatibility boundary，不是 security sandbox。
+
+同样，prepare 阶段的 import verification 不是无副作用的 metadata check：它会 populate `sys.modules`、执行第三方 top-level code，并可能污染 process-global state。alpha44 必须把“metadata/file-only verification”与“disposable isolated-process import verification”作为 design-review blocking choice；在选择前不能把长期 Embedded CPython process 中的 import 当成安全验证步骤。
 
 ## Atomic Environment Update
 
@@ -695,9 +737,31 @@ R 不依赖 Activity、Compose、Browser 或 Android UI。M 将结构化事实�
 | 清空 environment modules | 中低 | 仍有引用、finder cache、线程、extension lifetime 风险 |
 | subinterpreter | 取决于所有 extension 是否支持隔离 | 不能把它当作 arbitrary third-party native package 的自动解决方案 |
 | 每个 environment 一个 OS process | 高；进程退出提供最清晰边界 | **长期推荐**，尤其是 native/不同版本 |
-| 严格 process lock | 可预测但能力较窄 | alpha44 可作为临时 gate：同 process 只允许一个 environment fingerprint |
+| 严格 process lock | 可预测但能力较窄 | alpha44 可作为临时 gate：同 process 只允许一个 project-owned `environmentId` / Project Environment Identity |
 
 **Recommendation：** 在 process-per-environment 还没有实现前，Embedded R 不应承诺 arbitrary version switching；为不同 environment 请求返回 `PROCESS_ENVIRONMENT_SWITCH_UNSUPPORTED`，并由 M 让用户明确选择 External Provider。不能静默在当前 app process 中加载第二个版本。
+
+### Process gate 绑定 environment identity，而不是 fingerprint
+
+当前 process 的 loaded-environment binding 至少应记录 project-owned `environmentId` / Project Environment Identity：
+
+```text
+loaded environment A
+  → reject environment B
+  → even when dependencyFingerprint(A) == dependencyFingerprint(B)
+```
+
+原因是相同 fingerprint 只说明 dependency content 兼容，不会清空或隔离 A 已经进入 `sys.modules` 的 module object、global state、callbacks、logging handlers、threads、monkey patches 或其他 retained references。相同 environment 在多个顺序 Session 中可以复用 environment files，但第三方 module runtime state 仍可能跨 Session 保留；environmentId binding 不是 clean-session semantics。
+
+### Import verification 的进程污染风险
+
+如果 environment preparation 阶段执行 `import package`，该动作会：
+
+- populate `sys.modules`；
+- execute package top-level code；
+- potentially mutate process-global state。
+
+因此 alpha44 不能默认把长期 process 内的 import 当作无副作用验证。必须在 design review 中二选一：metadata/file verification only，或在 disposable isolated process 中做 import verification。本审计记录该阻塞点，但不实现任一方案。
 
 ## Native Extension 的进程级污染
 
@@ -773,7 +837,7 @@ M Presentation / existing observation / result routing
 - 默认 pure-Python wheel；hash 必须完整；source/native/editable/build backend 默认拒绝。
 - 通过 controlled `sys.path` 注入 environment；同时处理 `sys.modules`/finder/process boundary。
 - environment update 采用 build → verify → atomic switch；Session 固定 environment generation。
-- process-scoped CPython 在同一个 app process 中只允许一个 environment fingerprint；不同 fingerprint 需要新的 OS process 或明确 External Provider。
+- process-scoped CPython 在同一个 app process 中只允许一个 project-owned `environmentId`；即使两个 environment 的 dependency fingerprint 相同，也必须拒绝切换。不同 environment 需要新的 OS process 或明确 External Provider；复用同一个 environment 跨顺序 Session 仍不保证 clean-session semantics。
 
 ## Minimal alpha44 Proposal
 
@@ -785,12 +849,13 @@ M Presentation / existing observation / result routing
 2. 只接受受控依赖声明子集：明确版本/可解析输入、无 VCS/local/editable/source-build 选项；未锁定或无法预解析时报告 structured failure。
 3. 使用预解析/可信 manifest 或等价的严格锁定输入；不把手机端通用 pip resolver 作为 alpha44 必需条件。
 4. 只安装经过 hash、tag、archive、metadata 和 pure-Python payload 验证的 wheel。
-5. 每个项目有独立 logical environment、dependency fingerprint、manifest、generation、READY/STALE/FAILED 等状态。
+5. 每个项目有独立 logical environment、project-owned `environmentId`、dependency fingerprint、manifest、generation、READY/STALE/FAILED 等状态。
 6. Download Cache 与 Installed Environment 分离；相同 artifact 可以跨项目复用，mutable site-packages 不直接共享。
 7. 安装失败、取消、quota、hash mismatch 保持旧 READY environment；验证完成后 atomic switch。
 8. 返回结构化 package facts、environment facts 和 failure taxonomy；不解析 pip stdout。
-9. 对当前 process-scoped CPython 增加明确 capability gate：同 process 不切换不同 fingerprint；在没有 process isolation 时对 Fixture G  deterministic reject 或 External Provider，不能宣称完整 isolation。
-10. 真实 Android 验收覆盖 Fixture A–J 中 alpha44 声明支持的范围，并特别验证 offline/cache、hash、quota、旧环境回滚和 re-entry。
+9. 对当前 process-scoped CPython 增加明确 capability gate：同 process 不切换不同 project-owned `environmentId`；即使 fingerprint 相同也 deterministic reject 或走 External Provider，不能宣称完整 isolation。
+10. 在 alpha44 implementation 前冻结两个 blocking decisions：resolver authority（谁产出 complete graph、exact versions/artifacts 与 SHA-256）以及 import verification（metadata/file-only，或 disposable isolated process）；设备端不能在未决时悄悄运行通用 pip resolver 或长期 process 内 import。
+11. 真实 Android 验收覆盖 Fixture A–J 中 alpha44 声明支持的范围，并特别验证 offline/cache、hash、quota、旧环境回滚和 re-entry。
 
 ### 明确不纳入 alpha44 最小范围
 
@@ -821,16 +886,17 @@ M Presentation / existing observation / result routing
 
 ## Open Questions
 
-1. 依赖解析最终由受信任 CI/开发机、服务端还是设备端完成？
+1. **alpha44 blocking decision：** 依赖解析最终由受信任 CI/开发机、受信任服务、显式 SiftAlpha lock manifest，还是 fully pinned/hash-complete input 提供？在决定前不得把设备端变成隐式通用 resolver。
 2. 是否要定义 SiftAlpha-specific lock/manifest，还是采用未来 PyPA lockfile 规范的受限子集？
 3. requirements 与 pyproject 同时存在时，是否长期保持 hard conflict，还是增加显式 project policy？
 4. app-private 环境的大小、文件数、单包和总缓存 quota 分别是多少？
 5. Android CA bundle 与 index trust root 如何随 app/runtime 更新？
-6. 是否必须在 alpha44 就采用 per-environment OS process，还是先用 process lock + External Provider boundary？
+6. 是否必须在 alpha44 就采用 per-environment OS process，还是先用绑定 `environmentId` 的 process lock + External Provider boundary？即使先不实现 process isolation，也不能以相同 fingerprint 代替 environment identity。
 7. 纯 Python package 的 `.pth`、data files、console scripts 是否永远拒绝，还是建立可审计 allowlist？
 8. project source 是否允许作为本地 package 参与安装？如果允许，如何避免 editable/source-build 语义？
-9. 结果、environment manifest 和 failure facts 是否需要超出当前 Activity-lifetime cache 做持久化？
-10. 未来 native wheel 的 Android build provenance、API floor 与 system-library ownership 由谁签发？
+9. **alpha44 blocking decision：** import verification 采用 metadata/file-only，还是 disposable isolated process？不能把长期 Embedded process 内的 import 当成无副作用验证。
+10. 结果、environment manifest 和 failure facts 是否需要超出当前 Activity-lifetime cache 做持久化？
+11. 未来 native wheel 的 Android build provenance、API floor 与 system-library ownership 由谁签发？
 
 ## Risk Register
 
@@ -931,7 +997,7 @@ M Presentation / existing observation / result routing
 
 ### 6. environment 是否应该跨 Session 复用？
 
-**结论：应当在 fingerprint、runtime compatibility、verification 与 process policy 都匹配时复用。** Environment 与 Session 分离能避免每次运行重装；STOP 不删除 environment。限制是已加载 module/native state 可能要求新 process，不能只凭 READY marker 复用。
+**结论：应当在 project-owned `environmentId`、fingerprint、runtime compatibility、verification 与 process policy 都匹配时复用。** Environment 与 Session 分离能避免每次运行重装；STOP 不删除 environment。限制是已加载 module/native state 可能要求新 process，不能只凭 READY marker 或相同 fingerprint 复用；同一 environment 跨顺序 Session 也不保证 clean-session semantics。
 
 ### 7. 依赖改变后如何安全升级？
 
@@ -943,11 +1009,11 @@ M Presentation / existing observation / result routing
 
 ### 9. process-scoped CPython 会不会阻碍不同项目依赖版本隔离？
 
-**结论：会。** `sys.modules`、finder/path state、module references、native `.so` 与 static/global state 使 `sys.path` 注入不够。限制和处理方案是：在 process-per-environment 到来前，只允许同 fingerprint 或 deterministic reject/External fallback；不能宣称 arbitrary version isolation。
+**结论：会。** `sys.modules`、finder/path state、module references、native `.so` 与 static/global state 使 `sys.path` 注入不够。限制和处理方案是：在 process-per-environment 到来前，process gate 绑定一个 project-owned `environmentId`；即使 fingerprint 相同也拒绝切换到另一个 environment，或走 deterministic reject/External fallback；不能宣称 arbitrary version isolation。即使复用同一个 environment，跨 Session 的 third-party runtime state 仍可能保留。
 
 ### 10. alpha44 最小实现到底应该是什么？
 
-**结论：Pure-Python Project Environment v1。** 支持受控 requirements 或静态 pyproject 单一来源、预解析/哈希 wheel manifest、per-project logical environment、reuse/stale、structured state/failure、atomic generation、safe cleanup、cache separation 与 process gate。明确不包括 direct pip default、venv、native wheels、source builds、concurrent sessions、Web integration、UI redesign 和 process内 arbitrary version switch。
+**结论：Pure-Python Project Environment v1。** 支持受控 requirements 或静态 pyproject 单一来源、预解析/哈希 wheel manifest、per-project logical environment、reuse/stale、structured state/failure、atomic generation、safe cleanup、cache separation 与绑定 `environmentId` 的 process gate。alpha44 implementation 前还必须决定 resolver authority 以及 import verification 是否只做 metadata/file check 或放入 disposable isolated process。明确不包括 direct pip default、venv、native wheels、source builds、concurrent sessions、Web integration、UI redesign 和 process内 arbitrary version switch。
 
 ## Authoritative References
 
@@ -961,7 +1027,7 @@ M Presentation / existing observation / result routing
 6. [PEP 405 — Python Virtual Environments](https://peps.python.org/pep-0405/) — traditional venv 的 Python binary、prefix 与 site directory model。
 7. [PEP 621 — Storing project metadata in pyproject.toml](https://peps.python.org/pep-0621/) — `[project].dependencies` 与 static/dynamic metadata。
 8. [PyPA — `pyproject.toml` specification](https://packaging.python.org/en/latest/specifications/pyproject-toml/) — `[build-system]` 与 `[project]` 的职责边界。
-9. [PyPA — Platform compatibility tags](https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/) — `{python}-{abi}-{platform}`、`cp`、`abi3`、manylinux/glibc 与 musllinux/musl 语义。
+9. [PyPA — Platform compatibility tags](https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/) — `{python}-{abi}-{platform}`、`cp`、`abi3`、manylinux/glibc、musllinux/musl，以及 `android_apilevel_abi`（例如 `android_27_arm64_v8a`）语义。
 10. [PyPA — Binary distribution format](https://packaging.python.org/en/latest/specifications/binary-distribution-format/) — wheel archive/metadata 规范。
 11. [pip 26.2.1 — Secure installs](https://pip.pypa.io/en/stable/topics/secure-installs/) — hash-checking、`--only-binary :all:` 与 arbitrary code 风险。
 12. [pip 26.2.1 — Build System Interface](https://pip.pypa.io/en/stable/reference/build-system/) — build isolation、build dependencies、backend 与 extension build。
