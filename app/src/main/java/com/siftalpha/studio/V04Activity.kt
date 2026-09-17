@@ -59,6 +59,7 @@ import com.siftalpha.studio.runtime.ObservationDispatchDecision
 import com.siftalpha.studio.runtime.ObservationPresentationPolicy
 import com.siftalpha.studio.runtime.RuntimeWebObservationProbePolicy
 import com.siftalpha.studio.runtime.ProjectStatusGuidancePolicy
+import com.siftalpha.studio.runtime.ProjectStatusPresentationPolicy
 import com.siftalpha.studio.runtime.RuntimeWebAvailabilityTracker
 import com.siftalpha.studio.runtime.RuntimeWebCandidateSource
 import com.siftalpha.studio.runtime.RuntimeWebDiscoveryScopePolicy
@@ -811,11 +812,25 @@ open class V04Activity : StudioActivity() {
             webEndpointVerified = reachableWebUrl != null,
             richResultAvailable = richResult != null,
         )
-        statusGuidance?.let { guidance ->
-            box.addView(text(guidance.localizedText(), 12f, false).apply {
-                setTextColor(Color.rgb(170, 204, 235))
-                setPadding(0, dp(2), 0, dp(2))
-            })
+        if (
+            ProjectStatusPresentationPolicy.summarySource(statusGuidance) ==
+                ProjectStatusPresentationPolicy.SummarySource.GUIDANCE
+        ) {
+            statusGuidance?.let { guidance ->
+                box.addView(
+                    text(
+                        getString(
+                            R.string.runtime_policy_summary_label,
+                            guidance.localizedText(),
+                        ),
+                        12f,
+                        false,
+                    ).apply {
+                        setTextColor(Color.rgb(170, 204, 235))
+                        setPadding(0, dp(2), 0, dp(2))
+                    },
+                )
+            }
         }
         failureReasons[stateKey]?.let { reason ->
             box.addView(text(getString(R.string.runtime_failure_reason, reason), 12f, false).apply {
@@ -839,7 +854,10 @@ open class V04Activity : StudioActivity() {
             )
             setPadding(0, dp(2), 0, dp(5))
         })
-        if (statusGuidance == null) {
+        if (
+            ProjectStatusPresentationPolicy.summarySource(statusGuidance) ==
+                ProjectStatusPresentationPolicy.SummarySource.ACTION_POLICY
+        ) {
             val policyExplanation = buildString {
                 append(getString(R.string.runtime_policy_summary_label, policy.summary.localizedText()))
                 policy.disableReason?.let { reason ->
