@@ -39,6 +39,13 @@ class PythonRuntimeStructuredInvocationTest {
         pythonLaunchInvocation = invocation,
     )
 
+    private fun structuredRunner(host: FakeHost): String =
+        host.quotedInputs.single { value ->
+            value.contains("launch_args=()") &&
+                value.contains("SIFTALPHA_LAUNCH_ARGUMENT_COUNT") &&
+                value.contains("launch_mode=1")
+        }
+
     @Test
     fun `console script uses quoted argv array instead of user controlled bash c`() {
         val host = FakeHost()
@@ -50,21 +57,26 @@ class PythonRuntimeStructuredInvocationTest {
             ),
         )
 
-        val script = adapter.start(project).shellScript
+        adapter.start(project)
+        val runner = structuredRunner(host)
 
-        assertTrue(script.contains("launch_executable='/root/venvs/runtime-id/bin/sherlock'"))
-        assertTrue(script.contains("launch_args+=( '--help' )"))
-        assertTrue(script.contains("launch_args+=( ';' )"))
-        assertTrue(script.contains("launch_args+=( 'john smith' )"))
-        assertTrue(script.contains("launch_args+=( '${'$'}HOME' )"))
-        assertTrue(script.contains("\"${'$'}launch_executable\" \"${'$'}{launch_args[@]}\""))
-        assertTrue(script.contains("SIFTALPHA_LAUNCH_ARGUMENT_COUNT=%s"))
-        assertFalse(script.contains("bash -c \"sherlock"))
-        assertFalse(script.contains("configured_run='python main.py --help"))
+        assertTrue(host.quotedInputs.contains("/root/venvs/runtime-id/bin/sherlock"))
+        assertTrue(host.quotedInputs.contains("--help"))
+        assertTrue(host.quotedInputs.contains(";"))
+        assertTrue(host.quotedInputs.contains("john smith"))
+        assertTrue(host.quotedInputs.contains("${'$'}HOME"))
+        assertTrue(runner.contains("launch_executable='/root/venvs/runtime-id/bin/sherlock'"))
+        assertTrue(runner.contains("launch_args+=( '--help' )"))
+        assertTrue(runner.contains("launch_args+=( ';' )"))
+        assertTrue(runner.contains("launch_args+=( 'john smith' )"))
+        assertTrue(runner.contains("launch_args+=( '${'$'}HOME' )"))
+        assertTrue(runner.contains("\"${'$'}launch_executable\" \"${'$'}{launch_args[@]}\""))
+        assertFalse(runner.contains("bash -c \"sherlock"))
+        assertFalse(runner.contains("configured_run='python main.py --help"))
     }
 
     @Test
-    fun `python file structured launch passes entrypoint as argv zero payload`() {
+    fun `python file structured launch passes entrypoint as first argv element`() {
         val host = FakeHost()
         val adapter = PythonRuntimeAdapter(host)
         val project = baseProject(
@@ -74,13 +86,18 @@ class PythonRuntimeStructuredInvocationTest {
             ),
         )
 
-        val script = adapter.start(project).shellScript
+        adapter.start(project)
+        val runner = structuredRunner(host)
 
-        assertTrue(script.contains("launch_executable='/root/venvs/runtime-id/bin/python'"))
-        assertTrue(script.contains("launch_args+=( 'main.py' )"))
-        assertTrue(script.contains("launch_args+=( '--name' )"))
-        assertTrue(script.contains("launch_args+=( 'john smith' )"))
-        assertTrue(script.contains("\"${'$'}launch_executable\" \"${'$'}{launch_args[@]}\""))
-        assertFalse(script.contains("bash -c \"python main.py --name"))
+        assertTrue(host.quotedInputs.contains("/root/venvs/runtime-id/bin/python"))
+        assertTrue(host.quotedInputs.contains("main.py"))
+        assertTrue(host.quotedInputs.contains("--name"))
+        assertTrue(host.quotedInputs.contains("john smith"))
+        assertTrue(runner.contains("launch_executable='/root/venvs/runtime-id/bin/python'"))
+        assertTrue(runner.contains("launch_args+=( 'main.py' )"))
+        assertTrue(runner.contains("launch_args+=( '--name' )"))
+        assertTrue(runner.contains("launch_args+=( 'john smith' )"))
+        assertTrue(runner.contains("\"${'$'}launch_executable\" \"${'$'}{launch_args[@]}\""))
+        assertFalse(runner.contains("bash -c \"python main.py --name"))
     }
 }
