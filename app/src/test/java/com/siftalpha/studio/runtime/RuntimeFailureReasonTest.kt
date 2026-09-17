@@ -44,3 +44,4 @@ class RuntimeFailureReasonTest {
         assertFalse(reason.contains("\${"))
         assertTrue(reason.length <= 240)
     }
+}
