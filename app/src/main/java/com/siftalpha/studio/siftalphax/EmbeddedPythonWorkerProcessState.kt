@@ -11,6 +11,16 @@ object EmbeddedPythonWorkerProtocol {
     const val BOUND_SAME = 1
     const val REJECTED_INVALID_REQUEST = 2
     const val REJECTED_BINDING_CONFLICT = 3
+    const val REJECTED_WORKER_TERMINATING = 4
+
+    const val WORKER_LIFECYCLE_ACTIVE = 0
+    const val WORKER_LIFECYCLE_TERMINATING = 1
+
+    const val EXIT_ACCEPTED = 0
+    const val EXIT_ALREADY_REQUESTED = 1
+    const val EXIT_REJECTED_INVALID_REQUEST = 2
+    const val EXIT_REJECTED_IDENTITY_MISMATCH = 3
+    const val EXIT_REJECTED_WRONG_PROCESS = 4
 }
 
 data class EmbeddedPythonWorkerBindRequest(
@@ -32,11 +42,10 @@ class EmbeddedPythonWorkerProcessState(
     val workerInstanceId: String = "worker-${UUID.randomUUID()}",
 ) {
     private var boundProcessBindingId: ProcessBindingId? = null
+    private var lifecycleState = EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_ACTIVE
 
     init {
-        require(workerInstanceId.startsWith("worker-") && workerInstanceId.length > "worker-".length) {
-            "worker instance id must be a non-empty worker-<id> value"
-        }
+        validateWorkerInstanceId(workerInstanceId)
     }
 
     @Synchronized
@@ -48,6 +57,9 @@ class EmbeddedPythonWorkerProcessState(
 
     @Synchronized
     fun boundProcessBindingId(): String = boundProcessBindingId?.value.orEmpty()
+
+    @Synchronized
+    fun workerLifecycleState(): Int = lifecycleState
 
     /**
      * Rebuilds and verifies RuntimeLoadBindingV1 before the process gate is consulted.
@@ -79,6 +91,10 @@ class EmbeddedPythonWorkerProcessState(
             return EmbeddedPythonWorkerProtocol.REJECTED_INVALID_REQUEST
         }
 
+        if (lifecycleState == EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_TERMINATING) {
+            return EmbeddedPythonWorkerProtocol.REJECTED_WORKER_TERMINATING
+        }
+
         val existingBindingId = boundProcessBindingId
         return when {
             existingBindingId == null -> {
@@ -91,6 +107,57 @@ class EmbeddedPythonWorkerProcessState(
             }
 
             else -> EmbeddedPythonWorkerProtocol.REJECTED_BINDING_CONFLICT
+        }
+    }
+
+    /**
+     * Fences process termination to the current worker identity and binding. There is
+     * intentionally no reset operation: TERMINATING can only end when this OS process dies.
+     */
+    @Synchronized
+    fun requestWorkerExitForRebind(
+        expectedWorkerInstanceId: String?,
+        expectedProcessBindingId: String?,
+    ): Int {
+        val requestedWorkerInstanceId = try {
+            validateWorkerInstanceId(requireNotNull(expectedWorkerInstanceId))
+        } catch (_: IllegalArgumentException) {
+            return EmbeddedPythonWorkerProtocol.EXIT_REJECTED_INVALID_REQUEST
+        }
+        val requestedProcessBindingId = try {
+            ProcessBindingId.parse(requireNotNull(expectedProcessBindingId))
+        } catch (_: IllegalArgumentException) {
+            return EmbeddedPythonWorkerProtocol.EXIT_REJECTED_INVALID_REQUEST
+        }
+
+        if (
+            requestedWorkerInstanceId != workerInstanceId ||
+            requestedProcessBindingId != boundProcessBindingId
+        ) {
+            return EmbeddedPythonWorkerProtocol.EXIT_REJECTED_IDENTITY_MISMATCH
+        }
+
+        if (lifecycleState == EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_TERMINATING) {
+            return EmbeddedPythonWorkerProtocol.EXIT_ALREADY_REQUESTED
+        }
+
+        lifecycleState = EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_TERMINATING
+        return EmbeddedPythonWorkerProtocol.EXIT_ACCEPTED
+    }
+
+    private companion object {
+        private const val MAX_WORKER_INSTANCE_ID_UTF8_BYTES = 256
+
+        private fun validateWorkerInstanceId(value: String): String {
+            require(value.isNotBlank()) { "worker instance id must not be blank" }
+            require(!value.contains('\u0000')) { "worker instance id must not contain NUL" }
+            require(value.startsWith("worker-") && value.length > "worker-".length) {
+                "worker instance id must be a non-empty worker-<id> value"
+            }
+            require(value.toByteArray(Charsets.UTF_8).size <= MAX_WORKER_INSTANCE_ID_UTF8_BYTES) {
+                "worker instance id exceeds $MAX_WORKER_INSTANCE_ID_UTF8_BYTES UTF-8 bytes"
+            }
+            return value
         }
     }
 }

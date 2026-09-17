@@ -101,6 +101,136 @@ class EmbeddedPythonWorkerProcessStateTest {
     }
 
     @Test
+    fun matchingIdentityAcceptsTerminationAndEntersTerminating() {
+        val state = EmbeddedPythonWorkerProcessState(workerInstanceId = "worker-test-termination-a")
+        val binding = binding()
+        state.bind(request(binding))
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.EXIT_ACCEPTED,
+            state.requestWorkerExitForRebind(
+                expectedWorkerInstanceId = state.workerInstanceId,
+                expectedProcessBindingId = binding.processBindingId.value,
+            ),
+        )
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_TERMINATING,
+            state.workerLifecycleState(),
+        )
+    }
+
+    @Test
+    fun repeatedMatchingTerminationIsIdempotentlyReported() {
+        val state = EmbeddedPythonWorkerProcessState(workerInstanceId = "worker-test-termination-b")
+        val binding = binding()
+        state.bind(request(binding))
+        val workerInstanceId = state.workerInstanceId
+        val processBindingId = binding.processBindingId.value
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.EXIT_ACCEPTED,
+            state.requestWorkerExitForRebind(workerInstanceId, processBindingId),
+        )
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.EXIT_ALREADY_REQUESTED,
+            state.requestWorkerExitForRebind(workerInstanceId, processBindingId),
+        )
+    }
+
+    @Test
+    fun wrongWorkerIdentityIsRejectedWithoutEnteringTerminating() {
+        val state = EmbeddedPythonWorkerProcessState(workerInstanceId = "worker-test-termination-c")
+        val binding = binding()
+        state.bind(request(binding))
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.EXIT_REJECTED_IDENTITY_MISMATCH,
+            state.requestWorkerExitForRebind(
+                expectedWorkerInstanceId = "worker-another-process",
+                expectedProcessBindingId = binding.processBindingId.value,
+            ),
+        )
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_ACTIVE,
+            state.workerLifecycleState(),
+        )
+    }
+
+    @Test
+    fun wrongProcessBindingIdentityIsRejectedWithoutEnteringTerminating() {
+        val state = EmbeddedPythonWorkerProcessState(workerInstanceId = "worker-test-termination-d")
+        val binding = binding()
+        state.bind(request(binding))
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.EXIT_REJECTED_IDENTITY_MISMATCH,
+            state.requestWorkerExitForRebind(
+                expectedWorkerInstanceId = state.workerInstanceId,
+                expectedProcessBindingId = "sha256:${"f".repeat(64)}",
+            ),
+        )
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_ACTIVE,
+            state.workerLifecycleState(),
+        )
+    }
+
+    @Test
+    fun invalidTerminationRequestIsRejected() {
+        val state = EmbeddedPythonWorkerProcessState(workerInstanceId = "worker-test-termination-e")
+        val binding = binding()
+        state.bind(request(binding))
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.EXIT_REJECTED_INVALID_REQUEST,
+            state.requestWorkerExitForRebind(
+                expectedWorkerInstanceId = null,
+                expectedProcessBindingId = binding.processBindingId.value,
+            ),
+        )
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.EXIT_REJECTED_INVALID_REQUEST,
+            state.requestWorkerExitForRebind(
+                expectedWorkerInstanceId = state.workerInstanceId,
+                expectedProcessBindingId = "not-a-process-binding-id",
+            ),
+        )
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_ACTIVE,
+            state.workerLifecycleState(),
+        )
+    }
+
+    @Test
+    fun terminatingWorkerRejectsAllFurtherBindingsWithoutReset() {
+        val state = EmbeddedPythonWorkerProcessState(workerInstanceId = "worker-test-termination-f")
+        val first = binding(projectIdentity = "fixture-project-a")
+        val second = binding(projectIdentity = "fixture-project-b")
+        state.bind(request(first))
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.EXIT_ACCEPTED,
+            state.requestWorkerExitForRebind(
+                state.workerInstanceId,
+                first.processBindingId.value,
+            ),
+        )
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.REJECTED_WORKER_TERMINATING,
+            state.bind(request(first)),
+        )
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.REJECTED_WORKER_TERMINATING,
+            state.bind(request(second)),
+        )
+        assertEquals(first.processBindingId.value, state.boundProcessBindingId())
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_TERMINATING,
+            state.workerLifecycleState(),
+        )
+    }
+
+    @Test
     fun serviceRecreationFacadeCannotResetProcessScopedState() {
         val state = EmbeddedPythonWorkerProcessState(workerInstanceId = "worker-test-g")
         val binding = binding()

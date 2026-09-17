@@ -832,3 +832,11 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Added a typed AIDL handshake that exposes worker identity/PID and validates `RuntimeLoadBindingV1` before applying the process-scoped binding gate.
 - The worker accepts a first valid binding, treats the same binding as idempotent, and deterministically rejects a different binding without replacing the original.
 - Slice 2 does not load CPython or JNI, does not move the existing execution path, and is not connected to normal user flow. Instrumentation is compile-only until a device/emulator run is explicitly performed.
+
+## 2026-09-17 · alpha44 Slice 3 — Worker Termination + Fresh Process Transition
+
+- Added a fenced typed termination request requiring the current `WorkerInstanceId` and `ProcessBindingId`.
+- A valid request moves the process-scoped worker from `ACTIVE` to `TERMINATING`; repeated requests are idempotent, while all further binds are rejected until the OS process dies.
+- The worker verifies it is running as `:siftalpha_r_worker`, returns the structured exit result before scheduling a short delayed self-termination, and never exposes a binding reset operation.
+- Instrumentation now specifies one A → Binder DeathRecipient → fresh worker B flow. It is compiled in CI but has not been executed on a real device or emulator.
+- Slice 3 does not load CPython/JNI, migrate execution, add a supervisor, or connect the worker to normal user flow.

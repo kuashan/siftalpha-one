@@ -133,11 +133,14 @@ jobs:
       - name: Collect APK evidence
         run: |
           apk="app/build/outputs/apk/debug/app-debug.apk"
+          test_apk="app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
           test -s "$apk"
+          test -s "$test_apk"
           sdk_root="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           build_tools="$sdk_root/build-tools/36.0.0"
           cp "$apk" w0-evidence/siftalpha-studio-debug.apk
           sha256sum "$apk" | tee w0-evidence/apk-sha256.txt
+          sha256sum "$test_apk" | tee w0-evidence/androidTest-apk-sha256.txt
           "$build_tools/apksigner" verify --verbose --print-certs "$apk" | tee w0-evidence/apk-certificates.txt
           "$build_tools/aapt2" dump badging "$apk" | tee w0-evidence/apk-badging.txt
 
@@ -160,6 +163,7 @@ jobs:
           name: siftalpha-w0-${{ github.run_number }}
           path: |
             app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             w0-evidence
           if-no-files-found: warn
           retention-days: 14
