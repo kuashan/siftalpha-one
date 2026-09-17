@@ -2284,14 +2284,16 @@ open class V04Activity : StudioActivity() {
         ) {
             RuntimeObservationStep.WAIT_FOR_PENDING ->
                 scheduleExternalObservation(observation.project)
-            RuntimeObservationStep.REQUEST_STATUS ->
-                dispatch(
+            RuntimeObservationStep.REQUEST_STATUS -> {
+                val sent = dispatch(
                     project = observation.project,
                     action = ProjectRuntimeController.Action.STATUS,
                     webLogDiscoveryAllowed = observation.webLogDiscoveryAllowed,
                     automaticObservation = true,
                     observationGeneration = observation.generation,
                 )
+                if (!sent) scheduleExternalObservation(observation.project)
+            }
             RuntimeObservationStep.REQUEST_FINAL_LOGS ->
                 requestExternalFinalLogs(observation)
             RuntimeObservationStep.STOP ->
@@ -2307,13 +2309,17 @@ open class V04Activity : StudioActivity() {
             return
         }
         observation.finalLogsRequested = true
-        dispatch(
+        val sent = dispatch(
             project = observation.project,
             action = ProjectRuntimeController.Action.LOGS,
             webLogDiscoveryAllowed = observation.webLogDiscoveryAllowed,
             automaticObservation = true,
             observationGeneration = observation.generation,
         )
+        if (!sent) {
+            observation.finalLogsRequested = false
+            scheduleExternalObservation(observation.project)
+        }
     }
 
     private fun requestExternalWebLogs(observation: ExternalObservation) {
@@ -2332,13 +2338,17 @@ open class V04Activity : StudioActivity() {
         }
         observation.webLogProbeCount += 1
         observation.statusesSinceWebLogProbe = 0
-        dispatch(
+        val sent = dispatch(
             project = observation.project,
             action = ProjectRuntimeController.Action.LOGS,
             webLogDiscoveryAllowed = observation.webLogDiscoveryAllowed,
             automaticObservation = true,
             observationGeneration = observation.generation,
         )
+        if (!sent) {
+            observation.webLogProbeCount -= 1
+            scheduleExternalObservation(observation.project)
+        }
     }
 
     private fun continueExternalObservation(
