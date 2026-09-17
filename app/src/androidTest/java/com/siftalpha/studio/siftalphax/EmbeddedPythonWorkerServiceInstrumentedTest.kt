@@ -55,7 +55,7 @@ class EmbeddedPythonWorkerServiceInstrumentedTest {
             val death = CountDownLatch(1)
             val oldBinder = workerA.asBinder()
             val deathRecipient = IBinder.DeathRecipient { death.countDown() }
-            assertTrue("failed to register Binder DeathRecipient", oldBinder.linkToDeath(deathRecipient, 0))
+            oldBinder.linkToDeath(deathRecipient, 0)
 
             try {
                 assertEquals(
