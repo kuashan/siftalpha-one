@@ -1,11 +1,13 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-17（alpha42 Rich Result Presentation + Unified Open）
+最后更新：2026-09-17（alpha43 Baseline Closure）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
-产品基线分支：`main`（当前 main HEAD：`dff275575a9cdbd0564d394c4626cd7d9bb22637`）  
+当前文档/验收基线分支：`codex/siftalpha-x-embedded-cpython-spike`（HEAD：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`）  
+`main` 保持历史 production baseline，本轮未修改。  
 alpha30 source / real-device evidence remains historical; current branch continues from the alpha31 version-identity baseline。  
 M / R / X 架构与 Runtime prototype 工作分支：`codex/siftalpha-x-embedded-cpython-spike`  
-当前版本：0.8.0-alpha42 / versionCode 118（CLI Rich Result + Unified Open；等待本提交 CI 与真实设备验收）  
+当前版本：0.8.0-alpha43 / versionCode 119（Automatic Project Observation + Contextual Status Guidance；真实 Android 真机验收 PASS）  
+最近 CI：GitHub Actions Run #121 / Run ID `35226167054` / conclusion `success`；Artifact：`siftalpha-w0-121`；APK SHA-256：`6b70fc222cc8e27124daf2a5a910abc1174380b257c5549959abb279d25def6a`。  
 当前文档定义：`M = Management System`，`R = Runtime System`，`X = M + R`  
 规范架构定义：[ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)  
 Production baseline merge：[893229c](https://github.com/kuashan/siftalpha-one/commit/893229ce26d49a6ea22c79d6e2be85290cb8b0c3)（历史基线记录）  
@@ -129,8 +131,13 @@ M 不应依赖 CPython/JNI internals；R 不应依赖 Activity、Compose 或 Bro
 - Web：project-scoped procfs discovery、Runtime log fallback、Endpoint Probe、可用性跟踪和 Browser 安全入口。
 - 环境与维护：环境检测、工具管理、缓存、清理保护、编辑器、设置和语言能力。
 - 诊断与证据：结构化失败信息、运行日志、云端构建、单元测试、APK 签名和真机回归记录。
+- Automatic Project Observation：前台 Activity 生命周期内以低频 STATUS 为主，终态自动读取一次最终 LOGS；后台暂停观察但不停止底层 Runtime。
+- Contextual Status Guidance：主要状态说明根据真实 Lifecycle、Web、Rich Result 和失败事实选择，避免 READY_TO_RUN 覆盖终态结果语义。
+- Rich Result automatic finalization：终态自动发现 Rich Result，并通过 Unified Open 按 `WEB > RICH_RESULT > NONE` 选择唯一“打开”入口；Viewer 提供明确返回。
+- verified Web delayed readiness：`RUNNING` 可以先处于 Web unavailable；只有 Candidate 加 Endpoint Probe 验证真实可达后才开放 Web/Open。
+- foreground-only observation semantics：Activity 进入后台时只暂停自动观察；重新进入 App 后恢复观察，底层长期 Runtime 不因离开前台而停止。
 
-未来 Roadmap 尚待重新定义。本文件不创建 W6 或其他新的阶段编号。
+后文列出的 Future Direction 是当前推荐开发顺序，不是已经完成的能力；本文件不创建旧式 W6/W7 阶段。
 
 ## 4. 不可破坏的产品规则
 
@@ -386,3 +393,65 @@ alpha42 在 M 的安全结果回调中使用已经完成 Secret Redaction 的输
 alpha43 adds Activity-lifetime automatic observation for External Provider runs. After an accepted START, SiftAlpha issues low-frequency, project-scoped STATUS checks while the Activity is foregrounded. A terminal EXITED_SUCCESS or EXITED_ERROR state triggers one final LOGS read for Rich Result detection and diagnostics, then observation stops. Observation pauses with the Activity and resumes/reconciles on return; it does not stop Termux or the project runtime.
 
 The card exposes state-derived guidance only: it does not ask users to classify a project as a one-shot task or live service. Verified Web availability guides the existing Unified Open path to the browser; a Rich Result guides it to the native viewer. Raw logs and manual STATUS / LOGS remain secondary diagnostic and recovery controls. Embedded R keeps its existing snapshot polling and lifecycle ownership.
+
+## alpha43 Baseline Closure — Real-Device Acceptance
+
+alpha43 的真实 Android 真机验收已经完成并通过。当前基线是 `119 / 0.8.0-alpha43`，source HEAD 为 `66f9153e57547c4d8b6e50956b48ddf86b9dc656`。
+
+Sherlock 一次性流程只需用户点击一次运行：`START → RUNNING → Automatic Observation → EXITED_SUCCESS → final LOGS → Rich Result → Unified Open`。真实项目卡显示“状态：已正常结束”和“状态说明：运行结果已就绪，可以打开查看”，Rich Result 可打开；本次真实搜索产生 16 项结果。Viewer 有明确可见的“← 返回”按钮，返回项目卡后状态正确。
+
+situation-monitor 长期 Web 项目验证了延迟 ready 语义：项目可以先处于 RUNNING 且 Web 暂不可用，待 Web Server 开始监听并由 Endpoint Probe 验证真实可达后，才自动显示 Web 可打开并启用 Unified Open。外部浏览器访问 `/api/articles`、`/api/globe-data`、`/api/stats` 均真实返回 HTTP 200；关闭浏览器、离开 App 或重新进入不会停止长期 Runtime。
+
+真实验收也确认：普通用户不需要手动点击 STATUS 或 LOGS；Web discovery 的 LOGS 探测仍然有界（每 3 次 STATUS 一次、最多 3 次），终态只读取一次 final LOGS，不是后台无限刷新。只有明确 STOP 才代表 `STOPPED_BY_USER`；自然完成保持 `EXITED_SUCCESS`。
+
+**alpha43 real-device acceptance = PASS**
+
+本节封存的是当前 M-facing 观察、交互与呈现基线，不表示 Embedded R、完整 M/R/X 或生产级 M ↔ R 已完成。
+
+## Future Direction — 推荐技术顺序（不是已完成能力）
+
+下一阶段先进行环境与依赖模型审计；当前推荐顺序为：
+
+1. R Environment Model + Dependency Model
+2. Embedded R real-project compatibility expansion
+3. Embedded R integration with Automatic Observation、Web Discovery、Rich Result、Unified Open
+4. Runtime Session Isolation + Recovery hardening
+5. Result persistence
+6. Developer Mode separation + full normal-user UI redesign
+
+以上是研究与开发顺序，不是能力完成清单。
+
+## Developer Mode — 长期产品方向（本轮不实现）
+
+未来 SiftAlpha UI 计划分层：
+
+- 普通模式面向普通用户，隐藏 Runtime 工程细节。
+- Developer Mode 面向开发、诊断和维护，显示 `STATUS`、`LOGS`、Raw Log、Runtime details、PID / PGID、Web Discovery diagnostics、Environment details、failure diagnostics 和 maintenance controls。
+
+Developer Mode 只能改变 Presentation、visible controls 和 diagnostic visibility，不能拥有另一套 Runtime 状态。普通模式与 Developer Mode 必须共享同一个 Project Identity、Runtime State、Lifecycle、Result 和 Web State。本轮不实现 Developer Mode。
+
+## Next Formal Research Direction — R Environment & Dependency Model Architecture Audit
+
+alpha43 文档封存后的下一项正式工作是 `R Environment & Dependency Model Architecture Audit`。这是先审计、后实现的研究任务，本轮不实现任何 Embedded R 能力。
+
+审计范围包括：CPython environment、`sys.path`、`site-packages`、per-project isolation、dependency declaration discovery、`requirements.txt`、`pyproject.toml`、pip feasibility、wheel compatibility、pure-Python packages、native package boundary、cache、upgrade、cleanup、failure model，以及 M ↔ R contract。
+
+## Alpha43 仍未完成或未证明的 Embedded R 边界
+
+alpha43 真实设备通过的是当前 External Runtime Provider 下的 M-facing 观察、Web、Rich Result 与呈现链路，不扩大 Embedded R 的能力边界。以下能力仍未完成或未证明：
+
+- pip
+- `requirements.txt` / `pyproject.toml` dependency installation
+- venv
+- third-party dependencies
+- native wheels
+- arbitrary C extensions
+- blocking native/syscall hard-stop
+- arbitrary SAF project compatibility
+- concurrent sessions
+- full process-death recovery
+- Embedded R Web/Browser integration
+- production-grade M ↔ R integration
+- production sandboxing
+
+Production external runtime 仍主要依赖 Termux + PRoot + Ubuntu + Python 作为 External Runtime Provider。Embedded CPython 仍只是 R 当前第一个实现方向，不是完整 R。

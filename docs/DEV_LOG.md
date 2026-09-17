@@ -766,4 +766,61 @@ Rich Result 只在同一 Activity 实例内暂存：接受新 START 时清除旧
 - STATUS is the normal observation operation; terminal runs receive one final LOGS read for result detection and diagnostics.
 - Observation is generation-scoped, waits for pending user operations, pauses on Activity stop, and resumes without stopping the underlying runtime.
 - Added state-derived guidance and a localized visible Back action to RichResultActivity.
-- No new Rich Result type, background service, database, WebView, or runtime lifecycle change. Real-device acceptance remains a separate step.
+- No new Rich Result type, background service, database, WebView, or runtime lifecycle change. Real-device acceptance is closed in the Baseline Closure entry below.
+
+## 2026-09-17 · alpha43 Baseline Closure — Real-Device Acceptance
+
+### 最终版本身份
+
+- 产品名称：`Automatic Project Observation + Contextual Status Guidance`
+- versionCode：`119`
+- versionName：`0.8.0-alpha43`
+- Final source HEAD：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`
+- Parent HEAD：`d92e1802b983718280cdd303d56c9293c22a8425`
+- Branch：`codex/siftalpha-x-embedded-cpython-spike`
+- GitHub Actions：Run #121 / Run ID `35226167054` / conclusion `success`
+- Artifact：`siftalpha-w0-121`
+- APK SHA-256：`6b70fc222cc8e27124daf2a5a910abc1174380b257c5549959abb279d25def6a`
+
+### Sherlock 一次性项目 — 真实 Android 真机 PASS
+
+用户只点击一次“运行”，没有手动点击 STATUS（状态检测）或 LOGS（刷新日志）。SiftAlpha 自动完成：
+
+`START → RUNNING → Automatic Observation → 自然结束 → EXITED_SUCCESS → 最终 LOGS → Rich Result → Unified Open`
+
+最终真实项目卡显示：
+
+- 状态：已正常结束。
+- 状态说明：运行结果已就绪，可以打开查看。
+- 结果：Rich Result 可用；本次真实搜索产生 16 项结果。
+- 打开：可用。
+
+Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见的“← 返回”按钮，不依赖 Android 返回手势，返回项目卡后状态仍然正确。
+
+用户可见语义已经区分 `EXITED_SUCCESS` 与 `STOPPED_BY_USER`：自然结束不是“已停止”，只有明确点击 STOP 才代表用户停止。
+
+### situation-monitor 长期 Web 项目 — 真实 Android 真机 PASS
+
+项目启动后先执行 initial feed fetch。项目仍处于 RUNNING 时，Web 可以暂时显示未检测到网页；Web Server 真正开始监听后，Automatic Observation / Web Discovery 发现候选地址，并由 Endpoint Probe 验证真实可达，随后自动开放 Web 与 Unified Open。
+
+最终真实项目卡显示：
+
+- 状态：运行中。
+- 状态说明：项目正在持续运行，可随时打开实时界面。
+- Web：可打开。
+- 打开：可用。
+- 停止：可用。
+
+外部浏览器真实访问成功，示例请求均返回 HTTP 200：`GET /api/articles`、`GET /api/globe-data`、`GET /api/stats`。关闭或离开浏览器不会停止 Runtime；离开 SiftAlpha 后重新进入，长期 Runtime 仍继续运行并可被重新识别。用户确认该项目可以长期运行。
+
+### alpha43 最终行为封存
+
+- `RUNNING` 不等于 Web Ready。只有 Web Candidate 已发现且 Endpoint Probe 确认端点真实可访问后，才开放“Web：可打开”和“打开”。
+- STATUS 是长期自动观察的主要动作，External Provider 约每 2 秒观察一次；Web discovery 的 LOGS 探测按每 3 次 STATUS 一次、最多 3 次执行，不是无限后台刷新。
+- 终态项目只执行一次最终 LOGS，用于 Rich Result detection 与 final diagnostics。
+- Activity 进入后台时暂停 Automatic Observation，但不停止底层 Runtime；重新进入 App 后恢复观察。
+- Rich Result、Unified Open（`WEB > RICH_RESULT > NONE`）和 Rich Result Viewer 的返回链路保持可用。
+
+**alpha43 real-device acceptance = PASS**
+
+本条记录封存 alpha43 当前基线；不表示 Embedded R 或 M/R/X 已完成，也不启动后续版本开发。

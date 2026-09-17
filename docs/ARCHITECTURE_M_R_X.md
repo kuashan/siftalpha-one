@@ -1,10 +1,10 @@
 # SiftAlpha M / R / X Architecture Definition
 
-最后更新：2026-09-16  
+最后更新：2026-09-17（alpha43 Baseline Closure）  
 alpha30 实现起始基线与 Run #90 真实设备证据仍为历史记录。  
-当前 alpha32 source baseline：本分支 alpha31 version-identity baseline 之后的 M → R integration commit。  
+当前 alpha43 source baseline：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`；本轮只封存 alpha43 文档基线，不改变 canonical M/R/X 架构。  
 工作分支：`codex/siftalpha-x-embedded-cpython-spike`  
-当前 Runtime prototype：`versionCode 108` / `versionName 0.8.0-alpha32`
+当前 alpha43 版本：`versionCode 119` / `versionName 0.8.0-alpha43`
 
 本文件是 SiftAlpha M / R / X 的规范架构定义。它取代当前术语中的：
 
@@ -454,3 +454,16 @@ M 的一次性 CLI 呈现边界为：
 项目卡片只有一个主要“打开”动作。Presentation routing 为 `WEB > RICH_RESULT > NONE`：已通过现有 Endpoint Probe 的 Web Dashboard 继续进入外部 Browser；没有可用 Web 但存在安全 Link List 时进入 App 内 Result Viewer；只有 Raw Log 时不生成打开目标。长期自动化以及未来 Automated Quant Trading 的主要用户界面仍是 Live Web Dashboard，Raw Log 是 Secondary Diagnostics。
 
 该 alpha42 结果缓存是 Activity-lifetime 级别，不引入数据库；接受新的 START 清除旧 Rich Result，空 STATUS/LOGS 保留已有结果。alpha42 不改变 Runtime lifecycle、Web Discovery scope、Termux/Embedded R 运行链，也不表示 arbitrary Rich Result types、R complete 或 X complete。
+
+## alpha43 Baseline Closure — Observation and Presentation Boundary
+
+alpha43 的真实 Android 真机验收确认了当前 M-facing Trigger → Lifecycle → Interaction → Presentation 链路：
+
+- Automatic Observation 在前台 Activity 生命周期内以低频 STATUS 为主，终态自动读取一次 final LOGS。
+- Contextual Status Guidance、`EXITED_SUCCESS` / `STOPPED_BY_USER` 区分、Rich Result automatic finalization 与 Unified Open 属于当前呈现与交互基线。
+- Web 的 `RUNNING` 与 Web Ready 分离；Candidate 只有在 Endpoint Probe 验证真实可达后才成为可打开端点。
+- Activity 离开前台只暂停观察，不停止底层 Runtime；长期 Runtime 可在重新进入后恢复识别。
+
+这些验收结果不改变 canonical architecture：M 管，R 跑，X = M + R。它们也不代表 Embedded R、完整 R、完整 X 或 production-grade M ↔ R 已完成。Production external runtime 仍主要依赖 Termux + PRoot + Ubuntu + Python；Embedded CPython 仍是 R 的一个实现方向。
+
+alpha43 real-device acceptance = PASS；下一项正式研究为 R Environment & Dependency Model Architecture Audit。

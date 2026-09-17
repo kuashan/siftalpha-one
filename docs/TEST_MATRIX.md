@@ -16,7 +16,21 @@
 
 本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
 
-## A. 当前 alpha32 版本信息
+## A. 当前 alpha43 版本信息
+
+- 当前产品基线版本：`0.8.0-alpha43`
+- versionCode：`119`
+- 产品名称：`Automatic Project Observation + Contextual Status Guidance`
+- 当前文档/验收分支：`codex/siftalpha-x-embedded-cpython-spike`
+- Current source baseline HEAD：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`
+- Parent HEAD：`d92e1802b983718280cdd303d56c9293c22a8425`
+- 最近 CI：GitHub Actions Run #121 / Run ID `35226167054` / conclusion `success`
+- Artifact：`siftalpha-w0-121`
+- APK SHA-256：`6b70fc222cc8e27124daf2a5a910abc1174380b257c5549959abb279d25def6a`
+- 当前基线记录的是 M-facing 项目观察、状态引导与结果呈现能力；不代表 Embedded R 或完整 M/R/X 已完成。
+- `main` 未在本轮修改；旧版本与历史验证证据继续保留在本矩阵的历史区段和 `docs/DEV_LOG.md`。
+
+### Historical alpha32 / alpha30 reference
 
 - 当前 Runtime prototype 版本：`0.8.0-alpha32`
 - versionCode：`108`
@@ -31,7 +45,6 @@
 - alpha29 APK SHA-256：`2a7b7434817ffec53863ad9fd16745bdfef101677c5470a81efdab78aa269cc6`。
 - Run #80 未包含 Android emulator/device；Embedded CPython instrumentation source 已加入并随源码编译，但没有把 CI 视为 instrumentation executed/pass。
 - 详细 alpha29 real-device evidence 见本文件 H 节和 [DEV_LOG.md](DEV_LOG.md)。
-
 ## B. 云端验证矩阵
 
 | ID | 场景 | 期望 | 状态 | 证据 |
@@ -52,6 +65,8 @@
 | C-14 | 合并后正式 main 构建（历史基线证据） | validators、`testDebugUnitTest`、`assembleDebug`、APK metadata 和签名证据收集通过 | PASS | [Actions Run #70](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426) / [artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426/artifacts/10405122896) |
 | C-15 | alpha29 Embedded CPython Runtime prototype CI | CPython preparation、validators、JVM unit tests、CMake/native build、`assembleDebug`、signing verification 和 evidence collection 通过 | PASS | [Actions Run #80](https://github.com/kuashan/siftalpha-one/actions/runs/35060381162) / [artifact `siftalpha-w0-80`](https://github.com/kuashan/siftalpha-one/actions/runs/35060381162/artifacts/10432576095) |
 | C-16 | alpha30 R Project Script Execution Boundary CI | CPython preparation、validators、JVM unit tests、CMake/native build、`assembleDebug`、APK evidence 和 signing verification 通过；无 Android device | PASS（CI；instrumentation 未执行） | [Actions Run #83](https://github.com/kuashan/siftalpha-one/actions/runs/35078323509) / [artifact `siftalpha-w0-83`](https://github.com/kuashan/siftalpha-one/actions/runs/35078323509/artifacts/10439551021) |
+
+| C-17 | alpha43 Baseline Closure CI | repository validators, testDebugUnitTest, assembleDebug, CPython preparation, native/CMake, APK signing/evidence | PASS | [Actions Run #121](https://github.com/kuashan/siftalpha-one/actions/runs/35226167054) / artifact `siftalpha-w0-121` / APK SHA-256 `6b70fc222cc8e27124daf2a5a910abc1174380b257c5549959abb279d25def6a` |
 
 ## C. 安装与升级矩阵
 
@@ -359,9 +374,28 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 
 | Area | alpha43 coverage |
 |---|---|
-| External runtime observation | Foreground Activity observation uses low-frequency STATUS and stops after one terminal LOGS reconciliation. |
-| User operation safety | Pending operations and observation generations prevent overlapping or stale callbacks. |
-| Background behavior | Observation pauses on Activity stop; Termux/runtime continues and recovery resumes on return. |
-| User guidance | Guidance derives from runtime state, verified Web endpoint, and Rich Result availability; no user-selected project mode. |
-| Rich Result viewer | Adds a localized visible Back button; system Back remains supported. |
-| Acceptance boundary | JVM/build validation only; no alpha43 real-device acceptance is claimed by CI. |
+| Automatic Observation | Activity 前台期间以低频 STATUS 为主；终态自动执行一次最终 LOGS，用于 Rich Result 与诊断。后台暂停观察但不停止 Runtime。 |
+| Contextual Status Guidance | 用户主要状态说明来自当前真实事实；`EXITED_SUCCESS`、`STOPPED_BY_USER`、长期 RUNNING/Web Ready 语义分别呈现。 |
+| Web readiness | `RUNNING` 不等于 Web Ready；只有 Candidate 加 Endpoint Probe 验证真实可达后才开放 Web 与 Unified Open。 |
+| Rich Result / Unified Open | 终态自动发现 Rich Result；Unified Open 按 `WEB > RICH_RESULT > NONE` 路由；Viewer 有明确可见的返回按钮。 |
+| Automatic LOGS boundary | Web discovery 的 LOGS 按每 3 次 STATUS 一次、最多 3 次执行；终态只读一次最终 LOGS，不是后台无限刷新。 |
+| CI evidence | Run #121 / Run ID `35226167054` success；artifact `siftalpha-w0-121`；APK SHA-256 已在 current baseline 与 C-17 记录。 |
+| Real-device boundary | 下表记录真实 Android 真机验收；alpha43 已完成并通过。 |
+
+### alpha43 real-device acceptance
+
+| ID | Scenario | Result | Evidence |
+|---|---|---|---|
+| RD-43-01 | Sherlock one-shot: START → automatic observation → EXITED_SUCCESS → automatic final LOGS → Rich Result → Open | PASS / real-device verified / user-confirmed | 一次点击运行；无需手动 STATUS 或 LOGS；最终产生 16 项结果。 |
+| RD-43-02 | `EXITED_SUCCESS` presentation | PASS / real-device verified | 最终显示“状态：已正常结束”，不显示“已停止”。 |
+| RD-43-03 | `STOPPED_BY_USER` distinction | PASS / real-device verified / user-confirmed | 明确 STOP 与自然完成语义不同；只有明确 STOP 代表用户停止。 |
+| RD-43-04 | Rich Result Viewer / Unified Open / visible Back | PASS / real-device verified | Unified Open 进入 Viewer；“← 返回”可见；返回项目卡后状态正确。 |
+| RD-43-05 | Long-running Web delayed readiness | PASS / real-device verified | RUNNING 且 Web 暂不可用是正常过渡；Server 监听并完成 Endpoint Probe 后自动变为可打开。 |
+| RD-43-06 | Web endpoint safety | PASS / real-device verified | Candidate 不等于 Ready；只有真实可达 Endpoint Probe 成功后开放 Web/Open。 |
+| RD-43-07 | External browser | PASS / real-device verified | Verified Web 在外部浏览器打开；`/api/articles`、`/api/globe-data`、`/api/stats` 真实返回 HTTP 200。 |
+| RD-43-08 | Browser exit does not stop Runtime | PASS / real-device verified / user-confirmed | 关闭或离开浏览器后长期 Runtime 继续运行。 |
+| RD-43-09 | App leave/re-entry does not stop long-running Runtime | PASS / real-device verified / user-confirmed | 离开 SiftAlpha 后重新进入，Runtime 仍运行并可重新识别；后台只暂停观察。 |
+| RD-43-10 | Automatic observation | PASS / real-device verified / user-confirmed | 普通用户只需点击一次运行，不需要手动 STATUS 或 LOGS。 |
+| RD-43-11 | Automatic LOGS bounded behavior | PASS / source + unit + behavior evidence | Web discovery 最多 3 次有界 LOGS probe；终态一次 final LOGS；不声称后台无限刷新。 |
+
+**alpha43 real-device acceptance = PASS**
