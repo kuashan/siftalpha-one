@@ -33,6 +33,8 @@ data class RuntimeProjectSpec(
     val declaredEntry: String? = null,
     val declaredRun: String? = null,
     val relativePaths: List<String> = emptyList(),
+    /** Optional one-shot argv-based Python launch selected at action time. */
+    val pythonLaunchInvocation: PythonLaunchInvocation? = null,
 )
 
 interface RuntimeAdapter {

@@ -28,9 +28,13 @@ import com.siftalpha.studio.presentation.ProjectActionPolicy
 import com.siftalpha.studio.presentation.ProjectUiSnapshot
 import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
 import com.siftalpha.studio.runtime.ProjectRuntimeController
+import com.siftalpha.studio.runtime.ProjectRuntimeExecutionPlanner
 import com.siftalpha.studio.runtime.ProjectRuntimeSelection
 import com.siftalpha.studio.runtime.ProjectRuntimeSelectionStore
 import com.siftalpha.studio.runtime.ProjectSecretStore
+import com.siftalpha.studio.runtime.PythonCliLaunchResolver
+import com.siftalpha.studio.runtime.PythonLaunchInvocation
+import com.siftalpha.studio.runtime.RuntimeArgumentParser
 import com.siftalpha.studio.runtime.RuntimeCommand
 import com.siftalpha.studio.runtime.RuntimeControlPath
 import com.siftalpha.studio.runtime.RuntimeControlReason
@@ -40,6 +44,7 @@ import com.siftalpha.studio.runtime.RuntimeLifecycleOperation
 import com.siftalpha.studio.runtime.RuntimeLifecycleResolver
 import com.siftalpha.studio.runtime.RuntimeLifecycleState
 import com.siftalpha.studio.runtime.RuntimeLifecycleStore
+import com.siftalpha.studio.runtime.RuntimeKind
 import com.siftalpha.studio.runtime.RuntimeOwnership
 import com.siftalpha.studio.runtime.RuntimeOwnershipPolicy
 import com.siftalpha.studio.runtime.RuntimeResult
@@ -1189,6 +1194,7 @@ open class V04Activity : StudioActivity() {
         project: V04ProjectGateway.RuntimeProject,
         webProfile: WebProjectInspector.Profile? = null,
         controlRequest: RuntimeControlRequest? = null,
+        launchInvocation: PythonLaunchInvocation? = null,
     ) {
         val profile = webProfile ?: runCatching {
             webInspector.inspect(project.summary.documentId)
@@ -1199,6 +1205,7 @@ open class V04Activity : StudioActivity() {
             browserConfiguredUrl = profile?.configuredLocalUrl(),
             browserFramework = profile?.framework,
             controlRequest = controlRequest ?: selectedRuntimeControlRequest(project),
+            launchInvocation = launchInvocation,
         )
     }
 
@@ -1208,7 +1215,81 @@ open class V04Activity : StudioActivity() {
             return
         }
         val webProfile = runCatching { webInspector.inspect(project.summary.documentId) }.getOrNull()
+        val resolvedSelection =
+            project.runtimeSelection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
+        val isPythonCliCandidate =
+            controlRequest == RuntimeControlRequest.EXTERNAL_PROVIDER &&
+                webProfile != null &&
+                !webProfile.enabled &&
+                resolvedSelection?.primary == RuntimeKind.PYTHON
 
+        if (isPythonCliCandidate) {
+            val cliWebProfile = checkNotNull(webProfile)
+            val resolution = runCatching {
+                runtime.resolvePythonLaunch(project)
+            }.getOrElse {
+                errorDialog(
+                    getString(R.string.runtime_cli_pyproject_invalid),
+                    getString(R.string.runtime_cli_pyproject_invalid),
+                )
+                return
+            }
+            when (resolution) {
+                is PythonCliLaunchResolver.Resolution.DeclaredRun ->
+                    showGenericRunConfirmation(project, webProfile, controlRequest)
+                is PythonCliLaunchResolver.Resolution.ConsoleScripts -> {
+                    if (resolution.names.size == 1) {
+                        showPythonArgumentsDialog(
+                            project = project,
+                            webProfile = cliWebProfile,
+                            controlRequest = controlRequest,
+                            invocationFactory = { args ->
+                                PythonLaunchInvocation.consoleScript(resolution.names.single(), args)
+                            },
+                            entryLabel = resolution.names.single(),
+                        )
+                    } else {
+                        showPythonConsoleScriptSelection(project, cliWebProfile, controlRequest, resolution.names)
+                    }
+                }
+                is PythonCliLaunchResolver.Resolution.PythonFile ->
+                    showPythonArgumentsDialog(
+                        project = project,
+                        webProfile = cliWebProfile,
+                        controlRequest = controlRequest,
+                        invocationFactory = { args ->
+                            PythonLaunchInvocation.pythonFile(resolution.entrypoint, args)
+                        },
+                        entryLabel = resolution.entrypoint,
+                    )
+                PythonCliLaunchResolver.Resolution.Missing ->
+                    errorDialog(
+                        getString(R.string.runtime_cli_missing),
+                        getString(R.string.runtime_cli_missing),
+                    )
+                is PythonCliLaunchResolver.Resolution.Invalid -> {
+                    val message = when (resolution.reason) {
+                        PythonCliLaunchResolver.InvalidReason.TOML_PARSE_FAILED ->
+                            getString(R.string.runtime_cli_pyproject_invalid)
+                        PythonCliLaunchResolver.InvalidReason.SCRIPT_ENTRY_UNSUPPORTED ->
+                            getString(R.string.runtime_cli_unsupported)
+                        PythonCliLaunchResolver.InvalidReason.SCRIPT_NAME_UNSUPPORTED ->
+                            getString(R.string.runtime_cli_unsupported)
+                    }
+                    errorDialog(getString(R.string.runtime_cli_unsupported), message)
+                }
+            }
+            return
+        }
+
+        showGenericRunConfirmation(project, webProfile, controlRequest)
+    }
+
+    private fun showGenericRunConfirmation(
+        project: V04ProjectGateway.RuntimeProject,
+        webProfile: WebProjectInspector.Profile?,
+        controlRequest: RuntimeControlRequest,
+    ) {
         val configurationNote = "\n\n" + configurationUi.summaryText(
             configurationUi.snapshot(project.summary.documentId, project.folderName),
         )
@@ -1223,6 +1304,74 @@ open class V04Activity : StudioActivity() {
             .setNegativeButton(getString(R.string.common_cancel), null)
             .setPositiveButton(getString(R.string.runtime_button_run)) { _, _ ->
                 startProject(project, webProfile, controlRequest)
+            }
+            .show()
+    }
+
+    private fun showPythonConsoleScriptSelection(
+        project: V04ProjectGateway.RuntimeProject,
+        webProfile: WebProjectInspector.Profile,
+        controlRequest: RuntimeControlRequest,
+        names: List<String>,
+    ) {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.runtime_cli_select_entry))
+            .setMessage(getString(R.string.runtime_cli_multiple_entries))
+            .setItems(names.toTypedArray()) { _, which ->
+                if (which in names.indices) {
+                    val name = names[which]
+                    showPythonArgumentsDialog(
+                        project = project,
+                        webProfile = webProfile,
+                        controlRequest = controlRequest,
+                        invocationFactory = { args ->
+                            PythonLaunchInvocation.consoleScript(name, args)
+                        },
+                        entryLabel = name,
+                    )
+                }
+            }
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .show()
+    }
+
+    private fun showPythonArgumentsDialog(
+        project: V04ProjectGateway.RuntimeProject,
+        webProfile: WebProjectInspector.Profile,
+        controlRequest: RuntimeControlRequest,
+        invocationFactory: (List<String>) -> PythonLaunchInvocation,
+        entryLabel: String,
+    ) {
+        val input = EditText(this).apply {
+            hint = getString(R.string.runtime_cli_arguments_hint)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            setSingleLine(false)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.runtime_cli_arguments))
+            .setMessage(getString(R.string.runtime_cli_entry_label, entryLabel))
+            .setView(input)
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .setPositiveButton(getString(R.string.runtime_button_run)) { _, _ ->
+                when (val parsed = RuntimeArgumentParser.parse(input.text?.toString().orEmpty())) {
+                    is RuntimeArgumentParser.Result.Success -> {
+                        val invocation = runCatching {
+                            invocationFactory(parsed.arguments)
+                        }.getOrElse {
+                            errorDialog(
+                                getString(R.string.runtime_cli_unsupported),
+                                it.message ?: getString(R.string.runtime_cli_unsupported),
+                            )
+                            return@setPositiveButton
+                        }
+                        startProject(project, webProfile, controlRequest, invocation)
+                    }
+                    is RuntimeArgumentParser.Result.Invalid ->
+                        errorDialog(
+                            getString(R.string.runtime_cli_arguments_invalid),
+                            getString(R.string.runtime_cli_arguments_invalid),
+                        )
+                }
             }
             .show()
     }
@@ -1464,6 +1613,7 @@ open class V04Activity : StudioActivity() {
         browserFramework: String? = null,
         silentRecovery: Boolean = false,
         controlRequest: RuntimeControlRequest? = null,
+        launchInvocation: PythonLaunchInvocation? = null,
     ) {
         val stateKey = project.summary.documentId
         val effectiveControlRequest = controlRequest ?: if (
@@ -1522,7 +1672,12 @@ open class V04Activity : StudioActivity() {
         val command = try {
             when (action) {
                 ProjectRuntimeController.Action.PREPARE -> runtime.prepare(project)
-                ProjectRuntimeController.Action.START -> runtime.start(project)
+                ProjectRuntimeController.Action.START ->
+                    if (launchInvocation == null) {
+                        runtime.start(project)
+                    } else {
+                        runtime.start(project, launchInvocation)
+                    }
                 ProjectRuntimeController.Action.STOP -> runtime.stop(project)
                 ProjectRuntimeController.Action.STATUS -> runtime.status(project)
                 ProjectRuntimeController.Action.LOGS -> runtime.logs(project)
@@ -2060,6 +2215,8 @@ open class V04Activity : StudioActivity() {
                 getString(R.string.runtime_error_proot_missing)
             "SIFTALPHA_ERROR=PYTHON_MISSING" in text ->
                 getString(R.string.runtime_error_python_missing)
+            "SIFTALPHA_ERROR=PYTHON_CONSOLE_SCRIPT_MISSING" in text ->
+                getString(R.string.runtime_error_python_console_script_missing)
             "SIFTALPHA_ERROR=ENV_NOT_READY" in text ->
                 getString(R.string.runtime_error_env_not_ready)
             "SIFTALPHA_ERROR=TMUX_MISSING" in text ->

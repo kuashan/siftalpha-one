@@ -212,4 +212,15 @@
     <string name="runtime_workspace_environment">環境と設定</string>
     <string name="runtime_workspace_controls">実行操作</string>
     <string name="runtime_workspace_output">プロジェクト出力</string>
+
+    <string name="runtime_cli_entry_label">実行エントリ: %1$s</string>
+    <string name="runtime_cli_select_entry">実行エントリを選択</string>
+    <string name="runtime_cli_arguments">実行引数</string>
+    <string name="runtime_cli_arguments_hint">例: --help または --name &quot;john smith&quot;</string>
+    <string name="runtime_cli_arguments_invalid">実行引数の形式が正しくありません。引用符と引数の長さを確認してください。</string>
+    <string name="runtime_cli_multiple_entries">このプロジェクトは複数のコマンドエントリを宣言しています。選択してください。</string>
+    <string name="runtime_cli_pyproject_invalid">pyproject.toml を解析できません</string>
+    <string name="runtime_cli_unsupported">このコマンドエントリ形式は現在サポートされていません</string>
+    <string name="runtime_cli_missing">Python プロジェクトのエントリポイントを特定できません</string>
+    <string name="runtime_error_python_console_script_missing">インストール後のコマンドエントリが見つかりません</string>
 </resources>

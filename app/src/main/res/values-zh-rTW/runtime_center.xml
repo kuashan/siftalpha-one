@@ -212,4 +212,15 @@
     <string name="runtime_workspace_environment">環境與設定</string>
     <string name="runtime_workspace_controls">執行控制</string>
     <string name="runtime_workspace_output">專案輸出</string>
+
+    <string name="runtime_cli_entry_label">執行入口：%1$s</string>
+    <string name="runtime_cli_select_entry">選擇執行入口</string>
+    <string name="runtime_cli_arguments">執行參數</string>
+    <string name="runtime_cli_arguments_hint">例如：--help 或 --name &quot;john smith&quot;</string>
+    <string name="runtime_cli_arguments_invalid">執行參數格式錯誤，請檢查引號與參數長度。</string>
+    <string name="runtime_cli_multiple_entries">此專案宣告了多個命令入口，請選擇一個。</string>
+    <string name="runtime_cli_pyproject_invalid">無法解析 pyproject.toml</string>
+    <string name="runtime_cli_unsupported">目前不支援此命令入口格式</string>
+    <string name="runtime_cli_missing">無法判定 Python 專案入口</string>
+    <string name="runtime_error_python_console_script_missing">安裝後找不到命令入口</string>
 </resources>

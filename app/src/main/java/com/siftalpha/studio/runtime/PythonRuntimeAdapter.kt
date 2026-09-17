@@ -132,6 +132,25 @@ class PythonRuntimeAdapter(
             trimmedRun == "python3 $entry" ||
             trimmedRun == "python ${sh(entry)}" ||
             trimmedRun == "python3 ${sh(entry)}"
+        val invocation = project.pythonLaunchInvocation
+        val launchMode = if (invocation == null) 0 else 1
+        val launchKind = invocation?.kind?.id.orEmpty()
+        val launchExecutable = invocation?.let {
+            when (it.kind) {
+                PythonLaunchKind.CONSOLE_SCRIPT -> "$venv/bin/${it.executableName}"
+                PythonLaunchKind.PYTHON_FILE -> "$venv/bin/python"
+            }
+        }.orEmpty()
+        val launchDisplay = invocation?.executableName.orEmpty()
+        val launchArguments = invocation?.let {
+            when (it.kind) {
+                PythonLaunchKind.CONSOLE_SCRIPT -> it.arguments
+                PythonLaunchKind.PYTHON_FILE -> listOfNotNull(it.entrypoint) + it.arguments
+            }
+        }.orEmpty()
+        val launchArgumentAssignments = launchArguments.joinToString("\n") { argument ->
+            "            launch_args+=( ${sh(argument)} )"
+        }
 
         val runnerContent = """
             #!/usr/bin/env bash
@@ -143,7 +162,13 @@ class PythonRuntimeAdapter(
             secret_file=${sh(secrets)}
             configured_entry=${sh(entry)}
             configured_run=${sh(run)}
-            auto_entry_mode=${if (autoEntryMode) "1" else "0"}
+            auto_entry_mode=${if (autoEntryMode && invocation == null) "1" else "0"}
+            launch_mode=$launchMode
+            launch_kind=${sh(launchKind)}
+            launch_executable=${sh(launchExecutable)}
+            launch_display=${sh(launchDisplay)}
+            launch_args=()
+$launchArgumentAssignments
             resolved_entry=''
             identity_dir=${sh("$guestRuntimeRoot/$id")}
             identity_file=${sh("$guestRuntimeRoot/$id/$identityFileName")}
@@ -261,7 +286,7 @@ class PythonRuntimeAdapter(
               exit "${'$'}code"
             fi
 
-            if [ "${'$'}auto_entry_mode" = "1" ] && [ ! -f "${'$'}project/${'$'}configured_entry" ]; then
+            if [ "${'$'}launch_mode" != "1" ] && [ "${'$'}auto_entry_mode" = "1" ] && [ ! -f "${'$'}project/${'$'}configured_entry" ]; then
               candidate=''
               for wanted in main.py app.py run.py manage.py; do
                 candidate="${'$'}(find "${'$'}project" -maxdepth 4 -type f -name "${'$'}wanted" \
@@ -295,14 +320,30 @@ class PythonRuntimeAdapter(
             export PYTHONUNBUFFERED=1
             export VIRTUAL_ENV="${'$'}venv"
             export PATH="${'$'}venv/bin:${'$'}PATH"
-            if [ -n "${'$'}resolved_entry" ]; then
+            if [ "${'$'}launch_mode" = "1" ]; then
+              printf 'SIFTALPHA_LAUNCH_KIND=%s\n' "${'$'}launch_kind"
+              printf 'SIFTALPHA_LAUNCH_EXECUTABLE=%s\n' "${'$'}launch_display"
+              printf 'SIFTALPHA_LAUNCH_ARGUMENT_COUNT=%s\n' "${'$'}{#launch_args[@]}"
+              if [ ! -x "${'$'}launch_executable" ]; then
+                if [ "${'$'}launch_kind" = "CONSOLE_SCRIPT" ]; then
+                  echo 'SIFTALPHA_ERROR=PYTHON_CONSOLE_SCRIPT_MISSING'
+                else
+                  echo 'SIFTALPHA_ERROR=PYTHON_MISSING'
+                fi
+                code=76
+              else
+                "${'$'}launch_executable" "${'$'}{launch_args[@]}"
+                code=${'$'}?
+              fi
+            elif [ -n "${'$'}resolved_entry" ]; then
               printf 'COMMAND=python %s\n' "${'$'}resolved_entry"
               "${'$'}venv/bin/python" "${'$'}resolved_entry"
+              code=${'$'}?
             else
               printf 'COMMAND=%s\n' "${'$'}configured_run"
               bash -c "${'$'}configured_run"
+              code=${'$'}?
             fi
-            code=${'$'}?
             printf 'SIFTALPHA_PROCESS_EXIT=%s\n' "${'$'}code"
             printf 'EXITED_AT=%s\n' "${'$'}(date '+%Y-%m-%d %H:%M:%S')"
             printf 'STATE=EXITED\nEXIT_CODE=%s\n' "${'$'}code" >"${'$'}state"

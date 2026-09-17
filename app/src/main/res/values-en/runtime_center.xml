@@ -212,4 +212,15 @@
     <string name="runtime_workspace_environment">Environment and configuration</string>
     <string name="runtime_workspace_controls">Run controls</string>
     <string name="runtime_workspace_output">Project output</string>
+
+    <string name="runtime_cli_entry_label">Launch entry: %1$s</string>
+    <string name="runtime_cli_select_entry">Select launch entry</string>
+    <string name="runtime_cli_arguments">Runtime arguments</string>
+    <string name="runtime_cli_arguments_hint">For example: --help or --name &quot;john smith&quot;</string>
+    <string name="runtime_cli_arguments_invalid">Invalid runtime arguments. Check quotes and argument lengths.</string>
+    <string name="runtime_cli_multiple_entries">This project declares multiple command entries. Choose one.</string>
+    <string name="runtime_cli_pyproject_invalid">Unable to parse pyproject.toml</string>
+    <string name="runtime_cli_unsupported">This command entry format is not supported yet</string>
+    <string name="runtime_cli_missing">Unable to determine a Python project entrypoint</string>
+    <string name="runtime_error_python_console_script_missing">The installed command entry does not exist</string>
 </resources>

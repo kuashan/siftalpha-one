@@ -187,6 +187,34 @@ class ProjectRuntimeController(
 
     fun runtimeUnsupportedReason(): String = host.runtimeUnsupportedReason()
 
+    /**
+     * Resolve a one-shot Python launch at START time. Project metadata remains authoritative; this
+     * action-time read is intentionally not used by card refresh.
+     */
+    fun resolvePythonLaunch(
+        project: V04ProjectGateway.RuntimeProject,
+    ): PythonCliLaunchResolver.Resolution {
+        val projectId = project.summary.documentId
+        val facts = gateway.runtimeFacts(projectId)
+        val pyprojectToml = if (
+            facts.declaredRun.isNullOrBlank() &&
+            facts.relativePaths.any { it == "pyproject.toml" }
+        ) {
+            gateway.readProjectRootText(projectId, "pyproject.toml")
+        } else {
+            null
+        }
+        return PythonCliLaunchResolver.resolve(
+            declaredRun = facts.declaredRun,
+            pyprojectToml = pyprojectToml,
+            fallbackEntrypoint = if (facts.declaredRun.isNullOrBlank()) {
+                gateway.resolveEmbeddedPythonEntrypoint(projectId)
+            } else {
+                null
+            },
+        )
+    }
+
     fun prepare(project: V04ProjectGateway.RuntimeProject): RuntimeCommand {
         val context = executionContext(project)
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
@@ -218,22 +246,38 @@ class ProjectRuntimeController(
     fun prepareProgress(project: V04ProjectGateway.RuntimeProject): RuntimeCommand =
         PrepareProgressProbe.command(basicSpec(project), host)
 
-    fun start(project: V04ProjectGateway.RuntimeProject): RuntimeCommand {
+    fun start(project: V04ProjectGateway.RuntimeProject): RuntimeCommand =
+        start(project, pythonLaunchInvocation = null)
+
+    /**
+     * Start with an optional action-time structured Python argv contract. A null invocation keeps
+     * the existing declared-run / automatic-entry compatibility behavior.
+     */
+    fun start(
+        project: V04ProjectGateway.RuntimeProject,
+        pythonLaunchInvocation: PythonLaunchInvocation?,
+    ): RuntimeCommand {
         val context = executionContext(project)
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
             ?: return selectionError(project, context.selection)
+        if (pythonLaunchInvocation != null && resolved.primary != RuntimeKind.PYTHON) {
+            return executableUnavailable(project, resolved.primary)
+        }
         return when (resolved.primary) {
             RuntimeKind.PYTHON -> {
+                val effectiveSpec = context.spec.copy(
+                    pythonLaunchInvocation = pythonLaunchInvocation,
+                )
                 val python = PythonDependencyDiagnostics.wrapStartFailure(
-                    base = pythonAdapter.start(context.spec),
-                    project = context.spec,
+                    base = pythonAdapter.start(effectiveSpec),
+                    project = effectiveSpec,
                     host = host,
                 )
                 RuntimeEnvironmentComposer.start(
                     host = host,
-                    projectName = context.spec.name,
+                    projectName = effectiveSpec.name,
                     primary = python,
-                    nodeStatus = supplementalNodeAdapter.statusDetectedWebComponents(context.spec),
+                    nodeStatus = supplementalNodeAdapter.statusDetectedWebComponents(effectiveSpec),
                 )
             }
             RuntimeKind.NODE_JS -> nodeExecutableAdapter.start(context.spec)

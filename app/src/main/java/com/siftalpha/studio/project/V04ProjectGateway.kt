@@ -7,6 +7,8 @@ import com.siftalpha.studio.runtime.NodeStartContractPolicy
 import com.siftalpha.studio.runtime.ProjectRuntimeExecutionPlanner
 import com.siftalpha.studio.runtime.RuntimeKind
 import org.json.JSONObject
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
 import java.time.Instant
 import java.util.zip.ZipInputStream
 
@@ -66,6 +68,34 @@ class V04ProjectGateway(private val context: Context) {
             declaredEntry = objectValue?.optString("entry")?.takeIf { it.isNotBlank() },
             hasExternalDependencyRequirement = requiresExternalPythonEnvironment(nodes),
         )
+    }
+
+    /** Read one bounded root metadata file at action time without exposing SAF to policy code. */
+    fun readProjectRootText(
+        projectDocumentId: String,
+        fileName: String,
+        maxBytes: Int = MAX_ROOT_TEXT_BYTES,
+    ): String? {
+        require(fileName == "pyproject.toml") { "只有 pyproject.toml 可通过此接口读取" }
+        require(maxBytes in 1..MAX_ROOT_TEXT_BYTES) { "根文件读取上限无效" }
+        val file = projectStore.listProjectChildren(projectDocumentId)
+            .firstOrNull {
+                !it.isDirectory &&
+                    it.relativePath == fileName
+            } ?: return null
+        val bytes = projectStore.readProjectFileBytes(file, maxBytes + 1)
+        require(bytes.size <= maxBytes) {
+            "$fileName 超过 ${maxBytes / 1024} KB，当前启动解析器不会读取"
+        }
+        return runCatching {
+            Charsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString()
+        }.getOrElse {
+            error("$fileName 不是有效的 UTF-8 文本")
+        }
     }
 
     /** Resolve the one entrypoint M is willing to hand to Embedded R. R never scans or guesses. */
@@ -601,6 +631,7 @@ class V04ProjectGateway(private val context: Context) {
         private const val MAX_ZIP_FILE_BYTES = 64L * 1024 * 1024
         private const val MAX_ZIP_TOTAL_BYTES = 256L * 1024 * 1024
         private const val MAX_DEPENDENCY_PROBE_BYTES = 64 * 1024
+        private const val MAX_ROOT_TEXT_BYTES = 512 * 1024
         private val EMBEDDED_R_UNSUPPORTED_PYTHON_MANIFESTS = setOf(
             "pyproject.toml",
             "setup.py",
