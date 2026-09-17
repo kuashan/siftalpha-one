@@ -2,12 +2,15 @@
 
 最后更新：2026-09-17（alpha43 Baseline Closure）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
-当前文档/验收基线分支：`codex/siftalpha-x-embedded-cpython-spike`（HEAD：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`）  
+当前文档/验收分支：`codex/siftalpha-x-embedded-cpython-spike`  
+Current branch/document HEAD：`860645af9745ebbb978dad6d177359f5fddb23f1`  
+alpha43 production source baseline：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`  
 `main` 保持历史 production baseline，本轮未修改。  
 alpha30 source / real-device evidence remains historical; current branch continues from the alpha31 version-identity baseline。  
 M / R / X 架构与 Runtime prototype 工作分支：`codex/siftalpha-x-embedded-cpython-spike`  
 当前版本：0.8.0-alpha43 / versionCode 119（Automatic Project Observation + Contextual Status Guidance；真实 Android 真机验收 PASS）  
-最近 CI：GitHub Actions Run #121 / Run ID `35226167054` / conclusion `success`；Artifact：`siftalpha-w0-121`；APK SHA-256：`6b70fc222cc8e27124daf2a5a910abc1174380b257c5549959abb279d25def6a`。  
+最近 CI：GitHub Actions Run #122 / Run ID `35242617391` / conclusion `success`；Artifact：`siftalpha-w0-122`；APK SHA-256：`6b70fc222cc8e27124daf2a5a910abc1174380b257c5549959abb279d25def6a`。  
+alpha43 final production-source CI evidence：Run #121 / Run ID `35226167054` / conclusion `success`；Artifact：`siftalpha-w0-121`；APK SHA-256：`6b70fc222cc8e27124daf2a5a910abc1174380b257c5549959abb279d25def6a`。  
 当前文档定义：`M = Management System`，`R = Runtime System`，`X = M + R`  
 规范架构定义：[ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)  
 Production baseline merge：[893229c](https://github.com/kuashan/siftalpha-one/commit/893229ce26d49a6ea22c79d6e2be85290cb8b0c3)（历史基线记录）  

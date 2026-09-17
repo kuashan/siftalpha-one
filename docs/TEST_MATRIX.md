@@ -66,7 +66,8 @@
 | C-15 | alpha29 Embedded CPython Runtime prototype CI | CPython preparation、validators、JVM unit tests、CMake/native build、`assembleDebug`、signing verification 和 evidence collection 通过 | PASS | [Actions Run #80](https://github.com/kuashan/siftalpha-one/actions/runs/35060381162) / [artifact `siftalpha-w0-80`](https://github.com/kuashan/siftalpha-one/actions/runs/35060381162/artifacts/10432576095) |
 | C-16 | alpha30 R Project Script Execution Boundary CI | CPython preparation、validators、JVM unit tests、CMake/native build、`assembleDebug`、APK evidence 和 signing verification 通过；无 Android device | PASS（CI；instrumentation 未执行） | [Actions Run #83](https://github.com/kuashan/siftalpha-one/actions/runs/35078323509) / [artifact `siftalpha-w0-83`](https://github.com/kuashan/siftalpha-one/actions/runs/35078323509/artifacts/10439551021) |
 
-| C-17 | alpha43 Baseline Closure CI | repository validators, testDebugUnitTest, assembleDebug, CPython preparation, native/CMake, APK signing/evidence | PASS | [Actions Run #121](https://github.com/kuashan/siftalpha-one/actions/runs/35226167054) / artifact `siftalpha-w0-121` / APK SHA-256 `6b70fc222cc8e27124daf2a5a910abc1174380b257c5549959abb279d25def6a` |
+| C-17 | alpha43 Final Source Baseline CI | repository validators, testDebugUnitTest, assembleDebug, CPython preparation, native/CMake, APK signing/evidence | PASS | [Actions Run #121](https://github.com/kuashan/siftalpha-one/actions/runs/35226167054) / source HEAD `66f9153e57547c4d8b6e50956b48ddf86b9dc656` / artifact `siftalpha-w0-121` / APK SHA-256 `6b70fc222cc8e27124daf2a5a910abc1174380b257c5549959abb279d25def6a` |
+| C-18 | alpha43 Baseline Closure Documentation CI | repository validators, testDebugUnitTest, assembleDebug, CPython preparation, native/CMake, APK signing/evidence | PASS | [Actions Run #122](https://github.com/kuashan/siftalpha-one/actions/runs/35242617391) / HEAD `860645af9745ebbb978dad6d177359f5fddb23f1` / conclusion `success` / artifact `siftalpha-w0-122` / APK SHA-256 unchanged: `6b70fc222cc8e27124daf2a5a910abc1174380b257c5549959abb279d25def6a` |
 
 ## C. 安装与升级矩阵
 
@@ -379,7 +380,7 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 | Web readiness | `RUNNING` 不等于 Web Ready；只有 Candidate 加 Endpoint Probe 验证真实可达后才开放 Web 与 Unified Open。 |
 | Rich Result / Unified Open | 终态自动发现 Rich Result；Unified Open 按 `WEB > RICH_RESULT > NONE` 路由；Viewer 有明确可见的返回按钮。 |
 | Automatic LOGS boundary | Web discovery 的 LOGS 按每 3 次 STATUS 一次、最多 3 次执行；终态只读一次最终 LOGS，不是后台无限刷新。 |
-| CI evidence | Run #121 / Run ID `35226167054` success；artifact `siftalpha-w0-121`；APK SHA-256 已在 current baseline 与 C-17 记录。 |
+| CI evidence | Run #121 是 alpha43 final production-source CI；Run #122 是 Baseline Closure Documentation CI；两次均 success，APK SHA-256 unchanged。 |
 | Real-device boundary | 下表记录真实 Android 真机验收；alpha43 已完成并通过。 |
 
 ### alpha43 real-device acceptance
