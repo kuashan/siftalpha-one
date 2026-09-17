@@ -353,3 +353,15 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - `RichResultLifecyclePolicyTest`：覆盖新 START 清除、空 STATUS/LOGS 保留和后续结果更新。
 - 生产接线覆盖 M 的安全结果输出、Termux 与 Embedded snapshot 的结果识别、项目卡片结果计数和统一“打开”；现有 Web Discovery/Endpoint Probe/Browser 测试继续作为回归。
 - Rich Result Viewer 为原生 Android UI；外部 URL 二次通过 http/https 与 Android 浏览器目标检查。没有真实 Android device 的 CI 不能替代 Sherlock/Web 真机验收。
+
+
+## alpha43 — Automatic Project Observation + Contextual Status Guidance
+
+| Area | alpha43 coverage |
+|---|---|
+| External runtime observation | Foreground Activity observation uses low-frequency STATUS and stops after one terminal LOGS reconciliation. |
+| User operation safety | Pending operations and observation generations prevent overlapping or stale callbacks. |
+| Background behavior | Observation pauses on Activity stop; Termux/runtime continues and recovery resumes on return. |
+| User guidance | Guidance derives from runtime state, verified Web endpoint, and Rich Result availability; no user-selected project mode. |
+| Rich Result viewer | Adds a localized visible Back button; system Back remains supported. |
+| Acceptance boundary | JVM/build validation only; no alpha43 real-device acceptance is claimed by CI. |

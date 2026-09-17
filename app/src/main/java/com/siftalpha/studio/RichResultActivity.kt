@@ -52,6 +52,13 @@ class RichResultActivity : StudioActivity() {
         }
         scroll.addView(root)
 
+        root.addView(Button(this).apply {
+            text = getString(R.string.runtime_rich_result_back)
+            textSize = 13f
+            isAllCaps = false
+            setOnClickListener { finish() }
+        }, fullWidthParams(top = 0, bottom = 8))
+
         root.addView(TextView(this).apply {
             text = getString(R.string.runtime_rich_result_title)
             textSize = 24f

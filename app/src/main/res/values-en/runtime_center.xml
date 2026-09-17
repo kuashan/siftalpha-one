@@ -223,4 +223,9 @@
     <string name="runtime_cli_unsupported">This command entry format is not supported yet</string>
     <string name="runtime_cli_missing">Unable to determine a Python project entrypoint</string>
     <string name="runtime_error_python_console_script_missing">The installed command entry does not exist</string>
+    <string name="runtime_guidance_running_observing">The project is running. SiftAlpha will automatically detect a result or live interface.</string>
+    <string name="runtime_guidance_running_web_available">The project is still running. You can open its live interface at any time.</string>
+    <string name="runtime_guidance_result_ready">The run result is ready to open.</string>
+    <string name="runtime_guidance_completed_output">The project completed. View output / logs if needed.</string>
+    <string name="runtime_guidance_stopped_incomplete">You stopped the project. This result may be incomplete.</string>
 </resources>

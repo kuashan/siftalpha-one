@@ -223,4 +223,9 @@
     <string name="runtime_cli_unsupported">このコマンドエントリ形式は現在サポートされていません</string>
     <string name="runtime_cli_missing">Python プロジェクトのエントリポイントを特定できません</string>
     <string name="runtime_error_python_console_script_missing">インストール後のコマンドエントリが見つかりません</string>
+    <string name="runtime_guidance_running_observing">プロジェクトは実行中です。SiftAlpha が結果またはライブ画面を自動検出します。</string>
+    <string name="runtime_guidance_running_web_available">プロジェクトは実行を継続しています。いつでもライブ画面を開けます。</string>
+    <string name="runtime_guidance_result_ready">実行結果を開けます。</string>
+    <string name="runtime_guidance_completed_output">プロジェクトが完了しました。必要に応じて出力 / ログを確認できます。</string>
+    <string name="runtime_guidance_stopped_incomplete">プロジェクトを停止しました。今回の結果は不完全な可能性があります。</string>
 </resources>

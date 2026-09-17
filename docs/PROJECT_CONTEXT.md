@@ -379,3 +379,10 @@ alpha42 在 M 的安全结果回调中使用已经完成 Secret Redaction 的输
 项目卡片的主要呈现动作统一为“打开”。纯策略路由为 `WEB > RICH_RESULT > NONE`：只有现有 Web endpoint probe 已确认可用时才走原有 Browser 安全链；否则有 Rich Result 时进入原生 Rich Result Viewer；Raw Log 本身不会成为打开目标。一次性 CLI 面向 App 内 Rich Result，长期自动化和未来自动量化面向 Live Web Dashboard，Raw Log 只作为诊断。
 
 本轮结果缓存只覆盖同一 V04Activity 实例的生命周期；接受新的 START 会清除旧结果，空的 STATUS/LOGS 不会清除当前结果，后续发现的新链接列表可以更新结果。alpha42 不引入数据库、WebView、量化能力、依赖安装或新的 Runtime/Web 架构；真机验收仍需分别验证 Sherlock Rich Result 和既有 Web Dashboard。
+
+
+## alpha43 — Automatic Project Observation + Contextual Status Guidance
+
+alpha43 adds Activity-lifetime automatic observation for External Provider runs. After an accepted START, SiftAlpha issues low-frequency, project-scoped STATUS checks while the Activity is foregrounded. A terminal EXITED_SUCCESS or EXITED_ERROR state triggers one final LOGS read for Rich Result detection and diagnostics, then observation stops. Observation pauses with the Activity and resumes/reconciles on return; it does not stop Termux or the project runtime.
+
+The card exposes state-derived guidance only: it does not ask users to classify a project as a one-shot task or live service. Verified Web availability guides the existing Unified Open path to the browser; a Rich Result guides it to the native viewer. Raw logs and manual STATUS / LOGS remain secondary diagnostic and recovery controls. Embedded R keeps its existing snapshot polling and lifecycle ownership.

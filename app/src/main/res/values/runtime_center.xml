@@ -223,4 +223,9 @@
     <string name="runtime_cli_unsupported">当前命令入口格式暂不支持</string>
     <string name="runtime_cli_missing">无法确定 Python 项目入口</string>
     <string name="runtime_error_python_console_script_missing">安装后的命令入口不存在</string>
+    <string name="runtime_guidance_running_observing">项目正在运行，SiftAlpha 会自动检测结果或实时界面。</string>
+    <string name="runtime_guidance_running_web_available">项目正在持续运行，可随时打开实时界面。</string>
+    <string name="runtime_guidance_result_ready">运行结果已就绪，可以打开查看。</string>
+    <string name="runtime_guidance_completed_output">项目已完成。需要时可查看输出 / 日志。</string>
+    <string name="runtime_guidance_stopped_incomplete">项目已由你停止，本次结果可能不完整。</string>
 </resources>

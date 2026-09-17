@@ -11,4 +11,5 @@
     <string name="runtime_rich_result_no_browser">No browser is available</string>
     <string name="runtime_rich_result_browser_required">Choose a browser in Settings first</string>
     <string name="runtime_rich_result_browser_failed">The browser could not open this link</string>
+    <string name="runtime_rich_result_back">← Back</string>
 </resources>

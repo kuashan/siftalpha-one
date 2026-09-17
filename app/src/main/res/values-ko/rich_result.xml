@@ -11,4 +11,5 @@
     <string name="runtime_rich_result_no_browser">사용 가능한 브라우저가 없습니다</string>
     <string name="runtime_rich_result_browser_required">먼저 설정에서 브라우저를 선택하세요</string>
     <string name="runtime_rich_result_browser_failed">브라우저에서 링크를 열 수 없습니다</string>
+    <string name="runtime_rich_result_back">← 돌아가기</string>
 </resources>

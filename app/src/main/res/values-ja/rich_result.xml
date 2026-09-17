@@ -11,4 +11,5 @@
     <string name="runtime_rich_result_no_browser">利用できるブラウザがありません</string>
     <string name="runtime_rich_result_browser_required">先に設定でブラウザを選択してください</string>
     <string name="runtime_rich_result_browser_failed">ブラウザでリンクを開けませんでした</string>
+    <string name="runtime_rich_result_back">← 戻る</string>
 </resources>

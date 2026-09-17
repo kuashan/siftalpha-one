@@ -11,4 +11,5 @@
     <string name="runtime_rich_result_no_browser">没有可用浏览器</string>
     <string name="runtime_rich_result_browser_required">请先在设置中选择浏览器</string>
     <string name="runtime_rich_result_browser_failed">浏览器打开失败</string>
+    <string name="runtime_rich_result_back">← 返回</string>
 </resources>

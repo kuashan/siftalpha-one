@@ -758,3 +758,12 @@ EmbeddedPythonSnapshot 直接映射到 M `RuntimeState`：IDLE→UNKNOWN、START
 项目卡片不再提供并列的“查看结果”和“浏览器”主入口，而是统一显示“打开”。PresentationTargetResolver 按 `WEB > RICH_RESULT > NONE` 选择目标；WEB 继续使用 alpha41 的 Web State、Endpoint Probe 和 Browser 安全链，RICH_RESULT 使用原生文本型 RichResultActivity，NONE 不提供主要打开目标。Raw Log、复制全部、滚动和诊断输出保持不变。
 
 Rich Result 只在同一 Activity 实例内暂存：接受新 START 时清除旧结果，STATUS/LOGS 没有新结果时保留，后续 LOGS/Embedded snapshot 发现新链接时更新。alpha42 不等于 R 或 X 完成，也不包含 WebView、数据库、依赖安装、量化交易或永久结果存储。
+
+
+## alpha43 — Automatic Project Observation + Contextual Status Guidance
+
+- Added bounded, foreground-only observation for External Provider projects.
+- STATUS is the normal observation operation; terminal runs receive one final LOGS read for result detection and diagnostics.
+- Observation is generation-scoped, waits for pending user operations, pauses on Activity stop, and resumes without stopping the underlying runtime.
+- Added state-derived guidance and a localized visible Back action to RichResultActivity.
+- No new Rich Result type, background service, database, WebView, or runtime lifecycle change. Real-device acceptance remains a separate step.
