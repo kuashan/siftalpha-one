@@ -79,6 +79,20 @@ Pure-Python Environment v1 的目标，是让 Embedded R 在 Android app-private
 | sequential Session 不保证 clean-session semantics | 同一 process 中已加载的 module/global state 可能跨 Session 留存 |
 | Termux External Provider 保留 | Embedded capability failure 后由用户/策略明确选择 External Runtime，不静默改 provider |
 
+## M Stability Rule
+
+当前阶段的主要开发目标是 R（Runtime System）。除非存在明确且不可避免的技术必要性，后续实现不得修改 M（Management System）的既有 project-management semantics、用户工作流、项目导入行为、普通用户 UI 或 alpha43 已验收的 Runtime presentation behavior。实现更方便、顺便重构或代码更整洁，都不是修改 M 的充分理由。
+
+如果未来任务发现必须修改 M，必须先停止涉及 M 的实现并报告：
+
+1. 为什么必须修改 M；
+2. 不修改会阻塞什么；
+3. 具体涉及哪些 M 文件和行为；
+4. 是否存在只修改 R 或 M ↔ R Contract 的替代方案；
+5. 对现有 alpha43 已验收行为的影响。
+
+在获得明确批准前不得实施 M 修改。本轮只有 docs/** 变化，因此没有修改 M production code。
+
 ## Current Embedded R Facts
 
 以下是 alpha43 当前实现边界，属于 Verified fact，不是本轮新能力：
@@ -178,17 +192,18 @@ Pure-Python Environment v1 只自动发现项目根目录的单一 pylock.toml�
 
 1. pylock.toml 永远拥有安装优先级。
 2. source declarations 不参与设备端解析，不会偷偷合并进 lock。
-3. 如果 source declaration 文件存在，Environment v1 要求 lock 中存在 SiftAlpha provenance extension：
+3. 可选的 SiftAlpha provenance extension 只能服务于诊断和 provenance 展示；它不是 v1 的安装前置条件：
 
        [tool.siftalpha]
        contract = "pure-python-environment-v1"
        source-selection = "requirements.txt"
        source-declaration-digest = "sha256:<hex>"
 
-4. source-selection 必须明确 Locker 实际使用的是哪个 declaration；当 requirements.txt 与 pyproject.toml 同时存在时，不允许隐式合并，Locker 必须显式选择并记录。
-5. source-declaration-digest 是对选定 declaration 的 deterministic canonical digest：相对路径、UTF-8 内容、LF 归一化和无 BOM 规则先组成 canonical source record，再计算 SHA-256。当前文件缺失、digest 不匹配或 selection 不明确时，lock 状态为 LOCK_PROVENANCE_UNAVAILABLE 或 LOCK_INVALID，Embedded 不安装。
-6. 没有任何 source declaration 时，lock 可以作为 self-contained input；不因不存在的 source 文件而报 stale。
-7. source declaration 内容改变但 lock 未重新生成时，返回 stale/provenance failure；不能继续使用旧 lock 并声称它仍与项目声明一致。
+4. source-selection 可以记录 Locker 实际使用的是哪个 declaration；当 requirements.txt 与 pyproject.toml 同时存在时，Locker 不应隐式合并，但该记录不是设备端的安装条件。
+5. source-declaration-digest 可以是选定 declaration 的 deterministic canonical digest，用于 provenance display；相对路径、UTF-8 内容、LF 归一化和无 BOM 规则属于未来独立 provenance contract 的设计，不是 v1 installer 的输入。
+6. 没有任何 source declaration 或 [tool.siftalpha] 时，lock 仍可以作为 self-contained authoritative input。
+7. [tool] table 遵循 PyPA 规范：其中的数据必须是 disposable，且不得影响安装。缺少 [tool.siftalpha]、source-selection 不存在、source-declaration-digest 不匹配或 source declaration 与 lock 的 provenance 不一致，都不能使一个其他方面有效的 pylock.toml 变为 LOCK_INVALID、LOCK_MISSING 或安装阻塞。
+8. v1 不承担 source declaration → lock staleness 的强制检测。未来若要建立严格 provenance contract，必须使用独立的 SiftAlpha-owned metadata/record，而不能利用标准 [tool] 内容改变 pylock 安装结果。
 
 SiftAlpha provenance extension 只用于 provenance 和诊断，不改变标准 pylock.toml 的安装语义。它不替代标准字段，也不让设备端获得 resolver 能力。
 
@@ -197,12 +212,11 @@ SiftAlpha provenance extension 只用于 provenance 和诊断，不改变标准 
 Environment v1 不通过比较 requirements.txt 与 lock 中的文本行来猜测 stale。staleness 只由以下结构化事实决定：
 
 - lock file semantic digest 是否与 EnvironmentRecord 记录一致；
-- source declaration 是否存在以及其 provenance digest 是否匹配；
 - selected environment marker 是否仍兼容；
 - Runtime Base provenance、Python ABI、Android ABI/API policy 是否仍匹配；
 - installer policy version 是否仍兼容。
 
-无法可靠判断 provenance 时，选择安全失败 LOCK_PROVENANCE_UNAVAILABLE，不选择“可能没问题”的隐式继续。
+source declaration 的存在、内容变化或 provenance mismatch 不属于 v1 installer 的强制 staleness 判定。安装相关 staleness 只由 lock、selected runtime、artifact 和 installer policy 等 authoritative facts 决定；诊断层可以显示 source/provenance 差异，但不能据此拒绝安装有效 lock。
 
 ## Supported Lock Subset
 
@@ -222,7 +236,7 @@ Environment v1 不宣称支持整个 PEP 751 / PyPA pylock.toml specification。
 | packages.version | 必须存在且为有效版本 |
 | packages.marker | 只支持能够由当前 runtime context 评估的 marker；未知变量或无法确定的表达式拒绝 |
 | packages.requires-python | 存在时必须与当前 interpreter 兼容 |
-| packages.dependencies | Environment v1 要求每个 selected package 明确给出完整 dependency edges；空 graph 使用 []；只用于一致性验证和审计，不用于现场 resolution |
+| packages.dependencies | 可选；存在时只解析用于 diagnostics/audit display；不要求完整 edges，不参与安装、依赖解析或拒绝条件 |
 | packages.wheels | 每个 selected package 至少一个 candidate；允许多个 platform candidate，但设备只选一个匹配的纯 Python wheel |
 | wheel URL/path | 必须提供 exact URL 或 project-contained relative path；禁止根据 index 可用内容替换 lock 指定 artifact |
 | wheel size | Environment v1 要求存在并在下载后逐字节验证 |
@@ -231,7 +245,7 @@ Environment v1 不宣称支持整个 PEP 751 / PyPA pylock.toml specification。
 | editable | 拒绝；不执行 editable behavior |
 | [tool] | 只接受不影响安装的 provenance/diagnostic data；不把任意 tool table 解释为 resolver 指令 |
 
-PyPA 规范把 packages.dependencies 作为 audit information，而不是让 installer 在安装时重新做 resolution。Environment v1 会要求 selected package 的 dependency edges 完整并校验其引用，但实际安装集合只来自已经通过 marker selection 的 packages entries；installer 不根据 edges 增补、升级或回溯依赖。
+PyPA 规范的原文约束是：Data recorded in the [tool] table MUST be disposable（MUST NOT affect installation）；对 packages.dependencies，Tools MUST NOT use this information when doing installation，它 is purely informational for auditing purposes。alpha44/后续 v1 不要求 dependency edges 完整，不因缺失或不完整 edges 拒绝其他方面有效的 lock，也不沿这些 edges 重新解析。实际 install set 只来自经过 lock environment、package marker、requires-python 与 source uniqueness 筛选后的 packages entries；DependencyFingerprintV1 也不以 edges 完整为前提。
 
 ### Environment marker context
 
@@ -265,7 +279,7 @@ PyPA 当前 platform tag 规范使用 android_apilevel_abi 形式，例如 andro
 
 | 结果 | 含义 |
 |---|---|
-| LOCK_INVALID | lock 结构、字段、graph、provenance 或 semantic consistency 不符合 v1 |
+| LOCK_INVALID | lock 结构、字段或 authoritative semantic consistency 不符合 v1；可选 [tool] provenance 数据不属于阻塞条件 |
 | LOCK_INCOMPATIBLE | lock 有效，但 requires-python、environment marker、Runtime Base 或 Android policy 不匹配当前设备 |
 | ARTIFACT_INVALID | lock 指向的 artifact 存在，但 hash、size、filename、metadata、RECORD 或 archive safety 验证失败 |
 | UNSUPPORTED_PACKAGE_KIND | lock 有效但包含 v1 明确拒绝的 VCS、sdist、directory、editable 或 native package |
@@ -374,31 +388,50 @@ generationId 表示同一个 logical environment 的一次具体物理安装：
 
 即使 dependency contract 不变，旧 generation gen-v1 与重装后的 gen-v2 物理内容也可能不同，不能仅凭相同 environmentId 让 process 热切换。
 
-### ProcessBindingId
+### RuntimeLoadBindingV1 与 ProcessBindingId
 
-alpha44/后续 v1 的 process binding 不只绑定 environmentId，而是绑定具体 immutable generation：
+ProcessBindingId 必须先绑定“本次 worker 将加载的完整 runtime layer”，而不能依赖 alpha44 尚未实现的 environment generation、pylock parser 或 site-packages tree。为此冻结可扩展的 RuntimeLoadBindingV1：
+
+    RuntimeLoadBindingV1 =
+      projectIdentity
+      + projectSourceGeneration
+      + runtimeProvenanceDigest
+      + dependencyLayerBinding
+
+alpha44 foundation 的 dependencyLayerBinding 固定为：
+
+    STDLIB_ONLY
+
+因此 alpha44 可以在没有 pylock、environment installer、site-packages 或 generation store 的情况下真实计算并验证：
 
     ProcessBindingId =
       SHA-256(
-        "siftalpha.process-binding.v1",
-        environmentId,
-        generationId,
+        "siftalpha.runtime-load-binding.v1",
+        projectIdentity,
+        projectSourceGeneration,
         runtimeProvenanceDigest,
-        lockDigest,
-        sitePackagesTreeDigest
+        "stdlib-only"
       )
 
-ProcessBindingId 在 generation 验证成功后生成并写入 generation metadata。Worker process 启动时必须收到并确认：
+实际实现必须对字段使用明确的 canonical serialization；不得用伪造 environment、伪造 lockDigest 或空的 sitePackagesTreeDigest 绕过 binding。Worker startup 必须收到并确认：
 
-    environmentId
-    generationId
-    processBindingId
+    projectIdentity
+    projectSourceGeneration
     runtimeProvenanceDigest
-    sitePackagesPath
+    dependencyLayerBinding
+    processBindingId
 
-Worker 一旦 loaded binding set，就不能接受另一个 binding。即使新 binding 属于同一个 environmentId，也必须启动 fresh worker process。这样不会出现 env-v1 modules 被 env-v2 Session 误用的缺口。
+Worker 一旦 loaded binding set，就不能接受另一个 binding。Project A → Project B 必须启动 fresh worker；同一 Project 的 source generation A → B 也必须产生 fresh binding 并启动 fresh worker。Activity re-entry 只能复用仍然匹配的 project/source/runtime binding，不能静默复用错误 worker。
 
-lockDigest 是 validated pylock semantic document 的 canonical digest，不是任意 raw TOML whitespace 的 hash。sitePackagesTreeDigest 是 generation 中 sorted relative path、file size 和 file bytes/RECORD digest 的组合，不包含绝对 app-private path。两者都必须在 generation verification 完成后计算。
+alpha45 Environment v1 才把 dependencyLayerBinding 扩展为具体的 EnvironmentGenerationBinding：
+
+    EnvironmentGenerationBinding =
+      environmentId
+      + generationId
+      + lockDigest
+      + sitePackagesTreeDigest
+
+其中 lockDigest 是 validated pylock semantic document 的 canonical digest，sitePackagesTreeDigest 是 generation 中 sorted relative path、file size 和 file bytes/RECORD digest 的组合，均不包含绝对 app-private path。环境 generation 改变必须产生新的 RuntimeLoadBindingV1 / ProcessBindingId，并要求 fresh worker；这些字段不属于 alpha44 foundation 的前置依赖。
 
 ## Process Boundary Decision
 
@@ -417,10 +450,10 @@ Pure-Python Environment v1 的 lock consumer、artifact cache、wheel verifier �
 | 方案 | Correctness | UX | Android lifecycle | 实现风险 | 决定 |
 |---|---|---|---|---|---|
 | A. 当前单 process + strict environment binding | 对同一 binding 可预测；不能安全切换不同 Project | 用户运行过 A 后再运行 B 会 deterministic reject 或要求外部环境 | 复用当前模型，但 process death 仍会丢运行上下文 | 低 | 不作为完整 Environment v1 交付 |
-| B. per-environment fresh OS worker process | 能以 process exit 清除 sys.modules、线程和 native state 边界 | M 可在后台重启 worker，普通用户不需要理解 modules | 必须持久化 binding/session facts，处理被系统杀死 | 中高 | **选择，先作为 alpha44 foundation** |
+| B. per-runtime-load-binding fresh OS worker process | 能以 process exit 清除 sys.modules、线程和 native state 边界 | M 可在后台重启 worker，普通用户不需要理解 modules | 必须持久化 binding/session facts，处理被系统杀死 | 中高 | **选择，先作为 alpha44 foundation** |
 | C. subinterpreter / module cleanup | 对 arbitrary third-party code 的隔离证据不足 | 失败模式难解释 | 与 extension/module lifetime 复杂耦合 | 高且不确定 | 不选择 |
 
-Android 官方文档说明，系统会根据 process importance 在内存压力下杀死进程；cached process 尤其不能被当成永久 worker。因此 Process-Isolated Foundation 必须把 EnvironmentRecord、ProcessBindingId 和 Session facts 持久化，进程死亡要变成结构化 failure，而不是静默重跑或切换 provider。[Android processes and app lifecycle](https://developer.android.com/guide/components/activities/process-lifecycle)
+Android 官方文档说明，系统会根据 process importance 在内存压力下杀死进程；cached process 尤其不能被当成永久 worker。因此 Process-Isolated Foundation 必须把 RuntimeLoadBindingRecord、ProcessBindingId 和 Session facts 持久化，进程死亡要变成结构化 failure，而不是静默重跑或切换 provider。[Android processes and app lifecycle](https://developer.android.com/guide/components/activities/process-lifecycle)
 
 ### Process contract
 
@@ -428,10 +461,10 @@ alpha44 foundation 只允许：
 
     one worker process instance
             ↔ one ProcessBindingId
-            ↔ one environment generation
+            ↔ one RuntimeLoadBindingV1
             ↔ at most one active Session
 
-新 environment 或新 generation 的流程是：
+新 Project、新 source generation 或未来新 environment generation 的流程是：
 
 1. M/R 停止当前 Session；
 2. 旧 worker 完成 cooperative STOP 或在明确 timeout 后被终止；
@@ -856,9 +889,8 @@ alpha44 foundation 与后续 Pure-Python installer 共享以下最小 failure vo
 | Failure kind | 典型 stage | retryable | 语义 |
 |---|---|---:|---|
 | LOCK_MISSING | DISCOVERING | 否，除非用户提供 lock | 没有 authoritative pylock.toml |
-| LOCK_INVALID | VALIDATING_LOCK | 否，需重新生成 lock | schema、field、graph、provenance 无效 |
+| LOCK_INVALID | VALIDATING_LOCK | 否，需重新生成 lock | schema、field 或 authoritative semantic consistency 无效；可选 [tool] provenance data 不属于阻塞条件 |
 | LOCK_INCOMPATIBLE | VALIDATING_LOCK | 否，需其他 lock/runtime | Python/marker/Android/runtime 不兼容 |
-| LOCK_PROVENANCE_UNAVAILABLE | DISCOVERING/VALIDATING_LOCK | 否，需重新生成带 provenance 的 lock | source declaration 存在但无法可靠判断 stale |
 | PACKAGE_UNSUPPORTED | VALIDATING_LOCK/VERIFYING_ARTIFACT | 否，需受支持的 package | VCS、sdist、directory、editable、extras/group 或其他 v1 之外能力 |
 | UNSUPPORTED_NATIVE_PACKAGE | VERIFYING_ARTIFACT | 否，走 External Provider | native payload、native tag、C/C++/Rust extension |
 | ARTIFACT_NOT_FOUND | FETCHING | 是，URL/cache 修复后可重试 | exact artifact 不在 cache，URL 不可取得或离线 cache miss |
@@ -970,7 +1002,7 @@ Session 与 Environment 是不同对象：
 
 Session 开始后：
 
-1. 固定 ProcessBindingId、generation 和 source generation；
+1. alpha44 固定 ProcessBindingId、RuntimeLoadBindingV1 和 source generation；alpha45 再固定 environment generation；
 2. 不重新读取项目 current pointer 作为运行时依赖；
 3. current pointer 后续改变不影响该 Session；
 4. STOP 结束 Session，不删除 Environment；
@@ -978,14 +1010,13 @@ Session 开始后：
 6. environment GC 必须检查 active worker/session binding references；
 7. Activity 离开前台不能因此自动删除 environment 或停止 alpha43 已有的长期 Runtime semantics。
 
-同一 environment generation 可以被多个顺序 Session 复用，但这不提供 clean-session guarantee。不同 generation 即使同一 environmentId 也要求新的 ProcessBindingId 和 fresh worker。
+alpha45 的同一 environment generation 可以被多个顺序 Session 复用，但这不提供 clean-session guarantee。不同 generation 即使同一 environmentId 也要求新的 ProcessBindingId 和 fresh worker；alpha44 foundation 对应的边界是 source generation。
 
 ## External Provider Boundary
 
 以下任一条件出现时，Embedded R 返回 capability failure：
 
 - 没有 supported pylock.toml；
-- lock 缺失 provenance 或 stale；
 - selected package 没有 allowed pure wheel；
 - native wheel、.so、C/C++/Rust extension；
 - VCS、directory、archive/sdist、source build；
@@ -1036,7 +1067,7 @@ Session 开始后：
     2. Process-Isolated Worker Foundation
        worker identity + Binder IPC + start/status/stop/death
             ↓
-    3. ProcessBindingId / environment-generation binding
+    3. RuntimeLoadBindingV1 + foundation ProcessBindingId
             ↓
     4. pylock.toml parser + supported-subset validator
             ↓
@@ -1056,7 +1087,9 @@ Session 开始后：
             ↓
     12. M ↔ R prepare/start/facts wiring
             ↓
-    13. alpha45 real-device Pure-Python Environment acceptance
+    13. alpha45 EnvironmentGenerationBinding + atomic generation switch
+            ↓
+    14. alpha45 real-device Pure-Python Environment acceptance
 
 不能先实现 installer 再补 process binding；否则会把可安装文件误认为可安全加载的 runtime environment。
 
@@ -1073,7 +1106,7 @@ alpha44 只进入以下最小可证明范围：
 1. 一个 dedicated Embedded worker process 对应一个 ProcessBindingId；
 2. typed start/status/stop/process-death IPC contract；
 3. worker 启动时验证 Runtime Base provenance、binding identity 和 path containment；
-4. 新 environment/generation 不在旧 worker 内热切换；
+4. 新 Project/source generation 不在旧 worker 内热切换；未来 environment generation 也必须走同一 fresh-worker boundary；
 5. worker death 产生持久化、结构化 failure；
 6. stdlib-only project 在 worker 中维持当前 alpha43 Embedded execution contract；
 7. explicit External Provider boundary 与不 silent fallback；
@@ -1118,12 +1151,12 @@ alpha44 的最小真机验收不包含 third-party package install，包含：
 | ID | 场景 | 通过标准 |
 |---|---|---|
 | P1 | stdlib-only project | 在 dedicated worker 中正常 START/STATUS/STOP |
-| P2 | binding identity | worker 记录并回报唯一 workerInstanceId 与 ProcessBindingId |
-| P3 | environment switch | A → B 不在旧 worker 内换 path；旧 worker 退出后新 worker 才能加载 B |
-| P4 | generation switch | 同一 environmentId 的 gen-v1 → gen-v2 也要求新 binding/worker |
+| P2 | foundation binding identity | worker 记录并回报唯一 workerInstanceId 与可由 projectIdentity、projectSourceGeneration、runtimeProvenanceDigest、STDLIB_ONLY 真实计算的 ProcessBindingId |
+| P3 | Project boundary | Project A → Project B 必须退出旧 worker、创建 fresh worker；不得在旧 worker 内切换 source/path |
+| P4 | source generation boundary | 同一 Project 的 source generation A → B 必须产生 fresh binding 并创建 fresh worker |
 | P5 | process death | worker 被杀死后得到 structured WORKER_PROCESS_DIED，无 silent provider fallback |
-| P6 | long-running safety | Activity 离开前台不产生错误的 environment switch；现有 Runtime lifecycle 不被文档设计回退 |
-| P7 | External boundary | 不满足 worker/binding contract 时清晰提供 External Runtime 选项 |
+| P6 | lifecycle safety | Activity leave/re-entry 不造成错误 binding reuse；现有 alpha43 Runtime lifecycle 与 Presentation 不被文档设计回退 |
+| P7 | M stability / External boundary | 现有 M 行为保持不变；不满足 worker/binding contract 时清晰提供 External Runtime 选项。若实现需要修改 M，必须先停止、报告并获得明确批准 |
 
 ### Pure-Python Environment v1 acceptance after foundation
 
@@ -1141,6 +1174,7 @@ alpha44 的最小真机验收不包含 third-party package install，包含：
 | H | offline cache hit | exact SHA-256 cache hit 可继续 |
 | I | offline cache miss | NETWORK_UNAVAILABLE，不隐式联网 |
 | J | Project A/B | 不同 environmentId 使用不同 binding/worker；同 worker 不允许切换 |
+| K | environment generation switch | 属于 alpha45 Environment acceptance；gen-v1 → gen-v2 产生新的 EnvironmentGenerationBinding / ProcessBindingId，并使用 fresh worker；alpha44 不执行此项 |
 
 ## Future Extensions
 
@@ -1165,7 +1199,7 @@ alpha44 的最小真机验收不包含 third-party package install，包含：
 以下资料在本轮重新核对；“上游事实”与“SiftAlpha 选择”分开记录：
 
 1. [PEP 751 — A file format to record Python dependencies for installation reproducibility](https://peps.python.org/pep-0751/) — **Verified fact**：状态为 Final；定义 lock file、Locker/Installer 分工、lock-version、environment/package/wheel/hash 字段及安装时不需要重新 resolution 的模型。
-2. [PyPA pylock.toml specification](https://packaging.python.org/en/latest/specifications/pylock-toml/) — **Verified fact**：当前 interoperability specification；支持 lock-version = "1.0"、requires-python、environments、extras/groups、packages、多 wheel candidate、URL/path/size/hashes。**Recommendation**：后续 Environment v1 只接受本文定义的 pure-Python subset。
+2. [PyPA pylock.toml specification](https://packaging.python.org/en/latest/specifications/pylock-toml/) — **Verified fact**：当前 interoperability specification；支持 lock-version = "1.0"、requires-python、environments、extras/groups、packages、多 wheel candidate、URL/path/size/hashes；[tool] 数据必须 disposable 且不得影响安装，packages.dependencies 只能用于 auditing，安装时不得使用。**Recommendation**：后续 Environment v1 只接受本文定义的 pure-Python subset。
 3. [PyPA Binary distribution format](https://packaging.python.org/en/latest/specifications/binary-distribution-format/) — **Verified fact**：wheel archive、.dist-info、.data、purelib/platlib 语义。**Recommendation**：v1 只接受 purelib，拒绝 scripts/headers/data/platlib。
 4. [PyPA Platform compatibility tags](https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/) — **Verified fact**：tag 形式、android_apilevel_abi、manylinux/glibc、musllinux/musl。**Recommendation**：v1 只接受 none + any。
 5. [PyPA Core metadata specifications](https://packaging.python.org/en/latest/specifications/core-metadata/) — **Verified fact**：Metadata-Version、Name、Version required；Requires-Dist、Requires-Python 为结构化 metadata。
@@ -1185,7 +1219,7 @@ alpha44 的最小真机验收不包含 third-party package install，包含：
    **采用。** 使用标准 PEP 751/PyPA format，alpha44 只支持本文冻结的 pure-Python subset，不宣称支持整个标准。
 
 3. **requirements.txt / pyproject.toml 在 v1 中是什么角色？**
-   它们是 human/project dependency declaration 与 provenance/staleness evidence，不是 Embedded installer 的最终输入。pylock.toml 优先；同时存在时不合并，必须有明确 source selection/digest。
+   它们是 human/project dependency declaration 与可选 provenance display，不是 Embedded installer 的最终输入。pylock.toml 优先；同时存在时不合并。缺少 [tool.siftalpha]、source selection/digest 不存在或 provenance mismatch，都不能阻塞一个其他方面有效的 pylock.toml；v1 不强制检测 source declaration → lock staleness。
 
 4. **谁负责 resolver？**
    设备外的 Trusted Locker（CI、开发机或受信任 resolution service）负责完整 graph、exact versions、exact artifacts、markers 和 hashes。alpha44 app 不运行 resolver。
@@ -1197,13 +1231,13 @@ alpha44 的最小真机验收不包含 third-party package install，包含：
    **不执行。** alpha44 使用 metadata/file/wheel/RECORD/static payload verification；不在长期 Embedded CPython process 中 import 第三方 package。真实 import 留给 Runtime Session。
 
 7. **Process Isolation 是否进入 alpha44？**
-   **进入，但只交付 Process-Isolated Embedded R Foundation。** per-environment worker、typed IPC、binding gate、start/status/stop/death contract 是 alpha44；完整 Pure-Python Environment installer 调整到 alpha45。
+   **进入，但只交付 Process-Isolated Embedded R Foundation。** per-runtime-load-binding worker、typed IPC、binding gate、start/status/stop/death contract 是 alpha44；完整 Pure-Python Environment installer 调整到 alpha45。
 
 8. **ProcessBindingId 精确定义是什么？**
-   SHA-256("siftalpha.process-binding.v1" + environmentId + generationId + runtimeProvenanceDigest + lockDigest + sitePackagesTreeDigest)；worker 一旦加载该 binding，不得加载另一个 binding。
+   alpha44 使用可真实计算的 RuntimeLoadBindingV1：projectIdentity + projectSourceGeneration + runtimeProvenanceDigest + STDLIB_ONLY。ProcessBindingId = SHA-256("siftalpha.runtime-load-binding.v1" + 这组 canonical fields)；不伪造 environmentId、generationId、lockDigest 或 sitePackagesTreeDigest。alpha45 才把 dependencyLayerBinding 扩展为包含 environmentId、generationId、lockDigest、sitePackagesTreeDigest 的 EnvironmentGenerationBinding；worker 一旦加载该 binding，不得加载另一个 binding。
 
 9. **environmentId / generation / fingerprint 如何区分？**
-   dependencyFingerprint = selected dependency content；environmentId = project + runtime + dependency contract；generationId = 一次具体物理安装；ProcessBindingId = 该 immutable generation 的进程加载边界。dependency contract 变化创建新 environmentId；重装同 contract 创建新 generation 和 binding。
+   dependencyFingerprint = selected dependency content，且不假设 packages.dependencies 完整；environmentId = project + runtime + dependency contract；generationId = alpha45 中一次具体物理安装；alpha44 foundation 使用 projectSourceGeneration + STDLIB_ONLY 的 RuntimeLoadBindingV1。dependency contract 变化创建新 environmentId；source generation 改变要求 fresh binding/worker；重装同 contract 的新 generation 也要求新的 binding/worker。
 
 10. **Wheel Installer 支持的精确 subset 是什么？**
     仅支持 exact-hash wheel、Python tag py3/py314/cp314、ABI none、platform any、Root-Is-Purelib true、root purelib 或 .data/purelib；拒绝 native、Android native tag、manylinux/musllinux、sdist、VCS、editable、.pth、scripts、headers、data、platlib 和 build backend。
@@ -1218,9 +1252,9 @@ alpha44 的最小真机验收不包含 third-party package install，包含：
     在新 generation transaction 中下载、验证、安装和静态检查；旧 generation 保持 current/READY；新 generation 全部通过后以同目录 atomic pointer switch 替换 current.json；失败、取消或进程死亡不切换。
 
 14. **alpha44 最小真机验收是什么？**
-    stdlib-only dedicated worker、binding identity、A→B fresh-worker switch、same environmentId gen switch、STOP、worker death structured failure、无 silent External fallback。第三方 pure wheel A–J 验收属于 foundation 通过后的 alpha45。
+    P1 stdlib-only dedicated worker START/STATUS/STOP；P2 workerInstanceId + foundation ProcessBindingId；P3 Project A → Project B fresh worker；P4 同一 Project source generation A → B fresh binding/worker；P5 worker death structured failure；P6 Activity leave/re-entry 不错误复用 binding；P7 既有 M 行为不变且无 silent External fallback。environment generation switch 移到 alpha45；第三方 pure wheel A–J 验收属于 foundation 通过后的 alpha45。
 
 15. **alpha44 最终名称与范围是什么？**
-    **Process-Isolated Embedded R Foundation**：只建立可靠 per-environment worker/process boundary 和 typed lifecycle contract，不在本轮或 alpha44 foundation 中实现 wheel installer、resolver、cache、site-packages、UI 或版本升级。Pure-Python Environment v1 是 alpha45 candidate。
+    **Process-Isolated Embedded R Foundation**：只建立可靠 per-runtime-load-binding worker/process boundary 和 typed lifecycle contract，不在本轮或 alpha44 foundation 中实现 wheel installer、resolver、cache、site-packages、UI 或版本升级。Pure-Python Environment v1 是 alpha45 candidate。
 
 **No alpha44 production implementation was started.**
