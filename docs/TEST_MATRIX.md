@@ -344,3 +344,12 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - SAF source 与 app-private staging root 分离；staging 有界且失败清理。
 - Termux provider、RUN_COMMAND、PRoot、Ubuntu 和生产 M path 保持既有行为。
 - 本节的 CI 与真实设备状态以提交后的实际执行证据为准；source/CI readiness 不等于 real-device acceptance。
+
+
+## alpha42 — Rich Result Presentation + Unified Open
+
+- `RichResultParserTest`：覆盖强格式 Link List、顺序、URL 去重、中文标签、ANSI/OSC 清理、代理/帮助/Web 日志误识别、非 HTTP(S) scheme 和 200 项上限。
+- `PresentationTargetResolverTest`：覆盖 WEB 优先、Rich Result 回退、NONE，以及 Raw Log 不成为打开目标。
+- `RichResultLifecyclePolicyTest`：覆盖新 START 清除、空 STATUS/LOGS 保留和后续结果更新。
+- 生产接线覆盖 M 的安全结果输出、Termux 与 Embedded snapshot 的结果识别、项目卡片结果计数和统一“打开”；现有 Web Discovery/Endpoint Probe/Browser 测试继续作为回归。
+- Rich Result Viewer 为原生 Android UI；外部 URL 二次通过 http/https 与 Android 浏览器目标检查。没有真实 Android device 的 CI 不能替代 Sherlock/Web 真机验收。

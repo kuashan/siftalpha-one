@@ -50,8 +50,8 @@ android {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        versionCode = 117
-        versionName = "0.8.0-alpha41"
+        versionCode = 118
+        versionName = "0.8.0-alpha42"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

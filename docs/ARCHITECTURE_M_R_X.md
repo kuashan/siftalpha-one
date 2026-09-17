@@ -439,3 +439,18 @@ alpha32 的架构闭环是：
 这不是新的 Runtime Provider Framework。M 继续由 `ProjectRuntimeController` 协调，R 继续由现有 `EmbeddedPythonSession` 管理 Session/generation/native lifecycle；本轮只增加一个业务边界组件 `EmbeddedPythonProjectStager` 和必要的纯策略/状态映射 helper。R 不实现 Termux shell semantics，M 的 Embedded R 入口也不调用 `RuntimeCommandHost`、`RuntimeBackend.execute`、RUN_COMMAND、PRoot 或 Ubuntu。
 
 SAF source project 与 execution staging root 是不同的 ownership boundary：M/ProjectStore 读取 source，stager 创建和清理 app-private copy，R 只接收 explicit execution input。M 不伪造 sessionId/generation，R 不读取 Activity/Compose/Browser 状态。未实现 pip、venv、依赖安装、Web/Browser integration、并发、process-death recovery 或 universal hard-stop；alpha32 仍不表示 R 或 X 已完成。
+
+
+## alpha42 Presentation Boundary
+
+M 的一次性 CLI 呈现边界为：
+
+`safe Runtime output`
+→ `ANSI/OSC sanitization`
+→ `generic Link List Rich Result`
+→ `Unified Open`
+→ `native Rich Result Viewer`。
+
+项目卡片只有一个主要“打开”动作。Presentation routing 为 `WEB > RICH_RESULT > NONE`：已通过现有 Endpoint Probe 的 Web Dashboard 继续进入外部 Browser；没有可用 Web 但存在安全 Link List 时进入 App 内 Result Viewer；只有 Raw Log 时不生成打开目标。长期自动化以及未来 Automated Quant Trading 的主要用户界面仍是 Live Web Dashboard，Raw Log 是 Secondary Diagnostics。
+
+该 alpha42 结果缓存是 Activity-lifetime 级别，不引入数据库；接受新的 START 清除旧 Rich Result，空 STATUS/LOGS 保留已有结果。alpha42 不改变 Runtime lifecycle、Web Discovery scope、Termux/Embedded R 运行链，也不表示 arbitrary Rich Result types、R complete 或 X complete。

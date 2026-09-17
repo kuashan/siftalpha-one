@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="runtime_button_open">開く</string>
+    <string name="runtime_rich_result_title">実行結果</string>
+    <string name="runtime_rich_result_count">%1$d 件の結果</string>
+    <string name="runtime_rich_result_copy">結果をコピー</string>
+    <string name="runtime_rich_result_copied">結果をコピーしました</string>
+    <string name="runtime_rich_result_open">開く</string>
+    <string name="runtime_rich_result_empty">表示できる結果がありません</string>
+    <string name="runtime_rich_result_invalid_url">この結果リンクは開けません</string>
+    <string name="runtime_rich_result_no_browser">利用できるブラウザがありません</string>
+    <string name="runtime_rich_result_browser_required">先に設定でブラウザを選択してください</string>
+    <string name="runtime_rich_result_browser_failed">ブラウザでリンクを開けませんでした</string>
+</resources>

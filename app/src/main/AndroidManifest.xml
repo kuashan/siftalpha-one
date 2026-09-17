@@ -57,6 +57,11 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".RichResultActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".RuntimeStorageActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />

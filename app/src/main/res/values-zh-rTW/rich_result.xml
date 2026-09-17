@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="runtime_button_open">開啟</string>
+    <string name="runtime_rich_result_title">執行結果</string>
+    <string name="runtime_rich_result_count">結果：%1$d 項</string>
+    <string name="runtime_rich_result_copy">複製結果</string>
+    <string name="runtime_rich_result_copied">已複製結果</string>
+    <string name="runtime_rich_result_open">開啟</string>
+    <string name="runtime_rich_result_empty">沒有可顯示的結果</string>
+    <string name="runtime_rich_result_invalid_url">無法開啟此結果連結</string>
+    <string name="runtime_rich_result_no_browser">沒有可用瀏覽器</string>
+    <string name="runtime_rich_result_browser_required">請先在設定中選擇瀏覽器</string>
+    <string name="runtime_rich_result_browser_failed">瀏覽器無法開啟此連結</string>
+</resources>

@@ -226,6 +226,16 @@ class ProjectOutputPanelController(
         }
     }
 
+    /** Keeps diagnostics available while making a detected Rich Result the primary surface. */
+    fun collapse(folderName: String) {
+        expandedFolders.remove(folderName)
+        viewsByFolder[folderName]?.let { views ->
+            views.toggle.text = context.getString(R.string.runtime_project_output_expand)
+            views.tools.visibility = View.GONE
+            (views.scroll.parent as? View)?.visibility = View.GONE
+        }
+    }
+
     private fun displayContent(folderName: String): String =
         contentByFolder[folderName].orEmpty().ifBlank {
             context.getString(R.string.runtime_center_no_command)

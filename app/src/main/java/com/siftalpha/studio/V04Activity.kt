@@ -32,6 +32,8 @@ import com.siftalpha.studio.runtime.ProjectRuntimeExecutionPlanner
 import com.siftalpha.studio.runtime.ProjectRuntimeSelection
 import com.siftalpha.studio.runtime.ProjectRuntimeSelectionStore
 import com.siftalpha.studio.runtime.ProjectSecretStore
+import com.siftalpha.studio.runtime.PresentationTarget
+import com.siftalpha.studio.runtime.PresentationTargetResolver
 import com.siftalpha.studio.runtime.PythonCliLaunchResolver
 import com.siftalpha.studio.runtime.PythonLaunchInvocation
 import com.siftalpha.studio.runtime.RuntimeArgumentParser
@@ -55,6 +57,9 @@ import com.siftalpha.studio.runtime.RuntimeWebDiscoveryScopePolicy
 import com.siftalpha.studio.runtime.RuntimeWebStateStore
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
 import com.siftalpha.studio.runtime.RuntimeWebUrl
+import com.siftalpha.studio.runtime.RichResultDocument
+import com.siftalpha.studio.runtime.RichResultLifecyclePolicy
+import com.siftalpha.studio.runtime.RichResultParser
 import com.siftalpha.studio.runtime.TermuxBackend
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSnapshot
@@ -110,6 +115,8 @@ open class V04Activity : StudioActivity() {
     private lateinit var projectRuntimeSelectionStore: ProjectRuntimeSelectionStore
     private val recoveryProjects = mutableSetOf<String>()
     private val failureReasons = mutableMapOf<String, String>()
+    /** Activity-lifetime Rich Result cache; raw output remains owned by ProjectOutputPanelController. */
+    private val richResults = mutableMapOf<String, RichResultDocument>()
     private val refreshHandler = Handler(Looper.getMainLooper())
     private val refreshExecutor = Executors.newSingleThreadExecutor()
     private var refreshScheduled = false
@@ -543,6 +550,11 @@ open class V04Activity : StudioActivity() {
             framework = reachableWebFramework,
         )
         val webUiStatus = web.status
+        val richResult = richResults[stateKey]
+        val presentationTarget = PresentationTargetResolver.resolve(
+            webAvailable = reachableWebUrl != null,
+            richResultAvailable = richResult != null,
+        )
         val pendingItem = pending.values.firstOrNull { item ->
             item.documentId == summary.documentId ||
                 (item.documentId == null && item.folderName == project.folderName)
@@ -738,6 +750,12 @@ open class V04Activity : StudioActivity() {
                 setPadding(0, dp(2), 0, dp(2))
             })
         }
+        richResult?.let { document ->
+            box.addView(text(getString(R.string.runtime_rich_result_count, document.items.size), 13f, true).apply {
+                setTextColor(Color.rgb(170, 224, 190))
+                setPadding(0, dp(2), 0, dp(2))
+            })
+        }
         box.addView(text(webProfileLabel(webUiStatus), 12f, false).apply {
             setTextColor(
                 if (webProfile.enabled || !webSnapshot.candidateUrl.isNullOrBlank()) {
@@ -861,19 +879,25 @@ open class V04Activity : StudioActivity() {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, dp(5), 0, 0)
         }
-        val browserButton = smallButton(browserButtonLabel(webUiStatus)) {
-            openBrowserForProject(
+        val openButton = smallButton(getString(R.string.runtime_button_open)) {
+            openPresentation(
                 projectKey = summary.documentId,
+                projectName = summary.name,
                 folderName = project.folderName,
                 runtimeState = typedState,
-                url = reachableWebUrl,
-                framework = reachableWebFramework,
+                webUrl = reachableWebUrl,
+                webFramework = reachableWebFramework,
+                richResult = richResult,
             )
         }.apply {
-            isEnabled = policy.isEnabled(ProjectActionPolicy.Action.OPEN_BROWSER)
+            isEnabled = when (presentationTarget) {
+                PresentationTarget.WEB -> policy.isEnabled(ProjectActionPolicy.Action.OPEN_BROWSER)
+                PresentationTarget.RICH_RESULT -> true
+                PresentationTarget.NONE -> false
+            }
             alpha = if (isEnabled) 1f else 0.55f
         }
-        row3.addView(browserButton, weight())
+        row3.addView(openButton, weight())
         row3.addView(
             smallButton(getString(R.string.runtime_configuration_button)) {
                 configurationUi.showConfiguration(
@@ -936,9 +960,6 @@ open class V04Activity : StudioActivity() {
 
     private fun webProfileLabel(uiStatus: RuntimeWebUiStatus): String =
         getString(R.string.runtime_web_label, uiStatus.uiLabel(this))
-
-    private fun browserButtonLabel(uiStatus: RuntimeWebUiStatus): String =
-        getString(R.string.runtime_browser_label, uiStatus.uiLabel(this))
 
     private fun ProjectActionPolicy.MessageKey.localizedText(): String = getString(
         when (this) {
@@ -1477,6 +1498,7 @@ open class V04Activity : StudioActivity() {
             return
         }
         embeddedStartInFlight += stateKey
+        richResults.remove(stateKey)
         typedStates[stateKey] = RuntimeState.STARTING
         states[stateKey] = getString(R.string.runtime_action_starting)
         failureReasons.remove(stateKey)
@@ -1578,6 +1600,7 @@ open class V04Activity : StudioActivity() {
         val previous = embeddedLastSnapshots[stateKey]
         if (previous == snapshot) return false
         embeddedLastSnapshots[stateKey] = snapshot
+        updateEmbeddedRichResult(project, snapshot)
         val mappedState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot)
         typedStates[stateKey] = mappedState
         states[stateKey] = mappedState.uiLabel(this)
@@ -1756,6 +1779,7 @@ open class V04Activity : StudioActivity() {
             return
         }
         if (action == ProjectRuntimeController.Action.START) {
+            richResults.remove(stateKey)
             markExternalRuntimeOwner(stateKey)
         }
         if (
@@ -1909,6 +1933,20 @@ open class V04Activity : StudioActivity() {
         } else {
             failureReasons[stateKey] = failureReason!!
         }
+        val richResultChanged = if (
+            (
+                item.action == ProjectRuntimeController.Action.START ||
+                    item.action == ProjectRuntimeController.Action.STATUS ||
+                    item.action == ProjectRuntimeController.Action.LOGS
+                ) && !item.webLogDiscoveryAllowed
+        ) {
+            mergeRichResult(stateKey, stdout)
+        } else {
+            false
+        }
+        if (richResultChanged && ::projectOutputs.isInitialized) {
+            projectOutputs.collapse(item.folderName)
+        }
         val runtimeCandidate = RuntimeWebDiscoveryScopePolicy.candidateFromOutput(
             output = stdout,
             webCapabilityEnabled = item.webLogDiscoveryAllowed,
@@ -2050,8 +2088,10 @@ open class V04Activity : StudioActivity() {
                 if (!success && !recovering) runtimeError(result)
             }
             ProjectRuntimeController.Action.LOGS -> {
-                if (runtimeState != RuntimeState.UNKNOWN) {
-                    states[stateKey] = runtimeState.uiLabel(this)
+                if (runtimeState != RuntimeState.UNKNOWN || richResultChanged) {
+                    if (runtimeState != RuntimeState.UNKNOWN) {
+                        states[stateKey] = runtimeState.uiLabel(this)
+                    }
                     refresh()
                 }
                 if (!success) {
@@ -2081,6 +2121,73 @@ open class V04Activity : StudioActivity() {
             }
         }
         persistRuntimeState(stateKey)
+    }
+
+    private fun mergeRichResult(stateKey: String, output: String): Boolean {
+        val previous = richResults[stateKey]
+        val detected = RichResultParser.parse(output)
+        val merged = RichResultLifecyclePolicy.merge(previous, detected)
+        if (merged == previous) return false
+        if (merged == null) {
+            richResults.remove(stateKey)
+        } else {
+            richResults[stateKey] = merged
+        }
+        return true
+    }
+
+    private fun openPresentation(
+        projectKey: String,
+        projectName: String,
+        folderName: String,
+        runtimeState: RuntimeState,
+        webUrl: String?,
+        webFramework: String?,
+        richResult: RichResultDocument?,
+    ) {
+        when (PresentationTargetResolver.resolve(webUrl != null, richResult != null)) {
+            PresentationTarget.WEB -> openBrowserForProject(
+                projectKey = projectKey,
+                folderName = folderName,
+                runtimeState = runtimeState,
+                url = webUrl,
+                framework = webFramework,
+            )
+            PresentationTarget.RICH_RESULT -> openRichResultViewer(projectName, richResult)
+            PresentationTarget.NONE -> Unit
+        }
+    }
+
+    private fun openRichResultViewer(projectName: String, richResult: RichResultDocument?) {
+        if (richResult == null || richResult.isEmpty) return
+        startActivity(
+            Intent(this, RichResultActivity::class.java).apply {
+                putExtra(RichResultActivity.EXTRA_PROJECT_NAME, projectName)
+                putStringArrayListExtra(
+                    RichResultActivity.EXTRA_LABELS,
+                    ArrayList(richResult.items.map { it.label }),
+                )
+                putStringArrayListExtra(
+                    RichResultActivity.EXTRA_URLS,
+                    ArrayList(richResult.items.map { it.url }),
+                )
+            },
+        )
+    }
+
+    private fun updateEmbeddedRichResult(
+        project: V04ProjectGateway.RuntimeProject,
+        snapshot: EmbeddedPythonSnapshot,
+    ) {
+        val safeOutput = if (::secretStore.isInitialized) {
+            secretStore.redactRuntimeText(project.folderName, snapshot.stdout)
+        } else {
+            snapshot.stdout
+        }
+        val changed = mergeRichResult(project.summary.documentId, safeOutput)
+        if (changed && ::projectOutputs.isInitialized) {
+            projectOutputs.collapse(project.folderName)
+        }
     }
 
     private fun openBrowserForProject(

@@ -1,11 +1,11 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-16（M → R Embedded CPython First Integration，alpha32 source/CI readiness）
+最后更新：2026-09-17（alpha42 Rich Result Presentation + Unified Open）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
 产品基线分支：`main`（当前 main HEAD：`dff275575a9cdbd0564d394c4626cd7d9bb22637`）  
 alpha30 source / real-device evidence remains historical; current branch continues from the alpha31 version-identity baseline。  
 M / R / X 架构与 Runtime prototype 工作分支：`codex/siftalpha-x-embedded-cpython-spike`  
-当前版本：0.8.0-alpha32 / versionCode 108（M-managed SAF Python project → app-private staging → Embedded R；等待本提交 CI 与真实设备验收）  
+当前版本：0.8.0-alpha42 / versionCode 118（CLI Rich Result + Unified Open；等待本提交 CI 与真实设备验收）  
 当前文档定义：`M = Management System`，`R = Runtime System`，`X = M + R`  
 规范架构定义：[ARCHITECTURE_M_R_X.md](ARCHITECTURE_M_R_X.md)  
 Production baseline merge：[893229c](https://github.com/kuashan/siftalpha-one/commit/893229ce26d49a6ea22c79d6e2be85290cb8b0c3)（历史基线记录）  
@@ -368,3 +368,14 @@ M 使用 SAF project directory 的 documentId 作为 Project Identity；R 自己
 `EmbeddedPythonProjectStager` 只负责 SAF → app-private `files/siftalphax/projects/session-<uuid>` 的 bounded copy，保留相对目录，限制节点/文件数和单文件/总大小；复制失败会清理不完整根目录，不修改或删除 SAF source。R 的现有 `EmbeddedPythonSession`、CPython lifecycle、stdout/stderr、structured snapshot、cooperative STOP 和 re-entry 路径被复用。Embedded R 不经过 `RuntimeCommand`、Termux、RUN_COMMAND、PRoot 或 Ubuntu。
 
 当前 alpha32 是 source/CI readiness boundary，尚未声称任意 Python 项目、依赖安装、SAF arbitrary integration、Web/Browser integration、并发、process-death recovery 或 universal hard-stop 已完成。
+
+
+## alpha42 — Rich Result Presentation + Unified Open
+
+alpha42 在 M 的安全结果回调中使用已经完成 Secret Redaction 的输出，先移除 ANSI/OSC 终端控制序列，再按通用的强格式
+`[+] Label: http(s)://...`
+识别有限数量的 Link List Rich Result。结果只保存 label 与经过 HTTP/HTTPS 白名单验证的 URL；Raw Log 仍由既有 ProjectOutputPanelController 完整保留，但作为次级诊断入口。
+
+项目卡片的主要呈现动作统一为“打开”。纯策略路由为 `WEB > RICH_RESULT > NONE`：只有现有 Web endpoint probe 已确认可用时才走原有 Browser 安全链；否则有 Rich Result 时进入原生 Rich Result Viewer；Raw Log 本身不会成为打开目标。一次性 CLI 面向 App 内 Rich Result，长期自动化和未来自动量化面向 Live Web Dashboard，Raw Log 只作为诊断。
+
+本轮结果缓存只覆盖同一 V04Activity 实例的生命周期；接受新的 START 会清除旧结果，空的 STATUS/LOGS 不会清除当前结果，后续发现的新链接列表可以更新结果。alpha42 不引入数据库、WebView、量化能力、依赖安装或新的 Runtime/Web 架构；真机验收仍需分别验证 Sherlock Rich Result 和既有 Web Dashboard。

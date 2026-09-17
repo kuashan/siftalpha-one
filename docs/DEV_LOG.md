@@ -749,3 +749,12 @@ EmbeddedPythonSnapshot 直接映射到 M `RuntimeState`：IDLE→UNKNOWN、START
 本轮增加了 staging/entrypoint/state mapping JVM coverage，并更新了 Embedded R instrumentation source，继续保留 alpha29/alpha30 re-entry、failure、STOP、path-validation 和 file-backed regression。CI 没有真实 Android device 时，instrumentation 只能记录为 source/compiled/not executed；alpha32 真机验收仍需人工执行。
 
 已知未覆盖：pip、venv、third-party dependency installation、native wheels/arbitrary C extensions、blocking native/syscall hard-stop、SAF arbitrary project compatibility、并发、process-death recovery、Web/Browser integration、production M ↔ R integration。
+
+
+### alpha42 — Rich Result Presentation + Unified Open
+
+在 alpha41 Web Discovery Scope Repair 基础上，alpha42 增加最小的纯 Kotlin Rich Result 边界：M 对经过 Secret Redaction 的 Runtime output 做 ANSI/OSC 清理，只接受明确的 `[+] Label: http(s)://...` 链接列表格式，去重并限制最多 200 项。结果不会解析普通帮助文本、代理示例、Web 启动日志或 `SIFTALPHA_WEB_URL` 调试行。
+
+项目卡片不再提供并列的“查看结果”和“浏览器”主入口，而是统一显示“打开”。PresentationTargetResolver 按 `WEB > RICH_RESULT > NONE` 选择目标；WEB 继续使用 alpha41 的 Web State、Endpoint Probe 和 Browser 安全链，RICH_RESULT 使用原生文本型 RichResultActivity，NONE 不提供主要打开目标。Raw Log、复制全部、滚动和诊断输出保持不变。
+
+Rich Result 只在同一 Activity 实例内暂存：接受新 START 时清除旧结果，STATUS/LOGS 没有新结果时保留，后续 LOGS/Embedded snapshot 发现新链接时更新。alpha42 不等于 R 或 X 完成，也不包含 WebView、数据库、依赖安装、量化交易或永久结果存储。

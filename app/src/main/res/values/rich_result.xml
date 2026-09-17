@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="runtime_button_open">打开</string>
+    <string name="runtime_rich_result_title">运行结果</string>
+    <string name="runtime_rich_result_count">结果：%1$d 项</string>
+    <string name="runtime_rich_result_copy">复制结果</string>
+    <string name="runtime_rich_result_copied">已复制结果</string>
+    <string name="runtime_rich_result_open">打开</string>
+    <string name="runtime_rich_result_empty">暂无可显示的结果</string>
+    <string name="runtime_rich_result_invalid_url">无法打开此结果链接</string>
+    <string name="runtime_rich_result_no_browser">没有可用浏览器</string>
+    <string name="runtime_rich_result_browser_required">请先在设置中选择浏览器</string>
+    <string name="runtime_rich_result_browser_failed">浏览器打开失败</string>
+</resources>
