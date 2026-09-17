@@ -1934,11 +1934,10 @@ open class V04Activity : StudioActivity() {
             failureReasons[stateKey] = failureReason!!
         }
         val richResultChanged = if (
-            (
-                item.action == ProjectRuntimeController.Action.START ||
-                    item.action == ProjectRuntimeController.Action.STATUS ||
-                    item.action == ProjectRuntimeController.Action.LOGS
-                ) && !item.webLogDiscoveryAllowed
+            RichResultDetectionPolicy.shouldInspectOutput(
+                action = item.action,
+                webLogDiscoveryAllowed = item.webLogDiscoveryAllowed,
+            )
         ) {
             mergeRichResult(stateKey, stdout)
         } else {
