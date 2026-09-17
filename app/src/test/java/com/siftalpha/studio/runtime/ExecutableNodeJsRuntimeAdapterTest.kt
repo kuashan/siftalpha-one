@@ -20,6 +20,7 @@ class ExecutableNodeJsRuntimeAdapterTest {
     private fun project(
         paths: List<String> = listOf("package.json", "package-lock.json", "server.js"),
         declaredRun: String? = null,
+        webLogDiscoveryAllowed: Boolean = false,
     ) = RuntimeProjectSpec(
         name = "Node Fixture",
         folderName = "node-fixture",
@@ -28,6 +29,7 @@ class ExecutableNodeJsRuntimeAdapterTest {
         declaredType = "nodejs",
         declaredRun = declaredRun,
         relativePaths = paths,
+        webLogDiscoveryAllowed = webLogDiscoveryAllowed,
     )
 
     @Test
@@ -104,7 +106,9 @@ class ExecutableNodeJsRuntimeAdapterTest {
 
     @Test
     fun `start and already-running recovery include bounded runtime log Web fallback`() {
-        val shell = ExecutableNodeJsRuntimeAdapter(FakeHost()).start(project()).shellScript
+        val shell = ExecutableNodeJsRuntimeAdapter(FakeHost()).start(
+            project(webLogDiscoveryAllowed = true),
+        ).shellScript
 
         assertTrue(shell.contains("SIFTALPHA_WEB_DISCOVERY_SOURCE=RUNTIME_LOG"))
         assertTrue(shell.contains("SIFTALPHA_WEB_LOG_DISCOVERY=NO_CANDIDATE"))
@@ -189,7 +193,9 @@ class ExecutableNodeJsRuntimeAdapterTest {
 
     @Test
     fun `logs retain runtime web listener discovery and ordinary log fallback`() {
-        val shell = ExecutableNodeJsRuntimeAdapter(FakeHost()).logs(project()).shellScript
+        val shell = ExecutableNodeJsRuntimeAdapter(FakeHost()).logs(
+            project(webLogDiscoveryAllowed = true),
+        ).shellScript
 
         assertTrue(shell.contains("SIFTALPHA_WEB_AUTODISCOVERY"))
         assertTrue(shell.contains("SIFTALPHA_WEB_URL=http://127.0.0.1"))

@@ -10,7 +10,11 @@ package com.siftalpha.studio.runtime
  */
 object RuntimeWebLogDiscoveryShell {
 
-    fun shellSnippet(): String = """
+    fun shellSnippet(allowRuntimeLogDiscovery: Boolean = true): String {
+        if (!allowRuntimeLogDiscovery) {
+            return "echo 'SIFTALPHA_WEB_LOG_DISCOVERY=SKIPPED_NOT_WEB_PROJECT'"
+        }
+        return """
         siftalpha_log_web_candidate=''
         if [ -s "${'$'}log" ]; then
           siftalpha_log_web_candidate="${'$'}(tail -n 160 "${'$'}log" 2>/dev/null | \
@@ -64,5 +68,6 @@ object RuntimeWebLogDiscoveryShell {
           echo 'SIFTALPHA_WEB_LOG_DISCOVERY=NO_LOG'
         fi
         unset siftalpha_log_web_candidate siftalpha_log_web_bare siftalpha_log_web_port
-    """.trimIndent()
+        """.trimIndent()
+    }
 }

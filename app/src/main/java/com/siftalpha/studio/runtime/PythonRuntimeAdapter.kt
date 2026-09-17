@@ -627,7 +627,7 @@ SIFTALPHA_RUNNER
               echo 'SIFTALPHA_LOG=EMPTY'
             fi
             if [ "${'$'}siftalpha_web_procfs_success" != '1' ]; then
-              ${RuntimeWebLogDiscoveryShell.shellSnippet()}
+              ${RuntimeWebLogDiscoveryShell.shellSnippet(project.webLogDiscoveryAllowed)}
             fi
         """.trimIndent()
         return """

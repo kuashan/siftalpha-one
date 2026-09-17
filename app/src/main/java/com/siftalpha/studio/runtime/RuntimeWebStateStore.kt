@@ -14,6 +14,7 @@ class RuntimeWebStateStore(context: Context) {
         val candidateUrl: String?,
         val framework: String?,
         val detectedAtEpochMs: Long,
+        val source: RuntimeWebCandidateSource = RuntimeWebCandidateSource.UNKNOWN,
     )
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -22,20 +23,45 @@ class RuntimeWebStateStore(context: Context) {
         candidateUrl = prefs.getString(key(projectKey, "url"), null),
         framework = prefs.getString(key(projectKey, "framework"), null),
         detectedAtEpochMs = prefs.getLong(key(projectKey, "detected_at"), 0L),
+        source = prefs.getString(key(projectKey, "source"), null)
+            ?.let { raw -> runCatching { RuntimeWebCandidateSource.valueOf(raw) }.getOrDefault(RuntimeWebCandidateSource.UNKNOWN) }
+            ?: RuntimeWebCandidateSource.UNKNOWN,
     )
 
-    fun rememberCandidateUrl(projectKey: String, url: String, framework: String?) {
+    fun rememberCandidateUrl(
+        projectKey: String,
+        url: String,
+        framework: String?,
+        source: RuntimeWebCandidateSource = RuntimeWebCandidateSource.EXPLICIT,
+    ) {
         prefs.edit()
             .putString(key(projectKey, "url"), url)
             .putString(key(projectKey, "framework"), framework)
+            .putString(key(projectKey, "source"), source.name)
             .putLong(key(projectKey, "detected_at"), System.currentTimeMillis())
             .apply()
+    }
+
+    fun clearIfOutOfScope(projectKey: String, webCapabilityEnabled: Boolean): Boolean {
+        val current = snapshot(projectKey)
+        if (
+            current.candidateUrl != null &&
+            RuntimeWebDiscoveryScopePolicy.shouldClearPersistedCandidate(
+                webCapabilityEnabled = webCapabilityEnabled,
+                source = current.source,
+            )
+        ) {
+            clear(projectKey)
+            return true
+        }
+        return false
     }
 
     fun clear(projectKey: String) {
         prefs.edit()
             .remove(key(projectKey, "url"))
             .remove(key(projectKey, "framework"))
+            .remove(key(projectKey, "source"))
             .remove(key(projectKey, "detected_at"))
             .apply()
     }

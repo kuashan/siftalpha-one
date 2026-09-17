@@ -50,6 +50,8 @@ import com.siftalpha.studio.runtime.RuntimeOwnershipPolicy
 import com.siftalpha.studio.runtime.RuntimeResult
 import com.siftalpha.studio.runtime.RuntimeState
 import com.siftalpha.studio.runtime.RuntimeWebAvailabilityTracker
+import com.siftalpha.studio.runtime.RuntimeWebCandidateSource
+import com.siftalpha.studio.runtime.RuntimeWebDiscoveryScopePolicy
 import com.siftalpha.studio.runtime.RuntimeWebStateStore
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
 import com.siftalpha.studio.runtime.RuntimeWebUrl
@@ -71,6 +73,7 @@ open class V04Activity : StudioActivity() {
         val openBrowserAfterLogs: Boolean = false,
         val browserConfiguredUrl: String? = null,
         val browserFramework: String? = null,
+        val webLogDiscoveryAllowed: Boolean = false,
     )
 
     private data class BrowserTarget(
@@ -442,6 +445,12 @@ open class V04Activity : StudioActivity() {
             return
         }
 
+        result.cards.forEach { data ->
+            reconcileWebDiscoveryScope(
+                projectKey = data.project.summary.documentId,
+                webCapabilityEnabled = data.webProfile.enabled,
+            )
+        }
         val projects = result.cards.map { it.project }
         result.cards.firstOrNull { data ->
             val snapshot = runCatching {
@@ -789,7 +798,11 @@ open class V04Activity : StudioActivity() {
                 }
                 ProjectActionPolicy.Action.STATUS -> {
                     box.addView(button(getString(R.string.runtime_button_status)) {
-                        if (embeddedObservationOwned) refreshEmbeddedProject(project) else dispatch(project, ProjectRuntimeController.Action.STATUS)
+                        if (embeddedObservationOwned) refreshEmbeddedProject(project) else dispatch(
+                             project,
+                             ProjectRuntimeController.Action.STATUS,
+                             webLogDiscoveryAllowed = webProfile.enabled,
+                         )
                     })
                 }
                 null,
@@ -827,11 +840,19 @@ open class V04Activity : StudioActivity() {
             }.apply { isEnabled = embeddedActive || policy.isEnabled(ProjectActionPolicy.Action.STOP) }
         row2.addView(stopButton, weight())
         val statusButton = smallButton(getString(R.string.runtime_button_status)) {
-                if (embeddedObservationOwned) refreshEmbeddedProject(project) else dispatch(project, ProjectRuntimeController.Action.STATUS)
+                if (embeddedObservationOwned) refreshEmbeddedProject(project) else dispatch(
+                             project,
+                             ProjectRuntimeController.Action.STATUS,
+                             webLogDiscoveryAllowed = webProfile.enabled,
+                         )
             }.apply { isEnabled = embeddedObservationOwned || policy.isEnabled(ProjectActionPolicy.Action.STATUS) }
         row2.addView(statusButton, weight().apply { marginStart = dp(5) })
         val logsButton = smallButton(getString(R.string.runtime_button_refresh_logs)) {
-                if (embeddedObservationOwned) refreshEmbeddedProject(project) else dispatch(project, ProjectRuntimeController.Action.LOGS)
+                if (embeddedObservationOwned) refreshEmbeddedProject(project) else dispatch(
+                             project,
+                             ProjectRuntimeController.Action.LOGS,
+                             webLogDiscoveryAllowed = webProfile.enabled,
+                         )
             }.apply { isEnabled = embeddedObservationOwned || policy.isEnabled(ProjectActionPolicy.Action.LOGS) }
         row2.addView(logsButton, weight().apply { marginStart = dp(5) })
         box.addView(row2)
@@ -903,6 +924,15 @@ open class V04Activity : StudioActivity() {
             ProjectRuntimeSelection.TERMUX -> R.string.runtime_selection_termux
         },
     )
+
+    private fun reconcileWebDiscoveryScope(projectKey: String, webCapabilityEnabled: Boolean) {
+        if (
+            webStateStore.clearIfOutOfScope(projectKey, webCapabilityEnabled) &&
+            ::webAvailability.isInitialized
+        ) {
+            webAvailability.invalidate(projectKey)
+        }
+    }
 
     private fun webProfileLabel(uiStatus: RuntimeWebUiStatus): String =
         getString(R.string.runtime_web_label, uiStatus.uiLabel(this))
@@ -1006,6 +1036,9 @@ open class V04Activity : StudioActivity() {
                         project = project,
                         action = ProjectRuntimeController.Action.STATUS,
                         silentRecovery = true,
+                        webLogDiscoveryAllowed = runCatching {
+                            webInspector.inspect(key).enabled
+                        }.getOrDefault(false),
                     )
                 }
             }
@@ -1206,6 +1239,7 @@ open class V04Activity : StudioActivity() {
             browserFramework = profile?.framework,
             controlRequest = controlRequest ?: selectedRuntimeControlRequest(project),
             launchInvocation = launchInvocation,
+            webLogDiscoveryAllowed = profile?.enabled == true,
         )
     }
 
@@ -1614,6 +1648,7 @@ open class V04Activity : StudioActivity() {
         silentRecovery: Boolean = false,
         controlRequest: RuntimeControlRequest? = null,
         launchInvocation: PythonLaunchInvocation? = null,
+        webLogDiscoveryAllowed: Boolean = false,
     ) {
         val stateKey = project.summary.documentId
         val effectiveControlRequest = controlRequest ?: if (
@@ -1653,6 +1688,10 @@ open class V04Activity : StudioActivity() {
             return
         }
         if (!canDispatch(project, action, route.path)) return
+        if (action == ProjectRuntimeController.Action.START) {
+            webStateStore.clear(stateKey)
+            webAvailability.invalidate(stateKey)
+        }
         if (route.path == RuntimeControlPath.EMBEDDED_R) {
             when (action) {
                 ProjectRuntimeController.Action.START ->
@@ -1674,13 +1713,27 @@ open class V04Activity : StudioActivity() {
                 ProjectRuntimeController.Action.PREPARE -> runtime.prepare(project)
                 ProjectRuntimeController.Action.START ->
                     if (launchInvocation == null) {
-                        runtime.start(project)
+                        runtime.start(
+                            project = project,
+                            pythonLaunchInvocation = null,
+                            webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+                        )
                     } else {
-                        runtime.start(project, launchInvocation)
+                        runtime.start(
+                            project = project,
+                            pythonLaunchInvocation = launchInvocation,
+                            webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+                        )
                     }
                 ProjectRuntimeController.Action.STOP -> runtime.stop(project)
-                ProjectRuntimeController.Action.STATUS -> runtime.status(project)
-                ProjectRuntimeController.Action.LOGS -> runtime.logs(project)
+                ProjectRuntimeController.Action.STATUS -> runtime.status(
+                    project = project,
+                    webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+                )
+                ProjectRuntimeController.Action.LOGS -> runtime.logs(
+                    project = project,
+                    webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+                )
                 ProjectRuntimeController.Action.CLEAN -> runtime.clean(project)
                 ProjectRuntimeController.Action.CLONE_GITHUB -> error("clone requires spec")
             }
@@ -1707,8 +1760,7 @@ open class V04Activity : StudioActivity() {
         }
         if (
             ::webAvailability.isInitialized &&
-            (action == ProjectRuntimeController.Action.START ||
-                action == ProjectRuntimeController.Action.STOP ||
+            (action == ProjectRuntimeController.Action.STOP ||
                 action == ProjectRuntimeController.Action.CLEAN)
         ) {
             webAvailability.invalidate(project.summary.documentId)
@@ -1730,6 +1782,7 @@ open class V04Activity : StudioActivity() {
             openBrowserAfterLogs = openBrowserAfterLogs,
             browserConfiguredUrl = browserConfiguredUrl,
             browserFramework = browserFramework,
+            webLogDiscoveryAllowed = webLogDiscoveryAllowed,
         )
         states[stateKey] = if (silentRecovery) {
             getString(R.string.runtime_lifecycle_recovering)
@@ -1856,9 +1909,18 @@ open class V04Activity : StudioActivity() {
         } else {
             failureReasons[stateKey] = failureReason!!
         }
-        val runtimeUrl = RuntimeWebUrl.extractLocalHttpUrl(stdout)
-        runtimeUrl?.let { url ->
-            webStateStore.rememberCandidateUrl(item.documentId ?: item.folderName, url, item.browserFramework)
+        val runtimeCandidate = RuntimeWebDiscoveryScopePolicy.candidateFromOutput(
+            output = stdout,
+            webCapabilityEnabled = item.webLogDiscoveryAllowed,
+        )
+        val runtimeUrl = runtimeCandidate?.url
+        runtimeCandidate?.let { candidate ->
+            webStateStore.rememberCandidateUrl(
+                projectKey = item.documentId ?: item.folderName,
+                url = candidate.url,
+                framework = item.browserFramework,
+                source = candidate.source,
+            )
         }
         updateEnvironmentState(stateKey, stdout)
 
@@ -1936,6 +1998,7 @@ open class V04Activity : StudioActivity() {
                             project = currentProject,
                             action = ProjectRuntimeController.Action.LOGS,
                             browserFramework = item.browserFramework,
+                            webLogDiscoveryAllowed = item.webLogDiscoveryAllowed,
                         )
                     }
                 }
@@ -2055,10 +2118,19 @@ open class V04Activity : StudioActivity() {
     }
 
     private fun openBrowserFromRuntimeLogs(item: Pending, stdout: String) {
-        val logUrl = RuntimeWebUrl.extractLocalHttpUrl(stdout)
+        val logUrl = RuntimeWebDiscoveryScopePolicy.candidateFromOutput(
+            output = stdout,
+            webCapabilityEnabled = item.webLogDiscoveryAllowed,
+        )?.url
         val projectKey = item.documentId ?: item.folderName
         val stored = webStateStore.snapshot(projectKey)
-        val url = logUrl ?: stored.candidateUrl ?: item.browserConfiguredUrl
+        val storedUrl = stored.candidateUrl?.takeIf {
+            RuntimeWebDiscoveryScopePolicy.canUseCandidate(
+                webCapabilityEnabled = item.webLogDiscoveryAllowed,
+                source = stored.source,
+            )
+        }
+        val url = logUrl ?: storedUrl ?: item.browserConfiguredUrl
         if (url == null) {
             errorDialog(
                 getString(R.string.runtime_web_not_found_title),
@@ -2084,7 +2156,12 @@ open class V04Activity : StudioActivity() {
             )
             return
         }
-        webStateStore.rememberCandidateUrl(projectKey, validatedUrl, framework)
+        webStateStore.rememberCandidateUrl(
+            projectKey = projectKey,
+            url = validatedUrl,
+            framework = framework,
+            source = RuntimeWebCandidateSource.EXPLICIT,
+        )
 
         val uri = Uri.parse(validatedUrl)
         val browsers = discoverInstalledBrowsers(uri)

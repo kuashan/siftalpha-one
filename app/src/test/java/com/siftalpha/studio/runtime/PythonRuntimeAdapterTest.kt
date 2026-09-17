@@ -40,6 +40,7 @@ class PythonRuntimeAdapterTest {
         folderName = "sample-project",
         entry = "main.py",
         run = "python main.py",
+        webLogDiscoveryAllowed = true,
     )
 
     @Test
@@ -258,6 +259,16 @@ class PythonRuntimeAdapterTest {
         assertFalse(script.contains("lsof"))
         assertTrue(RuntimeWebEndpointProbe.targets("http://127.0.0.1:8766").isNotEmpty())
         assertTrue(RuntimeWebEndpointProbe.targets("http://example.com:8766").isEmpty())
+    }
+
+
+    @Test
+    fun `non Web project skips weak log discovery but keeps strong socket discovery`() {
+        val shell = adapter.logs(project.copy(webLogDiscoveryAllowed = false)).shellScript
+
+        assertTrue(shell.contains("SIFTALPHA_WEB_LOG_DISCOVERY=SKIPPED_NOT_WEB_PROJECT"))
+        assertTrue(shell.contains("SIFTALPHA_WEB_AUTODISCOVERY=PASS"))
+        assertFalse(shell.contains("SIFTALPHA_WEB_DISCOVERY_SOURCE=RUNTIME_LOG"))
     }
 
     @Test

@@ -266,8 +266,9 @@ class ProjectRuntimeController(
     fun start(
         project: V04ProjectGateway.RuntimeProject,
         pythonLaunchInvocation: PythonLaunchInvocation?,
+        webLogDiscoveryAllowed: Boolean = false,
     ): RuntimeCommand {
-        val context = executionContext(project)
+        val context = executionContext(project, webLogDiscoveryAllowed)
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
             ?: return selectionError(project, context.selection)
         if (pythonLaunchInvocation != null && resolved.primary != RuntimeKind.PYTHON) {
@@ -304,8 +305,11 @@ class ProjectRuntimeController(
         return ManagedProcessRuntime.stop(host, spec, host.runtimeId(spec.folderName))
     }
 
-    fun status(project: V04ProjectGateway.RuntimeProject): RuntimeCommand {
-        val context = executionContext(project)
+    fun status(
+        project: V04ProjectGateway.RuntimeProject,
+        webLogDiscoveryAllowed: Boolean = false,
+    ): RuntimeCommand {
+        val context = executionContext(project, webLogDiscoveryAllowed)
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
             ?: return unresolvedStatus(context)
         return when (resolved.primary) {
@@ -320,8 +324,11 @@ class ProjectRuntimeController(
         }
     }
 
-    fun logs(project: V04ProjectGateway.RuntimeProject): RuntimeCommand {
-        val context = executionContext(project)
+    fun logs(
+        project: V04ProjectGateway.RuntimeProject,
+        webLogDiscoveryAllowed: Boolean = false,
+    ): RuntimeCommand {
+        val context = executionContext(project, webLogDiscoveryAllowed)
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
         return when (resolved?.primary) {
             RuntimeKind.PYTHON -> PythonDependencyDiagnostics.appendRuntimeLogDiagnosis(
@@ -388,7 +395,10 @@ class ProjectRuntimeController(
         )
     }
 
-    private fun executionContext(project: V04ProjectGateway.RuntimeProject): ExecutionContext {
+    private fun executionContext(
+        project: V04ProjectGateway.RuntimeProject,
+        webLogDiscoveryAllowed: Boolean = false,
+    ): ExecutionContext {
         val facts = gateway.runtimeFacts(project.summary.documentId)
         val selection = ProjectRuntimeExecutionPlanner.select(
             relativePaths = facts.relativePaths,
@@ -416,6 +426,7 @@ class ProjectRuntimeController(
                 declaredEntry = facts.declaredEntry,
                 declaredRun = facts.declaredRun,
                 relativePaths = facts.relativePaths,
+                webLogDiscoveryAllowed = webLogDiscoveryAllowed,
             ),
             selection = selection,
         )

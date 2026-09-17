@@ -35,6 +35,8 @@ data class RuntimeProjectSpec(
     val relativePaths: List<String> = emptyList(),
     /** Optional one-shot argv-based Python launch selected at action time. */
     val pythonLaunchInvocation: PythonLaunchInvocation? = null,
+    /** M-owned Web capability gate for weak Runtime log URL discovery. */
+    val webLogDiscoveryAllowed: Boolean = false,
 )
 
 interface RuntimeAdapter {

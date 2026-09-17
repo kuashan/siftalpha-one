@@ -66,7 +66,7 @@ SIFTALPHA_RUNNER
             printf 'STATE=STARTING\n' >"${'$'}state"
         """.trimIndent()
 
-        val inspectInner = guestInspectShell(host, paths)
+        val inspectInner = guestInspectShell(host, paths, project.webLogDiscoveryAllowed)
         val clearSecretInner = "rm -f -- ${host.sh(paths.secrets)}"
 
         return RuntimeCommand(
@@ -283,7 +283,7 @@ SIFTALPHA_RUNNER
             else
               echo 'LOG_BYTES=0'
             fi
-            ${RuntimeWebLogDiscoveryShell.shellSnippet()}
+            ${RuntimeWebLogDiscoveryShell.shellSnippet(project.webLogDiscoveryAllowed)}
             if [ -s "${'$'}log" ]; then
               tail -n 160 "${'$'}log"
             else
@@ -350,7 +350,11 @@ SIFTALPHA_RUNNER
         description = "${project.name} · 清理 Runtime 环境，不删除项目源码",
     )
 
-    private fun guestInspectShell(host: RuntimeCommandHost, paths: GuestPaths): String = """
+    private fun guestInspectShell(
+        host: RuntimeCommandHost,
+        paths: GuestPaths,
+        webLogDiscoveryAllowed: Boolean,
+    ): String = """
         state=${host.sh(paths.state)}
         log=${host.sh(paths.runLog)}
         if [ -f "${'$'}state" ]; then
@@ -358,7 +362,7 @@ SIFTALPHA_RUNNER
         fi
         if [ -f "${'$'}log" ]; then
           printf 'SIFTALPHA_LOG_BYTES=%s\n' "${'$'}(wc -c <"${'$'}log" 2>/dev/null || echo 0)"
-          ${RuntimeWebLogDiscoveryShell.shellSnippet()}
+          ${RuntimeWebLogDiscoveryShell.shellSnippet(webLogDiscoveryAllowed)}
           tail -n 80 "${'$'}log" 2>/dev/null || true
         else
           echo 'SIFTALPHA_WEB_LOG_DISCOVERY=NO_LOG'
