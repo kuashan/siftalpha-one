@@ -54,6 +54,9 @@ import com.siftalpha.studio.runtime.RuntimeResult
 import com.siftalpha.studio.runtime.RuntimeState
 import com.siftalpha.studio.runtime.RuntimeAutoObservationPolicy
 import com.siftalpha.studio.runtime.RuntimeObservationStep
+import com.siftalpha.studio.runtime.ObservationDispatchDecision
+import com.siftalpha.studio.runtime.ObservationPresentationPolicy
+import com.siftalpha.studio.runtime.RuntimeWebObservationProbePolicy
 import com.siftalpha.studio.runtime.ProjectStatusGuidancePolicy
 import com.siftalpha.studio.runtime.RuntimeWebAvailabilityTracker
 import com.siftalpha.studio.runtime.RuntimeWebCandidateSource
@@ -91,10 +94,23 @@ open class V04Activity : StudioActivity() {
         val project: V04ProjectGateway.RuntimeProject,
         val generation: Long,
         val webLogDiscoveryAllowed: Boolean,
+        val configuredLocalUrl: String?,
         var finalLogsRequested: Boolean = false,
         var finalLogsCompleted: Boolean = false,
         var webLogProbeCount: Int = 0,
         var statusesSinceWebLogProbe: Int = 0,
+    )
+
+    private data class DeferredManualAction(
+        val project: V04ProjectGateway.RuntimeProject,
+        val action: ProjectRuntimeController.Action,
+        val openBrowserAfterLogs: Boolean = false,
+        val browserConfiguredUrl: String? = null,
+        val browserFramework: String? = null,
+        val silentRecovery: Boolean = false,
+        val controlRequest: RuntimeControlRequest? = null,
+        val launchInvocation: PythonLaunchInvocation? = null,
+        val webLogDiscoveryAllowed: Boolean = false,
     )
 
     private data class BrowserTarget(
@@ -142,6 +158,7 @@ open class V04Activity : StudioActivity() {
     private val externalObservations = mutableMapOf<String, ExternalObservation>()
     private val externalObservationGenerations = mutableMapOf<String, Long>()
     private val externalObservationRunnables = mutableMapOf<String, Runnable>()
+    private val deferredManualActions = mutableMapOf<String, DeferredManualAction>()
     private val embeddedStartExecutor = Executors.newSingleThreadExecutor()
     private val embeddedStartInFlight = mutableSetOf<String>()
     private val embeddedLastSnapshots = mutableMapOf<String, EmbeddedPythonSnapshot>()
@@ -218,7 +235,7 @@ open class V04Activity : StudioActivity() {
                 renderProjectResult(
                     folderName = item.folderName,
                     result = safeResult,
-                    expand = !item.automaticObservation,
+                    expand = ObservationPresentationPolicy.shouldExpandRawLogs(item.automaticObservation),
                 )
             }
             handleResult(item, safeResult)
@@ -309,6 +326,7 @@ open class V04Activity : StudioActivity() {
         embeddedPollProject = null
         externalObservations.keys.toList().forEach(::invalidateExternalObservation)
         externalObservationRunnables.clear()
+        deferredManualActions.clear()
         embeddedStartExecutor.shutdownNow()
         refreshExecutor.shutdownNow()
         super.onDestroy()
@@ -593,8 +611,14 @@ open class V04Activity : StudioActivity() {
             richResultAvailable = richResult != null,
         )
         val pendingItem = pending.values.firstOrNull { item ->
-            item.documentId == summary.documentId ||
-                (item.documentId == null && item.folderName == project.folderName)
+            (item.documentId == summary.documentId ||
+                (item.documentId == null && item.folderName == project.folderName)) &&
+                ObservationPresentationPolicy.isUserVisiblePending(item.automaticObservation)
+        }
+        val deferredManualAction = deferredManualActions[stateKey]
+        val visiblePendingAction = pendingItem?.action ?: deferredManualAction?.action
+        val pendingExecutionId = pendingItem?.let { visibleItem ->
+            pending.entries.firstOrNull { it.value === visibleItem }?.key
         }
         val configurationRequired =
             configurationSnapshot.preflight.missingRequired.isNotEmpty()
@@ -606,7 +630,7 @@ open class V04Activity : StudioActivity() {
         val lifecycleState = RuntimeLifecycleResolver.resolve(
             environmentReady = lifecycleEnvironmentReady,
             runtimeState = typedState,
-            operation = pendingItem?.action?.toLifecycleOperation()
+            operation = visiblePendingAction?.toLifecycleOperation()
                 ?: RuntimeLifecycleOperation.NONE,
             configurationRequired = configurationRequired,
             processActive = typedState in setOf(
@@ -644,10 +668,8 @@ open class V04Activity : StudioActivity() {
             ),
             lifecycle = typedState,
             web = web,
-            pending = pendingItem?.let { item ->
-                item.action.toUiOperation()?.let { operation ->
-                    ProjectUiSnapshot.PendingOperation(operation, pending.entries.firstOrNull { it.value === item }?.key)
-                }
+            pending = visiblePendingAction?.toUiOperation()?.let { operation ->
+                ProjectUiSnapshot.PendingOperation(operation, pendingExecutionId)
             },
             evidence = ProjectUiSnapshot.Evidence(
                 lifecycle = if (typedState == RuntimeState.UNKNOWN) {
@@ -1752,6 +1774,34 @@ open class V04Activity : StudioActivity() {
         observationGeneration: Long? = null,
     ): Boolean {
         val stateKey = project.summary.documentId
+        when (
+            ObservationPresentationPolicy.dispatchDecision(
+                automaticObservation = automaticObservation,
+                automaticPending = hasAutomaticPendingOperation(stateKey, project.folderName),
+                deferredManualAction = deferredManualActions.containsKey(stateKey),
+            )
+        ) {
+            ObservationDispatchDecision.DEFER_UNTIL_AUTOMATIC_COMPLETES -> {
+                deferredManualActions.putIfAbsent(
+                    stateKey,
+                    DeferredManualAction(
+                        project = project,
+                        action = action,
+                        openBrowserAfterLogs = openBrowserAfterLogs,
+                        browserConfiguredUrl = browserConfiguredUrl,
+                        browserFramework = browserFramework,
+                        silentRecovery = silentRecovery,
+                        controlRequest = controlRequest,
+                        launchInvocation = launchInvocation,
+                        webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+                    ),
+                )
+                refresh()
+                return true
+            }
+            ObservationDispatchDecision.WAITING_FOR_DEFERRED_ACTION -> return true
+            ObservationDispatchDecision.DISPATCH_NOW -> Unit
+        }
         val effectiveControlRequest = controlRequest ?: if (
             action == ProjectRuntimeController.Action.START
         ) {
@@ -1868,6 +1918,7 @@ open class V04Activity : StudioActivity() {
             beginExternalObservation(
                 project = project,
                 webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+                configuredLocalUrl = browserConfiguredUrl,
             )
         }
         if (
@@ -1898,39 +1949,56 @@ open class V04Activity : StudioActivity() {
             automaticObservation = automaticObservation,
             observationGeneration = observationGeneration,
         )
-        states[stateKey] = if (silentRecovery) {
-            getString(R.string.runtime_lifecycle_recovering)
-        } else when (action) {
-            ProjectRuntimeController.Action.PREPARE -> getString(R.string.runtime_action_preparing)
-            ProjectRuntimeController.Action.START -> getString(R.string.runtime_action_starting)
-            ProjectRuntimeController.Action.STOP -> getString(R.string.runtime_action_stopping)
-            ProjectRuntimeController.Action.STATUS -> getString(R.string.runtime_action_checking)
-            ProjectRuntimeController.Action.LOGS ->
-                states[stateKey] ?: getString(R.string.runtime_state_not_checked)
-            ProjectRuntimeController.Action.CLEAN -> getString(R.string.runtime_action_cleaning)
-            ProjectRuntimeController.Action.CLONE_GITHUB -> getString(R.string.runtime_action_importing)
+        if (!automaticObservation) {
+            states[stateKey] = if (silentRecovery) {
+                getString(R.string.runtime_lifecycle_recovering)
+            } else when (action) {
+                ProjectRuntimeController.Action.PREPARE -> getString(R.string.runtime_action_preparing)
+                ProjectRuntimeController.Action.START -> getString(R.string.runtime_action_starting)
+                ProjectRuntimeController.Action.STOP -> getString(R.string.runtime_action_stopping)
+                ProjectRuntimeController.Action.STATUS -> getString(R.string.runtime_action_checking)
+                ProjectRuntimeController.Action.LOGS ->
+                    states[stateKey] ?: getString(R.string.runtime_state_not_checked)
+                ProjectRuntimeController.Action.CLEAN -> getString(R.string.runtime_action_cleaning)
+                ProjectRuntimeController.Action.CLONE_GITHUB -> getString(R.string.runtime_action_importing)
+            }
+            when (action) {
+                ProjectRuntimeController.Action.START -> typedStates[stateKey] = RuntimeState.STARTING
+                ProjectRuntimeController.Action.PREPARE -> typedStates[stateKey] = RuntimeState.PREPARING
+                else -> Unit
+            }
+            // A new command supersedes the previous terminal failure while it is being reconciled.
+            // Persist STARTING/PREPARING before the callback arrives so a process-death or Activity
+            // recreation can still issue a real STATUS recovery probe.
+            failureReasons.remove(stateKey)
+            persistRuntimeState(stateKey)
+            refresh()
         }
-        when (action) {
-            ProjectRuntimeController.Action.START -> typedStates[stateKey] = RuntimeState.STARTING
-            ProjectRuntimeController.Action.PREPARE -> typedStates[stateKey] = RuntimeState.PREPARING
-            else -> Unit
-        }
-        // A new command supersedes the previous terminal failure while it is being reconciled.
-        // Persist STARTING/PREPARING before the callback arrives so a process-death or Activity
-        // recreation can still issue a real STATUS recovery probe.
-        failureReasons.remove(stateKey)
-        persistRuntimeState(stateKey)
-        refresh()
         registerPending(id, pendingItem)
         // Preserve the existing fast-result reconciliation order, but expose a still-pending
         // operation when the result has not already been consumed synchronously.
-        if (pending.containsKey(id)) refresh()
+        if (!automaticObservation && pending.containsKey(id)) refresh()
         return true
     }
 
     private fun registerPending(id: Int, item: Pending) {
         pending[id] = item
         TermuxResultBus.consume(id)?.let(resultListener)
+    }
+
+    private fun drainDeferredManualAction(stateKey: String) {
+        val deferred = deferredManualActions.remove(stateKey) ?: return
+        dispatch(
+            project = deferred.project,
+            action = deferred.action,
+            openBrowserAfterLogs = deferred.openBrowserAfterLogs,
+            browserConfiguredUrl = deferred.browserConfiguredUrl,
+            browserFramework = deferred.browserFramework,
+            silentRecovery = deferred.silentRecovery,
+            controlRequest = deferred.controlRequest,
+            launchInvocation = deferred.launchInvocation,
+            webLogDiscoveryAllowed = deferred.webLogDiscoveryAllowed,
+        )
     }
 
     private fun updateEnvironmentState(stateKey: String, stdout: String): Boolean? {
@@ -2194,6 +2262,11 @@ open class V04Activity : StudioActivity() {
                 if (!success) runtimeError(result)
             }
         }
+        if (item.automaticObservation) {
+            // A manual request accepted during automatic observation gets the first safe
+            // non-overlapping dispatch slot after the automatic result is reconciled.
+            drainDeferredManualAction(stateKey)
+        }
         continueExternalObservation(
             item = item,
             runtimeState = runtimeState,
@@ -2205,6 +2278,7 @@ open class V04Activity : StudioActivity() {
     private fun beginExternalObservation(
         project: V04ProjectGateway.RuntimeProject,
         webLogDiscoveryAllowed: Boolean,
+        configuredLocalUrl: String? = null,
     ) {
         val stateKey = project.summary.documentId
         externalObservationRunnables[stateKey]?.let(refreshHandler::removeCallbacks)
@@ -2214,6 +2288,9 @@ open class V04Activity : StudioActivity() {
             project = project,
             generation = generation,
             webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+            configuredLocalUrl = configuredLocalUrl ?: runCatching {
+                webInspector.inspect(stateKey).configuredLocalUrl()
+            }.getOrNull(),
         )
     }
 
@@ -2238,6 +2315,13 @@ open class V04Activity : StudioActivity() {
         pending.values.any { item ->
             item.documentId == projectKey ||
                 (item.documentId == null && item.folderName == folderName)
+        }
+
+    private fun hasAutomaticPendingOperation(projectKey: String, folderName: String): Boolean =
+        pending.values.any { item ->
+            item.automaticObservation &&
+                (item.documentId == projectKey ||
+                    (item.documentId == null && item.folderName == folderName))
         }
 
     private fun resumeExternalObservations() {
@@ -2322,13 +2406,33 @@ open class V04Activity : StudioActivity() {
         }
     }
 
+    private fun webObservationProbeAllowed(observation: ExternalObservation): Boolean {
+        val stateKey = observation.project.summary.documentId
+        val snapshot = webStateStore.snapshot(stateKey)
+        val candidateUrls = listOfNotNull(
+            snapshot.candidateUrl,
+            observation.configuredLocalUrl,
+        ).distinct()
+        val endpointVerified = ::webAvailability.isInitialized &&
+            webAvailability.reachableUrl(
+                projectKey = stateKey,
+                runtimeState = typedStates[stateKey] ?: RuntimeState.UNKNOWN,
+                candidateUrls = candidateUrls,
+            ) != null
+        return RuntimeWebObservationProbePolicy.shouldProbe(
+            RuntimeWebObservationProbePolicy.Input(
+                webLogDiscoveryAllowed = observation.webLogDiscoveryAllowed,
+                probeCount = observation.webLogProbeCount,
+                maxProbeCount = EXTERNAL_WEB_LOG_PROBE_MAX,
+                candidateExists = candidateUrls.isNotEmpty(),
+                endpointVerified = endpointVerified,
+            ),
+        )
+    }
+
     private fun requestExternalWebLogs(observation: ExternalObservation) {
         val stateKey = observation.project.summary.documentId
-        if (
-            !observation.webLogDiscoveryAllowed ||
-            observation.webLogProbeCount >= EXTERNAL_WEB_LOG_PROBE_MAX ||
-            webStateStore.snapshot(stateKey).candidateUrl != null
-        ) {
+        if (!webObservationProbeAllowed(observation)) {
             scheduleExternalObservation(observation.project)
             return
         }
@@ -2381,9 +2485,8 @@ open class V04Activity : StudioActivity() {
             ) {
                 requestExternalFinalLogs(observation)
             } else if (
-                observation.webLogDiscoveryAllowed &&
                 observation.webLogProbeCount == 0 &&
-                webStateStore.snapshot(stateKey).candidateUrl == null
+                webObservationProbeAllowed(observation)
             ) {
                 requestExternalWebLogs(observation)
             } else {
@@ -2407,10 +2510,8 @@ open class V04Activity : StudioActivity() {
                     RuntimeState.UNKNOWN -> {
                         observation.statusesSinceWebLogProbe += 1
                         if (
-                            observation.webLogDiscoveryAllowed &&
                             observation.statusesSinceWebLogProbe >= EXTERNAL_WEB_LOG_PROBE_EVERY_STATUS &&
-                            observation.webLogProbeCount < EXTERNAL_WEB_LOG_PROBE_MAX &&
-                            webStateStore.snapshot(stateKey).candidateUrl == null
+                            webObservationProbeAllowed(observation)
                         ) {
                             requestExternalWebLogs(observation)
                         } else {
