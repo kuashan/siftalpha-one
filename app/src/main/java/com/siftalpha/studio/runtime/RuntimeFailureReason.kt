@@ -28,7 +28,7 @@ object RuntimeFailureReason {
             .lastOrNull()
             .orEmpty()
         return when {
-            detail.isNotBlank() -> "exitCode=$exitCode: \${detail.takeLast(MAX_LENGTH - 12)}".takeLast(MAX_LENGTH)
+            detail.isNotBlank() -> "exitCode=$exitCode: ${detail.takeLast(MAX_LENGTH - 12)}".takeLast(MAX_LENGTH)
             exitCode != 0 -> "exitCode=$exitCode"
             else -> "runtime command failed"
         }

@@ -1,6 +1,7 @@
 package com.siftalpha.studio.runtime
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -18,6 +19,7 @@ class RuntimeFailureReasonTest {
         )
     }
 
+
     @Test
     fun boundsFallbackReason() {
         val reason = RuntimeFailureReason.summarize(
@@ -29,4 +31,16 @@ class RuntimeFailureReasonTest {
         assertTrue(reason!!.length <= 240)
         assertTrue(reason.startsWith("exitCode=2:"))
     }
-}
+
+    @Test
+    fun includesActualDetailWithoutInterpolationSource() {
+        val reason = RuntimeFailureReason.summarize(
+            exitCode = 2,
+            internalErrorMessage = "",
+            stdout = "",
+            stderr = "sherlock: error: missing USERNAMES",
+        )
+        assertTrue(reason!!.contains("missing USERNAMES"))
+        assertFalse(reason.contains("\${"))
+        assertTrue(reason.length <= 240)
+    }

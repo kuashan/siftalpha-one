@@ -46,6 +46,7 @@ import com.siftalpha.studio.runtime.RuntimeFailureReason
 import com.siftalpha.studio.runtime.RuntimeLifecycleOperation
 import com.siftalpha.studio.runtime.RuntimeLifecycleResolver
 import com.siftalpha.studio.runtime.RuntimeLifecycleState
+import com.siftalpha.studio.runtime.RuntimePresentationState
 import com.siftalpha.studio.runtime.RuntimeLifecycleStore
 import com.siftalpha.studio.runtime.RuntimeKind
 import com.siftalpha.studio.runtime.RuntimeOwnership
@@ -784,10 +785,12 @@ open class V04Activity : StudioActivity() {
             setPadding(0, dp(2), 0, 0)
         })
 
+        val terminalState = RuntimePresentationState.terminalStateForLabel(typedState)
         val stateLabel = when {
             snapshot.recoveryInProgress -> snapshot.lifecycleState.uiLabel(this)
             snapshot.lifecycleState == RuntimeLifecycleState.RUN_FAILED &&
                 snapshot.failureReason != null -> snapshot.lifecycleState.uiLabel(this)
+            terminalState != null -> terminalState.uiLabel(this, environmentStates[stateKey])
             presentationState != typedState -> presentationState.uiLabel(this)
             states[stateKey] != null && snapshot.lifecycleState == RuntimeLifecycleState.DETECTING ->
                 states.getValue(stateKey)
@@ -803,11 +806,12 @@ open class V04Activity : StudioActivity() {
             )
             setPadding(0, dp(2), 0, 0)
         })
-        ProjectStatusGuidancePolicy.resolve(
+        val statusGuidance = ProjectStatusGuidancePolicy.resolve(
             state = typedState,
             webEndpointVerified = reachableWebUrl != null,
             richResultAvailable = richResult != null,
-        )?.let { guidance ->
+        )
+        statusGuidance?.let { guidance ->
             box.addView(text(guidance.localizedText(), 12f, false).apply {
                 setTextColor(Color.rgb(170, 204, 235))
                 setPadding(0, dp(2), 0, dp(2))
@@ -835,23 +839,25 @@ open class V04Activity : StudioActivity() {
             )
             setPadding(0, dp(2), 0, dp(5))
         })
-        val policyExplanation = buildString {
-            append(getString(R.string.runtime_policy_summary_label, policy.summary.localizedText()))
-            policy.disableReason?.let { reason ->
-                append('\n')
-                append(getString(R.string.runtime_policy_disabled_reason, reason.localizedText()))
+        if (statusGuidance == null) {
+            val policyExplanation = buildString {
+                append(getString(R.string.runtime_policy_summary_label, policy.summary.localizedText()))
+                policy.disableReason?.let { reason ->
+                    append('\n')
+                    append(getString(R.string.runtime_policy_disabled_reason, reason.localizedText()))
+                }
             }
+            box.addView(text(policyExplanation, 12f, false).apply {
+                setTextColor(
+                    if (policy.disableReason == null) {
+                        Color.rgb(170, 224, 190)
+                    } else {
+                        Color.rgb(240, 184, 120)
+                    },
+                )
+                setPadding(0, 0, 0, dp(5))
+            })
         }
-        box.addView(text(policyExplanation, 12f, false).apply {
-            setTextColor(
-                if (policy.disableReason == null) {
-                    Color.rgb(170, 224, 190)
-                } else {
-                    Color.rgb(240, 184, 120)
-                },
-            )
-            setPadding(0, 0, 0, dp(5))
-        })
 
         // The single-project workspace presents the policy-selected next action first. The
         // secondary controls below remain available for observation and recovery, but the user
