@@ -222,7 +222,7 @@ source declaration 的存在、内容变化或 provenance mismatch 不属于 v1 
 
 Environment v1 不宣称支持整个 PEP 751 / PyPA pylock.toml specification。下表是冻结的 v1 subset。
 
-| Lock 内容 | alpha44 v1 |
+| Lock 内容 | Pure-Python Environment v1 (alpha45 candidate) |
 |---|---|
 | lock-version | 必须为字符串 "1.0"；未知 major 或不支持的版本为 LOCK_INVALID |
 | requires-python | 必须存在且与 Embedded CPython 3.14.7 兼容 |
@@ -1014,9 +1014,11 @@ alpha45 的同一 environment generation 可以被多个顺序 Session 复用，
 
 ## External Provider Boundary
 
+stdlib-only project 在 alpha44 不需要 pylock.toml，也不因没有 pylock.toml 触发 capability failure。
+
 以下任一条件出现时，Embedded R 返回 capability failure：
 
-- 没有 supported pylock.toml；
+- 项目需要 third-party dependency environment，且没有 supported authoritative pylock.toml；后续 Pure-Python Environment v1 对此返回 LOCK_MISSING / capability failure；
 - selected package 没有 allowed pure wheel；
 - native wheel、.so、C/C++/Rust extension；
 - VCS、directory、archive/sdist、source build；
