@@ -204,14 +204,24 @@ class ProjectRuntimeController(
         } else {
             null
         }
-        return PythonCliLaunchResolver.resolve(
+        val strictFallback = if (facts.declaredRun.isNullOrBlank()) {
+            gateway.resolveEmbeddedPythonEntrypoint(projectId)
+        } else {
+            null
+        }
+        val fallbackEntrypoint = PythonLaunchCompatibilityPolicy.fallbackEntrypoint(
+            summaryEntry = project.summary.entry,
+            relativePaths = facts.relativePaths,
+            strictFallback = strictFallback,
+        )
+        val resolution = PythonCliLaunchResolver.resolve(
             declaredRun = facts.declaredRun,
             pyprojectToml = pyprojectToml,
-            fallbackEntrypoint = if (facts.declaredRun.isNullOrBlank()) {
-                gateway.resolveEmbeddedPythonEntrypoint(projectId)
-            } else {
-                null
-            },
+            fallbackEntrypoint = fallbackEntrypoint,
+        )
+        return PythonLaunchCompatibilityPolicy.preserveLegacyRun(
+            resolution = resolution,
+            legacyRun = project.summary.run,
         )
     }
 
