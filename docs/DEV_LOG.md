@@ -1067,3 +1067,22 @@ This directly opens the path for OCI dependencies which already publish Android 
 wheel, so internal OCI acceptance is not claimed yet.
 
 VersionCode advances to `124`; versionName remains `0.8.0-alpha45`.
+
+
+## 2026-09-18 · alpha45 Slice 5 — Runtime Marker + Requires-Python Compatibility
+
+Implemented deterministic R-side Python compatibility evaluation using explicit SiftAlpha runtime
+facts for CPython 3.14.7 on Android/aarch64. The evaluator supports the stable numeric
+`Requires-Python` operators needed by the current dependency path and a bounded PEP-508-style marker
+subset with `and`, `or`, parentheses, equality/inequality, version comparisons and membership.
+
+Unknown marker variables or unsupported syntax are reported as UNSUPPORTED rather than silently
+evaluating false. No ambient process environment variables are consulted.
+
+Regression coverage includes the Python-version marker branches used by the current OCI SDK dependency
+declarations, so the Android Worker can deterministically choose the Python 3.14 dependency branch
+before wheel selection.
+
+This slice does not download/install artifacts and does not change M routing.
+
+VersionCode advances to `125`; versionName remains `0.8.0-alpha45`.
