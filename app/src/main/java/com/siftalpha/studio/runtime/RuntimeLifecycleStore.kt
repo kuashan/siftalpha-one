@@ -157,7 +157,7 @@ class RuntimeLifecycleStore internal constructor(
 
     @Suppress("UNUSED_PARAMETER")
     private fun legacyKey(projectKey: String, suffix: String): String =
-        "project:${digest(projectKey)}:${suffix}"
+        "project:${'$'}{digest(projectKey)}:${'$'}suffix"
 
     private fun digest(value: String): String {
         val bytes = MessageDigest.getInstance("SHA-256")

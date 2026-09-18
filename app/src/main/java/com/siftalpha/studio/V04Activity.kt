@@ -1227,12 +1227,13 @@ open class V04Activity : StudioActivity() {
     private fun persistRuntimeState(
         stateKey: String,
         selection: ProjectRuntimeSelection = projectRuntimeSelectionStore.read(stateKey),
+        persistedRuntimeState: RuntimeState = typedStates[stateKey] ?: RuntimeState.UNKNOWN,
     ) {
         if (!::lifecycleStore.isInitialized) return
         lifecycleStore.write(
             projectKey = stateKey,
             environmentReady = environmentReady(stateKey, selection),
-            runtimeState = typedStates[stateKey] ?: RuntimeState.UNKNOWN,
+            runtimeState = persistedRuntimeState,
             failureReason = failureReasons[stateKey],
             runtimeSelection = selection,
         )
@@ -1642,7 +1643,11 @@ open class V04Activity : StudioActivity() {
         typedStates[stateKey] = RuntimeState.PREPARING
         states[stateKey] = getString(R.string.runtime_action_preparing)
         failureReasons.remove(stateKey)
-        persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
+        persistRuntimeState(
+            stateKey,
+            ProjectRuntimeSelection.EMBEDDED_R,
+            persistedRuntimeState = RuntimeState.UNKNOWN,
+        )
         projectOutputs.write(
             project.folderName,
             listOf(
