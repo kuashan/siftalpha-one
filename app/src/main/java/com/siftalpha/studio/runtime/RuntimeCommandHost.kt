@@ -16,6 +16,10 @@ interface RuntimeCommandHost {
     fun runtimeId(folderName: String): String
     fun sh(value: String): String
     fun wrapUbuntu(inner: String): String
+
+    fun wrapUbuntuCancelable(runtimeId: String, operation: String, inner: String): String =
+        wrapUbuntu(inner)
+
     fun hostPreamble(): String
     fun hostProcessHelpers(): String
 }
@@ -87,6 +91,42 @@ class TermuxProotRuntimeHost(
         ${hostPreamble()}
         proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${sh(inner)}
     """.trimIndent()
+
+    override fun wrapUbuntuCancelable(
+        runtimeId: String,
+        operation: String,
+        inner: String,
+    ): String {
+        require(runtimeId.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid runtime id" }
+        require(operation.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid operation id" }
+        return """
+            ${hostPreamble()}
+            ${hostProcessHelpers()}
+            activity_pid_file="${'$'}runtime_dir/$runtimeId.$operation.pid"
+            activity_pgid_file="${'$'}runtime_dir/$runtimeId.$operation.pgid"
+            old_pid="${'$'}(cat "${'$'}activity_pid_file" 2>/dev/null || true)"
+            old_pgid="${'$'}(cat "${'$'}activity_pgid_file" 2>/dev/null || true)"
+            if siftalpha_pid_alive "${'$'}old_pid" || { [ -n "${'$'}old_pgid" ] && siftalpha_group_alive "${'$'}old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${sh(inner)} &
+              activity_pid=${'$'}!
+              printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pgid_file"
+            else
+              proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${sh(inner)} &
+              activity_pid=${'$'}!
+            fi
+            printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pid_file"
+            wait "${'$'}activity_pid"
+            activity_code=${'$'}?
+            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
+            exit "${'$'}activity_code"
+        """.trimIndent()
+    }
 
     override fun hostPreamble(): String = """
         set -e

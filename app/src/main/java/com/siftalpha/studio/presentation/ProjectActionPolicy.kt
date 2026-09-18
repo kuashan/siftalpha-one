@@ -153,14 +153,15 @@ object ProjectActionPolicy {
 
         if (snapshot.pending != null) {
             runtimeActions.forEach { actions[it] = disabled(DisableReason.PENDING_OPERATION) }
+            actions[Action.STOP] = enabled()
             actions[Action.CONFIGURE] = disabled(DisableReason.PENDING_OPERATION)
             actions[Action.OPEN_BROWSER] = disabled(DisableReason.PENDING_OPERATION)
             return result(
                 actions = actions,
                 summary = MessageKey.PENDING_OPERATION,
-                primaryAction = null,
+                primaryAction = Action.STOP,
                 directSecondaryAction = null,
-                disableReason = DisableReason.PENDING_OPERATION,
+                disableReason = null,
                 detailEntry = DetailEntry.RUNTIME,
             )
         }

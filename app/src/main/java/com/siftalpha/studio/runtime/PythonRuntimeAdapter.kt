@@ -28,7 +28,11 @@ class PythonRuntimeAdapter(
     )
 
     override fun prepare(project: RuntimeProjectSpec): RuntimeCommand = RuntimeCommand(
-        shellScript = host.wrapUbuntu(buildPrepare(project)),
+        shellScript = host.wrapUbuntuCancelable(
+            runtimeId = host.runtimeId(project.folderName),
+            operation = "prepare",
+            inner = buildPrepare(project),
+        ),
         label = "${project.name} · 准备环境",
         description = "${project.name} · 准备环境",
     )
@@ -515,11 +519,25 @@ SIFTALPHA_RUNNER
             ${host.hostProcessHelpers()}
             pid_file="${'$'}runtime_dir/${id}.pid"
             pgid_file="${'$'}runtime_dir/${id}.pgid"
+            prepare_pid_file="${'$'}runtime_dir/${id}.prepare.pid"
+            prepare_pgid_file="${'$'}runtime_dir/${id}.prepare.pgid"
             launch_log="${'$'}runtime_dir/${id}.launch.log"
             runtime_identity_dir="${'$'}runtime_dir/${id}"
             runtime_identity_id=${sh(id)}
             pid="${'$'}(cat "${'$'}pid_file" 2>/dev/null || true)"
             pgid="${'$'}(cat "${'$'}pgid_file" 2>/dev/null || true)"
+            prepare_pid="${'$'}(cat "${'$'}prepare_pid_file" 2>/dev/null || true)"
+            prepare_pgid="${'$'}(cat "${'$'}prepare_pgid_file" 2>/dev/null || true)"
+
+            if [ -n "${'$'}prepare_pid" ] || [ -n "${'$'}prepare_pgid" ]; then
+              if ! siftalpha_stop_tree "${'$'}prepare_pid" "${'$'}prepare_pgid"; then
+                echo 'SIFTALPHA_ERROR=PREPARE_STOP_INCOMPLETE'
+                echo 'SIFTALPHA_STATUS=STOP_FAILED'
+                exit 78
+              fi
+              echo 'SIFTALPHA_PREPARE_STOPPED=1'
+            fi
+            rm -f -- "${'$'}prepare_pid_file" "${'$'}prepare_pgid_file"
 
             if [ -n "${'$'}pid" ] || [ -n "${'$'}pgid" ]; then
               if ! siftalpha_stop_tree "${'$'}pid" "${'$'}pgid"; then

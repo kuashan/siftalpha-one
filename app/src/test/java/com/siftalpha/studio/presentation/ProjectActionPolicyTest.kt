@@ -253,7 +253,7 @@ class ProjectActionPolicyTest {
     }
 
     @Test
-    fun `pending operation blocks all duplicate runtime side effects`() {
+    fun `pending operation keeps project scoped stop available while blocking duplicate side effects`() {
         val policy = ProjectActionPolicy.resolve(
             snapshot(
                 lifecycle = RuntimeState.STARTING,
@@ -263,11 +263,11 @@ class ProjectActionPolicyTest {
         )
 
         assertEquals(ProjectActionPolicy.MessageKey.PENDING_OPERATION, policy.summary)
-        assertEquals(null, policy.primaryAction)
+        assertEquals(ProjectActionPolicy.Action.STOP, policy.primaryAction)
+        assertTrue(policy.isEnabled(ProjectActionPolicy.Action.STOP))
         listOf(
             ProjectActionPolicy.Action.PREPARE,
             ProjectActionPolicy.Action.START,
-            ProjectActionPolicy.Action.STOP,
             ProjectActionPolicy.Action.STATUS,
             ProjectActionPolicy.Action.LOGS,
             ProjectActionPolicy.Action.CLEAN,

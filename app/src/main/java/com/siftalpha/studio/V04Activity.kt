@@ -27,6 +27,7 @@ import com.siftalpha.studio.project.WebProjectInspector
 import com.siftalpha.studio.presentation.ProjectActionPolicy
 import com.siftalpha.studio.presentation.ProjectUiSnapshot
 import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
+import com.siftalpha.studio.runtime.ProjectActivityRegistry
 import com.siftalpha.studio.runtime.ProjectRuntimeController
 import com.siftalpha.studio.runtime.ProjectRuntimeExecutionPlanner
 import com.siftalpha.studio.runtime.ProjectRuntimeSelection
@@ -164,6 +165,8 @@ open class V04Activity : StudioActivity() {
     private val deferredManualActions = mutableMapOf<String, DeferredManualAction>()
     private val embeddedStartExecutor = Executors.newSingleThreadExecutor()
     private val embeddedStartInFlight = mutableSetOf<String>()
+    private val projectActivities = ProjectActivityRegistry()
+    private val cancelledExternalExecutions = mutableSetOf<Int>()
     private val embeddedLastSnapshots = mutableMapOf<String, EmbeddedPythonSnapshot>()
     private val embeddedRuntimeOwnership = mutableMapOf<String, RuntimeOwnership>()
     private var embeddedPollProject: V04ProjectGateway.RuntimeProject? = null
@@ -242,6 +245,9 @@ open class V04Activity : StudioActivity() {
             // Never consume such an unmatched result: registerPending() will immediately reconcile it.
             val item = pending.remove(result.executionId) ?: return@runOnUiThread
             TermuxResultBus.consume(result.executionId)
+            if (cancelledExternalExecutions.remove(result.executionId)) {
+                return@runOnUiThread
+            }
             if (item.automaticObservation && !isCurrentAutomaticObservation(item)) {
                 // A STOP, CLEAN, new START, or a newer observation generation superseded this
                 // delayed result. Consume it, but never let it mutate the new project state.
@@ -773,7 +779,8 @@ open class V04Activity : StudioActivity() {
                     item.documentId == stateKey ||
                         (item.documentId == null && item.folderName == project.folderName)
                 } &&
-                stateKey !in embeddedStartInFlight
+                stateKey !in embeddedStartInFlight &&
+                !projectActivities.hasActive(stateKey)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -923,7 +930,7 @@ open class V04Activity : StudioActivity() {
                 }
                 ProjectActionPolicy.Action.STOP -> {
                     box.addView(button(getString(R.string.runtime_button_stop)) {
-                        dispatch(project, ProjectRuntimeController.Action.STOP)
+                        stopProjectActivities(project)
                     })
                 }
                 ProjectActionPolicy.Action.CONFIGURE -> {
@@ -979,8 +986,12 @@ open class V04Activity : StudioActivity() {
             setPadding(0, dp(5), 0, 0)
         }
         val stopButton = smallButton(getString(R.string.runtime_button_stop)) {
-                dispatch(project, ProjectRuntimeController.Action.STOP)
-            }.apply { isEnabled = embeddedActive || policy.isEnabled(ProjectActionPolicy.Action.STOP) }
+                stopProjectActivities(project)
+            }.apply {
+                isEnabled = projectActivities.hasActive(stateKey) ||
+                    embeddedActive ||
+                    policy.isEnabled(ProjectActionPolicy.Action.STOP)
+            }
         row2.addView(stopButton, weight())
         val statusButton = smallButton(getString(R.string.runtime_button_status)) {
                 if (runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R) {
@@ -1253,13 +1264,18 @@ open class V04Activity : StudioActivity() {
         controlPath: RuntimeControlPath = RuntimeControlPath.EXTERNAL_PROVIDER,
     ): Boolean {
         val stateKey = project.summary.documentId
-        if (pending.values.any { item ->
-                item.documentId == stateKey ||
-                    (item.documentId == null && item.folderName == project.folderName)
-            }) {
+        val projectPending = pending.values.any { item ->
+            item.documentId == stateKey ||
+                (item.documentId == null && item.folderName == project.folderName)
+        }
+        if (projectPending && action != ProjectRuntimeController.Action.STOP) {
             return false
         }
-        if (recoveryProjects.contains(stateKey) && action != ProjectRuntimeController.Action.STATUS) {
+        if (
+            recoveryProjects.contains(stateKey) &&
+            action != ProjectRuntimeController.Action.STATUS &&
+            action != ProjectRuntimeController.Action.STOP
+        ) {
             return false
         }
         val currentState = typedStates[stateKey] ?: RuntimeState.UNKNOWN
@@ -1282,8 +1298,12 @@ open class V04Activity : StudioActivity() {
         ) {
             return false
         }
-        if (action == ProjectRuntimeController.Action.STOP &&
-            currentState !in ACTIVE_RUNTIME_STATES
+        if (
+            action == ProjectRuntimeController.Action.STOP &&
+            currentState !in ACTIVE_RUNTIME_STATES &&
+            !projectPending &&
+            !projectActivities.hasActive(stateKey) &&
+            !externalObservations.containsKey(stateKey)
         ) {
             return false
         }
@@ -1616,7 +1636,8 @@ open class V04Activity : StudioActivity() {
                 item.documentId == stateKey ||
                     (item.documentId == null && item.folderName == project.folderName)
             } ||
-            stateKey in embeddedStartInFlight
+            stateKey in embeddedStartInFlight ||
+            projectActivities.hasActive(stateKey)
         if (busy) {
             toast(getString(R.string.runtime_selection_active))
             return
@@ -1666,10 +1687,15 @@ open class V04Activity : StudioActivity() {
             expand = true,
         )
         refresh()
-        embeddedStartExecutor.execute {
+        val token = projectActivities.begin(
+            stateKey,
+            ProjectActivityRegistry.Kind.PREPARE,
+        )
+        val future = embeddedStartExecutor.submit {
             val result = runCatching { runtime.prepareEmbeddedPythonEnvironment(project) }
             runOnUiThread {
                 embeddedStartInFlight.remove(stateKey)
+                if (!projectActivities.finish(token)) return@runOnUiThread
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 val prepared = result.getOrNull()
                 if (prepared != null) {
@@ -1714,6 +1740,9 @@ open class V04Activity : StudioActivity() {
                     errorDialog(getString(R.string.runtime_prepare_failed), message)
                 }
             }
+        }
+        if (!projectActivities.attachCancel(token) { future.cancel(true) }) {
+            future.cancel(true)
         }
     }
 
@@ -1764,7 +1793,11 @@ open class V04Activity : StudioActivity() {
             expand = true,
         )
         refresh()
-        embeddedStartExecutor.execute {
+        val token = projectActivities.begin(
+            stateKey,
+            ProjectActivityRegistry.Kind.START,
+        )
+        val future = embeddedStartExecutor.submit {
             val result = runCatching {
                 runtime.startEmbeddedPython(
                     project = project,
@@ -1773,6 +1806,7 @@ open class V04Activity : StudioActivity() {
             }
             runOnUiThread {
                 embeddedStartInFlight.remove(stateKey)
+                if (!projectActivities.finish(token)) return@runOnUiThread
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 val snapshot = result.getOrNull()
                 if (snapshot != null) {
@@ -1803,6 +1837,72 @@ open class V04Activity : StudioActivity() {
                 }
             }
         }
+        if (!projectActivities.attachCancel(token) { future.cancel(true) }) {
+            future.cancel(true)
+        }
+    }
+
+    private fun stopProjectActivities(project: V04ProjectGateway.RuntimeProject) {
+        val stateKey = project.summary.documentId
+        val projectPending = pending.entries.filter { (_, item) ->
+            item.documentId == stateKey ||
+                (item.documentId == null && item.folderName == project.folderName)
+        }
+        projectPending.forEach { (executionId, _) ->
+            cancelledExternalExecutions += executionId
+        }
+
+        if (::prepareLiveProgress.isInitialized) {
+            prepareLiveProgress.finish(project.folderName)
+        }
+        invalidateExternalObservation(stateKey)
+        deferredManualActions.remove(stateKey)
+        recoveryProjects.remove(stateKey)
+
+        val cancelledInternal = projectActivities.cancelProject(stateKey)
+        if (cancelledInternal > 0) {
+            embeddedStartInFlight.remove(stateKey)
+        }
+
+        val embeddedSnapshot = runCatching {
+            runtime.embeddedPythonSnapshotFor(stateKey)
+        }.getOrNull()
+        val embeddedRunning = embeddedSnapshot != null && isEmbeddedActive(embeddedSnapshot)
+
+        if (embeddedRunning) {
+            requestEmbeddedStop(project)
+            return
+        }
+
+        if (
+            cancelledInternal > 0 &&
+            selectedRuntimeSelection(project) == ProjectRuntimeSelection.EMBEDDED_R
+        ) {
+            typedStates[stateKey] = RuntimeState.STOPPED_BY_USER
+            states[stateKey] = getString(R.string.runtime_state_stopped_by_user)
+            failureReasons.remove(stateKey)
+            projectOutputs.write(
+                project.folderName,
+                listOf(
+                    "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                    "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                    "SIFTALPHA_X_STOP_REQUEST=LOCAL_ACTIVITY_CANCELLED",
+                ).joinToString("\n"),
+                expand = true,
+            )
+            persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
+            refresh()
+            return
+        }
+
+        // External commands cannot be recalled through Android's RUN_COMMAND contract. Their
+        // callbacks are invalidated above; the project-scoped STOP command terminates any owned
+        // PREPARE or runtime process tree inside Termux/PRoot without touching other projects.
+        dispatch(
+            project = project,
+            action = ProjectRuntimeController.Action.STOP,
+            controlRequest = RuntimeControlRequest.EXTERNAL_PROVIDER,
+        )
     }
 
     private fun requestEmbeddedStop(project: V04ProjectGateway.RuntimeProject) {
@@ -1946,7 +2046,7 @@ open class V04Activity : StudioActivity() {
         observationGeneration: Long? = null,
     ): Boolean {
         val stateKey = project.summary.documentId
-        when (
+        if (action != ProjectRuntimeController.Action.STOP) when (
             ObservationPresentationPolicy.dispatchDecision(
                 automaticObservation = automaticObservation,
                 automaticPending = hasAutomaticPendingOperation(stateKey, project.folderName),

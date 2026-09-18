@@ -20,6 +20,8 @@ class PythonRuntimeAdapterTest {
             return "'" + value.replace("'", "'\"'\"'") + "'"
         }
         override fun wrapUbuntu(inner: String): String = "HOST_WRAP_BEGIN\n$inner\nHOST_WRAP_END"
+        override fun wrapUbuntuCancelable(runtimeId: String, operation: String, inner: String): String =
+            "HOST_CANCELABLE_BEGIN:$runtimeId:$operation\n$inner\nHOST_CANCELABLE_END"
         override fun hostPreamble(): String = """
             set -e
             ROOT='/storage/emulated/0/AcodeProjects'
@@ -60,7 +62,7 @@ class PythonRuntimeAdapterTest {
         val script = command.shellScript
 
         assertEquals("Sample · 准备环境", command.label)
-        assertTrue(script.contains("HOST_WRAP_BEGIN"))
+        assertTrue(script.contains("HOST_CANCELABLE_BEGIN:runtime-id:prepare"))
         assertTrue(script.contains("python3 -m venv"))
         assertTrue(script.contains("python3 -m pip --version"))
         assertTrue(script.contains("apt-get install -y python3-venv python3-pip"))
@@ -134,6 +136,9 @@ class PythonRuntimeAdapterTest {
 
         assertTrue(stop.contains("siftalpha_stop_tree"))
         assertTrue(stop.contains("SIFTALPHA_STATUS=STOPPED_BY_USER"))
+        assertTrue(stop.contains("prepare_pid_file="${'$'}runtime_dir/runtime-id.prepare.pid""))
+        assertTrue(stop.contains("prepare_pgid_file="${'$'}runtime_dir/runtime-id.prepare.pgid""))
+        assertTrue(stop.contains("SIFTALPHA_PREPARE_STOPPED=1"))
         assertTrue(stop.contains("SIFTALPHA_ERROR=STOP_INCOMPLETE"))
         assertTrue("STOP must keep using the legacy host PID files", stop.contains("pid_file=\"${'$'}runtime_dir/runtime-id.pid\""))
         assertTrue("STOP must keep using the legacy host PGID files", stop.contains("pgid_file=\"${'$'}runtime_dir/runtime-id.pgid\""))
