@@ -21,6 +21,8 @@ data class EmbeddedPythonExecutionSpec(
     val runtimeKind: EmbeddedPythonRuntimeKind,
     val sessionId: String,
     val generation: Long,
+    val environmentSitePackages: File? = null,
+    val environmentKey: String? = null,
 ) {
     init {
         require(projectIdentity.isNotBlank()) { "project identity must not be blank" }
@@ -33,6 +35,17 @@ data class EmbeddedPythonExecutionSpec(
         }
         require(sessionId.matches(SESSION_ID_PATTERN)) { "session id is not safe" }
         require(generation > 0L) { "generation must be positive" }
+        require((environmentSitePackages == null) == (environmentKey == null)) {
+            "environment site-packages and environment key must be provided together"
+        }
+        if (environmentSitePackages != null) {
+            require(environmentSitePackages.isAbsolute) {
+                "environment site-packages must be absolute"
+            }
+            require(environmentKey?.matches(ENVIRONMENT_KEY_PATTERN) == true) {
+                "environment key is invalid"
+            }
+        }
     }
 
     val entrypointFile: File
@@ -71,6 +84,12 @@ data class EmbeddedPythonExecutionSpec(
         if (!workingDirectoryFile.isDirectory) {
             errors += "WORKING_DIRECTORY_MISSING"
         }
+        environmentSitePackages?.let { environment ->
+            val canonical = runCatching { environment.canonicalFile }.getOrNull()
+            if (canonical == null || !canonical.isDirectory) {
+                errors += "ENVIRONMENT_SITE_PACKAGES_INVALID"
+            }
+        }
         return errors
     }
 
@@ -79,6 +98,7 @@ data class EmbeddedPythonExecutionSpec(
 
     companion object {
         private val SESSION_ID_PATTERN = Regex("[A-Za-z0-9._-]+")
+        private val ENVIRONMENT_KEY_PATTERN = Regex("sha256:[0-9a-f]{64}")
         private fun safeRelativePath(value: String, allowCurrent: Boolean): Boolean {
             if (value.isBlank() || value.startsWith("/") || value.contains('\u0000')) {
                 return false

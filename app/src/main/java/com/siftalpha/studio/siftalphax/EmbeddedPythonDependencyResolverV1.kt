@@ -109,7 +109,8 @@ class EmbeddedPythonDependencyResolverV1(
             }
                 .distinct()
                 .filter { version ->
-                    packageConstraints.all {
+                    EmbeddedPythonRequirementParserV1.versionMatches("", version) &&
+                        packageConstraints.all {
                         EmbeddedPythonRequirementParserV1.versionMatches(it.specifier, version)
                     }
                 }

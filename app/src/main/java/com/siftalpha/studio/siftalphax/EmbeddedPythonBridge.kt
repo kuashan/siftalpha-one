@@ -17,6 +17,7 @@ internal object EmbeddedPythonBridge {
         home: String,
         projectIdentity: String,
         executionRoot: String,
+        environmentSitePackages: String,
         entrypoint: String,
         workingDirectory: String,
         sessionId: String,

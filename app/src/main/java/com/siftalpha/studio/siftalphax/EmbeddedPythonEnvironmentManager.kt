@@ -1,14 +1,16 @@
 package com.siftalpha.studio.siftalphax
 
 import android.content.Context
+import android.os.Build
 import java.io.File
 
 class EmbeddedPythonEnvironmentManager(context: Context) {
     private val appContext = context.applicationContext
 
     enum class Outcome {
+        READY_REUSED,
         READY_NO_EXTERNAL_DEPENDENCIES,
-        DEPENDENCY_INSTALL_REQUIRED,
+        READY_DEPENDENCIES_INSTALLED,
     }
 
     data class PreparationResult(
@@ -16,54 +18,75 @@ class EmbeddedPythonEnvironmentManager(context: Context) {
         val outcome: Outcome,
         val environmentRoot: File,
         val sitePackages: File,
+        val environmentKey: String,
     )
 
-    fun prepareFoundation(
+    data class LoadBinding(
+        val sitePackages: File,
+        val environmentKey: String,
+    )
+
+    fun prepare(
         projectIdentity: String,
-        hasExternalDependencyRequirement: Boolean,
+        dependencyInput: EmbeddedPythonDependencyInputV1,
     ): PreparationResult {
         require(projectIdentity.isNotBlank()) { "projectIdentity must not be blank" }
         EmbeddedPythonFiles.prepare(appContext)
-        EmbeddedPythonFiles.dependencyCacheRoot(appContext)
+        val cacheRoot = EmbeddedPythonFiles.dependencyCacheRoot(appContext)
         val environmentRoot = EmbeddedPythonFiles.projectEnvironmentRoot(appContext, projectIdentity)
-        val sitePackages = File(environmentRoot, SITE_PACKAGES)
-        check(sitePackages.mkdirs() || sitePackages.isDirectory) {
-            "Unable to create project-owned site-packages directory"
-        }
-        val stateFile = File(environmentRoot, STATE_FILE)
-        val readyMarker = File(environmentRoot, READY_MARKER)
-        val outcome = if (hasExternalDependencyRequirement) {
-            if (readyMarker.exists()) check(readyMarker.delete()) {
-                "Unable to clear stale Internal Environment READY marker"
-            }
-            stateFile.writeText(Outcome.DEPENDENCY_INSTALL_REQUIRED.name + "\n")
-            Outcome.DEPENDENCY_INSTALL_REQUIRED
-        } else {
-            stateFile.writeText(Outcome.READY_NO_EXTERNAL_DEPENDENCIES.name + "\n")
-            readyMarker.writeText(SCHEMA + "\n")
-            Outcome.READY_NO_EXTERNAL_DEPENDENCIES
-        }
-        return PreparationResult(
-            ready = outcome == Outcome.READY_NO_EXTERNAL_DEPENDENCIES,
-            outcome = outcome,
+        val installer = EmbeddedPythonWheelInstallerV1(cacheRoot)
+
+        installer.readReadyBinding(
+            projectIdentity = projectIdentity,
             environmentRoot = environmentRoot,
-            sitePackages = sitePackages,
+            sourceFingerprint = dependencyInput.sourceFingerprint,
+        )?.let { existing ->
+            return PreparationResult(
+                ready = true,
+                outcome = Outcome.READY_REUSED,
+                environmentRoot = environmentRoot,
+                sitePackages = existing.sitePackages,
+                environmentKey = existing.environmentKey,
+            )
+        }
+
+        val plan = EmbeddedPythonDependencyResolverV1().resolve(
+            input = dependencyInput,
+            androidApiLevel = Build.VERSION.SDK_INT,
+        )
+        val installed = installer.install(
+            projectIdentity = projectIdentity,
+            environmentRoot = environmentRoot,
+            plan = plan,
+        )
+        return PreparationResult(
+            ready = true,
+            outcome = if (plan.packages.isEmpty()) {
+                Outcome.READY_NO_EXTERNAL_DEPENDENCIES
+            } else {
+                Outcome.READY_DEPENDENCIES_INSTALLED
+            },
+            environmentRoot = environmentRoot,
+            sitePackages = installed.sitePackages,
+            environmentKey = installed.environmentKey,
         )
     }
 
-    fun isReady(projectIdentity: String): Boolean {
-        val root = EmbeddedPythonFiles.projectEnvironmentRoot(appContext, projectIdentity)
-        val state = File(root, STATE_FILE)
-        return File(root, READY_MARKER).isFile &&
-            File(root, SITE_PACKAGES).isDirectory &&
-            state.isFile &&
-            state.readText().trim() == Outcome.READY_NO_EXTERNAL_DEPENDENCIES.name
-    }
-
-    companion object {
-        private const val SCHEMA = "siftalpha.internal-python-environment.v1"
-        private const val READY_MARKER = ".siftalpha_internal_environment_ready"
-        private const val STATE_FILE = "state-v1.txt"
-        private const val SITE_PACKAGES = "site-packages"
+    fun loadBinding(
+        projectIdentity: String,
+        dependencyInput: EmbeddedPythonDependencyInputV1,
+    ): LoadBinding? {
+        val environmentRoot = EmbeddedPythonFiles.projectEnvironmentRoot(appContext, projectIdentity)
+        val installed = EmbeddedPythonWheelInstallerV1(
+            EmbeddedPythonFiles.dependencyCacheRoot(appContext),
+        ).readReadyBinding(
+            projectIdentity = projectIdentity,
+            environmentRoot = environmentRoot,
+            sourceFingerprint = dependencyInput.sourceFingerprint,
+        ) ?: return null
+        return LoadBinding(
+            sitePackages = installed.sitePackages,
+            environmentKey = installed.environmentKey,
+        )
     }
 }

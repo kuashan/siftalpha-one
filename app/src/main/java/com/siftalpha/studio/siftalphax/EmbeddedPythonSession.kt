@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicLong
 class EmbeddedPythonSession private constructor(context: Context) {
     private val appContext = context.applicationContext
     private val nextGeneration = AtomicLong(0L)
+    private var boundEnvironmentKey: String? = null
 
     @Synchronized
     fun snapshot(): EmbeddedPythonSnapshot =
@@ -55,6 +56,8 @@ class EmbeddedPythonSession private constructor(context: Context) {
         executionRoot: File,
         entrypoint: String,
         workingDirectory: String = ".",
+        environmentSitePackages: File? = null,
+        environmentKey: String? = null,
     ): EmbeddedPythonSnapshot {
         val current = snapshot()
         check(EmbeddedPythonStatePolicy.canStart(current.state)) {
@@ -71,6 +74,8 @@ class EmbeddedPythonSession private constructor(context: Context) {
             runtimeKind = EmbeddedPythonRuntimeKind.CPYTHON,
             sessionId = sessionId,
             generation = generation,
+            environmentSitePackages = environmentSitePackages,
+            environmentKey = environmentKey,
         )
         return start(spec, home)
     }
@@ -83,11 +88,19 @@ class EmbeddedPythonSession private constructor(context: Context) {
         check(invalid.isEmpty()) {
             "Invalid embedded Python execution specification: " + invalid.joinToString(",")
         }
+        val requestedEnvironmentKey = spec.environmentKey
+        val existingEnvironmentKey = boundEnvironmentKey
+        if (requestedEnvironmentKey != null) {
+            check(existingEnvironmentKey == null || existingEnvironmentKey == requestedEnvironmentKey) {
+                "EMBEDDED_R_PROCESS_ENVIRONMENT_RESTART_REQUIRED"
+            }
+        }
         check(
             EmbeddedPythonBridge.nativeStart(
                 home.absolutePath,
                 spec.projectIdentity,
                 spec.executionRoot.absolutePath,
+                spec.environmentSitePackages?.absolutePath.orEmpty(),
                 spec.entrypointFile.absolutePath,
                 spec.workingDirectoryFile.absolutePath,
                 spec.sessionId,
@@ -96,11 +109,15 @@ class EmbeddedPythonSession private constructor(context: Context) {
         ) {
             "Embedded CPython did not accept the session"
         }
+        if (requestedEnvironmentKey != null && boundEnvironmentKey == null) {
+            boundEnvironmentKey = requestedEnvironmentKey
+        }
         Log.i(
             TAG,
             "SIFTALPHA_X_ENGINE=CPYTHON SIFTALPHA_X_TERMUX=NOT_USED " +
                 "SIFTALPHA_X_RUN_COMMAND=NOT_USED SIFTALPHA_X_PROOT=NOT_USED " +
                 "SIFTALPHA_X_PROJECT_ID=" + spec.projectIdentity + " " +
+                "SIFTALPHA_X_ENVIRONMENT_KEY=" + spec.environmentKey.orEmpty() + " " +
                 "SIFTALPHA_X_SESSION_ID=" + spec.sessionId + " " +
                 "SIFTALPHA_X_GENERATION=" + spec.generation,
         )

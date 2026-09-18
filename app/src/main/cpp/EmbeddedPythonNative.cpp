@@ -290,6 +290,7 @@ struct Session {
     std::string home;
     std::string projectIdentity;
     std::string executionRoot;
+    std::string environmentSitePackages;
     std::string entrypoint;
     std::string workingDirectory;
     std::int64_t generation = 0;
@@ -841,6 +842,66 @@ bool validateExecutionSpec(
         return false;
     }
 
+    if (!session->environmentSitePackages.empty()) {
+        const std::string environmentsBase =
+            parentDirectory(session->home) + "/environments";
+        struct stat environmentsInfo {};
+        if (lstat(environmentsBase.c_str(), &environmentsInfo) != 0 ||
+            !S_ISDIR(environmentsInfo.st_mode)) {
+            if (failure != nullptr) {
+                *failure =
+                    "SIFTALPHA_X_PROJECT_SPEC_ERROR=environments directory is unavailable";
+            }
+            return false;
+        }
+
+        std::string canonicalEnvironmentsBase;
+        if (!canonicalPath(environmentsBase, &canonicalEnvironmentsBase)) {
+            if (failure != nullptr) {
+                *failure =
+                    "SIFTALPHA_X_PROJECT_SPEC_ERROR=environments directory cannot be resolved";
+            }
+            return false;
+        }
+
+        componentFailure.clear();
+        if (!validatePathComponents(
+                session->environmentSitePackages,
+                canonicalEnvironmentsBase,
+                false,
+                &ignoredMissing,
+                &componentFailure)) {
+            if (failure != nullptr) {
+                *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=" + componentFailure;
+            }
+            return false;
+        }
+
+        struct stat environmentInfo {};
+        if (lstat(session->environmentSitePackages.c_str(), &environmentInfo) != 0 ||
+            !S_ISDIR(environmentInfo.st_mode)) {
+            if (failure != nullptr) {
+                *failure =
+                    "SIFTALPHA_X_PROJECT_SPEC_ERROR=environment site-packages is not a directory";
+            }
+            return false;
+        }
+
+        std::string canonicalEnvironmentSitePackages;
+        if (!canonicalPath(
+                session->environmentSitePackages,
+                &canonicalEnvironmentSitePackages) ||
+            !pathWithin(
+                canonicalEnvironmentsBase,
+                canonicalEnvironmentSitePackages)) {
+            if (failure != nullptr) {
+                *failure =
+                    "SIFTALPHA_X_PROJECT_SPEC_ERROR=environment site-packages escapes app-private environments";
+            }
+            return false;
+        }
+    }
+
     if (entrypoint.front() != '/') {
         if (failure != nullptr) {
             *failure = "SIFTALPHA_X_PROJECT_SPEC_ERROR=entrypoint is outside execution root";
@@ -1052,6 +1113,7 @@ bool configureExecutionSys(
     PyObject* originalPath,
     PyObject* originalArgv,
     const std::string& executionRoot,
+    const std::string& environmentSitePackages,
     const std::string& entrypoint) {
     PyObject* newPath = PySequence_List(originalPath);
     if (newPath == nullptr) {
@@ -1062,13 +1124,27 @@ bool configureExecutionSys(
         PyUnicode_FromString(entrypointDirectory.c_str());
     PyObject* executionRootObject =
         PyUnicode_FromString(executionRoot.c_str());
+    PyObject* environmentSitePackagesObject =
+        environmentSitePackages.empty()
+            ? nullptr
+            : PyUnicode_FromString(environmentSitePackages.c_str());
     bool success =
         entrypointDirectoryObject != nullptr &&
         executionRootObject != nullptr &&
-        PyList_Insert(newPath, 0, executionRootObject) == 0 &&
-        PyList_Insert(newPath, 0, entrypointDirectoryObject) == 0;
+        (environmentSitePackages.empty() ||
+            environmentSitePackagesObject != nullptr);
+    if (success && environmentSitePackagesObject != nullptr) {
+        success = PyList_Insert(newPath, 0, environmentSitePackagesObject) == 0;
+    }
+    if (success) {
+        success = PyList_Insert(newPath, 0, executionRootObject) == 0;
+    }
+    if (success) {
+        success = PyList_Insert(newPath, 0, entrypointDirectoryObject) == 0;
+    }
     Py_XDECREF(entrypointDirectoryObject);
     Py_XDECREF(executionRootObject);
+    Py_XDECREF(environmentSitePackagesObject);
     if (success) {
         success = PyObject_SetAttrString(sysModule, "path", newPath) == 0;
     }
@@ -1352,6 +1428,7 @@ void runSession(const std::shared_ptr<Session>& session) {
                     originalPath,
                     originalArgv,
                     session->executionRoot,
+                    session->environmentSitePackages,
                     session->entrypoint) &&
                 initializeExecutionGlobals(globals, session->entrypoint);
             if (!executionContextReady) {
@@ -1611,6 +1688,7 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeStart(
     jstring home,
     jstring projectIdentity,
     jstring executionRoot,
+    jstring environmentSitePackages,
     jstring entrypoint,
     jstring workingDirectory,
     jstring sessionId,
@@ -1618,6 +1696,8 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeStart(
     const std::string homePath = jstringToUtf8(env, home);
     const std::string projectId = jstringToUtf8(env, projectIdentity);
     const std::string rootPath = jstringToUtf8(env, executionRoot);
+    const std::string environmentSitePackagesPath =
+        jstringToUtf8(env, environmentSitePackages);
     const std::string entrypointPath = jstringToUtf8(env, entrypoint);
     const std::string workingDirectoryPath = jstringToUtf8(env, workingDirectory);
     const std::string id = jstringToUtf8(env, sessionId);
@@ -1652,6 +1732,7 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeStart(
         session->home = homePath;
         session->projectIdentity = projectId;
         session->executionRoot = rootPath;
+        session->environmentSitePackages = environmentSitePackagesPath;
         session->entrypoint = entrypointPath;
         session->workingDirectory = workingDirectoryPath;
         session->generation = static_cast<std::int64_t>(generation);

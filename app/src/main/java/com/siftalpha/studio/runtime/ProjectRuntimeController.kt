@@ -2,7 +2,9 @@ package com.siftalpha.studio.runtime
 
 import com.siftalpha.studio.project.EmbeddedPythonProjectStager
 import com.siftalpha.studio.project.V04ProjectGateway
+import com.siftalpha.studio.siftalphax.EmbeddedPythonDependencyInputV1
 import com.siftalpha.studio.siftalphax.EmbeddedPythonEnvironmentManager
+import com.siftalpha.studio.siftalphax.EmbeddedPythonRequirementParserV1
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSnapshot
 import com.siftalpha.studio.siftalphax.EmbeddedPythonStatePolicy
@@ -143,11 +145,11 @@ class ProjectRuntimeController(
         check(route.path == RuntimeControlPath.EMBEDDED_R) {
             "Embedded R prepare route rejected: ${route.reason}"
         }
-        val facts = gateway.runtimeFacts(project.summary.documentId)
+        val dependencyInput = embeddedPythonDependencyInput(project.summary.documentId)
         session.prepareRuntime()
-        return environmentManager.prepareFoundation(
+        return environmentManager.prepare(
             projectIdentity = project.summary.documentId,
-            hasExternalDependencyRequirement = facts.hasExternalDependencyRequirement,
+            dependencyInput = dependencyInput,
         )
     }
 
@@ -175,9 +177,11 @@ class ProjectRuntimeController(
             "Embedded R requires a resolved Python project"
         }
         val projectId = project.summary.documentId
-        check(environmentManager.isReady(projectId)) {
-            "EMBEDDED_R_ENVIRONMENT_NOT_READY"
-        }
+        val dependencyInput = embeddedPythonDependencyInput(projectId)
+        val environmentBinding = environmentManager.loadBinding(
+            projectIdentity = projectId,
+            dependencyInput = dependencyInput,
+        ) ?: error("EMBEDDED_R_ENVIRONMENT_NOT_READY")
         val current = session.snapshot()
         check(EmbeddedPythonStatePolicy.canStart(current.state)) {
             "Only one embedded Python session may be active; current state is " + current.state
@@ -194,6 +198,8 @@ class ProjectRuntimeController(
                 executionRoot = stagedRoot,
                 entrypoint = entrypoint,
                 workingDirectory = ".",
+                environmentSitePackages = environmentBinding.sitePackages,
+                environmentKey = environmentBinding.environmentKey,
             )
             synchronized(embeddedStagingRoots) {
                 embeddedStagingRoots[snapshot.sessionId] = stagedRoot
@@ -204,6 +210,31 @@ class ProjectRuntimeController(
             stager.cleanup(stagedRoot)
             throw error
         }
+    }
+
+    private fun embeddedPythonDependencyInput(
+        projectDocumentId: String,
+    ): EmbeddedPythonDependencyInputV1 {
+        val requirements = gateway.readProjectRootText(
+            projectDocumentId,
+            "requirements.txt",
+        )
+        val pyproject = gateway.readProjectRootText(
+            projectDocumentId,
+            "pyproject.toml",
+        )
+        val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
+            requirementsText = requirements,
+            pyprojectText = pyproject,
+        )
+        val facts = gateway.runtimeFacts(projectDocumentId)
+        check(
+            input.sourceKind != EmbeddedPythonDependencyInputV1.SourceKind.NONE ||
+                !facts.hasExternalDependencyRequirement
+        ) {
+            "UNSUPPORTED_DEPENDENCY_MANIFEST: use root requirements.txt or [project].dependencies"
+        }
+        return input
     }
 
     /** A successful return only means the stop request was accepted; terminal state is polled. */

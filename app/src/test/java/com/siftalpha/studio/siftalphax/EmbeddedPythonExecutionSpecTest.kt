@@ -51,6 +51,30 @@ class EmbeddedPythonExecutionSpecTest {
     }
 
     @Test
+    fun validatesOptionalProjectEnvironmentBinding() {
+        val base = Files.createTempDirectory("siftalpha-spec-environment").toFile()
+        val root = File(base, "projects/session").apply { mkdirs() }
+        val sitePackages = File(base, "environments/project/site-packages").apply { mkdirs() }
+        File(root, "main.py").writeText("print('ok')")
+        try {
+            val spec = EmbeddedPythonExecutionSpec(
+                projectIdentity = "fixture-project-environment",
+                executionRoot = root,
+                entrypoint = "main.py",
+                workingDirectory = ".",
+                runtimeKind = EmbeddedPythonRuntimeKind.CPYTHON,
+                sessionId = "siftalpha-x-environment",
+                generation = 1L,
+                environmentSitePackages = sitePackages,
+                environmentKey = "sha256:" + "a".repeat(64),
+            )
+            assertEquals(emptyList<String>(), spec.validationErrors())
+        } finally {
+            base.deleteRecursively()
+        }
+    }
+
+    @Test
     fun rejectsTraversalAndAbsoluteTargetsAtConstruction() {
         val root = File(System.getProperty("java.io.tmpdir"), "siftalpha-spec-invalid")
         root.mkdirs()
