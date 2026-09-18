@@ -881,4 +881,21 @@ completed on a real Android device with `Time: 0.958` and `OK (1 test)`. The evi
 - Added the R-only typed `EmbeddedPythonWorkerExecutionSnapshotV1` Parcelable and one-transaction Binder STATUS path. Scalar execution getters remain only for Slice 4–6 compatibility and diagnostics.
 - The snapshot captures Worker process identity/lifecycle, binding identity, current execution identity, project paths, `stopRequested`, and bounded terminal output from immutable process/execution state captures.
 - Terminal results remain sealed until a later execution is accepted; Binder clients can recover the current execution identity after reconnect, while a fresh Worker process starts with a new `WorkerInstanceId` and an empty execution slot.
-- Slice 7 source and JVM/instrumentation coverage are present. CI compiles the instrumentation APK; Slice 7 real-device instrumentation has not yet been executed.
+- Slice 7 source and JVM/instrumentation coverage are present. The real-device instrumentation
+  `EmbeddedPythonWorkerExecutionSnapshotInstrumentedTest#workerSnapshotSurvivesBinderReconnectAndFencesProcessLifetime`
+  completed with `Time: 1.608` and `OK (1 test)`. The cross-domain stabilization race is covered
+  by deterministic JVM tests.
+
+## 2026-09-18 · alpha44 Slice 8 — Production Worker Supervisor Foundation
+
+- Added the R-only `EmbeddedPythonWorkerSupervisor` connection/lifetime foundation without
+  connecting it to the Management layer or normal-user flow.
+- The Supervisor uses explicit bind/connect and disconnect/reconnect, typed
+  `WorkerExecutionSnapshotV1` refresh, `linkToDeath`, and connection-epoch fencing for stale
+  ServiceConnection and Binder callbacks.
+- Worker loss transitions to `CONNECTION_LOST`, clears the live Worker snapshot, and preserves
+  only `lastWorkerInstanceId` for process-epoch diagnostics. There is no automatic reconnect,
+  Worker restart, RuntimeLoadBinding rebind, or project restart.
+- Slice 8 source, JVM state-machine coverage, and instrumentation source are present; CI only
+  compiles the instrumentation APK. Slice 8 real-device instrumentation has not yet been
+  executed.
