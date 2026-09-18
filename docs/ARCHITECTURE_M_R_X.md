@@ -467,3 +467,29 @@ alpha43 的真实 Android 真机验收确认了当前 M-facing Trigger → Lifec
 这些验收结果不改变 canonical architecture：M 管，R 跑，X = M + R。它们也不代表 Embedded R、完整 R、完整 X 或 production-grade M ↔ R 已完成。Production external runtime 仍主要依赖 Termux + PRoot + Ubuntu + Python；Embedded CPython 仍是 R 的一个实现方向。
 
 alpha43 real-device acceptance = PASS；下一项正式研究为 R Environment & Dependency Model Architecture Audit。
+
+
+## 14. R Compatibility Invariant and Automatic Execution-Space Routing
+
+R development is capability-expanding, not replacement-by-regression. A new execution architecture,
+Worker process, dependency model, or isolation boundary must not silently make a previously accepted
+project class unusable. The engineering invariant is:
+
+`SupportedProjects(R_new) ⊇ AcceptedRegressionProjects(R_previous)`.
+
+Execution-space selection is an M responsibility and should be invisible to normal users. Importing a
+project must not require the user to understand Embedded R, Worker R, Termux, PRoot, or provider
+internals. M detects project/runtime facts, selects a compatible execution space, and retains explicit
+provider selection only as an internal/diagnostic escape hatch.
+
+Dependency manifests and protected-configuration metadata are capability evidence, not automatic
+prohibitions. They may influence preparation, environment binding, secret injection, or provider
+selection, but their mere presence must not revoke the already-accepted alpha32 file-backed Embedded R
+boundary. AUTO routing may select the External Provider when execution semantics actually differ
+(for example, a supplemental runtime or a non-direct declared launch command), while the legacy
+Embedded R path remains available for the project classes it previously accepted.
+
+The dedicated Worker/Supervisor architecture introduced in alpha44 is an additional R execution
+foundation. It does not replace the existing production Embedded R path until capability parity and
+real-device regression coverage are demonstrated. Production migration must therefore be incremental
+and guarded by compatibility tests, including real projects such as long-running network automation.

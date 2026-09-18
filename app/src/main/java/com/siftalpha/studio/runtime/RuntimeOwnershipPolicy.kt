@@ -33,5 +33,7 @@ object RuntimeOwnershipPolicy {
     fun afterAcceptedStart(request: RuntimeControlRequest): RuntimeOwnership = when (request) {
         RuntimeControlRequest.EMBEDDED_R -> RuntimeOwnership.EMBEDDED_R
         RuntimeControlRequest.EXTERNAL_PROVIDER -> RuntimeOwnership.EXTERNAL_PROVIDER
+        RuntimeControlRequest.AUTO ->
+            error("AUTO must be resolved to a concrete control path before ownership is recorded")
     }
 }

@@ -899,3 +899,40 @@ completed on a real Android device with `Time: 0.958` and `OK (1 test)`. The evi
 - Slice 8 source, JVM state-machine coverage, and instrumentation source are present; CI only
   compiles the instrumentation APK. Slice 8 real-device instrumentation has not yet been
   executed.
+
+
+## 2026-09-18 · alpha44 R Compatibility Repair — Automatic Execution-Space Foundation
+
+### Product invariant
+
+This repair restores the intended product direction: users import a project and use it; they are not
+required to understand or choose Embedded R versus External Provider. R evolves by adding compatible
+execution spaces and capabilities, not by sacrificing project classes that already worked.
+
+The compatibility baseline is monotonic for accepted regressions:
+
+`SupportedProjects(R_new) ⊇ AcceptedRegressionProjects(R_previous)`.
+
+### Routing repair
+
+- Standard project cards no longer expose the execution-space selector.
+- START now resolves execution space automatically from current project/runtime facts.
+- Python projects with the accepted file-backed entrypoint boundary can continue into Embedded R.
+- A non-Python project, unresolved Embedded R entrypoint, unavailable Embedded R runtime, supplemental
+  runtime, or non-direct declared launch command can route to the External Provider automatically.
+- Dependency-manifest presence and protected-configuration metadata are no longer hard bans on
+  Embedded R. They remain capability evidence for future environment/configuration work.
+- Runtime recovery is based on actual active Embedded R ownership rather than a stale persisted
+  provider preference.
+
+### alpha44 Worker boundary
+
+Slice 1–8 Worker/Snapshot/Supervisor work is retained unchanged. This repair does not migrate
+production START/STATUS/STOP to the Worker and does not delete the existing Embedded R production
+path. Worker migration remains gated on capability parity.
+
+### Verification status
+
+JVM/CI coverage is updated for automatic routing and compatibility semantics. Real-device regression
+for the user's Oracle Cloud long-running project remains pending and must be executed after Source + CI
+review before this compatibility repair is considered closed.

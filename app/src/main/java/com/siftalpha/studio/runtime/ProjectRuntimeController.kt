@@ -87,7 +87,7 @@ class ProjectRuntimeController(
             }
         }
 
-        if (action != Action.START || request != RuntimeControlRequest.EMBEDDED_R) {
+        if (action != Action.START || request == RuntimeControlRequest.EXTERNAL_PROVIDER) {
             return RuntimeControlDecision(
                 path = RuntimeControlPath.EXTERNAL_PROVIDER,
                 reason = RuntimeControlReason.EXPLICIT_EXTERNAL_PROVIDER,

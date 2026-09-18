@@ -9,10 +9,13 @@ import com.siftalpha.studio.project.EmbeddedPythonEntrypointPolicy
  * whether the already accepted Embedded CPython boundary can own this particular START.
  */
 enum class RuntimeControlRequest {
-    /** Preserve the existing Termux/External Provider default control path. */
+    /** Let SiftAlpha choose the execution space from project/runtime capability facts. */
+    AUTO,
+
+    /** Force the External Provider path. Kept for diagnostics and explicit internal callers. */
     EXTERNAL_PROVIDER,
 
-    /** Explicit opt-in from the existing "Run with Embedded R" action. */
+    /** Force the legacy Embedded R path when its file-backed Python boundary is compatible. */
     EMBEDDED_R,
 }
 
@@ -63,39 +66,59 @@ object EmbeddedPythonCapabilityRouting {
                 reason = RuntimeControlReason.EXPLICIT_EXTERNAL_PROVIDER,
             )
         }
+
+        fun unavailable(reason: RuntimeControlReason): RuntimeControlDecision =
+            if (request == RuntimeControlRequest.AUTO) {
+                RuntimeControlDecision(RuntimeControlPath.EXTERNAL_PROVIDER, reason)
+            } else {
+                rejected(reason)
+            }
+
         if (!facts.embeddedRuntimeAvailable) {
-            return rejected(RuntimeControlReason.EMBEDDED_R_UNAVAILABLE)
+            return unavailable(RuntimeControlReason.EMBEDDED_R_UNAVAILABLE)
         }
 
         val resolved = facts.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
-            ?: return rejected(RuntimeControlReason.RUNTIME_SELECTION_UNRESOLVED)
+            ?: return unavailable(RuntimeControlReason.RUNTIME_SELECTION_UNRESOLVED)
         if (resolved.primary != RuntimeKind.PYTHON) {
-            return rejected(RuntimeControlReason.RUNTIME_NOT_PYTHON)
-        }
-        if (resolved.supplemental.isNotEmpty()) {
-            return rejected(RuntimeControlReason.SUPPLEMENTAL_RUNTIME_UNSUPPORTED)
-        }
-        if (facts.hasProtectedConfigurationRequirement) {
-            return rejected(RuntimeControlReason.PROTECTED_CONFIGURATION_REQUIRED)
-        }
-        if (facts.hasExternalDependencyRequirement) {
-            return rejected(RuntimeControlReason.DEPENDENCY_ENVIRONMENT_REQUIRED)
+            return unavailable(RuntimeControlReason.RUNTIME_NOT_PYTHON)
         }
 
         val safeEntrypoint = facts.resolvedEntrypoint
             ?.let(EmbeddedPythonEntrypointPolicy::safeRelativePath)
-            ?: return rejected(RuntimeControlReason.ENTRYPOINT_UNRESOLVED)
+            ?: return unavailable(RuntimeControlReason.ENTRYPOINT_UNRESOLVED)
         val projectFiles = facts.relativePaths
             .asSequence()
             .mapNotNull(EmbeddedPythonEntrypointPolicy::safeRelativePath)
             .toSet()
         if (safeEntrypoint !in projectFiles) {
-            return rejected(RuntimeControlReason.ENTRYPOINT_NOT_IN_PROJECT)
+            return unavailable(RuntimeControlReason.ENTRYPOINT_NOT_IN_PROJECT)
         }
 
-        val declaredRun = facts.declaredRun?.trim().orEmpty()
-        if (declaredRun.isNotBlank() && !isDirectPythonRun(declaredRun, safeEntrypoint)) {
-            return rejected(RuntimeControlReason.DECLARED_RUN_UNSUPPORTED)
+        /*
+         * Compatibility invariant:
+         * dependency/configuration metadata is evidence about what the project may need, not a
+         * prohibition on the file-backed Embedded R boundary. alpha32 could execute such projects;
+         * later routing must not make that already-working set smaller.
+         *
+         * AUTO remains conservative where execution semantics really differ: a supplemental runtime
+         * or a non-direct declared command is routed to the External Provider. An explicit internal
+         * Embedded R request still preserves the legacy file-backed behavior.
+         */
+        if (request == RuntimeControlRequest.AUTO) {
+            if (resolved.supplemental.isNotEmpty()) {
+                return RuntimeControlDecision(
+                    RuntimeControlPath.EXTERNAL_PROVIDER,
+                    RuntimeControlReason.SUPPLEMENTAL_RUNTIME_UNSUPPORTED,
+                )
+            }
+            val declaredRun = facts.declaredRun?.trim().orEmpty()
+            if (declaredRun.isNotBlank() && !isDirectPythonRun(declaredRun, safeEntrypoint)) {
+                return RuntimeControlDecision(
+                    RuntimeControlPath.EXTERNAL_PROVIDER,
+                    RuntimeControlReason.DECLARED_RUN_UNSUPPORTED,
+                )
+            }
         }
 
         return RuntimeControlDecision(

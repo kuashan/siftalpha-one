@@ -20,11 +20,22 @@ class EmbeddedPythonCapabilityRoutingTest {
     }
 
     @Test
-    fun defaultRequestRemainsExternalProvider() {
+    fun autoPurePythonProjectRoutesToEmbeddedR() {
         val decision = EmbeddedPythonCapabilityRouting.resolve(
             facts(
                 paths = listOf("main.py", "helper.py"),
+                declaredRun = "python main.py",
             ),
+            request = RuntimeControlRequest.AUTO,
+        )
+
+        assertEquals(RuntimeControlPath.EMBEDDED_R, decision.path)
+    }
+
+    @Test
+    fun explicitExternalProviderRequestStaysExternal() {
+        val decision = EmbeddedPythonCapabilityRouting.resolve(
+            facts(paths = listOf("main.py", "helper.py")),
             request = RuntimeControlRequest.EXTERNAL_PROVIDER,
         )
 
@@ -33,7 +44,21 @@ class EmbeddedPythonCapabilityRoutingTest {
     }
 
     @Test
-    fun nonPythonProjectIsRejectedFromEmbeddedR() {
+    fun autoNonPythonProjectFallsBackToExternalProvider() {
+        val decision = EmbeddedPythonCapabilityRouting.resolve(
+            facts(
+                paths = listOf("package.json", "index.js"),
+                declaredType = "nodejs",
+            ),
+            request = RuntimeControlRequest.AUTO,
+        )
+
+        assertEquals(RuntimeControlPath.EXTERNAL_PROVIDER, decision.path)
+        assertEquals(RuntimeControlReason.RUNTIME_NOT_PYTHON, decision.reason)
+    }
+
+    @Test
+    fun explicitNonPythonProjectIsRejectedFromEmbeddedR() {
         val decision = EmbeddedPythonCapabilityRouting.resolve(
             facts(
                 paths = listOf("package.json", "index.js"),
@@ -46,19 +71,20 @@ class EmbeddedPythonCapabilityRoutingTest {
     }
 
     @Test
-    fun supplementalRuntimeIsRejected() {
+    fun autoSupplementalRuntimeFallsBackToExternalProvider() {
         val decision = EmbeddedPythonCapabilityRouting.resolve(
             facts(
                 paths = listOf("main.py", "frontend/package.json", "frontend/index.js"),
             ),
+            request = RuntimeControlRequest.AUTO,
         )
 
-        assertEquals(RuntimeControlPath.REJECTED, decision.path)
+        assertEquals(RuntimeControlPath.EXTERNAL_PROVIDER, decision.path)
         assertEquals(RuntimeControlReason.SUPPLEMENTAL_RUNTIME_UNSUPPORTED, decision.reason)
     }
 
     @Test
-    fun dependencyEnvironmentRequirementFallsBackFromEmbeddedR() {
+    fun dependencyMetadataDoesNotShrinkLegacyEmbeddedRCompatibility() {
         val decision = EmbeddedPythonCapabilityRouting.resolve(
             facts(
                 paths = listOf("main.py", "requirements.txt"),
@@ -66,12 +92,25 @@ class EmbeddedPythonCapabilityRoutingTest {
             ),
         )
 
-        assertEquals(RuntimeControlPath.REJECTED, decision.path)
-        assertEquals(RuntimeControlReason.DEPENDENCY_ENVIRONMENT_REQUIRED, decision.reason)
+        assertEquals(RuntimeControlPath.EMBEDDED_R, decision.path)
     }
 
     @Test
-    fun protectedConfigurationRequirementFallsBackFromEmbeddedR() {
+    fun autoDependencyMetadataCanStillUseEmbeddedR() {
+        val decision = EmbeddedPythonCapabilityRouting.resolve(
+            facts(
+                paths = listOf("main.py", "requirements.txt"),
+                declaredRun = "python main.py",
+                hasExternalDependencyRequirement = true,
+            ),
+            request = RuntimeControlRequest.AUTO,
+        )
+
+        assertEquals(RuntimeControlPath.EMBEDDED_R, decision.path)
+    }
+
+    @Test
+    fun protectedConfigurationMetadataDoesNotShrinkLegacyEmbeddedRCompatibility() {
         val decision = EmbeddedPythonCapabilityRouting.resolve(
             facts(
                 paths = listOf("main.py"),
@@ -79,47 +118,62 @@ class EmbeddedPythonCapabilityRoutingTest {
             ),
         )
 
-        assertEquals(RuntimeControlPath.REJECTED, decision.path)
-        assertEquals(RuntimeControlReason.PROTECTED_CONFIGURATION_REQUIRED, decision.reason)
+        assertEquals(RuntimeControlPath.EMBEDDED_R, decision.path)
     }
 
     @Test
-    fun unresolvedEntrypointIsRejectedWithoutGuessing() {
-        val decision = EmbeddedPythonCapabilityRouting.resolve(
+    fun unresolvedEntrypointFallsBackAutomaticallyButExplicitEmbeddedRejects() {
+        val auto = EmbeddedPythonCapabilityRouting.resolve(
+            facts(
+                paths = listOf("first.py", "second.py"),
+                resolvedEntrypoint = null,
+            ),
+            request = RuntimeControlRequest.AUTO,
+        )
+        val explicit = EmbeddedPythonCapabilityRouting.resolve(
             facts(
                 paths = listOf("first.py", "second.py"),
                 resolvedEntrypoint = null,
             ),
         )
 
-        assertEquals(RuntimeControlPath.REJECTED, decision.path)
-        assertEquals(RuntimeControlReason.ENTRYPOINT_UNRESOLVED, decision.reason)
+        assertEquals(RuntimeControlPath.EXTERNAL_PROVIDER, auto.path)
+        assertEquals(RuntimeControlPath.REJECTED, explicit.path)
+        assertEquals(RuntimeControlReason.ENTRYPOINT_UNRESOLVED, explicit.reason)
     }
 
     @Test
-    fun arbitraryRunCommandDoesNotEnterFileBackedEmbeddedBoundary() {
-        val decision = EmbeddedPythonCapabilityRouting.resolve(
-            facts(
-                paths = listOf("main.py"),
-                declaredRun = "python -m package",
-            ),
+    fun nonDirectDeclaredRunUsesExternalProviderAutomaticallyButExplicitEmbeddedKeepsLegacyEntry() {
+        val facts = facts(
+            paths = listOf("main.py"),
+            declaredRun = "python -m package",
         )
+        val auto = EmbeddedPythonCapabilityRouting.resolve(
+            facts,
+            request = RuntimeControlRequest.AUTO,
+        )
+        val explicit = EmbeddedPythonCapabilityRouting.resolve(facts)
 
-        assertEquals(RuntimeControlPath.REJECTED, decision.path)
-        assertEquals(RuntimeControlReason.DECLARED_RUN_UNSUPPORTED, decision.reason)
+        assertEquals(RuntimeControlPath.EXTERNAL_PROVIDER, auto.path)
+        assertEquals(RuntimeControlReason.DECLARED_RUN_UNSUPPORTED, auto.reason)
+        assertEquals(RuntimeControlPath.EMBEDDED_R, explicit.path)
     }
 
     @Test
-    fun unavailableEmbeddedRuntimeIsRejected() {
-        val decision = EmbeddedPythonCapabilityRouting.resolve(
-            facts(
-                paths = listOf("main.py"),
-                embeddedRuntimeAvailable = false,
-            ),
+    fun unavailableEmbeddedRuntimeFallsBackAutomaticallyButExplicitEmbeddedRejects() {
+        val facts = facts(
+            paths = listOf("main.py"),
+            embeddedRuntimeAvailable = false,
         )
+        val auto = EmbeddedPythonCapabilityRouting.resolve(
+            facts,
+            request = RuntimeControlRequest.AUTO,
+        )
+        val explicit = EmbeddedPythonCapabilityRouting.resolve(facts)
 
-        assertEquals(RuntimeControlPath.REJECTED, decision.path)
-        assertEquals(RuntimeControlReason.EMBEDDED_R_UNAVAILABLE, decision.reason)
+        assertEquals(RuntimeControlPath.EXTERNAL_PROVIDER, auto.path)
+        assertEquals(RuntimeControlPath.REJECTED, explicit.path)
+        assertEquals(RuntimeControlReason.EMBEDDED_R_UNAVAILABLE, explicit.reason)
     }
 
     private fun facts(
@@ -135,7 +189,10 @@ class EmbeddedPythonCapabilityRoutingTest {
             relativePaths = paths,
             declaredType = declaredType,
         )
-        assertTrue("test setup must resolve a single runtime", selection is ProjectRuntimeExecutionPlanner.Selection.Resolved)
+        assertTrue(
+            "test setup must resolve a single runtime",
+            selection is ProjectRuntimeExecutionPlanner.Selection.Resolved,
+        )
         return EmbeddedPythonCapabilityFacts(
             selection = selection,
             relativePaths = paths,

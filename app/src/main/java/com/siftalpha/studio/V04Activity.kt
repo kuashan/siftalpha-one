@@ -576,7 +576,7 @@ open class V04Activity : StudioActivity() {
         }
         val embeddedRuntimeState = embeddedSnapshot?.let { EmbeddedPythonRuntimeStateMapping.toRuntimeState(it) }
         val typedState = embeddedRuntimeState ?: typedStates[stateKey] ?: RuntimeState.UNKNOWN
-        val runtimeSelection = projectRuntimeSelectionStore.read(stateKey)
+        val runtimeSelection = automaticRuntimeSelection(project)
         val embeddedObservationOwned = embeddedSnapshot != null
         val embeddedActive = embeddedSnapshot?.let(::isEmbeddedActive) == true
         val webSnapshot = webStateStore.snapshot(stateKey)
@@ -722,28 +722,8 @@ open class V04Activity : StudioActivity() {
             setTextColor(Color.rgb(150, 157, 169))
             setPadding(0, dp(3), 0, 0)
         })
-        box.addView(text(
-            getString(R.string.runtime_selection_current, runtimeSelectionLabel(runtimeSelection)),
-            12f,
-            false,
-        ).apply {
-            setTextColor(Color.rgb(170, 204, 235))
-            setPadding(0, dp(2), 0, 0)
-        })
-        box.addView(smallButton(getString(R.string.runtime_selection_change)) {
-            showRuntimeSelectionDialog(project)
-        }.apply {
-            isEnabled = typedState !in ACTIVE_RUNTIME_STATES &&
-                !pending.values.any { item ->
-                    item.documentId == stateKey ||
-                        (item.documentId == null && item.folderName == project.folderName)
-                } &&
-                stateKey !in embeddedStartInFlight
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(4) }
-        })
+        // Execution-space selection is automatic. Normal users should not need to understand
+        // Embedded R versus External Provider merely to run an imported project.
         box.addView(text("▶ ${summary.run}", 12f, false).apply {
             setTextColor(Color.rgb(150, 157, 169))
             typeface = Typeface.MONOSPACE
@@ -1029,11 +1009,42 @@ open class V04Activity : StudioActivity() {
         return box
     }
 
+    private fun automaticRuntimeSelection(
+        project: V04ProjectGateway.RuntimeProject,
+    ): ProjectRuntimeSelection {
+        val resolved = project.runtimeSelection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
+        return if (resolved?.primary == RuntimeKind.PYTHON) {
+            ProjectRuntimeSelection.EMBEDDED_R
+        } else {
+            ProjectRuntimeSelection.TERMUX
+        }
+    }
+
+    private fun selectedRuntimeControlRequest(project: V04ProjectGateway.RuntimeProject): RuntimeControlRequest {
+        val requiredConfiguration = runCatching {
+            configurationUi.snapshot(
+                project.summary.documentId,
+                project.folderName,
+            ).preflight.requiredCount > 0
+        }.getOrDefault(false)
+        val decision = runCatching {
+            runtime.resolveControlPath(
+                project = project,
+                action = ProjectRuntimeController.Action.START,
+                request = RuntimeControlRequest.AUTO,
+                requiredConfiguration = requiredConfiguration,
+            )
+        }.getOrNull()
+        return if (decision?.path == RuntimeControlPath.EMBEDDED_R) {
+            RuntimeControlRequest.EMBEDDED_R
+        } else {
+            RuntimeControlRequest.EXTERNAL_PROVIDER
+        }
+    }
+
+    // Retained only as an internal compatibility hook for existing stored diagnostics.
     private fun selectedRuntimeSelection(project: V04ProjectGateway.RuntimeProject): ProjectRuntimeSelection =
         projectRuntimeSelectionStore.read(project.summary.documentId)
-
-    private fun selectedRuntimeControlRequest(project: V04ProjectGateway.RuntimeProject): RuntimeControlRequest =
-        selectedRuntimeSelection(project).controlRequest
 
     private fun runtimeSelectionLabel(selection: ProjectRuntimeSelection): String = getString(
         when (selection) {
@@ -1155,9 +1166,15 @@ open class V04Activity : StudioActivity() {
             val key = project.summary.documentId
             restoreStoredState(key)
             val cached = lifecycleStore.read(key)
-            if (projectRuntimeSelectionStore.read(key) != ProjectRuntimeSelection.TERMUX) {
-                // Embedded R owns its own snapshot/polling path; never issue Termux recovery probes
-                // for a project explicitly owned by Embedded R.
+            val embeddedSnapshot = runCatching {
+                runtime.embeddedPythonSnapshotFor(key)
+            }.getOrNull()
+            if (
+                embeddedSnapshot != null &&
+                ownsEmbeddedObservation(key, embeddedSnapshot) &&
+                isEmbeddedActive(embeddedSnapshot)
+            ) {
+                // Recover from actual runtime ownership, never from a stale user-selected provider.
                 recoveryProjects.remove(key)
                 return@forEach
             }
