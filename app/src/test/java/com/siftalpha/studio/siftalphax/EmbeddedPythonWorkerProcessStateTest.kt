@@ -24,6 +24,7 @@ class EmbeddedPythonWorkerProcessStateTest {
             state.bindingState(),
         )
         assertEquals(binding.processBindingId.value, state.boundProcessBindingId())
+        assertEquals(binding, state.boundRuntimeLoadBinding())
     }
 
     @Test
@@ -34,6 +35,7 @@ class EmbeddedPythonWorkerProcessStateTest {
         assertEquals(EmbeddedPythonWorkerProtocol.BOUND_NEW, state.bind(request(binding)))
         assertEquals(EmbeddedPythonWorkerProtocol.BOUND_SAME, state.bind(request(binding)))
         assertEquals(binding.processBindingId.value, state.boundProcessBindingId())
+        assertEquals(binding, state.boundRuntimeLoadBinding())
     }
 
     @Test
@@ -48,6 +50,7 @@ class EmbeddedPythonWorkerProcessStateTest {
             state.bind(request(second)),
         )
         assertEquals(first.processBindingId.value, state.boundProcessBindingId())
+        assertEquals(first, state.boundRuntimeLoadBinding())
     }
 
     @Test

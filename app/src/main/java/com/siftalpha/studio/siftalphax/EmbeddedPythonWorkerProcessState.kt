@@ -36,6 +36,26 @@ object EmbeddedPythonWorkerProtocol {
     const val CPYTHON_SMOKE_START_REJECTED_NOT_BOUND = 4
     const val CPYTHON_SMOKE_START_REJECTED_WORKER_TERMINATING = 5
     const val CPYTHON_SMOKE_START_REJECTED_WRONG_PROCESS = 6
+    const val CPYTHON_SMOKE_START_REJECTED_RUNTIME_BUSY = 7
+
+    const val PROJECT_EXECUTION_NOT_STARTED = 0
+    const val PROJECT_EXECUTION_PREPARING = 1
+    const val PROJECT_EXECUTION_STARTING = 2
+    const val PROJECT_EXECUTION_RUNNING = 3
+    const val PROJECT_EXECUTION_SUCCEEDED = 4
+    const val PROJECT_EXECUTION_FAILED = 5
+    const val PROJECT_EXECUTION_STOPPED = 6
+    const val PROJECT_EXECUTION_INTERNAL_ERROR = 7
+
+    const val PROJECT_EXECUTION_START_ACCEPTED = 0
+    const val PROJECT_EXECUTION_START_REJECTED_INVALID_REQUEST = 1
+    const val PROJECT_EXECUTION_START_REJECTED_IDENTITY_MISMATCH = 2
+    const val PROJECT_EXECUTION_START_REJECTED_NOT_BOUND = 3
+    const val PROJECT_EXECUTION_START_REJECTED_WORKER_TERMINATING = 4
+    const val PROJECT_EXECUTION_START_REJECTED_WRONG_PROCESS = 5
+    const val PROJECT_EXECUTION_START_REJECTED_BUSY = 6
+    const val PROJECT_EXECUTION_START_REJECTED_RUNTIME_MODE_CONFLICT = 7
+    const val PROJECT_EXECUTION_START_REJECTED_UNSUPPORTED_DEPENDENCY_LAYER = 8
 }
 
 data class EmbeddedPythonWorkerBindRequest(
@@ -57,6 +77,7 @@ class EmbeddedPythonWorkerProcessState(
     val workerInstanceId: String = "worker-${UUID.randomUUID()}",
 ) {
     private var boundProcessBindingId: ProcessBindingId? = null
+    private var boundRuntimeLoadBinding: RuntimeLoadBindingV1? = null
     private var lifecycleState = EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_ACTIVE
 
     init {
@@ -73,6 +94,10 @@ class EmbeddedPythonWorkerProcessState(
     @Synchronized
     fun boundProcessBindingId(): String = boundProcessBindingId?.value.orEmpty()
 
+    /** R-only immutable binding facts captured at BOUND_NEW and never replaced in this process. */
+    @Synchronized
+    fun boundRuntimeLoadBinding(): RuntimeLoadBindingV1? = boundRuntimeLoadBinding
+
     @Synchronized
     fun workerLifecycleState(): Int = lifecycleState
 
@@ -81,8 +106,8 @@ class EmbeddedPythonWorkerProcessState(
      */
     @Synchronized
     fun bind(request: EmbeddedPythonWorkerBindRequest): Int {
-        val requestedBindingId = try {
-            val binding = RuntimeLoadBindingV1(
+        val binding = try {
+            RuntimeLoadBindingV1(
                 projectIdentity = requireNotNull(request.projectIdentity),
                 projectSourceGeneration = ProjectSourceGeneration.of(
                     requireNotNull(request.projectSourceGeneration),
@@ -94,6 +119,10 @@ class EmbeddedPythonWorkerProcessState(
                     requireNotNull(request.dependencyLayerBinding),
                 ),
             )
+        } catch (_: IllegalArgumentException) {
+            return EmbeddedPythonWorkerProtocol.REJECTED_INVALID_REQUEST
+        }
+        val requestedBindingId = try {
             val expectedBindingId = ProcessBindingId.parse(
                 requireNotNull(request.expectedProcessBindingId),
             )
@@ -114,6 +143,7 @@ class EmbeddedPythonWorkerProcessState(
         return when {
             existingBindingId == null -> {
                 boundProcessBindingId = requestedBindingId
+                boundRuntimeLoadBinding = binding
                 EmbeddedPythonWorkerProtocol.BOUND_NEW
             }
 

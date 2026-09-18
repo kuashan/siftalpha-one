@@ -13,10 +13,11 @@ import android.util.Log
 import java.io.File
 
 /**
- * R-only typed IPC endpoint for the future Embedded Python worker.
+ * R-only typed IPC endpoint for the Embedded Python worker foundation.
  *
- * Slice 3 extends the dedicated-process and RuntimeLoadBindingV1 handshake with a fenced
- * termination primitive; no runtime execution is performed here.
+ * The dedicated process now exposes the Slice 4 CPython smoke and Slice 5 finite, file-backed
+ * execution foundation. These contracts are intentionally not connected to the Management layer
+ * or the normal-user project flow.
  */
 class EmbeddedPythonWorkerService : Service() {
     private val binder = object : IEmbeddedPythonWorker.Stub() {
@@ -126,6 +127,65 @@ class EmbeddedPythonWorkerService : Service() {
         override fun getCpythonSmokePythonPid(): Int = smokeController.snapshot().pythonPid
 
         override fun getCpythonSmokeSessionId(): String = smokeController.snapshot().sessionId
+
+        override fun startProjectExecutionV1(
+            expectedWorkerInstanceId: String?,
+            expectedProcessBindingId: String?,
+            executionRoot: String?,
+            entrypoint: String?,
+            workingDirectory: String?,
+        ): Int {
+            if (Binder.getCallingUid() != applicationInfo.uid) {
+                return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_START_REJECTED_INVALID_REQUEST
+            }
+            if (Binder.getCallingPid() == Process.myPid() || !isDedicatedWorkerProcess()) {
+                return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_START_REJECTED_WRONG_PROCESS
+            }
+
+            val result = projectController.start(
+                context = applicationContext,
+                expectedWorkerInstanceId = expectedWorkerInstanceId,
+                expectedProcessBindingId = expectedProcessBindingId,
+                executionRoot = executionRoot,
+                entrypoint = entrypoint,
+                workingDirectory = workingDirectory,
+            )
+            Log.i(
+                TAG,
+                "project execution start result=$result pid=${Process.myPid()} " +
+                    "workerInstanceId=${processState.workerInstanceId} " +
+                    "bindingState=${processState.bindingState()}",
+            )
+            return result
+        }
+
+        override fun getProjectExecutionState(): Int = projectController.snapshot().state
+
+        override fun getProjectExecutionSessionId(): String =
+            projectController.snapshot().sessionId
+
+        override fun getProjectExecutionGeneration(): Long =
+            projectController.snapshot().generation
+
+        override fun getProjectExecutionProjectIdentity(): String =
+            projectController.snapshot().projectIdentity
+
+        override fun getProjectExecutionRoot(): String = projectController.snapshot().executionRoot
+
+        override fun getProjectExecutionEntrypoint(): String =
+            projectController.snapshot().entrypoint
+
+        override fun getProjectExecutionWorkingDirectory(): String =
+            projectController.snapshot().workingDirectory
+
+        override fun hasProjectExecutionExitCode(): Boolean =
+            projectController.snapshot().hasExitCode
+
+        override fun getProjectExecutionExitCode(): Int = projectController.snapshot().exitCode
+
+        override fun getProjectExecutionStdout(): String = projectController.snapshot().stdout
+
+        override fun getProjectExecutionStderr(): String = projectController.snapshot().stderr
     }
 
     private val terminationHandler by lazy(LazyThreadSafetyMode.NONE) {
@@ -182,6 +242,14 @@ class EmbeddedPythonWorkerService : Service() {
         // Companion object state is process-local. Service recreation in this process cannot
         // reset the binding; a fresh OS worker process creates a fresh state object instead.
         private val processState = EmbeddedPythonWorkerProcessState()
-        private val smokeController = EmbeddedPythonWorkerCpythonSmokeController(processState)
+        private val runtimeUseGate = EmbeddedPythonWorkerRuntimeUseGate()
+        private val smokeController = EmbeddedPythonWorkerCpythonSmokeController(
+            processState = processState,
+            runtimeUseGate = runtimeUseGate,
+        )
+        private val projectController = EmbeddedPythonWorkerProjectExecutionController(
+            processState = processState,
+            runtimeUseGate = runtimeUseGate,
+        )
     }
 }

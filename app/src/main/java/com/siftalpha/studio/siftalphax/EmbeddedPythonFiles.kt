@@ -14,7 +14,12 @@ object EmbeddedPythonFiles {
         val home = File(root, "python")
         val marker = File(home, READY_MARKER)
         if (!marker.isFile || !File(home, "lib/python3.14/os.py").isFile) {
-            root.deleteRecursively()
+            check(!home.exists() || home.deleteRecursively()) {
+                "Unable to clear incomplete private CPython directory"
+            }
+            check(root.mkdirs() || root.isDirectory) {
+                "Unable to create private SiftAlpha X directory"
+            }
             check(home.mkdirs() || home.isDirectory) { "Unable to create private CPython directory" }
             copyAssetTree(context, ASSET_ROOT, home)
             check(File(home, "lib/python3.14/os.py").isFile) {

@@ -79,6 +79,10 @@ data class EmbeddedPythonExecutionSpec(
 
     companion object {
         private val SESSION_ID_PATTERN = Regex("[A-Za-z0-9._-]+")
+
+        internal fun isSafeRelativePath(value: String, allowCurrent: Boolean): Boolean =
+            safeRelativePath(value, allowCurrent)
+
         private fun safeRelativePath(value: String, allowCurrent: Boolean): Boolean {
             if (value.isBlank() || value.startsWith("/") || value.contains('\u0000')) {
                 return false

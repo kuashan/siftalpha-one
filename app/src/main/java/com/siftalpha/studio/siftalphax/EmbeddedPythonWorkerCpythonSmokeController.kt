@@ -15,17 +15,32 @@ import java.util.concurrent.Executors
  */
 class EmbeddedPythonWorkerCpythonSmokeController(
     private val processState: EmbeddedPythonWorkerProcessState,
+    private val runtimeUseGate: EmbeddedPythonWorkerRuntimeUseGate,
 ) {
     private val smokeState = EmbeddedPythonWorkerCpythonSmokeState()
     private val executor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "SiftAlphaWorkerCpythonSmoke").apply { isDaemon = true }
     }
 
+    @Synchronized
     fun start(
         context: Context,
         expectedWorkerInstanceId: String?,
         expectedProcessBindingId: String?,
     ): Int {
+        if (
+            smokeState.snapshot().state !=
+                EmbeddedPythonWorkerProtocol.CPYTHON_SMOKE_NOT_STARTED
+        ) {
+            return EmbeddedPythonWorkerProtocol.CPYTHON_SMOKE_START_ALREADY_STARTED
+        }
+        when (runtimeUseGate.tryAcquire(EmbeddedPythonWorkerRuntimeUseGate.Owner.CPYTHON_SMOKE)) {
+            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.SAME_OWNER_BUSY,
+            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.OTHER_OWNER_BUSY,
+            -> return EmbeddedPythonWorkerProtocol.CPYTHON_SMOKE_START_REJECTED_RUNTIME_BUSY
+
+            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.ACQUIRED -> Unit
+        }
         val result = smokeState.start(
             expectedWorkerInstanceId = expectedWorkerInstanceId,
             expectedProcessBindingId = expectedProcessBindingId,
@@ -34,8 +49,19 @@ class EmbeddedPythonWorkerCpythonSmokeController(
             bindingState = processState.bindingState(),
             workerLifecycleState = processState.workerLifecycleState(),
         )
-        if (result == EmbeddedPythonWorkerProtocol.CPYTHON_SMOKE_START_ACCEPTED) {
+        if (result != EmbeddedPythonWorkerProtocol.CPYTHON_SMOKE_START_ACCEPTED) {
+            runtimeUseGate.release(EmbeddedPythonWorkerRuntimeUseGate.Owner.CPYTHON_SMOKE)
+            return result
+        }
+        try {
             executor.execute { runSmoke(context.applicationContext) }
+        } catch (error: RuntimeException) {
+            smokeState.completeFailure(
+                exitCode = null,
+                stdout = "",
+                stderr = failureText("executor", error),
+            )
+            runtimeUseGate.release(EmbeddedPythonWorkerRuntimeUseGate.Owner.CPYTHON_SMOKE)
         }
         return result
     }
@@ -104,6 +130,7 @@ class EmbeddedPythonWorkerCpythonSmokeController(
             )
         } finally {
             runCatching { stagedRoot?.deleteRecursively() }
+            runtimeUseGate.release(EmbeddedPythonWorkerRuntimeUseGate.Owner.CPYTHON_SMOKE)
         }
     }
 
