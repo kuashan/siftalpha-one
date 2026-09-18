@@ -176,7 +176,10 @@ class EmbeddedPythonWheelInstallerV1(
                 if (mapped != null && !entry.isDirectory) {
                     require(occupied.add(mapped)) { "wheel file collision: $mapped" }
                     val target = safeTarget(staging, mapped)
-                    check(target.parentFile?.mkdirs() != false) { "unable to create wheel directory" }
+                    val parent = checkNotNull(target.parentFile)
+                    check(parent.mkdirs() || parent.isDirectory) {
+                        "unable to create wheel directory"
+                    }
                     FileOutputStream(target).use { output ->
                         val buffer = ByteArray(32 * 1024)
                         var fileBytes = 0L
