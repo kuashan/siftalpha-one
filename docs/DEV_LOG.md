@@ -984,3 +984,23 @@ internal diagnostic/compatibility path; normal users do not choose providers.
 
 This preserves the product contract: import project -> SiftAlpha detects requirements -> SiftAlpha
 chooses a compatible execution space. The user is not asked to rewrite code to fit a narrower runtime.
+
+
+## 2026-09-18 · alpha45 Slice 1 — Pure-Python Environment Lock Contract
+
+alpha45 starts after the accepted alpha44 process-isolated Worker foundation. This slice is R-only and
+does not connect the Worker to the normal-user Management flow.
+
+Implemented a bounded typed `pylock.toml` consumer for the Pure-Python Environment v1 preparation
+pipeline. It accepts only the frozen SiftAlpha v1 structural subset: lock-version 1.0, explicit
+requires-python, non-empty created-by, empty extras/dependency-groups/default-groups, package records,
+and exact wheel origins with positive size plus lowercase SHA-256. VCS, directory, archive and sdist
+package sources are rejected as unsupported. Project-local wheel paths are constrained to safe relative
+POSIX paths and remote wheel origins require HTTPS without embedded credentials.
+
+This slice deliberately does not resolve dependencies, access the network, evaluate markers or
+Requires-Python, select wheel tags, download/extract/install wheels, create site-packages, or modify M.
+Those remain later alpha45 slices. Existing External Provider behavior and alpha44 Worker execution
+contracts are unchanged.
+
+Version advances to `121 / 0.8.0-alpha45`.
