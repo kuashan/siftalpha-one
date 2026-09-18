@@ -34,12 +34,16 @@ class EmbeddedPythonWorkerCpythonSmokeController(
         ) {
             return EmbeddedPythonWorkerProtocol.CPYTHON_SMOKE_START_ALREADY_STARTED
         }
-        when (runtimeUseGate.tryAcquire(EmbeddedPythonWorkerRuntimeUseGate.Owner.CPYTHON_SMOKE)) {
-            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.SAME_OWNER_BUSY,
-            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.OTHER_OWNER_BUSY,
-            -> return EmbeddedPythonWorkerProtocol.CPYTHON_SMOKE_START_REJECTED_RUNTIME_BUSY
+        val smokeLease = when (
+            val acquire = runtimeUseGate.tryAcquire(
+                EmbeddedPythonWorkerRuntimeUseGate.Owner.CPYTHON_SMOKE,
+            )
+        ) {
+            is EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.Acquired -> acquire.lease
 
-            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.ACQUIRED -> Unit
+            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.SameOwnerBusy,
+            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.OtherOwnerBusy,
+            -> return EmbeddedPythonWorkerProtocol.CPYTHON_SMOKE_START_REJECTED_RUNTIME_BUSY
         }
         val result = smokeState.start(
             expectedWorkerInstanceId = expectedWorkerInstanceId,
@@ -50,25 +54,28 @@ class EmbeddedPythonWorkerCpythonSmokeController(
             workerLifecycleState = processState.workerLifecycleState(),
         )
         if (result != EmbeddedPythonWorkerProtocol.CPYTHON_SMOKE_START_ACCEPTED) {
-            runtimeUseGate.release(EmbeddedPythonWorkerRuntimeUseGate.Owner.CPYTHON_SMOKE)
+            runtimeUseGate.release(smokeLease)
             return result
         }
         try {
-            executor.execute { runSmoke(context.applicationContext) }
+            executor.execute { runSmoke(context.applicationContext, smokeLease) }
         } catch (error: RuntimeException) {
             smokeState.completeFailure(
                 exitCode = null,
                 stdout = "",
                 stderr = failureText("executor", error),
             )
-            runtimeUseGate.release(EmbeddedPythonWorkerRuntimeUseGate.Owner.CPYTHON_SMOKE)
+            runtimeUseGate.release(smokeLease)
         }
         return result
     }
 
     fun snapshot(): EmbeddedPythonWorkerCpythonSmokeSnapshot = smokeState.snapshot()
 
-    private fun runSmoke(context: Context) {
+    private fun runSmoke(
+        context: Context,
+        smokeLease: EmbeddedPythonWorkerRuntimeUseGate.Lease,
+    ) {
         var stagedRoot: File? = null
         try {
             // Runtime assets must exist before the fixture is staged. prepare() may rebuild the
@@ -130,7 +137,7 @@ class EmbeddedPythonWorkerCpythonSmokeController(
             )
         } finally {
             runCatching { stagedRoot?.deleteRecursively() }
-            runtimeUseGate.release(EmbeddedPythonWorkerRuntimeUseGate.Owner.CPYTHON_SMOKE)
+            runtimeUseGate.release(smokeLease)
         }
     }
 

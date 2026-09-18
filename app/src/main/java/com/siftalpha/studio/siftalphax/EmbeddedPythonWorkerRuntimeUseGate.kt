@@ -7,32 +7,47 @@ class EmbeddedPythonWorkerRuntimeUseGate {
         PROJECT_EXECUTION,
     }
 
-    enum class AcquireResult {
-        ACQUIRED,
-        SAME_OWNER_BUSY,
-        OTHER_OWNER_BUSY,
+    sealed class AcquireResult {
+        class Acquired internal constructor(
+            val lease: Lease,
+        ) : AcquireResult()
+
+        object SameOwnerBusy : AcquireResult()
+
+        object OtherOwnerBusy : AcquireResult()
     }
 
-    private var owner: Owner? = null
+    /** An opaque ownership token; only the exact successful acquisition may release it. */
+    class Lease internal constructor(
+        val owner: Owner,
+        private val token: Long,
+    )
+
+    private var activeLease: Lease? = null
+    private var nextToken = 0L
 
     @Synchronized
-    fun tryAcquire(requestedOwner: Owner): AcquireResult = when (owner) {
+    fun tryAcquire(requestedOwner: Owner): AcquireResult = when (val current = activeLease) {
         null -> {
-            owner = requestedOwner
-            AcquireResult.ACQUIRED
+            val lease = Lease(requestedOwner, ++nextToken)
+            activeLease = lease
+            AcquireResult.Acquired(lease)
         }
 
-        requestedOwner -> AcquireResult.SAME_OWNER_BUSY
-        else -> AcquireResult.OTHER_OWNER_BUSY
-    }
-
-    @Synchronized
-    fun release(releasingOwner: Owner) {
-        if (owner == releasingOwner) {
-            owner = null
+        else -> if (current.owner == requestedOwner) {
+            AcquireResult.SameOwnerBusy
+        } else {
+            AcquireResult.OtherOwnerBusy
         }
     }
 
     @Synchronized
-    fun currentOwner(): Owner? = owner
+    fun release(lease: Lease) {
+        if (activeLease === lease && activeLease?.token == lease.token) {
+            activeLease = null
+        }
+    }
+
+    @Synchronized
+    fun currentOwner(): Owner? = activeLease?.owner
 }

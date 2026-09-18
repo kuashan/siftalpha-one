@@ -20,6 +20,7 @@ class EmbeddedPythonWorkerProjectExecutionController(
     private val executor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "SiftAlphaWorkerProjectExecution").apply { isDaemon = true }
     }
+    private var activeExecutionLease: EmbeddedPythonWorkerRuntimeUseGate.Lease? = null
 
     @Synchronized
     fun start(
@@ -44,19 +45,25 @@ class EmbeddedPythonWorkerProjectExecutionController(
             return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_START_REJECTED_BUSY
         }
 
-        // The terminal state is published just before the background task reaches its finally
-        // block. Reclaim our own completed gate here so a sequential re-entry cannot observe a
-        // short-lived stale PROJECT_EXECUTION owner.
-        runtimeUseGate.release(EmbeddedPythonWorkerRuntimeUseGate.Owner.PROJECT_EXECUTION)
+        // A terminal result can become visible just before the previous task reaches finally.
+        // Reclaim only that execution's lease; its later finally release is then harmless.
+        activeExecutionLease?.let { previousLease ->
+            activeExecutionLease = null
+            runtimeUseGate.release(previousLease)
+        }
 
-        when (runtimeUseGate.tryAcquire(EmbeddedPythonWorkerRuntimeUseGate.Owner.PROJECT_EXECUTION)) {
-            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.SAME_OWNER_BUSY ->
+        val executionLease = when (
+            val acquire = runtimeUseGate.tryAcquire(
+                EmbeddedPythonWorkerRuntimeUseGate.Owner.PROJECT_EXECUTION,
+            )
+        ) {
+            is EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.Acquired -> acquire.lease
+
+            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.SameOwnerBusy ->
                 return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_START_REJECTED_BUSY
 
-            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.OTHER_OWNER_BUSY ->
+            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.OtherOwnerBusy ->
                 return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_START_REJECTED_RUNTIME_MODE_CONFLICT
-
-            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.ACQUIRED -> Unit
         }
 
         val result = executionState.start(
@@ -68,24 +75,28 @@ class EmbeddedPythonWorkerProjectExecutionController(
             request = request,
         )
         if (result != EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_START_ACCEPTED) {
-            runtimeUseGate.release(EmbeddedPythonWorkerRuntimeUseGate.Owner.PROJECT_EXECUTION)
+            runtimeUseGate.release(executionLease)
             return result
         }
 
+        activeExecutionLease = executionLease
         try {
-            executor.execute { runExecution(context.applicationContext) }
+            executor.execute { runExecution(context.applicationContext, executionLease) }
         } catch (error: RuntimeException) {
             executionState.completeInternalError(
                 "SIFTALPHA_WORKER_PROJECT_EXECUTION_FAILURE=executor:${error.message.orEmpty()}",
             )
-            runtimeUseGate.release(EmbeddedPythonWorkerRuntimeUseGate.Owner.PROJECT_EXECUTION)
+            releaseExecutionLease(executionLease)
         }
         return result
     }
 
     fun snapshot(): EmbeddedPythonWorkerProjectExecutionSnapshot = executionState.snapshot()
 
-    private fun runExecution(context: Context) {
+    private fun runExecution(
+        context: Context,
+        executionLease: EmbeddedPythonWorkerRuntimeUseGate.Lease,
+    ) {
         try {
             val inputs = executionState.inputs()
                 ?: error("project execution inputs disappeared")
@@ -140,8 +151,16 @@ class EmbeddedPythonWorkerProjectExecutionController(
                     "${error::class.java.simpleName}:${error.message.orEmpty()}",
             )
         } finally {
-            runtimeUseGate.release(EmbeddedPythonWorkerRuntimeUseGate.Owner.PROJECT_EXECUTION)
+            releaseExecutionLease(executionLease)
         }
+    }
+
+    @Synchronized
+    private fun releaseExecutionLease(lease: EmbeddedPythonWorkerRuntimeUseGate.Lease) {
+        if (activeExecutionLease === lease) {
+            activeExecutionLease = null
+        }
+        runtimeUseGate.release(lease)
     }
 
     private fun pollNativeResult() {
