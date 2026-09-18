@@ -96,7 +96,7 @@ class EmbeddedPythonCapabilityRoutingTest {
     }
 
     @Test
-    fun autoDependencyMetadataCanStillUseEmbeddedR() {
+    fun autoDependencyMetadataRoutesToCapableExternalProvider() {
         val decision = EmbeddedPythonCapabilityRouting.resolve(
             facts(
                 paths = listOf("main.py", "requirements.txt"),
@@ -106,7 +106,8 @@ class EmbeddedPythonCapabilityRoutingTest {
             request = RuntimeControlRequest.AUTO,
         )
 
-        assertEquals(RuntimeControlPath.EMBEDDED_R, decision.path)
+        assertEquals(RuntimeControlPath.EXTERNAL_PROVIDER, decision.path)
+        assertEquals(RuntimeControlReason.DEPENDENCY_ENVIRONMENT_REQUIRED, decision.reason)
     }
 
     @Test
@@ -119,6 +120,20 @@ class EmbeddedPythonCapabilityRoutingTest {
         )
 
         assertEquals(RuntimeControlPath.EMBEDDED_R, decision.path)
+    }
+
+    @Test
+    fun autoProtectedConfigurationRoutesToCapableExternalProvider() {
+        val decision = EmbeddedPythonCapabilityRouting.resolve(
+            facts(
+                paths = listOf("main.py"),
+                hasProtectedConfigurationRequirement = true,
+            ),
+            request = RuntimeControlRequest.AUTO,
+        )
+
+        assertEquals(RuntimeControlPath.EXTERNAL_PROVIDER, decision.path)
+        assertEquals(RuntimeControlReason.PROTECTED_CONFIGURATION_REQUIRED, decision.reason)
     }
 
     @Test

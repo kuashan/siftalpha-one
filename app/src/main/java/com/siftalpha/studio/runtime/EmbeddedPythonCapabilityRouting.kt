@@ -106,6 +106,22 @@ object EmbeddedPythonCapabilityRouting {
          * Embedded R request still preserves the legacy file-backed behavior.
          */
         if (request == RuntimeControlRequest.AUTO) {
+            // AUTO must choose an execution space that can actually satisfy the project today.
+            // Dependency/configuration metadata is not a user-facing rejection; it is routing evidence.
+            // Until Embedded R owns dependency/environment preparation and protected configuration
+            // injection, keep such projects on the already-capable External Provider path.
+            if (facts.hasProtectedConfigurationRequirement) {
+                return RuntimeControlDecision(
+                    RuntimeControlPath.EXTERNAL_PROVIDER,
+                    RuntimeControlReason.PROTECTED_CONFIGURATION_REQUIRED,
+                )
+            }
+            if (facts.hasExternalDependencyRequirement) {
+                return RuntimeControlDecision(
+                    RuntimeControlPath.EXTERNAL_PROVIDER,
+                    RuntimeControlReason.DEPENDENCY_ENVIRONMENT_REQUIRED,
+                )
+            }
             if (resolved.supplemental.isNotEmpty()) {
                 return RuntimeControlDecision(
                     RuntimeControlPath.EXTERNAL_PROVIDER,

@@ -1012,8 +1012,21 @@ open class V04Activity : StudioActivity() {
     private fun automaticRuntimeSelection(
         project: V04ProjectGateway.RuntimeProject,
     ): ProjectRuntimeSelection {
-        val resolved = project.runtimeSelection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
-        return if (resolved?.primary == RuntimeKind.PYTHON) {
+        val requiredConfiguration = runCatching {
+            configurationUi.snapshot(
+                project.summary.documentId,
+                project.folderName,
+            ).preflight.requiredCount > 0
+        }.getOrDefault(false)
+        val decision = runCatching {
+            runtime.resolveControlPath(
+                project = project,
+                action = ProjectRuntimeController.Action.START,
+                request = RuntimeControlRequest.AUTO,
+                requiredConfiguration = requiredConfiguration,
+            )
+        }.getOrNull()
+        return if (decision?.path == RuntimeControlPath.EMBEDDED_R) {
             ProjectRuntimeSelection.EMBEDDED_R
         } else {
             ProjectRuntimeSelection.TERMUX

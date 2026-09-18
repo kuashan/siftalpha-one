@@ -959,3 +959,28 @@ CPython main-thread semantics required by ordinary scripts.
 A real-device instrumentation regression was added to register `SIGTERM` handlers in two sequential
 Embedded R sessions. OCI compatibility remains pending until the new artifact passes CI and the real
 Oracle Cloud project is rerun on device.
+
+
+## 2026-09-18 · OCI real-project regression — dependency execution-space routing
+
+The unchanged Oracle Cloud catcher progressed beyond the previous signal failure on real device.
+Observed evidence:
+
+- Embedded CPython started with Termux/PRoot unused.
+- The Web dashboard started and published `http://127.0.0.1:8080/`.
+- The project then detected that the third-party `oci` module was missing and entered its existing
+  auto-install path.
+- That path launches `[sys.executable, "-m", "pip", ...]`. Current Embedded R intentionally packages
+  the CPython shared library + stdlib only; it does not package a standalone Python executable,
+  `pip`, or `ensurepip`. The resulting empty `sys.executable` caused
+  `PermissionError: [Errno 13] Permission denied: ''`.
+
+This is an R capability/routing gap, not a project-source defect. The OCI source remains unchanged.
+
+AUTO routing is corrected accordingly: dependency requirements and protected configuration are routing
+evidence. Until Embedded R gains its planned environment/dependency/configuration capabilities, AUTO
+selects the already-capable External Provider for those projects. Explicit Embedded R remains an
+internal diagnostic/compatibility path; normal users do not choose providers.
+
+This preserves the product contract: import project -> SiftAlpha detects requirements -> SiftAlpha
+chooses a compatible execution space. The user is not asked to rewrite code to fit a narrower runtime.
