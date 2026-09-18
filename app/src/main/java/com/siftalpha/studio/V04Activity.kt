@@ -1714,7 +1714,25 @@ open class V04Activity : StudioActivity() {
         val stateKey = project.summary.documentId
         val snapshot = runCatching {
             runtime.embeddedPythonSnapshotFor(stateKey)
-        }.getOrNull() ?: return
+        }.getOrNull()
+        if (snapshot == null) {
+            typedStates[stateKey] = RuntimeState.UNKNOWN
+            states[stateKey] = getString(R.string.runtime_state_not_running)
+            failureReasons.remove(stateKey)
+            projectOutputs.write(
+                project.folderName,
+                listOf(
+                    "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                    "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                    "SIFTALPHA_X_STATE=IDLE",
+                    "SIFTALPHA_X_RUNTIME_PHASE=IDLE",
+                    "SIFTALPHA_X_PROJECT_STATUS=NOT_STARTED",
+                ).joinToString("\n"),
+                expand = true,
+            )
+            refresh()
+            return
+        }
         if (!ownsEmbeddedObservation(stateKey, snapshot)) return
         if (embeddedRuntimeOwnership[stateKey] != RuntimeOwnership.EXTERNAL_PROVIDER) {
             embeddedRuntimeOwnership[stateKey] = RuntimeOwnershipPolicy.afterAcceptedStart(
