@@ -56,7 +56,7 @@ path = Path(sys.argv[1])
 text = path.read_text()
 include = "#include <string.h>\n"
 if include not in text:
-    marker = "#include <sys/types.h>\n"
+    marker = "#include <stdlib.h>\n"
     if marker not in text:
         raise SystemExit("ashmem_memfd include anchor changed")
     text = text.replace(marker, marker + include, 1)
