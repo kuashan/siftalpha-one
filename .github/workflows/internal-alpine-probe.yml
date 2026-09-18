@@ -1,0 +1,48 @@
+name: SiftAlpha Internal Alpine Probe
+
+on:
+  push:
+    branches:
+      - codex/siftalpha-no-worker-alpha43
+    paths:
+      - .github/workflows/internal-alpine-probe.yml
+      - tools/probe_internal_alpine_android.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+
+      - name: Install Android NDK
+        run: |
+          set -euo pipefail
+          sdkmanager "ndk;27.3.13750724"
+          sudo apt-get update
+          sudo apt-get install -y unzip make curl
+
+      - name: Build reproducible Internal Alpine assets
+        run: |
+          set -euo pipefail
+          mkdir -p internal-alpine-probe
+          tools/probe_internal_alpine_android.sh internal-alpine-probe
+
+      - name: Upload probe artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: internal-alpine-probe
+          path: internal-alpine-probe
+          if-no-files-found: error
+          retention-days: 14
