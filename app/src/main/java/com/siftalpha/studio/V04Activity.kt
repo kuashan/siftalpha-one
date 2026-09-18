@@ -909,11 +909,15 @@ open class V04Activity : StudioActivity() {
                 }
                 ProjectActionPolicy.Action.STATUS -> {
                     box.addView(button(getString(R.string.runtime_button_status)) {
-                        if (embeddedObservationOwned) refreshEmbeddedProject(project) else dispatch(
-                             project,
-                             ProjectRuntimeController.Action.STATUS,
-                             webLogDiscoveryAllowed = webProfile.enabled,
-                         )
+                        if (runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R) {
+                            refreshEmbeddedProject(project)
+                        } else {
+                            dispatch(
+                                project,
+                                ProjectRuntimeController.Action.STATUS,
+                                webLogDiscoveryAllowed = webProfile.enabled,
+                            )
+                        }
                     })
                 }
                 null,
@@ -951,19 +955,27 @@ open class V04Activity : StudioActivity() {
             }.apply { isEnabled = embeddedActive || policy.isEnabled(ProjectActionPolicy.Action.STOP) }
         row2.addView(stopButton, weight())
         val statusButton = smallButton(getString(R.string.runtime_button_status)) {
-                if (embeddedObservationOwned) refreshEmbeddedProject(project) else dispatch(
-                             project,
-                             ProjectRuntimeController.Action.STATUS,
-                             webLogDiscoveryAllowed = webProfile.enabled,
-                         )
+                if (runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R) {
+                    refreshEmbeddedProject(project)
+                } else {
+                    dispatch(
+                        project,
+                        ProjectRuntimeController.Action.STATUS,
+                        webLogDiscoveryAllowed = webProfile.enabled,
+                    )
+                }
             }.apply { isEnabled = embeddedObservationOwned || policy.isEnabled(ProjectActionPolicy.Action.STATUS) }
         row2.addView(statusButton, weight().apply { marginStart = dp(5) })
         val logsButton = smallButton(getString(R.string.runtime_button_refresh_logs)) {
-                if (embeddedObservationOwned) refreshEmbeddedProject(project) else dispatch(
-                             project,
-                             ProjectRuntimeController.Action.LOGS,
-                             webLogDiscoveryAllowed = webProfile.enabled,
-                         )
+                if (runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R) {
+                    refreshEmbeddedProject(project)
+                } else {
+                    dispatch(
+                        project,
+                        ProjectRuntimeController.Action.LOGS,
+                        webLogDiscoveryAllowed = webProfile.enabled,
+                    )
+                }
             }.apply { isEnabled = embeddedObservationOwned || policy.isEnabled(ProjectActionPolicy.Action.LOGS) }
         row2.addView(logsButton, weight().apply { marginStart = dp(5) })
         box.addView(row2)
