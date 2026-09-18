@@ -228,7 +228,7 @@ object EmbeddedPythonPylockV1Parser {
         if (!table.contains("size") || !table.isLong("size")) {
             invalid("$path.size must be a positive integer")
         }
-        val size = table.getLong("size")
+        val size = requireNotNull(table.getLong("size"))
         if (size <= 0L) {
             invalid("$path.size must be a positive integer")
         }
