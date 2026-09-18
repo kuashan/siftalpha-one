@@ -19,6 +19,19 @@ val prepareEmbeddedCpython = tasks.register<Exec>("prepareEmbeddedCpython") {
     )
 }
 
+val internalAlpineOutput = layout.buildDirectory
+    .dir("generated/internal-alpine")
+    .get()
+    .asFile
+val internalAlpineAssets = internalAlpineOutput.resolve("assets")
+val internalAlpineJniLibs = internalAlpineOutput.resolve("jniLibs")
+val prepareInternalAlpine = tasks.register<Exec>("prepareInternalAlpine") {
+    commandLine(
+        rootProject.file("tools/prepare_internal_alpine_android.sh").absolutePath,
+        internalAlpineOutput.absolutePath,
+    )
+}
+
 val trustedKeystorePayload = providers.gradleProperty("SIFTALPHA_DEBUG_KEYSTORE_B64")
     .orElse(providers.environmentVariable("SIFTALPHA_DEBUG_KEYSTORE_B64"))
     .orNull
@@ -78,7 +91,15 @@ android {
     sourceSets {
         getByName("main") {
             assets.srcDir(embeddedCpythonAssets)
+            assets.srcDir(internalAlpineAssets)
             jniLibs.srcDir(embeddedCpythonJniLibs)
+            jniLibs.srcDir(internalAlpineJniLibs)
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 
@@ -129,6 +150,7 @@ dependencies {
 tasks.matching { it.name == "assembleDebug" }.configureEach {
     dependsOn("testDebugUnitTest")
     dependsOn(prepareEmbeddedCpython)
+    dependsOn(prepareInternalAlpine)
 }
 
 tasks.configureEach {
@@ -139,5 +161,6 @@ tasks.configureEach {
         name.contains("mergeDebugAssets", ignoreCase = true)
     ) {
         dependsOn(prepareEmbeddedCpython)
+        dependsOn(prepareInternalAlpine)
     }
 }
