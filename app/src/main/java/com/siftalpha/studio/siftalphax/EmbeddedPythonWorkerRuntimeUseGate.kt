@@ -20,7 +20,7 @@ class EmbeddedPythonWorkerRuntimeUseGate {
     /** An opaque ownership token; only the exact successful acquisition may release it. */
     class Lease internal constructor(
         val owner: Owner,
-        private val token: Long,
+        internal val token: Long,
     )
 
     private var activeLease: Lease? = null
