@@ -30,6 +30,30 @@ class EmbeddedPythonWorkerRuntimeUseGateTest {
     }
 
     @Test
+    fun smokeOwnerBlocksProjectUntilReleased() {
+        val gate = EmbeddedPythonWorkerRuntimeUseGate()
+        val smokeLease = acquiredLease(
+            gate,
+            EmbeddedPythonWorkerRuntimeUseGate.Owner.CPYTHON_SMOKE,
+        )
+
+        assertEquals(
+            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.SameOwnerBusy,
+            gate.tryAcquire(EmbeddedPythonWorkerRuntimeUseGate.Owner.CPYTHON_SMOKE),
+        )
+        assertEquals(
+            EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.OtherOwnerBusy,
+            gate.tryAcquire(EmbeddedPythonWorkerRuntimeUseGate.Owner.PROJECT_EXECUTION),
+        )
+
+        gate.release(smokeLease)
+        assertTrue(
+            gate.tryAcquire(EmbeddedPythonWorkerRuntimeUseGate.Owner.PROJECT_EXECUTION) is
+                EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.Acquired,
+        )
+    }
+
+    @Test
     fun staleLeaseReleaseCannotReleaseNewOwnerLease() {
         val gate = EmbeddedPythonWorkerRuntimeUseGate()
         val leaseA = acquiredLease(
