@@ -20,9 +20,7 @@ class EmbeddedPythonWheelSelectionV1Test {
         val selected = result as EmbeddedPythonWheelSelectionResultV1.Selected
         assertEquals("demo-1.0.0-cp314-none-any.whl", selected.wheel.filename)
         assertEquals(0, selected.priority)
-        assertEquals(listOf("cp314"), selected.tags.pythonTags)
-        assertEquals(listOf("none"), selected.tags.abiTags)
-        assertEquals(listOf("any"), selected.tags.platformTags)
+        assertEquals(EmbeddedPythonWheelArtifactKind.PURE_PYTHON, selected.artifactKind)
     }
 
     @Test
@@ -42,7 +40,7 @@ class EmbeddedPythonWheelSelectionV1Test {
     }
 
     @Test
-    fun rejectsNativeOnlyCandidatesInPurePythonV1() {
+    fun pureSelectorStillRejectsNativeOnlyCandidates() {
         val result = EmbeddedPythonWheelSelectionV1.select(
             pkg(
                 wheels = listOf(
@@ -57,6 +55,82 @@ class EmbeddedPythonWheelSelectionV1Test {
             EmbeddedPythonWheelSelectionFailureCode.NO_SUPPORTED_PURE_PYTHON_WHEEL,
             rejected.code,
         )
+    }
+
+    @Test
+    fun androidSelectorAcceptsMatchingCp314AndroidWheel() {
+        val result = EmbeddedPythonWheelSelectionV1.selectForAndroidRuntime(
+            pkg(
+                wheels = listOf(
+                    wheel("demo-1.0.0-cp314-cp314-android_24_arm64_v8a.whl"),
+                ),
+            ),
+            androidApiLevel = 26,
+        )
+
+        val selected = result as EmbeddedPythonWheelSelectionResultV1.Selected
+        assertEquals(EmbeddedPythonWheelArtifactKind.ANDROID_NATIVE, selected.artifactKind)
+        assertEquals(24, selected.minimumAndroidApi)
+        assertEquals(0, selected.priority)
+    }
+
+    @Test
+    fun androidSelectorAcceptsPy3NoneAndroidArtifact() {
+        val result = EmbeddedPythonWheelSelectionV1.selectForAndroidRuntime(
+            pkg(
+                wheels = listOf(
+                    wheel("demo-1.0.0-py3-none-android_24_arm64_v8a.whl"),
+                ),
+            ),
+            androidApiLevel = 26,
+        )
+
+        val selected = result as EmbeddedPythonWheelSelectionResultV1.Selected
+        assertEquals(EmbeddedPythonWheelArtifactKind.ANDROID_NATIVE, selected.artifactKind)
+        assertEquals(2, selected.priority)
+    }
+
+    @Test
+    fun androidSelectorRejectsTooNewApiWrongAbiAndManylinux() {
+        val result = EmbeddedPythonWheelSelectionV1.selectForAndroidRuntime(
+            pkg(
+                wheels = listOf(
+                    wheel("demo-1.0.0-cp314-cp314-android_28_arm64_v8a.whl"),
+                    wheel("demo-1.0.0-cp314-cp314-android_24_x86_64.whl"),
+                    wheel("demo-1.0.0-cp314-cp314-manylinux_2_28_aarch64.whl"),
+                ),
+            ),
+            androidApiLevel = 26,
+        )
+
+        val rejected = result as EmbeddedPythonWheelSelectionResultV1.Rejected
+        assertEquals(
+            EmbeddedPythonWheelSelectionFailureCode.NO_SUPPORTED_ANDROID_WHEEL,
+            rejected.code,
+        )
+    }
+
+    @Test
+    fun androidSelectorPrefersCompatibleAndroidWheelThenFallsBackToPure() {
+        val native = EmbeddedPythonWheelSelectionV1.selectForAndroidRuntime(
+            pkg(
+                wheels = listOf(
+                    wheel("demo-1.0.0-py3-none-any.whl"),
+                    wheel("demo-1.0.0-cp314-cp314-android_24_arm64_v8a.whl"),
+                ),
+            ),
+            androidApiLevel = 26,
+        )
+        val nativeSelected = native as EmbeddedPythonWheelSelectionResultV1.Selected
+        assertEquals(EmbeddedPythonWheelArtifactKind.ANDROID_NATIVE, nativeSelected.artifactKind)
+
+        val pureFallback = EmbeddedPythonWheelSelectionV1.selectForAndroidRuntime(
+            pkg(wheels = listOf(wheel("demo-1.0.0-py3-none-any.whl"))),
+            androidApiLevel = 26,
+        )
+        val pureSelected = pureFallback as EmbeddedPythonWheelSelectionResultV1.Selected
+        assertEquals(EmbeddedPythonWheelArtifactKind.PURE_PYTHON, pureSelected.artifactKind)
+        assertEquals(12, pureSelected.priority)
     }
 
     @Test

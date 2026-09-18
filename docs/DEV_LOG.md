@@ -1045,3 +1045,25 @@ prerequisite for preparing OCI's own `py3-none-any` SDK wheel internally; OCI's 
 closure (notably cryptography) still requires a later Android-native capability.
 
 VersionCode advances to `123`; versionName remains `0.8.0-alpha45`.
+
+
+## 2026-09-18 · alpha45 Slice 4 — Android Native Wheel Eligibility
+
+OCI internal execution is now an explicit alpha45 priority, so Android-native wheel eligibility is
+moved forward instead of leaving every native package behind the External Provider boundary.
+
+The R-side wheel selector now has a second deterministic mode for the app's CPython 3.14 Android
+runtime. It accepts only Android-tagged wheels whose minimum API is not newer than the device and whose
+ABI matches the requested Android ABI. Exact `cp314-cp314-android_<api>_arm64_v8a` artifacts are
+supported, along with `py314/py3-none-android_...` data/native-library artifacts. manylinux,
+musllinux, wrong-ABI, too-new-API and foreign-platform wheels remain rejected.
+
+The original Pure-Python selector is preserved unchanged for the existing v1 contract. Native
+eligibility does not yet mean native installation: archive verification, .so containment/DT_NEEDED
+validation, extraction, library loading and generation binding remain subsequent slices.
+
+This directly opens the path for OCI dependencies which already publish Android CPython wheels
+(for example aiohttp). OCI still has native dependencies without an official CPython 3.14 Android
+wheel, so internal OCI acceptance is not claimed yet.
+
+VersionCode advances to `124`; versionName remains `0.8.0-alpha45`.
