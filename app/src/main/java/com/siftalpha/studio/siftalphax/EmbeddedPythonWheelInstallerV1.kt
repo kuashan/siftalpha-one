@@ -9,8 +9,12 @@ import java.security.MessageDigest
 import java.util.UUID
 import java.util.zip.ZipInputStream
 import javax.net.ssl.HttpsURLConnection
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 class EmbeddedPythonWheelInstallerV1(
     private val cacheRoot: File,
@@ -82,11 +86,13 @@ class EmbeddedPythonWheelInstallerV1(
         val manifestFile = File(environmentRoot, MANIFEST_FILE)
         val sitePackages = File(environmentRoot, SITE_PACKAGES)
         if (!marker.isFile || !manifestFile.isFile || !sitePackages.isDirectory) return null
-        val manifest = runCatching { JSONObject(manifestFile.readText()) }.getOrNull() ?: return null
-        if (manifest.optString("schema") != SCHEMA) return null
-        if (manifest.optString("projectIdentity") != projectIdentity) return null
-        if (manifest.optString("sourceFingerprint") != sourceFingerprint) return null
-        val environmentKey = manifest.optString("environmentKey")
+        val manifest = runCatching {
+            Json.parseToJsonElement(manifestFile.readText()).jsonObject
+        }.getOrNull() ?: return null
+        if (manifest["schema"]?.jsonPrimitive?.content != SCHEMA) return null
+        if (manifest["projectIdentity"]?.jsonPrimitive?.content != projectIdentity) return null
+        if (manifest["sourceFingerprint"]?.jsonPrimitive?.content != sourceFingerprint) return null
+        val environmentKey = manifest["environmentKey"]?.jsonPrimitive?.content ?: return null
         if (!environmentKey.matches(Regex("sha256:[0-9a-f]{64}"))) return null
         return InstalledEnvironment(sitePackages.canonicalFile, environmentKey)
     }
@@ -253,25 +259,28 @@ class EmbeddedPythonWheelInstallerV1(
         plan: EmbeddedPythonDependencyPlanV1,
         environmentKey: String,
     ) {
-        val packages = JSONArray()
-        plan.packages.forEach { pkg ->
-            packages.put(
-                JSONObject()
-                    .put("name", pkg.normalizedName)
-                    .put("version", pkg.version)
-                    .put("wheel", pkg.wheel.wheel.filename)
-                    .put("sha256", pkg.wheel.wheel.sha256)
-                    .put("nativeAndroid", pkg.wheel.nativeAndroid),
-            )
+        val packages = buildJsonArray {
+            plan.packages.forEach { pkg ->
+                add(
+                    buildJsonObject {
+                        put("name", pkg.normalizedName)
+                        put("version", pkg.version)
+                        put("wheel", pkg.wheel.wheel.filename)
+                        put("sha256", pkg.wheel.wheel.sha256)
+                        put("nativeAndroid", pkg.wheel.nativeAndroid)
+                    },
+                )
+            }
         }
-        val manifest = JSONObject()
-            .put("schema", SCHEMA)
-            .put("projectIdentity", projectIdentity)
-            .put("sourceFingerprint", plan.sourceFingerprint)
-            .put("resolvedFingerprint", plan.resolvedFingerprint)
-            .put("environmentKey", environmentKey)
-            .put("packages", packages)
-        File(environmentRoot, MANIFEST_FILE).writeText(manifest.toString(2) + "\n")
+        val manifest = buildJsonObject {
+            put("schema", SCHEMA)
+            put("projectIdentity", projectIdentity)
+            put("sourceFingerprint", plan.sourceFingerprint)
+            put("resolvedFingerprint", plan.resolvedFingerprint)
+            put("environmentKey", environmentKey)
+            put("packages", packages)
+        }
+        File(environmentRoot, MANIFEST_FILE).writeText(manifest.toString() + "\n")
     }
 
     private fun environmentKey(projectIdentity: String, resolvedFingerprint: String): String {
