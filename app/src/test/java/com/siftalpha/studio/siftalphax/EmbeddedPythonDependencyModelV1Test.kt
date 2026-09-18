@@ -101,7 +101,7 @@ class EmbeddedPythonDependencyModelV1Test {
         yanked = false,
     )
 
-    private class FakeIndex : EmbeddedPythonPackageIndexV1 {
+    private inner class FakeIndex : EmbeddedPythonPackageIndexV1 {
         override fun listWheels(normalizedName: String): List<EmbeddedPythonIndexWheelV1> =
             when (normalizedName) {
                 "root" -> listOf(wheel("root-1.5-py3-none-any.whl"))
