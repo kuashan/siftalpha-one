@@ -78,10 +78,6 @@ object EmbeddedPythonCapabilityRouting {
         if (facts.hasProtectedConfigurationRequirement) {
             return rejected(RuntimeControlReason.PROTECTED_CONFIGURATION_REQUIRED)
         }
-        if (facts.hasExternalDependencyRequirement) {
-            return rejected(RuntimeControlReason.DEPENDENCY_ENVIRONMENT_REQUIRED)
-        }
-
         val safeEntrypoint = facts.resolvedEntrypoint
             ?.let(EmbeddedPythonEntrypointPolicy::safeRelativePath)
             ?: return rejected(RuntimeControlReason.ENTRYPOINT_UNRESOLVED)
