@@ -32,20 +32,19 @@ class EmbeddedPythonWorkerService : Service() {
         override fun getBoundProcessBindingId(): String = processState.boundProcessBindingId()
 
         /**
-         * Authoritative multi-field STATUS path. Both records are captured as immutable values;
-         * this method never composes the result by making a sequence of scalar reads.
+         * Authoritative multi-field STATUS path. The capturer rejects a process/execution read
+         * that crossed a monotonic process-state transition; it never composes the result from
+         * public scalar Binder getters.
          */
         override fun getWorkerExecutionSnapshotV1(): EmbeddedPythonWorkerExecutionSnapshotV1 {
             if (Binder.getCallingUid() != applicationInfo.uid) {
                 throw SecurityException("worker snapshot is private to the application UID")
             }
-            // Do not hold either monitor while acquiring the other one. This preserves the
-            // existing processState/controller lock independence and avoids nested-lock cycles.
-            val processSnapshot = processState.snapshot()
-            val executionSnapshot = projectController.snapshot()
-            return EmbeddedPythonWorkerExecutionSnapshotV1Mapper.map(
-                process = processSnapshot,
-                execution = executionSnapshot,
+            // Each supplier takes one independent immutable capture. The capturer never holds
+            // the process-state and execution-state monitors together.
+            return EmbeddedPythonWorkerExecutionSnapshotV1Capturer.capture(
+                processSnapshot = { processState.snapshot() },
+                executionSnapshot = { projectController.snapshot() },
                 workerPid = Process.myPid(),
             )
         }
