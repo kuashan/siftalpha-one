@@ -1004,3 +1004,24 @@ Those remain later alpha45 slices. Existing External Provider behavior and alpha
 contracts are unchanged.
 
 Version advances to `121 / 0.8.0-alpha45`.
+
+
+## 2026-09-18 · alpha45 Slice 2 — Dependency Fingerprint + Environment Identity
+
+Implemented the next R-only Pure-Python Environment v1 identity layer.
+
+This slice adds deterministic `DependencyFingerprintV1` from an already-selected dependency set and a
+project-owned `EnvironmentIdV1`. The dependency fingerprint includes the frozen runtime context,
+exact wheel filename/hash/origin, normalized package identity, selected tags and installer policy.
+Package and tag input order are canonicalized so equivalent selections produce the same fingerprint.
+
+`EnvironmentIdV1` binds the dependency fingerprint to stable project identity, runtime contract,
+Runtime Base provenance and installer policy. Therefore two Projects with identical dependencies still
+receive different environment IDs; this prevents mutable site-packages ownership from being shared by
+accident.
+
+This slice does not yet evaluate markers or Requires-Python, select wheels from pylock candidates,
+download/install artifacts, create generations/site-packages, or change M/normal-user routing.
+Existing alpha44 Worker and External Provider behavior remain unchanged.
+
+VersionCode advances to `122`; versionName remains `0.8.0-alpha45`.
