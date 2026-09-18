@@ -216,12 +216,15 @@ object EmbeddedPythonRuntimeCompatibilityV1 {
                 TokenType.IN -> "in"
                 TokenType.NOT -> {
                     advance()
-                    expect(TokenType.IN)
-                    "not in"
+                    if (current.type != TokenType.IN) {
+                        fail("marker 'not' must be followed by 'in'")
+                    }
+                    advance()
+                    return compare(left, "not in", parseOperand())
                 }
                 else -> fail("marker comparison operator expected")
             }
-            if (current.type != TokenType.NOT) advance()
+            advance()
             val right = parseOperand()
             return compare(left, operator, right)
         }
