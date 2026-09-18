@@ -114,7 +114,7 @@ EOF
 "$RANLIB" "$WORK/libtalloc.a"
 
 CPPFLAGS="-D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I. -DARG_MAX=131072 -I$TALLOC_COMPAT -DVERSION=\\\"${PROOT_VERSION}\\\""
-CFLAGS="-O2 -Wall -Wextra -fPIE"
+CFLAGS="-O2 -Wall -Wextra -fPIE -DPROOT_UNBUNDLE_LOADER=\\\"/siftalpha-proot\\\""
 LDFLAGS="-Wl,-z,noexecstack -pie -L$WORK -ltalloc"
 
 make -C "$PROOT_SRC/src"   CC="$CC"   STRIP="$STRIP"   OBJCOPY="$OBJCOPY"   OBJDUMP="$OBJDUMP"   CPPFLAGS="$CPPFLAGS"   CFLAGS="$CFLAGS"   LDFLAGS="$LDFLAGS"   PROOT_UNBUNDLE_LOADER="/siftalpha-proot"   -j"$(nproc)"

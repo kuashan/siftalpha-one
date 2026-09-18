@@ -136,8 +136,8 @@ class PythonRuntimeAdapterTest {
 
         assertTrue(stop.contains("siftalpha_stop_tree"))
         assertTrue(stop.contains("SIFTALPHA_STATUS=STOPPED_BY_USER"))
-        assertTrue(stop.contains("prepare_pid_file="${'$'}runtime_dir/runtime-id.prepare.pid""))
-        assertTrue(stop.contains("prepare_pgid_file="${'$'}runtime_dir/runtime-id.prepare.pgid""))
+        assertTrue(stop.contains("prepare_pid_file=\"${'$'}runtime_dir/runtime-id.prepare.pid\""))
+        assertTrue(stop.contains("prepare_pgid_file=\"${'$'}runtime_dir/runtime-id.prepare.pgid\""))
         assertTrue(stop.contains("SIFTALPHA_PREPARE_STOPPED=1"))
         assertTrue(stop.contains("SIFTALPHA_ERROR=STOP_INCOMPLETE"))
         assertTrue("STOP must keep using the legacy host PID files", stop.contains("pid_file=\"${'$'}runtime_dir/runtime-id.pid\""))
