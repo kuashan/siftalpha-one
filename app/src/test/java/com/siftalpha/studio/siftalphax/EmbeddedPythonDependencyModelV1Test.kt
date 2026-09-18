@@ -40,6 +40,30 @@ class EmbeddedPythonDependencyModelV1Test {
     }
 
     @Test
+    fun rejectsUnsupportedDynamicOrBuildOnlyPyprojectAsRuntimeDependencies() {
+        assertRejects {
+            EmbeddedPythonRequirementParserV1.fromProjectFiles(
+                requirementsText = null,
+                pyprojectText = """
+                    [build-system]
+                    requires = ["setuptools"]
+                """.trimIndent(),
+            )
+        }
+        assertRejects {
+            EmbeddedPythonRequirementParserV1.fromProjectFiles(
+                requirementsText = null,
+                pyprojectText = """
+                    [project]
+                    name = "demo"
+                    version = "1.0"
+                    dynamic = ["dependencies"]
+                """.trimIndent(),
+            )
+        }
+    }
+
+    @Test
     fun markerEvaluationUsesAndroidRuntimeAndExtras() {
         val android = EmbeddedPythonRuntimeCompatibilityV1.marker(
             "sys_platform == 'android' and python_version >= '3.14'",
@@ -90,6 +114,17 @@ class EmbeddedPythonDependencyModelV1Test {
         )
         val plan = resolver.resolve(input, androidApiLevel = 36)
         assertEquals(listOf("child", "root"), plan.packages.map { it.normalizedName })
+    }
+
+    private fun assertRejects(block: () -> Unit) {
+        try {
+            block()
+            throw AssertionError("expected validation failure")
+        } catch (_: IllegalArgumentException) {
+            // expected
+        } catch (_: IllegalStateException) {
+            // expected
+        }
     }
 
     private fun wheel(filename: String) = EmbeddedPythonIndexWheelV1(

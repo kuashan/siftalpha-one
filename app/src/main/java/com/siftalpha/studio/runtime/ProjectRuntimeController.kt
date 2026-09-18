@@ -130,6 +130,19 @@ class ProjectRuntimeController(
         }
     }
 
+    fun embeddedPythonEnvironmentReady(
+        project: V04ProjectGateway.RuntimeProject,
+    ): Boolean {
+        val environmentManager = embeddedPythonEnvironmentManager ?: return false
+        return runCatching {
+            val dependencyInput = embeddedPythonDependencyInput(project.summary.documentId)
+            environmentManager.loadBinding(
+                projectIdentity = project.summary.documentId,
+                dependencyInput = dependencyInput,
+            ) != null
+        }.getOrDefault(false)
+    }
+
     fun prepareEmbeddedPythonEnvironment(
         project: V04ProjectGateway.RuntimeProject,
     ): EmbeddedPythonEnvironmentManager.PreparationResult {

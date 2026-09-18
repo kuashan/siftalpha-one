@@ -50,10 +50,15 @@ object EmbeddedPythonRequirementParserV1 {
             requirements = parseRequirements(requirementsText)
             canonicalSource = "requirements.txt\n" + normalizeNewlines(requirementsText) +
                 "\npyproject-requires-python\n" + pyproject?.requiresPython.orEmpty()
-        } else if (pyproject != null) {
+        } else if (pyproject?.projectTablePresent == true) {
+            require(!pyproject.dynamicDependencies) {
+                "dynamic project dependencies are not supported by Internal Python preparation"
+            }
             sourceKind = EmbeddedPythonDependencyInputV1.SourceKind.PYPROJECT_TOML
             requirements = pyproject.dependencies.map(::parseRequirement)
             canonicalSource = "pyproject.toml\n" + normalizeNewlines(pyprojectText.orEmpty())
+        } else if (pyprojectText != null) {
+            error("pyproject.toml without a [project] table is not a supported runtime dependency source")
         } else {
             sourceKind = EmbeddedPythonDependencyInputV1.SourceKind.NONE
             requirements = emptyList()
@@ -162,7 +167,18 @@ object EmbeddedPythonRequirementParserV1 {
         require(!parsed.hasErrors()) {
             parsed.errors().take(3).joinToString(" | ") { it.toString() }
         }
-        val project = parsed.getTable("project") ?: return PyprojectMetadata(emptyList(), null)
+        val project = parsed.getTable("project")
+            ?: return PyprojectMetadata(
+                dependencies = emptyList(),
+                requiresPython = null,
+                projectTablePresent = false,
+                dynamicDependencies = false,
+            )
+        val dynamicDependencies = project.getArray("dynamic")?.let { dynamic ->
+            (0 until dynamic.size()).any { index ->
+                dynamic.get(index) == "dependencies"
+            }
+        } ?: false
         val dependencies = if (project.contains("dependencies")) {
             require(project.isArray("dependencies")) { "project.dependencies must be an array" }
             val array = requireNotNull(project.getArray("dependencies"))
@@ -177,7 +193,12 @@ object EmbeddedPythonRequirementParserV1 {
             emptyList()
         }
         val requiresPython = project.getString("requires-python")?.trim()?.takeIf { it.isNotEmpty() }
-        return PyprojectMetadata(dependencies, requiresPython)
+        return PyprojectMetadata(
+            dependencies = dependencies,
+            requiresPython = requiresPython,
+            projectTablePresent = true,
+            dynamicDependencies = dynamicDependencies,
+        )
     }
 
     private fun validateSpecifierSet(specifier: String) {
@@ -207,6 +228,8 @@ object EmbeddedPythonRequirementParserV1 {
     private data class PyprojectMetadata(
         val dependencies: List<String>,
         val requiresPython: String?,
+        val projectTablePresent: Boolean,
+        val dynamicDependencies: Boolean,
     )
 
     private data class StableVersion(

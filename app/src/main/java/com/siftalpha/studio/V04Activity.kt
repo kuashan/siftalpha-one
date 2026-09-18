@@ -655,7 +655,15 @@ open class V04Activity : StudioActivity() {
         }
         val configurationRequired =
             configurationSnapshot.preflight.missingRequired.isNotEmpty()
-        val lifecycleEnvironmentReady = environmentReady(stateKey, runtimeSelection)
+        var lifecycleEnvironmentReady = environmentReady(stateKey, runtimeSelection)
+        if (
+            runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R &&
+            lifecycleEnvironmentReady == true &&
+            !runtime.embeddedPythonEnvironmentReady(project)
+        ) {
+            setEnvironmentReady(stateKey, ProjectRuntimeSelection.EMBEDDED_R, false)
+            lifecycleEnvironmentReady = false
+        }
         val lifecycleState = RuntimeLifecycleResolver.resolve(
             environmentReady = lifecycleEnvironmentReady,
             runtimeState = typedState,
