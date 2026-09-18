@@ -62,6 +62,7 @@ enum class EmbeddedPythonStopResult {
 }
 
 data class EmbeddedPythonSnapshot(
+    val engine: InternalPythonBackend = InternalPythonBackend.CPYTHON,
     val sessionId: String = "",
     val projectIdentity: String = "",
     val executionRoot: String = "",
@@ -144,9 +145,9 @@ object EmbeddedPythonSnapshotParser {
 
 object EmbeddedPythonDiagnosticText {
     fun session(snapshot: EmbeddedPythonSnapshot): String = listOf(
-        "SIFTALPHA_X_ENGINE=CPYTHON",
+        "SIFTALPHA_X_ENGINE=" + snapshot.engine,
         "SIFTALPHA_X_TERMUX=NOT_USED",
-        "SIFTALPHA_X_PROOT=NOT_USED",
+        "SIFTALPHA_X_PROOT=" + if (snapshot.engine == InternalPythonBackend.ALPINE) "INTERNAL" else "NOT_USED",
         "SIFTALPHA_X_PROJECT_ID=${snapshot.projectIdentity.ifBlank { "-" }}",
         "SIFTALPHA_X_EXECUTION_ROOT=${snapshot.executionRoot.ifBlank { "-" }}",
         "SIFTALPHA_X_ENTRYPOINT=${snapshot.entrypoint.ifBlank { "-" }}",

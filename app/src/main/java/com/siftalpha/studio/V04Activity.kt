@@ -73,6 +73,8 @@ import com.siftalpha.studio.runtime.RichResultParser
 import com.siftalpha.studio.runtime.TermuxBackend
 import com.siftalpha.studio.siftalphax.EmbeddedPythonEnvironmentManager
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
+import com.siftalpha.studio.siftalphax.InternalAlpineEnvironmentManager
+import com.siftalpha.studio.siftalphax.InternalAlpineSession
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSnapshot
 import com.siftalpha.studio.siftalphax.EmbeddedPythonState
 import com.siftalpha.studio.runtime.TermuxResultBus
@@ -293,6 +295,8 @@ open class V04Activity : StudioActivity() {
             embeddedPythonSession = EmbeddedPythonSession.shared(this),
             embeddedPythonProjectStager = EmbeddedPythonProjectStager(this),
             embeddedPythonEnvironmentManager = EmbeddedPythonEnvironmentManager(this),
+            internalAlpineEnvironmentManager = InternalAlpineEnvironmentManager(this),
+            internalAlpineSession = InternalAlpineSession(this),
         )
         secretStore = ProjectSecretStore(this)
         lifecycleStore = RuntimeLifecycleStore(this)
@@ -1716,6 +1720,7 @@ open class V04Activity : StudioActivity() {
                             "SIFTALPHA_X_PROJECT_ID=" + stateKey,
                             "SIFTALPHA_X_ENVIRONMENT_READY=" + prepared.ready,
                             "SIFTALPHA_X_ENVIRONMENT_OUTCOME=" + prepared.outcome.name,
+                            "SIFTALPHA_X_INTERNAL_BACKEND=" + prepared.backend.name,
                         ).joinToString("\n"),
                         expand = true,
                     )
@@ -1776,7 +1781,7 @@ open class V04Activity : StudioActivity() {
             }
             return
         }
-        if (!runtime.embeddedPythonCanStart()) {
+        if (!runtime.embeddedPythonCanStart(project)) {
             toast(getString(R.string.runtime_embedded_r_active))
             return
         }

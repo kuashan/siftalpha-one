@@ -8,6 +8,10 @@ import com.siftalpha.studio.siftalphax.EmbeddedPythonRequirementParserV1
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSnapshot
 import com.siftalpha.studio.siftalphax.EmbeddedPythonStatePolicy
+import com.siftalpha.studio.siftalphax.InternalAlpineDependencySource
+import com.siftalpha.studio.siftalphax.InternalAlpineEnvironmentManager
+import com.siftalpha.studio.siftalphax.InternalAlpineSession
+import com.siftalpha.studio.siftalphax.InternalPythonBackend
 import java.io.File
 
 /**
@@ -22,6 +26,8 @@ class ProjectRuntimeController(
     private val embeddedPythonSession: EmbeddedPythonSession? = null,
     private val embeddedPythonProjectStager: EmbeddedPythonProjectStager? = null,
     private val embeddedPythonEnvironmentManager: EmbeddedPythonEnvironmentManager? = null,
+    private val internalAlpineEnvironmentManager: InternalAlpineEnvironmentManager? = null,
+    private val internalAlpineSession: InternalAlpineSession? = null,
 ) {
 
     enum class Action {
@@ -33,6 +39,26 @@ class ProjectRuntimeController(
         CLEAN,
         CLONE_GITHUB,
     }
+
+    enum class InternalEnvironmentOutcome {
+        CPYTHON_READY_REUSED,
+        CPYTHON_READY_NO_EXTERNAL_DEPENDENCIES,
+        CPYTHON_READY_DEPENDENCIES_INSTALLED,
+        ALPINE_READY_REUSED,
+        ALPINE_READY_ENVIRONMENT_INSTALLED,
+    }
+
+    data class InternalEnvironmentPreparationResult(
+        val ready: Boolean,
+        val outcome: InternalEnvironmentOutcome,
+        val backend: InternalPythonBackend,
+    )
+
+    private data class InternalDependencyFiles(
+        val requirementsText: String?,
+        val pyprojectText: String?,
+        val alpineSource: InternalAlpineDependencySource,
+    )
 
     data class GitHubCloneSpec(
         val cloneUrl: String,
@@ -54,13 +80,30 @@ class ProjectRuntimeController(
 
     fun runtimeSupported(): Boolean = host.runtimeSupported()
 
-    fun embeddedPythonCanStart(): Boolean {
-        val session = embeddedPythonSession ?: return false
-        return runCatching { EmbeddedPythonStatePolicy.canStart(session.snapshot().state) }
-            .getOrDefault(false)
+    fun embeddedPythonCanStart(project: V04ProjectGateway.RuntimeProject): Boolean {
+        val projectId = project.summary.documentId
+        val files = internalDependencyFiles(projectId)
+        val cpythonBinding = runCatching {
+            val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
+                files.requirementsText,
+                files.pyprojectText,
+            )
+            embeddedPythonEnvironmentManager?.loadBinding(projectId, input)
+        }.getOrNull()
+        if (cpythonBinding != null) {
+            val session = embeddedPythonSession ?: return false
+            return runCatching { EmbeddedPythonStatePolicy.canStart(session.snapshot().state) }
+                .getOrDefault(false)
+        }
+        val alpineBinding = internalAlpineEnvironmentManager?.loadBinding(projectId, files.alpineSource)
+        return alpineBinding != null && internalAlpineSession?.canStart(projectId) == true
     }
 
     fun embeddedPythonSnapshotFor(projectDocumentId: String): EmbeddedPythonSnapshot? {
+        internalAlpineSession?.snapshot(projectDocumentId)?.let { snapshot ->
+            cleanupEmbeddedStaging(snapshot)
+            return snapshot
+        }
         val session = embeddedPythonSession ?: return null
         val snapshot = runCatching { session.snapshot() }.getOrNull() ?: return null
         cleanupEmbeddedStaging(snapshot)
@@ -70,6 +113,7 @@ class ProjectRuntimeController(
     }
 
     /**
+     * Resolves the M control action    /**
      * Resolves the M control action to the existing Embedded R or External Provider path.
      *
      * The default request remains External Provider so the experimental Embedded R path is explicit.
@@ -113,9 +157,10 @@ class ProjectRuntimeController(
             resolvedEntrypoint = gateway.resolveEmbeddedPythonEntrypoint(project.summary.documentId),
             hasExternalDependencyRequirement = facts.hasExternalDependencyRequirement,
             hasProtectedConfigurationRequirement = requiredConfiguration,
-            embeddedRuntimeAvailable = embeddedPythonSession != null &&
-                embeddedPythonEnvironmentManager != null &&
-                (action != Action.START || embeddedPythonProjectStager != null),
+            embeddedRuntimeAvailable = embeddedPythonProjectStager != null && (
+                (embeddedPythonSession != null && embeddedPythonEnvironmentManager != null) ||
+                    (internalAlpineSession != null && internalAlpineEnvironmentManager != null)
+                ),
         )
         return if (action == Action.PREPARE) {
             EmbeddedPythonCapabilityRouting.resolvePreparation(
@@ -133,49 +178,104 @@ class ProjectRuntimeController(
     fun embeddedPythonEnvironmentReady(
         project: V04ProjectGateway.RuntimeProject,
     ): Boolean {
-        val environmentManager = embeddedPythonEnvironmentManager ?: return false
-        return runCatching {
-            val dependencyInput = embeddedPythonDependencyInput(project.summary.documentId)
-            environmentManager.loadBinding(
-                projectIdentity = project.summary.documentId,
-                dependencyInput = dependencyInput,
+        val projectId = project.summary.documentId
+        val files = internalDependencyFiles(projectId)
+        val cpythonReady = runCatching {
+            val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
+                files.requirementsText,
+                files.pyprojectText,
+            )
+            embeddedPythonEnvironmentManager?.loadBinding(
+                projectIdentity = projectId,
+                dependencyInput = input,
             ) != null
         }.getOrDefault(false)
+        if (cpythonReady) return true
+        return internalAlpineEnvironmentManager?.loadBinding(
+            projectIdentity = projectId,
+            source = files.alpineSource,
+        ) != null
     }
 
     fun prepareEmbeddedPythonEnvironment(
         project: V04ProjectGateway.RuntimeProject,
-    ): EmbeddedPythonEnvironmentManager.PreparationResult {
-        val session = checkNotNull(embeddedPythonSession) { "Embedded R is unavailable" }
-        val environmentManager = checkNotNull(embeddedPythonEnvironmentManager) {
-            "Embedded R environment manager is unavailable"
-        }
+    ): InternalEnvironmentPreparationResult {
         val route = resolveControlPath(
             project = project,
             action = Action.PREPARE,
             request = RuntimeControlRequest.EMBEDDED_R,
         )
         check(route.path == RuntimeControlPath.EMBEDDED_R) {
-            "Embedded R prepare route rejected: ${route.reason}"
+            "Embedded R prepare route rejected: " + route.reason
         }
-        val dependencyInput = embeddedPythonDependencyInput(project.summary.documentId)
-        session.prepareRuntime()
-        return environmentManager.prepare(
-            projectIdentity = project.summary.documentId,
-            dependencyInput = dependencyInput,
-        )
+        val projectId = project.summary.documentId
+        val files = internalDependencyFiles(projectId)
+        val cpythonSession = embeddedPythonSession
+        val cpythonManager = embeddedPythonEnvironmentManager
+        var cpythonError: Throwable? = null
+
+        if (cpythonSession != null && cpythonManager != null) {
+            try {
+                val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
+                    files.requirementsText,
+                    files.pyprojectText,
+                )
+                cpythonSession.prepareRuntime()
+                val prepared = cpythonManager.prepare(
+                    projectIdentity = projectId,
+                    dependencyInput = input,
+                )
+                return InternalEnvironmentPreparationResult(
+                    ready = prepared.ready,
+                    outcome = when (prepared.outcome) {
+                        EmbeddedPythonEnvironmentManager.Outcome.READY_REUSED ->
+                            InternalEnvironmentOutcome.CPYTHON_READY_REUSED
+                        EmbeddedPythonEnvironmentManager.Outcome.READY_NO_EXTERNAL_DEPENDENCIES ->
+                            InternalEnvironmentOutcome.CPYTHON_READY_NO_EXTERNAL_DEPENDENCIES
+                        EmbeddedPythonEnvironmentManager.Outcome.READY_DEPENDENCIES_INSTALLED ->
+                            InternalEnvironmentOutcome.CPYTHON_READY_DEPENDENCIES_INSTALLED
+                    },
+                    backend = InternalPythonBackend.CPYTHON,
+                )
+            } catch (error: Throwable) {
+                if (!shouldFallbackToAlpine(error)) throw error
+                cpythonError = error
+            }
+        }
+
+        val alpineManager = internalAlpineEnvironmentManager
+            ?: throw cpythonError ?: error("Internal Alpine environment manager is unavailable")
+        val stager = embeddedPythonProjectStager
+            ?: throw cpythonError ?: error("Internal project staging is unavailable")
+        val staged = stager.stageAll(projectId)
+        return try {
+            val prepared = alpineManager.prepare(
+                projectIdentity = projectId,
+                stagedProject = staged,
+                source = files.alpineSource,
+            )
+            InternalEnvironmentPreparationResult(
+                ready = prepared.ready,
+                outcome = when (prepared.outcome) {
+                    InternalAlpineEnvironmentManager.Outcome.READY_REUSED ->
+                        InternalEnvironmentOutcome.ALPINE_READY_REUSED
+                    InternalAlpineEnvironmentManager.Outcome.READY_ENVIRONMENT_INSTALLED ->
+                        InternalEnvironmentOutcome.ALPINE_READY_ENVIRONMENT_INSTALLED
+                },
+                backend = InternalPythonBackend.ALPINE,
+            )
+        } finally {
+            stager.cleanup(staged)
+        }
     }
 
+    /** M-only control entry for an explicitly selected Python project; Termux is not involved. */
     /** M-only control entry for an explicitly selected Python project; Termux is not involved. */
     fun startEmbeddedPython(
         project: V04ProjectGateway.RuntimeProject,
         requiredConfiguration: Boolean = false,
     ): EmbeddedPythonSnapshot {
-        val session = checkNotNull(embeddedPythonSession) { "Embedded R is unavailable" }
-        val stager = checkNotNull(embeddedPythonProjectStager) { "Embedded R staging is unavailable" }
-        val environmentManager = checkNotNull(embeddedPythonEnvironmentManager) {
-            "Embedded R environment manager is unavailable"
-        }
+        val stager = checkNotNull(embeddedPythonProjectStager) { "Internal project staging is unavailable" }
         val route = resolveControlPath(
             project = project,
             action = Action.START,
@@ -183,37 +283,56 @@ class ProjectRuntimeController(
             requiredConfiguration = requiredConfiguration,
         )
         check(route.path == RuntimeControlPath.EMBEDDED_R) {
-            "Embedded R route rejected: ${route.reason}"
+            "Embedded R route rejected: " + route.reason
         }
         val selection = project.runtimeSelection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
         check(selection?.primary == RuntimeKind.PYTHON) {
-            "Embedded R requires a resolved Python project"
+            "Internal Python requires a resolved Python project"
         }
         val projectId = project.summary.documentId
-        val dependencyInput = embeddedPythonDependencyInput(projectId)
-        val environmentBinding = environmentManager.loadBinding(
-            projectIdentity = projectId,
-            dependencyInput = dependencyInput,
-        ) ?: error("EMBEDDED_R_ENVIRONMENT_NOT_READY")
-        val current = session.snapshot()
-        check(EmbeddedPythonStatePolicy.canStart(current.state)) {
-            "Only one embedded Python session may be active; current state is " + current.state
+        val files = internalDependencyFiles(projectId)
+        val cpythonInput = runCatching {
+            EmbeddedPythonRequirementParserV1.fromProjectFiles(
+                files.requirementsText,
+                files.pyprojectText,
+            )
+        }.getOrNull()
+        val cpythonBinding = cpythonInput?.let { input ->
+            embeddedPythonEnvironmentManager?.loadBinding(projectId, input)
         }
-        cleanupEmbeddedStaging(current)
+        val alpineBinding = internalAlpineEnvironmentManager?.loadBinding(projectId, files.alpineSource)
         val entrypoint = gateway.resolveEmbeddedPythonEntrypoint(projectId)
             ?: error("EMBEDDED_R_ENTRYPOINT_UNRESOLVED")
-        // prepare() can recover an incomplete CPython asset root; do it before creating a staging copy.
-        session.prepareRuntime()
         val stagedRoot = stager.stage(projectId, entrypoint)
+
         return try {
-            val snapshot = session.start(
-                projectIdentity = projectId,
-                executionRoot = stagedRoot,
-                entrypoint = entrypoint,
-                workingDirectory = ".",
-                environmentSitePackages = environmentBinding.sitePackages,
-                environmentKey = environmentBinding.environmentKey,
-            )
+            val snapshot = if (cpythonBinding != null) {
+                val session = checkNotNull(embeddedPythonSession) { "Embedded CPython is unavailable" }
+                val current = session.snapshot()
+                check(EmbeddedPythonStatePolicy.canStart(current.state)) {
+                    "Only one embedded Python session may be active; current state is " + current.state
+                }
+                cleanupEmbeddedStaging(current)
+                session.prepareRuntime()
+                session.start(
+                    projectIdentity = projectId,
+                    executionRoot = stagedRoot,
+                    entrypoint = entrypoint,
+                    workingDirectory = ".",
+                    environmentSitePackages = cpythonBinding.sitePackages,
+                    environmentKey = cpythonBinding.environmentKey,
+                )
+            } else {
+                val binding = alpineBinding ?: error("EMBEDDED_R_ENVIRONMENT_NOT_READY")
+                val session = checkNotNull(internalAlpineSession) { "Internal Alpine is unavailable" }
+                check(session.canStart(projectId)) { "Internal Alpine project session is already active" }
+                session.start(
+                    projectIdentity = projectId,
+                    executionRoot = stagedRoot,
+                    entrypoint = entrypoint,
+                    environmentRoot = binding.environmentRoot,
+                )
+            }
             synchronized(embeddedStagingRoots) {
                 embeddedStagingRoots[snapshot.sessionId] = stagedRoot
             }
@@ -223,6 +342,34 @@ class ProjectRuntimeController(
             stager.cleanup(stagedRoot)
             throw error
         }
+    }
+
+    private fun internalDependencyFiles(projectDocumentId: String): InternalDependencyFiles {
+        val requirements = gateway.readProjectRootText(projectDocumentId, "requirements.txt")
+        val pyproject = gateway.readProjectRootText(projectDocumentId, "pyproject.toml")
+        return InternalDependencyFiles(
+            requirementsText = requirements,
+            pyprojectText = pyproject,
+            alpineSource = InternalAlpineDependencySource.fromProjectFiles(requirements, pyproject),
+        )
+    }
+
+    private fun shouldFallbackToAlpine(error: Throwable): Boolean {
+        val text = generateSequence(error) { it.cause }
+            .mapNotNull { it.message }
+            .joinToString("\n")
+            .lowercase()
+        return listOf(
+            "no_compatible_wheel",
+            "unsupported_dependency_manifest",
+            "not supported by internal python preparation",
+            "requirements options and nested requirement files are not supported",
+            "direct url requirements are not supported",
+            "unsupported requirement syntax",
+            "unsupported version specifier",
+            "dynamic project dependencies are not supported",
+            "pyproject.toml without a [project] table",
+        ).any { text.contains(it.lowercase()) }
     }
 
     private fun embeddedPythonDependencyInput(
@@ -252,10 +399,12 @@ class ProjectRuntimeController(
 
     /** A successful return only means the stop request was accepted; terminal state is polled. */
     fun requestEmbeddedPythonStop(projectDocumentId: String): Boolean {
-        val session = embeddedPythonSession ?: return false
         val snapshot = embeddedPythonSnapshotFor(projectDocumentId) ?: return false
         if (!EmbeddedPythonStatePolicy.canStop(snapshot.state)) return false
-        return session.requestStop()
+        return when (snapshot.engine) {
+            InternalPythonBackend.CPYTHON -> embeddedPythonSession?.requestStop() == true
+            InternalPythonBackend.ALPINE -> internalAlpineSession?.requestStop(projectDocumentId) == true
+        }
     }
 
     private fun cleanupEmbeddedStaging(snapshot: EmbeddedPythonSnapshot) {

@@ -43,6 +43,24 @@ class EmbeddedPythonProjectStagerTest {
     }
 
     @Test
+    fun stagesWholeProjectWithoutRequiringEntrypoint() {
+        val base = Files.createTempDirectory("siftalpha-stager-all").toFile()
+        val destination = File(base, "stage")
+        try {
+            val staged = EmbeddedPythonProjectStager.stageNodes(
+                destination = destination,
+                nodes = listOf(node("requirements.txt"), node("package/data.txt")),
+                entrypoint = null,
+            ) { node, _ -> node.relativePath.toByteArray() }
+
+            assertEquals("requirements.txt", File(staged, "requirements.txt").readText())
+            assertEquals("package/data.txt", File(staged, "package/data.txt").readText())
+        } finally {
+            base.deleteRecursively()
+        }
+    }
+
+    @Test
     fun rejectsUnsafeRelativePathBeforeCreatingStagingRoot() {
         val base = Files.createTempDirectory("siftalpha-stager-unsafe").toFile()
         val destination = File(base, "stage")

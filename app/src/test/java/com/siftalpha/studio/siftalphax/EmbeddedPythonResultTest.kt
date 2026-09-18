@@ -79,6 +79,21 @@ class EmbeddedPythonResultTest {
     }
 
     @Test
+    fun alpineSnapshotReportsTruthfulInternalBackendDiagnostics() {
+        val snapshot = EmbeddedPythonSnapshot(
+            engine = InternalPythonBackend.ALPINE,
+            sessionId = "alpine-a",
+            projectIdentity = "project-a",
+            state = EmbeddedPythonState.RUNNING,
+        )
+        val diagnostics = EmbeddedPythonDiagnosticText.copyAll(snapshot)
+
+        assertTrue(diagnostics.contains("SIFTALPHA_X_ENGINE=ALPINE"))
+        assertTrue(diagnostics.contains("SIFTALPHA_X_TERMUX=NOT_USED"))
+        assertTrue(diagnostics.contains("SIFTALPHA_X_PROOT=INTERNAL"))
+    }
+
+    @Test
     fun preservesFailureOutputAndNullableRunningFields() {
         val snapshot = EmbeddedPythonSnapshotParser.parse(
             """

@@ -54,6 +54,23 @@ class EmbeddedPythonProjectStager(
         }
     }
 
+    fun stageAll(projectDocumentId: String): File {
+        require(projectDocumentId.isNotBlank()) { "项目身份不能为空" }
+        val projectsRoot = File(appContext.filesDir, PRIVATE_PROJECTS_PATH)
+        check(projectsRoot.mkdirs() || projectsRoot.isDirectory) {
+            "无法创建内置 R 项目暂存目录"
+        }
+        val stagingRoot = File(projectsRoot, "session-" + UUID.randomUUID())
+        check(stagingRoot.parentFile?.canonicalFile == projectsRoot.canonicalFile)
+        val nodes = projectStore.listProjectTreeForStaging(projectDocumentId)
+        return stageNodes(
+            destination = stagingRoot,
+            nodes = nodes,
+            entrypoint = null,
+            limits = DEFAULT_LIMITS,
+        ) { node, maxBytes -> projectStore.readProjectFileBytes(node, maxBytes) }
+    }
+
     fun cleanup(stagingRoot: File) {
         if (!stagingRoot.exists()) return
         val projectsRoot = File(appContext.filesDir, PRIVATE_PROJECTS_PATH)
@@ -76,12 +93,14 @@ class EmbeddedPythonProjectStager(
         internal fun stageNodes(
             destination: File,
             nodes: List<ProjectStore.FileNode>,
-            entrypoint: String,
+            entrypoint: String?,
             limits: EmbeddedPythonStagingLimits = DEFAULT_LIMITS,
             reader: (ProjectStore.FileNode, Int) -> ByteArray,
         ): File {
-            val safeEntrypoint = EmbeddedPythonEntrypointPolicy.safeRelativePath(entrypoint)
-                ?: error("入口路径不是安全的项目相对路径")
+            val safeEntrypoint = entrypoint?.let {
+                EmbeddedPythonEntrypointPolicy.safeRelativePath(it)
+                    ?: error("入口路径不是安全的项目相对路径")
+            }
             require(nodes.size <= limits.maxNodes) {
                 "项目文件树超过内置 R 暂存节点上限 ${limits.maxNodes}"
             }
@@ -98,8 +117,10 @@ class EmbeddedPythonProjectStager(
             require(files.size <= limits.maxFiles) {
                 "项目文件数量超过内置 R 暂存上限 ${limits.maxFiles}"
             }
-            require(files.any { it.first == safeEntrypoint }) {
-                "入口文件不在项目暂存源树中"
+            if (safeEntrypoint != null) {
+                require(files.any { it.first == safeEntrypoint }) {
+                    "入口文件不在项目暂存源树中"
+                }
             }
 
             var destinationCreated = false
