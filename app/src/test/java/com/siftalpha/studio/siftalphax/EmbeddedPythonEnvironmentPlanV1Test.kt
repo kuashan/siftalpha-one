@@ -68,6 +68,7 @@ class EmbeddedPythonEnvironmentPlanV1Test {
             packages = listOf(
                 pkg(
                     name = "cryptography",
+                    version = "50.0.0",
                     marker = "python_version >= '3.8'",
                     requiresPython = ">=3.8",
                     wheel = wheel(
@@ -81,6 +82,7 @@ class EmbeddedPythonEnvironmentPlanV1Test {
                 ),
                 pkg(
                     name = "oci",
+                    version = "2.186.0",
                     wheel = wheel("oci-2.186.0-py3-none-any.whl"),
                 ),
             ),
