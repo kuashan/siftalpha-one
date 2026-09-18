@@ -1,5 +1,7 @@
 package com.siftalpha.studio.siftalphax;
 
+import com.siftalpha.studio.siftalphax.EmbeddedPythonWorkerExecutionSnapshotV1;
+
 interface IEmbeddedPythonWorker {
     const int BINDING_STATE_UNBOUND = 0;
     const int BINDING_STATE_BOUND = 1;
