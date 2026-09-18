@@ -204,7 +204,7 @@ object ProjectActionPolicy {
         }
         actions[Action.PREPARE] = when {
             selectionReason != null -> disabled(selectionReason)
-            snapshot.runtime.supported -> enabled()
+            embeddedRSelected || snapshot.runtime.supported -> enabled()
             else -> disabled(DisableReason.RUNTIME_HOST_UNAVAILABLE)
         }
         actions[Action.START] = when {
@@ -249,28 +249,34 @@ object ProjectActionPolicy {
                     disableReason = selectionReason
                     detailEntry = DetailEntry.RUNTIME
                 }
-                !embeddedRSelected &&
-                    snapshot.environment.readiness == ProjectUiSnapshot.Readiness.NOT_READY -> {
+                snapshot.environment.readiness == ProjectUiSnapshot.Readiness.NOT_READY -> {
                     actions[Action.START] = disabled(DisableReason.ENVIRONMENT_NOT_READY)
                     primaryAction = Action.PREPARE
-                    secondaryAction = Action.STATUS
+                    secondaryAction = Action.STATUS.takeIf {
+                        actions.getValue(Action.STATUS).enabled
+                    }
                     message = MessageKey.ENVIRONMENT_PREPARE_REQUIRED
                     disableReason = DisableReason.ENVIRONMENT_NOT_READY
                     detailEntry = DetailEntry.ENVIRONMENT
                 }
-                !embeddedRSelected &&
-                    snapshot.environment.readiness == ProjectUiSnapshot.Readiness.UNKNOWN -> {
+                snapshot.environment.readiness == ProjectUiSnapshot.Readiness.UNKNOWN -> {
                     actions[Action.START] = disabled(DisableReason.ENVIRONMENT_UNKNOWN)
-                    primaryAction = Action.STATUS
-                    secondaryAction = Action.PREPARE
+                    primaryAction = if (actions.getValue(Action.STATUS).enabled) {
+                        Action.STATUS
+                    } else {
+                        Action.PREPARE
+                    }
+                    secondaryAction = if (primaryAction == Action.STATUS) Action.PREPARE else null
                     message = MessageKey.ENVIRONMENT_STATUS_REQUIRED
                     disableReason = DisableReason.ENVIRONMENT_UNKNOWN
                     detailEntry = DetailEntry.ENVIRONMENT
                 }
-                !embeddedRSelected && snapshot.configuration.needsConfiguration -> {
+                snapshot.configuration.needsConfiguration -> {
                     actions[Action.START] = disabled(DisableReason.REQUIRED_CONFIGURATION_MISSING)
                     primaryAction = Action.CONFIGURE
-                    secondaryAction = Action.STATUS
+                    secondaryAction = Action.STATUS.takeIf {
+                        actions.getValue(Action.STATUS).enabled
+                    }
                     message = MessageKey.CONFIGURATION_REQUIRED
                     disableReason = DisableReason.REQUIRED_CONFIGURATION_MISSING
                     detailEntry = DetailEntry.CONFIGURATION

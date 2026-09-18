@@ -2,6 +2,7 @@ package com.siftalpha.studio.runtime
 
 import com.siftalpha.studio.project.EmbeddedPythonProjectStager
 import com.siftalpha.studio.project.V04ProjectGateway
+import com.siftalpha.studio.siftalphax.EmbeddedPythonEnvironmentManager
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSnapshot
 import com.siftalpha.studio.siftalphax.EmbeddedPythonStatePolicy
@@ -18,6 +19,7 @@ class ProjectRuntimeController(
     private val gateway: V04ProjectGateway,
     private val embeddedPythonSession: EmbeddedPythonSession? = null,
     private val embeddedPythonProjectStager: EmbeddedPythonProjectStager? = null,
+    private val embeddedPythonEnvironmentManager: EmbeddedPythonEnvironmentManager? = null,
 ) {
 
     enum class Action {
@@ -87,7 +89,10 @@ class ProjectRuntimeController(
             }
         }
 
-        if (action != Action.START || request != RuntimeControlRequest.EMBEDDED_R) {
+        if (
+            (action != Action.START && action != Action.PREPARE) ||
+            request != RuntimeControlRequest.EMBEDDED_R
+        ) {
             return RuntimeControlDecision(
                 path = RuntimeControlPath.EXTERNAL_PROVIDER,
                 reason = RuntimeControlReason.EXPLICIT_EXTERNAL_PROVIDER,
@@ -99,18 +104,50 @@ class ProjectRuntimeController(
             relativePaths = facts.relativePaths,
             declaredType = facts.declaredType,
         )
-        return EmbeddedPythonCapabilityRouting.resolve(
-            facts = EmbeddedPythonCapabilityFacts(
-                selection = selection,
-                relativePaths = facts.relativePaths,
-                declaredRun = facts.declaredRun,
-                resolvedEntrypoint = gateway.resolveEmbeddedPythonEntrypoint(project.summary.documentId),
-                hasExternalDependencyRequirement = facts.hasExternalDependencyRequirement,
-                hasProtectedConfigurationRequirement = requiredConfiguration,
-                embeddedRuntimeAvailable = embeddedPythonSession != null &&
-                    embeddedPythonProjectStager != null,
-            ),
-            request = request,
+        val capabilityFacts = EmbeddedPythonCapabilityFacts(
+            selection = selection,
+            relativePaths = facts.relativePaths,
+            declaredRun = facts.declaredRun,
+            resolvedEntrypoint = gateway.resolveEmbeddedPythonEntrypoint(project.summary.documentId),
+            hasExternalDependencyRequirement = facts.hasExternalDependencyRequirement,
+            hasProtectedConfigurationRequirement = requiredConfiguration,
+            embeddedRuntimeAvailable = embeddedPythonSession != null &&
+                embeddedPythonEnvironmentManager != null &&
+                (action != Action.START || embeddedPythonProjectStager != null),
+        )
+        return if (action == Action.PREPARE) {
+            EmbeddedPythonCapabilityRouting.resolvePreparation(
+                facts = capabilityFacts,
+                request = request,
+            )
+        } else {
+            EmbeddedPythonCapabilityRouting.resolve(
+                facts = capabilityFacts,
+                request = request,
+            )
+        }
+    }
+
+    fun prepareEmbeddedPythonEnvironment(
+        project: V04ProjectGateway.RuntimeProject,
+    ): EmbeddedPythonEnvironmentManager.PreparationResult {
+        val session = checkNotNull(embeddedPythonSession) { "Embedded R is unavailable" }
+        val environmentManager = checkNotNull(embeddedPythonEnvironmentManager) {
+            "Embedded R environment manager is unavailable"
+        }
+        val route = resolveControlPath(
+            project = project,
+            action = Action.PREPARE,
+            request = RuntimeControlRequest.EMBEDDED_R,
+        )
+        check(route.path == RuntimeControlPath.EMBEDDED_R) {
+            "Embedded R prepare route rejected: ${route.reason}"
+        }
+        val facts = gateway.runtimeFacts(project.summary.documentId)
+        session.prepareRuntime()
+        return environmentManager.prepareFoundation(
+            projectIdentity = project.summary.documentId,
+            hasExternalDependencyRequirement = facts.hasExternalDependencyRequirement,
         )
     }
 
@@ -121,6 +158,9 @@ class ProjectRuntimeController(
     ): EmbeddedPythonSnapshot {
         val session = checkNotNull(embeddedPythonSession) { "Embedded R is unavailable" }
         val stager = checkNotNull(embeddedPythonProjectStager) { "Embedded R staging is unavailable" }
+        val environmentManager = checkNotNull(embeddedPythonEnvironmentManager) {
+            "Embedded R environment manager is unavailable"
+        }
         val route = resolveControlPath(
             project = project,
             action = Action.START,
@@ -135,6 +175,9 @@ class ProjectRuntimeController(
             "Embedded R requires a resolved Python project"
         }
         val projectId = project.summary.documentId
+        check(environmentManager.isReady(projectId)) {
+            "EMBEDDED_R_ENVIRONMENT_NOT_READY"
+        }
         val current = session.snapshot()
         check(EmbeddedPythonStatePolicy.canStart(current.state)) {
             "Only one embedded Python session may be active; current state is " + current.state

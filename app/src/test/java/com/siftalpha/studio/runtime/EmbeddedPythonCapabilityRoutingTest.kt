@@ -72,6 +72,21 @@ class EmbeddedPythonCapabilityRoutingTest {
     }
 
     @Test
+    fun preparationDoesNotRequireEntrypointOrProtectedConfiguration() {
+        val decision = EmbeddedPythonCapabilityRouting.resolvePreparation(
+            facts(
+                paths = listOf("requirements.txt", "package/main.py"),
+                resolvedEntrypoint = null,
+                hasExternalDependencyRequirement = true,
+                hasProtectedConfigurationRequirement = true,
+            ),
+        )
+
+        assertEquals(RuntimeControlPath.EMBEDDED_R, decision.path)
+        assertEquals(RuntimeControlReason.EMBEDDED_R_ELIGIBLE, decision.reason)
+    }
+
+    @Test
     fun protectedConfigurationRequirementFallsBackFromEmbeddedR() {
         val decision = EmbeddedPythonCapabilityRouting.resolve(
             facts(

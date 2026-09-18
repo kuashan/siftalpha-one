@@ -301,7 +301,7 @@ class ProjectActionPolicyTest {
     }
 
     @Test
-    fun embeddedRSelectionCanStartWithoutExternalEnvironmentPreparation() {
+    fun embeddedRSelectionRequiresItsOwnPreparedEnvironment() {
         val policy = ProjectActionPolicy.resolve(
             snapshot(
                 runtime = ProjectUiSnapshot.Runtime(
@@ -312,18 +312,33 @@ class ProjectActionPolicyTest {
                     supported = false,
                 ),
                 environment = ProjectUiSnapshot.Environment(ProjectUiSnapshot.Readiness.NOT_READY),
-                configuration = ProjectUiSnapshot.Configuration(
-                    requiredCount = 1,
-                    configuredRequiredCount = 0,
-                    missingRequiredNames = listOf("TOKEN"),
+            ),
+            runtimeSelection = ProjectRuntimeSelection.EMBEDDED_R,
+        )
+
+        assertEquals(ProjectActionPolicy.Action.PREPARE, policy.primaryAction)
+        assertFalse(policy.isEnabled(ProjectActionPolicy.Action.START))
+        assertTrue(policy.isEnabled(ProjectActionPolicy.Action.PREPARE))
+    }
+
+    @Test
+    fun embeddedRPreparedEnvironmentCanStartWithoutExternalHost() {
+        val policy = ProjectActionPolicy.resolve(
+            snapshot(
+                runtime = ProjectUiSnapshot.Runtime(
+                    selection = ProjectUiSnapshot.Runtime.Selection(
+                        status = ProjectUiSnapshot.Runtime.SelectionStatus.RESOLVED,
+                        primary = RuntimeKind.PYTHON,
+                    ),
+                    supported = false,
                 ),
+                environment = ProjectUiSnapshot.Environment(ProjectUiSnapshot.Readiness.READY),
             ),
             runtimeSelection = ProjectRuntimeSelection.EMBEDDED_R,
         )
 
         assertEquals(ProjectActionPolicy.Action.START, policy.primaryAction)
         assertTrue(policy.isEnabled(ProjectActionPolicy.Action.START))
-        assertFalse(policy.isEnabled(ProjectActionPolicy.Action.PREPARE))
     }
 
     @Test

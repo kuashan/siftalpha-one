@@ -70,6 +70,7 @@ import com.siftalpha.studio.runtime.RichResultDocument
 import com.siftalpha.studio.runtime.RichResultLifecyclePolicy
 import com.siftalpha.studio.runtime.RichResultParser
 import com.siftalpha.studio.runtime.TermuxBackend
+import com.siftalpha.studio.siftalphax.EmbeddedPythonEnvironmentManager
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSnapshot
 import com.siftalpha.studio.siftalphax.EmbeddedPythonState
@@ -203,6 +204,35 @@ open class V04Activity : StudioActivity() {
     private val environmentStates: MutableMap<String, Boolean>
         get() = RUNTIME_ENVIRONMENT_READY
 
+    private fun environmentStateKey(
+        projectKey: String,
+        selection: ProjectRuntimeSelection,
+    ): String = selection.name + ":" + projectKey
+
+    private fun environmentReady(
+        projectKey: String,
+        selection: ProjectRuntimeSelection = projectRuntimeSelectionStore.read(projectKey),
+    ): Boolean? = environmentStates[environmentStateKey(projectKey, selection)]
+
+    private fun setEnvironmentReady(
+        projectKey: String,
+        selection: ProjectRuntimeSelection,
+        ready: Boolean?,
+    ) {
+        val key = environmentStateKey(projectKey, selection)
+        if (ready == null) {
+            environmentStates.remove(key)
+        } else {
+            environmentStates[key] = ready
+        }
+    }
+
+    private fun clearEnvironmentStates(projectKey: String) {
+        ProjectRuntimeSelection.entries.forEach { selection ->
+            environmentStates.remove(environmentStateKey(projectKey, selection))
+        }
+    }
+
     private val resultListener: (RuntimeResult) -> Unit = { result ->
         runOnUiThread {
             if (::prepareLiveProgress.isInitialized && prepareLiveProgress.consumeIfProbe(result)) {
@@ -254,6 +284,7 @@ open class V04Activity : StudioActivity() {
             gateway = gateway,
             embeddedPythonSession = EmbeddedPythonSession.shared(this),
             embeddedPythonProjectStager = EmbeddedPythonProjectStager(this),
+            embeddedPythonEnvironmentManager = EmbeddedPythonEnvironmentManager(this),
         )
         secretStore = ProjectSecretStore(this)
         lifecycleStore = RuntimeLifecycleStore(this)
@@ -624,11 +655,7 @@ open class V04Activity : StudioActivity() {
         }
         val configurationRequired =
             configurationSnapshot.preflight.missingRequired.isNotEmpty()
-        val lifecycleEnvironmentReady = if (runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R) {
-            true
-        } else {
-            environmentStates[stateKey]
-        }
+        val lifecycleEnvironmentReady = environmentReady(stateKey, runtimeSelection)
         val lifecycleState = RuntimeLifecycleResolver.resolve(
             environmentReady = lifecycleEnvironmentReady,
             runtimeState = typedState,
@@ -658,7 +685,7 @@ open class V04Activity : StudioActivity() {
                     RuntimeState.RUNNING,
                 ),
             ),
-            environment = ProjectUiSnapshot.Environment.from(environmentStates[stateKey]),
+            environment = ProjectUiSnapshot.Environment.from(lifecycleEnvironmentReady),
             configuration = ProjectUiSnapshot.Configuration(
                 requiredCount = configurationSnapshot.preflight.requiredCount,
                 configuredRequiredCount = configurationSnapshot.preflight.configuredRequiredCount,
@@ -679,7 +706,7 @@ open class V04Activity : StudioActivity() {
                 } else {
                     ProjectUiSnapshot.LifecycleEvidence.CACHED
                 },
-                environment = when (environmentStates[stateKey]) {
+                environment = when (lifecycleEnvironmentReady) {
                     null -> ProjectUiSnapshot.EnvironmentEvidence.NONE
                     else -> ProjectUiSnapshot.EnvironmentEvidence.CACHED
                 },
@@ -752,20 +779,14 @@ open class V04Activity : StudioActivity() {
         if (selectedProjectDocumentId != null) {
             box.addView(section(getString(R.string.runtime_workspace_environment)))
         }
-        val environmentLabel = if (runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R) {
-            getString(R.string.runtime_embedded_r_environment_ready)
-        } else {
-            when (environmentStates[stateKey]) {
-                true -> getString(R.string.runtime_state_env_ready)
-                false -> getString(R.string.runtime_state_env_not_ready)
-                null -> getString(R.string.runtime_environment_unknown)
-            }
+        val environmentLabel = when (lifecycleEnvironmentReady) {
+            true -> getString(R.string.runtime_state_env_ready)
+            false -> getString(R.string.runtime_state_env_not_ready)
+            null -> getString(R.string.runtime_environment_unknown)
         }
         box.addView(text(getString(R.string.runtime_environment_label, environmentLabel), 12f, false).apply {
             setTextColor(
-                if (runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R ||
-                    environmentStates[stateKey] == true
-                ) {
+                if (lifecycleEnvironmentReady == true) {
                     Color.rgb(170, 224, 190)
                 } else {
                     Color.rgb(150, 157, 169)
@@ -791,7 +812,7 @@ open class V04Activity : StudioActivity() {
             snapshot.recoveryInProgress -> snapshot.lifecycleState.uiLabel(this)
             snapshot.lifecycleState == RuntimeLifecycleState.RUN_FAILED &&
                 snapshot.failureReason != null -> snapshot.lifecycleState.uiLabel(this)
-            terminalState != null -> terminalState.uiLabel(this, environmentStates[stateKey])
+            terminalState != null -> terminalState.uiLabel(this, lifecycleEnvironmentReady)
             presentationState != typedState -> presentationState.uiLabel(this)
             states[stateKey] != null && snapshot.lifecycleState == RuntimeLifecycleState.DETECTING ->
                 states.getValue(stateKey)
@@ -937,8 +958,7 @@ open class V04Activity : StudioActivity() {
         row1.addView(smallButton(getString(R.string.runtime_button_edit)) { openEditor(project) }, weight())
         val prepareButton = smallButton(getString(R.string.runtime_button_prepare)) { confirmPrepare(project) }
             .apply {
-                isEnabled = runtimeSelection == ProjectRuntimeSelection.TERMUX &&
-                    policy.isEnabled(ProjectActionPolicy.Action.PREPARE)
+                isEnabled = policy.isEnabled(ProjectActionPolicy.Action.PREPARE)
             }
         row1.addView(prepareButton, weight().apply { marginStart = dp(5) })
         val runButton = smallButton(getString(R.string.runtime_button_run)) { confirmRun(project) }
@@ -1135,8 +1155,11 @@ open class V04Activity : StudioActivity() {
     private fun restoreStoredState(stateKey: String) {
         if (!::lifecycleStore.isInitialized) return
         val cached = lifecycleStore.read(stateKey)
-        if (!environmentStates.containsKey(stateKey)) {
-            cached.environmentReady?.let { environmentStates[stateKey] = it }
+        ProjectRuntimeSelection.entries.forEach { selection ->
+            val key = environmentStateKey(stateKey, selection)
+            if (!environmentStates.containsKey(key)) {
+                cached.environmentReadyFor(selection)?.let { environmentStates[key] = it }
+            }
         }
         if (!typedStates.containsKey(stateKey) && cached.runtimeState != RuntimeState.UNKNOWN) {
             typedStates[stateKey] = cached.runtimeState
@@ -1201,13 +1224,17 @@ open class V04Activity : StudioActivity() {
         refresh()
     }
 
-    private fun persistRuntimeState(stateKey: String) {
+    private fun persistRuntimeState(
+        stateKey: String,
+        selection: ProjectRuntimeSelection = projectRuntimeSelectionStore.read(stateKey),
+    ) {
         if (!::lifecycleStore.isInitialized) return
         lifecycleStore.write(
             projectKey = stateKey,
-            environmentReady = environmentStates[stateKey],
+            environmentReady = environmentReady(stateKey, selection),
             runtimeState = typedStates[stateKey] ?: RuntimeState.UNKNOWN,
             failureReason = failureReasons[stateKey],
+            runtimeSelection = selection,
         )
     }
 
@@ -1229,13 +1256,16 @@ open class V04Activity : StudioActivity() {
         val currentState = typedStates[stateKey] ?: RuntimeState.UNKNOWN
         if (action == ProjectRuntimeController.Action.START) {
             if (currentState in ACTIVE_RUNTIME_STATES) return false
-            if (controlPath == RuntimeControlPath.EXTERNAL_PROVIDER) {
-                if (environmentStates[stateKey] != true) return false
-                val configuration = configurationUi.snapshot(stateKey, project.folderName)
-                if (configuration.preflight.missingRequired.isNotEmpty()) {
-                    refresh()
-                    return false
-                }
+            val selection = when (controlPath) {
+                RuntimeControlPath.EMBEDDED_R -> ProjectRuntimeSelection.EMBEDDED_R
+                RuntimeControlPath.EXTERNAL_PROVIDER -> ProjectRuntimeSelection.TERMUX
+                RuntimeControlPath.REJECTED -> return false
+            }
+            if (environmentReady(stateKey, selection) != true) return false
+            val configuration = configurationUi.snapshot(stateKey, project.folderName)
+            if (configuration.preflight.missingRequired.isNotEmpty()) {
+                refresh()
+                return false
             }
         }
         if (action == ProjectRuntimeController.Action.PREPARE &&
@@ -1355,13 +1385,18 @@ open class V04Activity : StudioActivity() {
     }
 
     private fun confirmPrepare(project: V04ProjectGateway.RuntimeProject) {
-        if (!ensureRuntime()) return
+        val controlRequest = selectedRuntimeControlRequest(project)
+        if (controlRequest == RuntimeControlRequest.EXTERNAL_PROVIDER && !ensureRuntime()) return
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.runtime_prepare_title, project.summary.name))
             .setMessage(getString(R.string.runtime_prepare_message))
             .setNegativeButton(getString(R.string.common_cancel), null)
             .setPositiveButton(getString(R.string.runtime_prepare_start)) { _, _ ->
-                dispatch(project, ProjectRuntimeController.Action.PREPARE)
+                dispatch(
+                    project = project,
+                    action = ProjectRuntimeController.Action.PREPARE,
+                    controlRequest = controlRequest,
+                )
             }
             .show()
     }
@@ -1597,6 +1632,76 @@ open class V04Activity : StudioActivity() {
             }
             .setNegativeButton(getString(R.string.common_cancel), null)
             .show()
+    }
+
+    private fun prepareEmbeddedProject(project: V04ProjectGateway.RuntimeProject) {
+        val stateKey = project.summary.documentId
+        if (stateKey in embeddedStartInFlight) return
+        embeddedStartInFlight += stateKey
+        setEnvironmentReady(stateKey, ProjectRuntimeSelection.EMBEDDED_R, null)
+        typedStates[stateKey] = RuntimeState.PREPARING
+        states[stateKey] = getString(R.string.runtime_action_preparing)
+        failureReasons.remove(stateKey)
+        persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
+        projectOutputs.write(
+            project.folderName,
+            listOf(
+                "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                "SIFTALPHA_X_ENVIRONMENT_STAGE=PREPARING",
+            ).joinToString("\n"),
+            expand = true,
+        )
+        refresh()
+        embeddedStartExecutor.execute {
+            val result = runCatching { runtime.prepareEmbeddedPythonEnvironment(project) }
+            runOnUiThread {
+                embeddedStartInFlight.remove(stateKey)
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                val prepared = result.getOrNull()
+                if (prepared != null) {
+                    setEnvironmentReady(stateKey, ProjectRuntimeSelection.EMBEDDED_R, prepared.ready)
+                    typedStates[stateKey] = RuntimeState.UNKNOWN
+                    states[stateKey] = if (prepared.ready) {
+                        getString(R.string.runtime_state_not_running)
+                    } else {
+                        getString(R.string.runtime_state_env_not_ready)
+                    }
+                    failureReasons.remove(stateKey)
+                    projectOutputs.write(
+                        project.folderName,
+                        listOf(
+                            "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                            "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                            "SIFTALPHA_X_ENVIRONMENT_READY=" + prepared.ready,
+                            "SIFTALPHA_X_ENVIRONMENT_OUTCOME=" + prepared.outcome.name,
+                        ).joinToString("\n"),
+                        expand = true,
+                    )
+                    persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
+                    refresh()
+                } else {
+                    setEnvironmentReady(stateKey, ProjectRuntimeSelection.EMBEDDED_R, false)
+                    typedStates[stateKey] = RuntimeState.ENVIRONMENT_ERROR
+                    states[stateKey] = getString(R.string.runtime_prepare_failed)
+                    val message = result.exceptionOrNull()?.message ?: getString(R.string.runtime_unavailable)
+                    failureReasons[stateKey] = message
+                    projectOutputs.write(
+                        project.folderName,
+                        listOf(
+                            "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                            "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                            "SIFTALPHA_X_ENVIRONMENT_STAGE=FAILED",
+                            message,
+                        ).joinToString("\n"),
+                        expand = true,
+                    )
+                    persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
+                    refresh()
+                    errorDialog(getString(R.string.runtime_prepare_failed), message)
+                }
+            }
+        }
     }
 
     private fun startEmbeddedProject(
@@ -1857,7 +1962,8 @@ open class V04Activity : StudioActivity() {
             ObservationDispatchDecision.DISPATCH_NOW -> Unit
         }
         val effectiveControlRequest = controlRequest ?: if (
-            action == ProjectRuntimeController.Action.START
+            action == ProjectRuntimeController.Action.START ||
+            action == ProjectRuntimeController.Action.PREPARE
         ) {
             selectedRuntimeControlRequest(project)
         } else {
@@ -1905,6 +2011,8 @@ open class V04Activity : StudioActivity() {
         }
         if (route.path == RuntimeControlPath.EMBEDDED_R) {
             when (action) {
+                ProjectRuntimeController.Action.PREPARE ->
+                    prepareEmbeddedProject(project)
                 ProjectRuntimeController.Action.START ->
                     startEmbeddedProject(project, requiredConfiguration)
                 ProjectRuntimeController.Action.STOP ->
@@ -2057,11 +2165,12 @@ open class V04Activity : StudioActivity() {
 
     private fun updateEnvironmentState(stateKey: String, stdout: String): Boolean? {
         when {
-            "SIFTALPHA_ENV=READY" in stdout -> environmentStates[stateKey] = true
+            "SIFTALPHA_ENV=READY" in stdout ->
+                setEnvironmentReady(stateKey, ProjectRuntimeSelection.TERMUX, true)
             "SIFTALPHA_ENV=NOT_READY" in stdout || "SIFTALPHA_ENV=CLEANED" in stdout ->
-                environmentStates[stateKey] = false
+                setEnvironmentReady(stateKey, ProjectRuntimeSelection.TERMUX, false)
         }
-        return environmentStates[stateKey]
+        return environmentReady(stateKey, ProjectRuntimeSelection.TERMUX)
     }
 
     private fun showRuntimeConfigurationFinding(
@@ -2100,7 +2209,7 @@ open class V04Activity : StudioActivity() {
         val stateKey = project.summary.documentId
         // Configuration can be opened before preparation. In that state saving or skipping values
         // must not issue a doomed runtime command; the normal Prepare -> Run flow remains intact.
-        if (environmentStates[stateKey] != true) return
+        if (environmentReady(stateKey) != true) return
         if (pending.values.any { item ->
                 item.documentId == project.summary.documentId ||
                     (item.documentId == null && item.folderName == project.folderName)
@@ -2192,7 +2301,7 @@ open class V04Activity : StudioActivity() {
                     getString(R.string.runtime_prepare_failed)
                 }
                 if (prepared) {
-                    environmentStates[stateKey] = true
+                    setEnvironmentReady(stateKey, ProjectRuntimeSelection.TERMUX, true)
                     typedStates[stateKey] = RuntimeState.UNKNOWN
                 } else {
                     typedStates[stateKey] = RuntimeState.ENVIRONMENT_ERROR
@@ -2309,7 +2418,7 @@ open class V04Activity : StudioActivity() {
                 )
                 if (success) {
                     typedStates[stateKey] = RuntimeState.UNKNOWN
-                    environmentStates[stateKey] = false
+                    setEnvironmentReady(stateKey, ProjectRuntimeSelection.TERMUX, false)
                     configurationUi.clearRuntimeDiscovery(item.folderName)
                 }
                 refresh()
@@ -3123,7 +3232,7 @@ open class V04Activity : StudioActivity() {
                     val stateKey = project!!.summary.documentId
                     states[stateKey] = getString(R.string.runtime_state_not_checked)
                     typedStates[stateKey] = RuntimeState.UNKNOWN
-                    environmentStates.remove(stateKey)
+                    clearEnvironmentStates(stateKey)
                     output.append("\n${getString(R.string.runtime_import_completed, spec.sourceUrl)}")
                     toast(getString(R.string.runtime_project_imported, spec.projectName))
                 } else {

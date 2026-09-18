@@ -100,6 +100,33 @@ object EmbeddedPythonCapabilityRouting {
         )
     }
 
+    fun resolvePreparation(
+        facts: EmbeddedPythonCapabilityFacts,
+        request: RuntimeControlRequest = RuntimeControlRequest.EMBEDDED_R,
+    ): RuntimeControlDecision {
+        if (request == RuntimeControlRequest.EXTERNAL_PROVIDER) {
+            return RuntimeControlDecision(
+                path = RuntimeControlPath.EXTERNAL_PROVIDER,
+                reason = RuntimeControlReason.EXPLICIT_EXTERNAL_PROVIDER,
+            )
+        }
+        if (!facts.embeddedRuntimeAvailable) {
+            return rejected(RuntimeControlReason.EMBEDDED_R_UNAVAILABLE)
+        }
+        val resolved = facts.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
+            ?: return rejected(RuntimeControlReason.RUNTIME_SELECTION_UNRESOLVED)
+        if (resolved.primary != RuntimeKind.PYTHON) {
+            return rejected(RuntimeControlReason.RUNTIME_NOT_PYTHON)
+        }
+        if (resolved.supplemental.isNotEmpty()) {
+            return rejected(RuntimeControlReason.SUPPLEMENTAL_RUNTIME_UNSUPPORTED)
+        }
+        return RuntimeControlDecision(
+            path = RuntimeControlPath.EMBEDDED_R,
+            reason = RuntimeControlReason.EMBEDDED_R_ELIGIBLE,
+        )
+    }
+
     private fun isDirectPythonRun(command: String, entrypoint: String): Boolean {
         val tokens = command.split(Regex("""\s+""")).filter { it.isNotBlank() }
         if (tokens.size != 2) return false
