@@ -31,6 +31,23 @@ class EmbeddedPythonWorkerProjectExecutionStateTest {
     }
 
     @Test
+    fun freshProjectSnapshotHasNoExecutionOrResult() {
+        val snapshot = EmbeddedPythonWorkerProjectExecutionState().snapshot()
+
+        assertEquals(EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_NOT_STARTED, snapshot.state)
+        assertEquals("", snapshot.sessionId)
+        assertEquals(0L, snapshot.generation)
+        assertEquals("", snapshot.projectIdentity)
+        assertEquals("", snapshot.executionRoot)
+        assertEquals("", snapshot.entrypoint)
+        assertEquals("", snapshot.workingDirectory)
+        assertFalse(snapshot.stopRequested)
+        assertFalse(snapshot.hasExitCode)
+        assertEquals("", snapshot.stdout)
+        assertEquals("", snapshot.stderr)
+    }
+
+    @Test
     fun workerIdentityMismatchIsRejected() {
         val binding = binding()
         val state = EmbeddedPythonWorkerProjectExecutionState()
@@ -279,6 +296,7 @@ class EmbeddedPythonWorkerProjectExecutionStateTest {
             stop(state, binding),
         )
         assertTrue(state.isStopRequested())
+        assertTrue(state.snapshot().stopRequested)
         assertEquals(
             EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_ALREADY_REQUESTED,
             stop(state, binding),
@@ -365,6 +383,7 @@ class EmbeddedPythonWorkerProjectExecutionStateTest {
         )
         val stopped = state.snapshot()
         assertEquals(EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOPPED, stopped.state)
+        assertTrue(stopped.stopRequested)
         assertTrue(stopped.hasExitCode)
         assertEquals(130, stopped.exitCode)
 
@@ -373,7 +392,73 @@ class EmbeddedPythonWorkerProjectExecutionStateTest {
             start(state, binding, entrypoint = "after.py"),
         )
         assertFalse(state.isStopRequested())
+        assertFalse(state.snapshot().stopRequested)
         assertTrue(state.snapshot().generation > first.generation)
+    }
+
+    @Test
+    fun stoppedTerminalResultIsSealedAgainstLateNativeSnapshots() {
+        val binding = binding()
+        val state = startedState(binding)
+        val current = state.snapshot()
+        val stoppedOutput = nativeSnapshot(
+            current,
+            EmbeddedPythonState.STOPPED,
+            exitCode = 0,
+            stdout = "stopped stdout",
+            stderr = "stopped stderr",
+        )
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOPPED,
+            state.applyNativeSnapshot(stoppedOutput),
+        )
+        val sealed = state.snapshot()
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOPPED,
+            state.applyNativeSnapshot(
+                nativeSnapshot(
+                    current,
+                    EmbeddedPythonState.SUCCEEDED,
+                    exitCode = 0,
+                    stdout = "late success",
+                    stderr = "late stderr",
+                ),
+            ),
+        )
+        assertEquals(sealed, state.snapshot())
+    }
+
+    @Test
+    fun normalTerminalResultIsSealedAgainstLateNativeSnapshots() {
+        val binding = binding()
+        val state = startedState(binding)
+        val current = state.snapshot()
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_SUCCEEDED,
+            state.applyNativeSnapshot(
+                nativeSnapshot(
+                    current,
+                    EmbeddedPythonState.SUCCEEDED,
+                    exitCode = 0,
+                    stdout = "first success",
+                    stderr = "",
+                ),
+            ),
+        )
+        val sealed = state.snapshot()
+        state.applyNativeSnapshot(
+            nativeSnapshot(
+                current,
+                EmbeddedPythonState.FAILED,
+                exitCode = 9,
+                stdout = "late failure",
+                stderr = "late failure stderr",
+            ),
+        )
+        assertEquals(sealed, state.snapshot())
     }
 
     @Test

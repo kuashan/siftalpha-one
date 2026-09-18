@@ -868,5 +868,17 @@ completed on a real Android device with `Time: 1.484` and `OK (1 test)`. The evi
 - STOP is accepted only for the current `RUNNING` execution. The exact project runtime-use lease remains held until the native terminal snapshot is published; stale STOP requests cannot reach `nativeRequestStop()` or affect a later execution.
 - Project polling no longer has a fixed 30-second wall-clock timeout. The existing 30-second bound remains only for the one-shot CPython smoke path.
 - A stopped execution can re-enter sequentially in the same Worker process and RuntimeLoadBinding with a new session and higher generation. STOP uses the existing native cooperative-stop capability and does not kill the Worker process.
-- The new long-running instrumentation flow and Slice 6 JVM coverage are included in source; CI compiles the instrumentation APK but does not execute it on a device. **Slice 6 real-device acceptance remains pending.**
+- The new long-running instrumentation flow and Slice 6 JVM coverage are included in source; CI compiles the instrumentation APK but does not execute it on a device. The real-device acceptance is recorded in the following entry.
 - Slice 6 does not connect the Worker to M, add a production Supervisor, add hard-kill fallback, or migrate production START/STATUS/STOP.
+
+### alpha44 Slice 6 — Real-device acceptance
+
+`EmbeddedPythonWorkerLongRunningStopInstrumentedTest#workerStopsLongRunningProjectAndAllowsReentry`
+completed on a real Android device with `Time: 0.958` and `OK (1 test)`. The evidence covers long-running execution, typed cooperative STOP, exit code 130, stale STOP fencing, and same-Worker sequential re-entry.
+
+## 2026-09-18 · alpha44 Slice 7 — Worker Execution Status / Result Snapshot Hardening
+
+- Added the R-only typed `EmbeddedPythonWorkerExecutionSnapshotV1` Parcelable and one-transaction Binder STATUS path. Scalar execution getters remain only for Slice 4–6 compatibility and diagnostics.
+- The snapshot captures Worker process identity/lifecycle, binding identity, current execution identity, project paths, `stopRequested`, and bounded terminal output from immutable process/execution state captures.
+- Terminal results remain sealed until a later execution is accepted; Binder clients can recover the current execution identity after reconnect, while a fresh Worker process starts with a new `WorkerInstanceId` and an empty execution slot.
+- Slice 7 source and JVM/instrumentation coverage are present. CI compiles the instrumentation APK; Slice 7 real-device instrumentation has not yet been executed.

@@ -28,6 +28,21 @@ class EmbeddedPythonWorkerProcessStateTest {
     }
 
     @Test
+    fun freshProcessSnapshotIsActiveAndUnbound() {
+        val state = EmbeddedPythonWorkerProcessState(workerInstanceId = "worker-test-snapshot-a")
+
+        assertEquals(
+            EmbeddedPythonWorkerProcessSnapshot(
+                workerInstanceId = "worker-test-snapshot-a",
+                workerLifecycleState = EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_ACTIVE,
+                bindingState = EmbeddedPythonWorkerProtocol.BINDING_STATE_UNBOUND,
+                processBindingId = "",
+            ),
+            state.snapshot(),
+        )
+    }
+
+    @Test
     fun sameBindingIsIdempotent() {
         val state = EmbeddedPythonWorkerProcessState(workerInstanceId = "worker-test-b")
         val binding = binding()
@@ -36,6 +51,25 @@ class EmbeddedPythonWorkerProcessStateTest {
         assertEquals(EmbeddedPythonWorkerProtocol.BOUND_SAME, state.bind(request(binding)))
         assertEquals(binding.processBindingId.value, state.boundProcessBindingId())
         assertEquals(binding, state.boundRuntimeLoadBinding())
+    }
+
+    @Test
+    fun processSnapshotPreservesBindingAcrossSameAndConflictingRequests() {
+        val state = EmbeddedPythonWorkerProcessState(workerInstanceId = "worker-test-snapshot-b")
+        val first = binding(projectIdentity = "snapshot-first")
+        val second = binding(projectIdentity = "snapshot-second")
+
+        assertEquals(EmbeddedPythonWorkerProtocol.BOUND_NEW, state.bind(request(first)))
+        val bound = state.snapshot()
+        assertEquals(EmbeddedPythonWorkerProtocol.BINDING_STATE_BOUND, bound.bindingState)
+        assertEquals(first.processBindingId.value, bound.processBindingId)
+        assertEquals(EmbeddedPythonWorkerProtocol.BOUND_SAME, state.bind(request(first)))
+        assertEquals(bound, state.snapshot())
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.REJECTED_BINDING_CONFLICT,
+            state.bind(request(second)),
+        )
+        assertEquals(bound, state.snapshot())
     }
 
     @Test
@@ -108,6 +142,7 @@ class EmbeddedPythonWorkerProcessStateTest {
         val state = EmbeddedPythonWorkerProcessState(workerInstanceId = "worker-test-termination-a")
         val binding = binding()
         state.bind(request(binding))
+        val boundSnapshot = state.snapshot()
 
         assertEquals(
             EmbeddedPythonWorkerProtocol.EXIT_ACCEPTED,
@@ -119,6 +154,16 @@ class EmbeddedPythonWorkerProcessStateTest {
         assertEquals(
             EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_TERMINATING,
             state.workerLifecycleState(),
+        )
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_TERMINATING,
+            state.snapshot().workerLifecycleState,
+        )
+        assertEquals(
+            boundSnapshot.copy(
+                workerLifecycleState = EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_TERMINATING,
+            ),
+            state.snapshot(),
         )
     }
 
@@ -263,6 +308,7 @@ class EmbeddedPythonWorkerProcessStateTest {
             EmbeddedPythonWorkerProtocol.BINDING_STATE_UNBOUND,
             secondProcess.bindingState(),
         )
+        assertNotEquals(firstProcess.snapshot().workerInstanceId, secondProcess.snapshot().workerInstanceId)
     }
 
     private class WorkerServiceFacade(private val state: EmbeddedPythonWorkerProcessState) {

@@ -7,7 +7,7 @@ import java.io.File
 import java.util.concurrent.Executors
 
 /**
- * Process-scoped finite file-backed execution owner for the dedicated R Worker.
+ * Process-scoped file-backed execution owner for the dedicated R Worker.
  *
  * The caller owns and stages executionRoot. This controller never deletes that directory and
  * never reads SAF or Management-layer project state.

@@ -74,6 +74,14 @@ data class EmbeddedPythonWorkerBindRequest(
     val expectedProcessBindingId: String?,
 )
 
+/** Immutable process facts captured under the process-state monitor in one read. */
+data class EmbeddedPythonWorkerProcessSnapshot(
+    val workerInstanceId: String,
+    val workerLifecycleState: Int,
+    val bindingState: Int,
+    val processBindingId: String,
+)
+
 /**
  * Process-scoped binding gate for the dedicated Runtime worker.
  *
@@ -108,6 +116,28 @@ class EmbeddedPythonWorkerProcessState(
 
     @Synchronized
     fun workerLifecycleState(): Int = lifecycleState
+
+    /**
+     * Captures all process-level status fields under one monitor boundary.
+     *
+     * Callers should use this value object instead of composing a status record from the scalar
+     * getters above. The binding identity is immutable after BOUND_NEW; lifecycle transitions
+     * are copied as one process observation.
+     */
+    @Synchronized
+    fun snapshot(): EmbeddedPythonWorkerProcessSnapshot {
+        val bindingId = boundProcessBindingId?.value.orEmpty()
+        return EmbeddedPythonWorkerProcessSnapshot(
+            workerInstanceId = workerInstanceId,
+            workerLifecycleState = lifecycleState,
+            bindingState = if (bindingId.isBlank()) {
+                EmbeddedPythonWorkerProtocol.BINDING_STATE_UNBOUND
+            } else {
+                EmbeddedPythonWorkerProtocol.BINDING_STATE_BOUND
+            },
+            processBindingId = bindingId,
+        )
+    }
 
     /**
      * Rebuilds and verifies RuntimeLoadBindingV1 before the process gate is consulted.

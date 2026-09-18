@@ -72,6 +72,8 @@ interface IEmbeddedPythonWorker {
 
     String getBoundProcessBindingId();
 
+    EmbeddedPythonWorkerExecutionSnapshotV1 getWorkerExecutionSnapshotV1();
+
     int bindRuntimeLoadV1(
         String projectIdentity,
         String projectSourceGeneration,

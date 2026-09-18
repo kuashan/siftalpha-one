@@ -42,6 +42,7 @@ data class EmbeddedPythonWorkerProjectExecutionSnapshot(
     val executionRoot: String,
     val entrypoint: String,
     val workingDirectory: String,
+    val stopRequested: Boolean,
     val hasExitCode: Boolean,
     val exitCode: Int,
     val stdout: String,
@@ -57,7 +58,7 @@ data class EmbeddedPythonWorkerProjectExecutionInputs(
     val generation: Long,
 )
 
-/** Android-independent finite execution state and native snapshot adapter. */
+/** Android-independent long-running-capable execution state and native snapshot adapter. */
 class EmbeddedPythonWorkerProjectExecutionState {
     private var state = EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_NOT_STARTED
     private var sessionId = ""
@@ -308,6 +309,7 @@ class EmbeddedPythonWorkerProjectExecutionState {
             executionRoot = root,
             entrypoint = entrypoint,
             workingDirectory = workingDirectory,
+            stopRequested = stopRequested,
             hasExitCode = exitCode != null,
             exitCode = exitCode ?: -1,
             stdout = stdout,
@@ -342,6 +344,9 @@ class EmbeddedPythonWorkerProjectExecutionState {
         snapshot: EmbeddedPythonSnapshot,
     ) {
         state = terminalState
+        if (terminalState == EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOPPED) {
+            stopRequested = true
+        }
         exitCode = if (
             terminalState == EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOPPED
         ) {

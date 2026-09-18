@@ -31,6 +31,25 @@ class EmbeddedPythonWorkerService : Service() {
 
         override fun getBoundProcessBindingId(): String = processState.boundProcessBindingId()
 
+        /**
+         * Authoritative multi-field STATUS path. Both records are captured as immutable values;
+         * this method never composes the result by making a sequence of scalar reads.
+         */
+        override fun getWorkerExecutionSnapshotV1(): EmbeddedPythonWorkerExecutionSnapshotV1 {
+            if (Binder.getCallingUid() != applicationInfo.uid) {
+                throw SecurityException("worker snapshot is private to the application UID")
+            }
+            // Do not hold either monitor while acquiring the other one. This preserves the
+            // existing processState/controller lock independence and avoids nested-lock cycles.
+            val processSnapshot = processState.snapshot()
+            val executionSnapshot = projectController.snapshot()
+            return EmbeddedPythonWorkerExecutionSnapshotV1Mapper.map(
+                process = processSnapshot,
+                execution = executionSnapshot,
+                workerPid = Process.myPid(),
+            )
+        }
+
         override fun bindRuntimeLoadV1(
             projectIdentity: String?,
             projectSourceGeneration: String?,
@@ -186,6 +205,8 @@ class EmbeddedPythonWorkerService : Service() {
             return result
         }
 
+        // Scalar execution getters remain for Slice 4-6 compatibility and diagnostics only.
+        // Future multi-field STATUS must use getWorkerExecutionSnapshotV1().
         override fun getProjectExecutionState(): Int = projectController.snapshot().state
 
         override fun getProjectExecutionSessionId(): String =
