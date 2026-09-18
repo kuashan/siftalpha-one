@@ -58,16 +58,17 @@ class EmbeddedPythonCapabilityRoutingTest {
     }
 
     @Test
-    fun dependencyEnvironmentRequirementFallsBackFromEmbeddedR() {
+    fun dependencyMetadataDoesNotBlockEmbeddedRStart() {
         val decision = EmbeddedPythonCapabilityRouting.resolve(
             facts(
                 paths = listOf("main.py", "requirements.txt"),
+                declaredRun = "python main.py",
                 hasExternalDependencyRequirement = true,
             ),
         )
 
-        assertEquals(RuntimeControlPath.REJECTED, decision.path)
-        assertEquals(RuntimeControlReason.DEPENDENCY_ENVIRONMENT_REQUIRED, decision.reason)
+        assertEquals(RuntimeControlPath.EMBEDDED_R, decision.path)
+        assertEquals(RuntimeControlReason.EMBEDDED_R_ELIGIBLE, decision.reason)
     }
 
     @Test
