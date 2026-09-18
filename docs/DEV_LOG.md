@@ -1025,3 +1025,23 @@ download/install artifacts, create generations/site-packages, or change M/normal
 Existing alpha44 Worker and External Provider behavior remain unchanged.
 
 VersionCode advances to `122`; versionName remains `0.8.0-alpha45`.
+
+
+## 2026-09-18 · alpha45 Slice 3 — Pure-Python Wheel Compatibility Selection
+
+Implemented deterministic R-side wheel compatibility selection for the first internal Python
+environment path. The selector validates wheel filename structure and package identity, then chooses
+the highest-priority CPython 3.14 pure-Python candidate in this order:
+
+`cp314-none-any > py314-none-any > py3-none-any`.
+
+Equivalent candidates are tie-broken by filename so selection is deterministic and can feed the
+existing DependencyFingerprint/EnvironmentIdentity contract. Native Android, manylinux, musllinux and
+other non-`none-any` wheels remain outside Pure-Python Environment v1 and are reported as no supported
+pure wheel rather than being loaded unsafely.
+
+This slice performs no network access, installation, marker evaluation, or M wiring. It is a direct
+prerequisite for preparing OCI's own `py3-none-any` SDK wheel internally; OCI's native dependency
+closure (notably cryptography) still requires a later Android-native capability.
+
+VersionCode advances to `123`; versionName remains `0.8.0-alpha45`.
