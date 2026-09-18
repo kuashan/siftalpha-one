@@ -10,6 +10,7 @@ on:
     branches:
       - main
       - codex/siftalpha-x-embedded-cpython-spike
+      - codex/siftalpha-no-worker-alpha43
   workflow_dispatch:
 
 permissions:
