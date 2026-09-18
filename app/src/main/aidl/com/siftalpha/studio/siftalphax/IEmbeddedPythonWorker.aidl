@@ -54,6 +54,14 @@ interface IEmbeddedPythonWorker {
     const int PROJECT_EXECUTION_START_REJECTED_RUNTIME_MODE_CONFLICT = 7;
     const int PROJECT_EXECUTION_START_REJECTED_UNSUPPORTED_DEPENDENCY_LAYER = 8;
 
+    const int PROJECT_EXECUTION_STOP_ACCEPTED = 0;
+    const int PROJECT_EXECUTION_STOP_ALREADY_REQUESTED = 1;
+    const int PROJECT_EXECUTION_STOP_REJECTED_INVALID_REQUEST = 2;
+    const int PROJECT_EXECUTION_STOP_REJECTED_IDENTITY_MISMATCH = 3;
+    const int PROJECT_EXECUTION_STOP_REJECTED_NOT_RUNNING = 4;
+    const int PROJECT_EXECUTION_STOP_REJECTED_WRONG_PROCESS = 5;
+    const int PROJECT_EXECUTION_STOP_NATIVE_REJECTED = 6;
+
     String getWorkerInstanceId();
 
     int getWorkerPid();
@@ -102,6 +110,13 @@ interface IEmbeddedPythonWorker {
         String executionRoot,
         String entrypoint,
         String workingDirectory
+    );
+
+    int requestProjectExecutionStopV1(
+        String expectedWorkerInstanceId,
+        String expectedProcessBindingId,
+        String expectedExecutionSessionId,
+        long expectedExecutionGeneration
     );
 
     int getProjectExecutionState();

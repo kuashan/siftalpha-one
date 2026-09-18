@@ -211,6 +211,198 @@ class EmbeddedPythonWorkerProjectExecutionStateTest {
     }
 
     @Test
+    fun stopBeforeExecutionIsRejectedAsNotRunning() {
+        val state = EmbeddedPythonWorkerProjectExecutionState()
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_NOT_RUNNING,
+            state.requestStop(
+                expectedWorkerInstanceId = WORKER_ID,
+                expectedProcessBindingId = binding().processBindingId.value,
+                expectedExecutionSessionId = "siftalpha-worker-exec-not-started",
+                expectedExecutionGeneration = 1L,
+                actualWorkerInstanceId = WORKER_ID,
+                actualProcessBindingId = binding().processBindingId.value,
+            ),
+        )
+    }
+
+    @Test
+    fun invalidStopRequestIsRejectedBeforeStateChanges() {
+        val state = startedState(binding())
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_INVALID_REQUEST,
+            state.requestStop(
+                expectedWorkerInstanceId = "not-a-worker-id",
+                expectedProcessBindingId = "invalid",
+                expectedExecutionSessionId = "",
+                expectedExecutionGeneration = 0L,
+                actualWorkerInstanceId = WORKER_ID,
+                actualProcessBindingId = binding().processBindingId.value,
+            ),
+        )
+        assertFalse(state.isStopRequested())
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_RUNNING,
+            state.snapshot().state,
+        )
+    }
+
+    @Test
+    fun stopDuringPreparingAndStartingIsRejectedAsNotRunning() {
+        val binding = binding()
+        val state = EmbeddedPythonWorkerProjectExecutionState()
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_START_ACCEPTED,
+            start(state, binding),
+        )
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_NOT_RUNNING,
+            stop(state, binding),
+        )
+
+        state.markStarting()
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_NOT_RUNNING,
+            stop(state, binding),
+        )
+    }
+
+    @Test
+    fun matchingRunningExecutionAcceptsStopAndDuplicateIsIdempotent() {
+        val binding = binding()
+        val state = startedState(binding)
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_ACCEPTED,
+            stop(state, binding),
+        )
+        assertTrue(state.isStopRequested())
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_ALREADY_REQUESTED,
+            stop(state, binding),
+        )
+    }
+
+    @Test
+    fun stopRejectsWrongWorkerBindingSessionAndGenerationIdentity() {
+        val binding = binding()
+        val state = startedState(binding)
+        val current = state.snapshot()
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_IDENTITY_MISMATCH,
+            stop(state, binding, workerInstanceId = "worker-stale"),
+        )
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_IDENTITY_MISMATCH,
+            stop(
+                state,
+                binding,
+                processBindingId = binding(projectIdentity = "other").processBindingId.value,
+            ),
+        )
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_IDENTITY_MISMATCH,
+            stop(state, binding, sessionId = "siftalpha-worker-exec-stale"),
+        )
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_IDENTITY_MISMATCH,
+            stop(state, binding, generation = current.generation + 1L),
+        )
+        assertFalse(state.isStopRequested())
+    }
+
+    @Test
+    fun staleStopFromExecutionACannotAuthorizeOrChangeExecutionB() {
+        val binding = binding()
+        val state = startedState(binding)
+        val first = state.snapshot()
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOPPED,
+            state.applyNativeSnapshot(nativeSnapshot(first, EmbeddedPythonState.STOPPED, 130)),
+        )
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_START_ACCEPTED,
+            start(state, binding, entrypoint = "after.py"),
+        )
+        state.markStarting()
+        state.markRunning()
+        val second = state.snapshot()
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_IDENTITY_MISMATCH,
+            stop(
+                state,
+                binding,
+                sessionId = first.sessionId,
+                generation = first.generation,
+            ),
+        )
+        assertFalse(state.isStopRequested())
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_ACCEPTED,
+            stop(state, binding, sessionId = second.sessionId, generation = second.generation),
+        )
+    }
+
+    @Test
+    fun stoppedTerminalUsesCooperativeExitCodeAndAllowsReentry() {
+        val binding = binding()
+        val state = startedState(binding)
+        val first = state.snapshot()
+
+        state.applyNativeSnapshot(
+            nativeSnapshot(
+                first,
+                EmbeddedPythonState.STOPPED,
+                exitCode = 0,
+                stdout = "started\ncooperative stop",
+                stderr = "SIFTALPHA_X_STOP=COOPERATIVE",
+            ),
+        )
+        val stopped = state.snapshot()
+        assertEquals(EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOPPED, stopped.state)
+        assertTrue(stopped.hasExitCode)
+        assertEquals(130, stopped.exitCode)
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_START_ACCEPTED,
+            start(state, binding, entrypoint = "after.py"),
+        )
+        assertFalse(state.isStopRequested())
+        assertTrue(state.snapshot().generation > first.generation)
+    }
+
+    @Test
+    fun projectLeaseRemainsBusyUntilItsExactLeaseIsReleased() {
+        val binding = binding()
+        val state = startedState(binding)
+        val gate = EmbeddedPythonWorkerRuntimeUseGate()
+        val acquire = gate.tryAcquire(EmbeddedPythonWorkerRuntimeUseGate.Owner.PROJECT_EXECUTION)
+        assertTrue(acquire is EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.Acquired)
+        val projectLease = (acquire as EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.Acquired).lease
+
+        assertEquals(
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_ACCEPTED,
+            stop(state, binding),
+        )
+        assertTrue(state.isStopRequested())
+        assertTrue(
+            gate.tryAcquire(EmbeddedPythonWorkerRuntimeUseGate.Owner.CPYTHON_SMOKE) is
+                EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.OtherOwnerBusy,
+        )
+
+        gate.release(projectLease)
+        assertTrue(
+            gate.tryAcquire(EmbeddedPythonWorkerRuntimeUseGate.Owner.CPYTHON_SMOKE) is
+                EmbeddedPythonWorkerRuntimeUseGate.AcquireResult.Acquired,
+        )
+    }
+
+    @Test
     fun nativeFailedTerminalMapsToProjectFailed() {
         val binding = binding()
         val state = startedState(binding)
@@ -308,6 +500,22 @@ class EmbeddedPythonWorkerProjectExecutionStateTest {
         boundRuntimeLoadBinding = binding,
         workerLifecycleState = EmbeddedPythonWorkerProtocol.WORKER_LIFECYCLE_ACTIVE,
         request = request(entrypoint = entrypoint),
+    )
+
+    private fun stop(
+        state: EmbeddedPythonWorkerProjectExecutionState,
+        binding: RuntimeLoadBindingV1,
+        workerInstanceId: String = WORKER_ID,
+        processBindingId: String = binding.processBindingId.value,
+        sessionId: String = state.snapshot().sessionId,
+        generation: Long = state.snapshot().generation,
+    ): Int = state.requestStop(
+        expectedWorkerInstanceId = workerInstanceId,
+        expectedProcessBindingId = processBindingId,
+        expectedExecutionSessionId = sessionId,
+        expectedExecutionGeneration = generation,
+        actualWorkerInstanceId = WORKER_ID,
+        actualProcessBindingId = binding.processBindingId.value,
     )
 
     private fun request(

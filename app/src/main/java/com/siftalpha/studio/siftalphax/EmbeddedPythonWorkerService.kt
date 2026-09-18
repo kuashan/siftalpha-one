@@ -15,9 +15,9 @@ import java.io.File
 /**
  * R-only typed IPC endpoint for the Embedded Python worker foundation.
  *
- * The dedicated process now exposes the Slice 4 CPython smoke and Slice 5 finite, file-backed
- * execution foundation. These contracts are intentionally not connected to the Management layer
- * or the normal-user project flow.
+ * The dedicated process exposes the Slice 4 CPython smoke and Slice 5/6 file-backed execution
+ * foundation, including cooperative long-running STOP and same-process re-entry. These contracts
+ * are intentionally not connected to the Management layer or the normal-user project flow.
  */
 class EmbeddedPythonWorkerService : Service() {
     private val binder = object : IEmbeddedPythonWorker.Stub() {
@@ -155,6 +155,33 @@ class EmbeddedPythonWorkerService : Service() {
                 "project execution start result=$result pid=${Process.myPid()} " +
                     "workerInstanceId=${processState.workerInstanceId} " +
                     "bindingState=${processState.bindingState()}",
+            )
+            return result
+        }
+
+        override fun requestProjectExecutionStopV1(
+            expectedWorkerInstanceId: String?,
+            expectedProcessBindingId: String?,
+            expectedExecutionSessionId: String?,
+            expectedExecutionGeneration: Long,
+        ): Int {
+            if (Binder.getCallingUid() != applicationInfo.uid) {
+                return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_INVALID_REQUEST
+            }
+            if (Binder.getCallingPid() == Process.myPid() || !isDedicatedWorkerProcess()) {
+                return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_WRONG_PROCESS
+            }
+
+            val result = projectController.requestStop(
+                expectedWorkerInstanceId = expectedWorkerInstanceId,
+                expectedProcessBindingId = expectedProcessBindingId,
+                expectedExecutionSessionId = expectedExecutionSessionId,
+                expectedExecutionGeneration = expectedExecutionGeneration,
+            )
+            Log.i(
+                TAG,
+                "project execution stop result=$result pid=${Process.myPid()} " +
+                    "workerInstanceId=${processState.workerInstanceId}",
             )
             return result
         }

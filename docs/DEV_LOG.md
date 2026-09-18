@@ -854,5 +854,19 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - The Worker obtains projectIdentity from its immutable process-scoped RuntimeLoadBindingV1; callers provide only the staged execution root and safe relative entrypoint/working-directory values.
 - Runtime preparation now repairs only files/siftalphax/python; it preserves caller-owned files/siftalphax/projects staging so a first Worker prepare cannot delete a staged project.
 - Added process-local finite execution state, native snapshot identity fencing, typed success/failure/internal-error results, sequential re-entry, and Smoke-versus-project native-session exclusion.
-- Added a single source/instrumentation flow for success then expected Python failure, including runtime-rebuild preservation. CI compiles the instrumentation APK; Slice 5 real-device execution remains pending.
+- Added a single source/instrumentation flow for success then expected Python failure, including runtime-rebuild preservation. The Slice 5 real-device acceptance subsequently passed; CI still compiles the instrumentation APK without running instrumentation.
 - Slice 5 does not connect the Worker to M, migrate production START/STATUS/STOP, add long-running STOP, or implement a production Worker Supervisor.
+
+### alpha44 Slice 5 — Real-device acceptance
+
+`EmbeddedPythonWorkerProjectExecutionInstrumentedTest#workerExecutesCallerStagedFiniteProjectWithTypedResults`
+completed on a real Android device with `Time: 1.484` and `OK (1 test)`. The evidence covers caller-staged app-private project execution, typed results, expected Python failure/traceback, runtime-rebuild preservation, and sequential re-entry in the dedicated Worker process.
+
+## 2026-09-18 · alpha44 Slice 6 — Worker-side Long-running STOP + Re-entry
+
+- Added the R-only typed cooperative STOP contract for a specific project execution, fenced by WorkerInstanceId, ProcessBindingId, execution sessionId, and execution generation.
+- STOP is accepted only for the current `RUNNING` execution. The exact project runtime-use lease remains held until the native terminal snapshot is published; stale STOP requests cannot reach `nativeRequestStop()` or affect a later execution.
+- Project polling no longer has a fixed 30-second wall-clock timeout. The existing 30-second bound remains only for the one-shot CPython smoke path.
+- A stopped execution can re-enter sequentially in the same Worker process and RuntimeLoadBinding with a new session and higher generation. STOP uses the existing native cooperative-stop capability and does not kill the Worker process.
+- The new long-running instrumentation flow and Slice 6 JVM coverage are included in source; CI compiles the instrumentation APK but does not execute it on a device. **Slice 6 real-device acceptance remains pending.**
+- Slice 6 does not connect the Worker to M, add a production Supervisor, add hard-kill fallback, or migrate production START/STATUS/STOP.

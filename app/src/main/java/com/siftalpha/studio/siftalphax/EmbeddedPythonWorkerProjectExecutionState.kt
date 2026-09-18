@@ -67,6 +67,7 @@ class EmbeddedPythonWorkerProjectExecutionState {
     private var exitCode: Int? = null
     private var stdout = ""
     private var stderr = ""
+    private var stopRequested = false
 
     @Synchronized
     fun start(
@@ -139,6 +140,7 @@ class EmbeddedPythonWorkerProjectExecutionState {
         exitCode = null
         stdout = ""
         stderr = ""
+        stopRequested = false
         state = EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_PREPARING
         return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_START_ACCEPTED
     }
@@ -169,6 +171,67 @@ class EmbeddedPythonWorkerProjectExecutionState {
             state = EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_RUNNING
         }
     }
+
+    /**
+     * Authorizes a cooperative stop for exactly the current execution.
+     *
+     * This method is the last R-side fence before nativeRequestStop(). Callers must serialize
+     * that native call with start() at the controller boundary. A session or generation mismatch
+     * is never treated as a duplicate stop request for the current execution.
+     */
+    @Synchronized
+    fun requestStop(
+        expectedWorkerInstanceId: String?,
+        expectedProcessBindingId: String?,
+        expectedExecutionSessionId: String?,
+        expectedExecutionGeneration: Long,
+        actualWorkerInstanceId: String,
+        actualProcessBindingId: String,
+    ): Int {
+        val requestedWorkerInstanceId = try {
+            validateWorkerInstanceId(requireNotNull(expectedWorkerInstanceId))
+        } catch (_: IllegalArgumentException) {
+            return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_INVALID_REQUEST
+        }
+        val requestedProcessBindingId = try {
+            ProcessBindingId.parse(requireNotNull(expectedProcessBindingId))
+        } catch (_: IllegalArgumentException) {
+            return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_INVALID_REQUEST
+        }
+        val requestedSessionId = try {
+            validateExecutionSessionId(requireNotNull(expectedExecutionSessionId))
+        } catch (_: IllegalArgumentException) {
+            return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_INVALID_REQUEST
+        }
+        if (expectedExecutionGeneration <= 0L) {
+            return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_INVALID_REQUEST
+        }
+
+        if (state == EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_NOT_STARTED) {
+            return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_NOT_RUNNING
+        }
+        if (
+            requestedWorkerInstanceId != actualWorkerInstanceId ||
+            requestedProcessBindingId.value != actualProcessBindingId
+        ) {
+            return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_IDENTITY_MISMATCH
+        }
+        if (requestedSessionId != sessionId || expectedExecutionGeneration != generation) {
+            return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_IDENTITY_MISMATCH
+        }
+        if (state != EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_RUNNING) {
+            return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_REJECTED_NOT_RUNNING
+        }
+        if (stopRequested) {
+            return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_ALREADY_REQUESTED
+        }
+
+        stopRequested = true
+        return EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_ACCEPTED
+    }
+
+    @Synchronized
+    fun isStopRequested(): Boolean = stopRequested
 
     /** Maps a parsed native snapshot and fences it to the current Worker-owned execution. */
     @Synchronized
@@ -279,7 +342,13 @@ class EmbeddedPythonWorkerProjectExecutionState {
         snapshot: EmbeddedPythonSnapshot,
     ) {
         state = terminalState
-        exitCode = snapshot.exitCode
+        exitCode = if (
+            terminalState == EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOPPED
+        ) {
+            COOPERATIVE_STOP_EXIT_CODE
+        } else {
+            snapshot.exitCode
+        }
         stdout = boundOutput(snapshot.stdout)
         stderr = boundOutput(snapshot.stderr)
     }
@@ -300,6 +369,8 @@ class EmbeddedPythonWorkerProjectExecutionState {
     private companion object {
         private const val MAX_OUTPUT_CHARS = 64 * 1024
         private const val MAX_WORKER_INSTANCE_ID_UTF8_BYTES = 256
+        private const val MAX_EXECUTION_SESSION_ID_UTF8_BYTES = 256
+        private const val COOPERATIVE_STOP_EXIT_CODE = 130
 
         private fun boundOutput(value: String): String = value.take(MAX_OUTPUT_CHARS)
 
@@ -318,6 +389,15 @@ class EmbeddedPythonWorkerProjectExecutionState {
             }
             require(value.toByteArray(Charsets.UTF_8).size <= MAX_WORKER_INSTANCE_ID_UTF8_BYTES) {
                 "worker instance id exceeds $MAX_WORKER_INSTANCE_ID_UTF8_BYTES UTF-8 bytes"
+            }
+            return value
+        }
+
+        private fun validateExecutionSessionId(value: String): String {
+            require(value.isNotBlank()) { "execution session id must not be blank" }
+            require(!value.contains('\u0000')) { "execution session id must not contain NUL" }
+            require(value.toByteArray(Charsets.UTF_8).size <= MAX_EXECUTION_SESSION_ID_UTF8_BYTES) {
+                "execution session id exceeds $MAX_EXECUTION_SESSION_ID_UTF8_BYTES UTF-8 bytes"
             }
             return value
         }

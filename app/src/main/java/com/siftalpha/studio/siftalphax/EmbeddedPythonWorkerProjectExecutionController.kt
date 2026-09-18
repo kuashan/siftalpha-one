@@ -93,6 +93,56 @@ class EmbeddedPythonWorkerProjectExecutionController(
 
     fun snapshot(): EmbeddedPythonWorkerProjectExecutionSnapshot = executionState.snapshot()
 
+    /**
+     * Fences and dispatches a cooperative stop while serializing it with start().
+     *
+     * The execution state is validated before nativeRequestStop() is reachable. Holding this
+     * controller monitor across both steps prevents a validated stop for A from racing with a
+     * new start for B.
+     */
+    @Synchronized
+    fun requestStop(
+        expectedWorkerInstanceId: String?,
+        expectedProcessBindingId: String?,
+        expectedExecutionSessionId: String?,
+        expectedExecutionGeneration: Long,
+    ): Int {
+        val authorization = executionState.requestStop(
+            expectedWorkerInstanceId = expectedWorkerInstanceId,
+            expectedProcessBindingId = expectedProcessBindingId,
+            expectedExecutionSessionId = expectedExecutionSessionId,
+            expectedExecutionGeneration = expectedExecutionGeneration,
+            actualWorkerInstanceId = processState.workerInstanceId,
+            actualProcessBindingId = processState.boundProcessBindingId(),
+        )
+        if (authorization != EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_ACCEPTED) {
+            return authorization
+        }
+
+        return try {
+            if (EmbeddedPythonBridge.nativeRequestStop()) {
+                EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_ACCEPTED
+            } else {
+                // A native false result can race with natural terminal publication. The
+                // execution state remains authoritative; do not manufacture an infrastructure
+                // failure after the execution has already ended.
+                val currentState = executionState.snapshot().state
+                if (currentState !in ACTIVE_STATES) {
+                    EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_NATIVE_REJECTED
+                } else {
+                    EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_NATIVE_REJECTED
+                }
+            }
+        } catch (error: Throwable) {
+            Log.e(
+                TAG,
+                "nativeRequestStop failed in worker pid=${Process.myPid()} " +
+                    "type=${error::class.java.simpleName}",
+            )
+            EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_STOP_NATIVE_REJECTED
+        }
+    }
+
     private fun runExecution(
         context: Context,
         executionLease: EmbeddedPythonWorkerRuntimeUseGate.Lease,
@@ -164,8 +214,7 @@ class EmbeddedPythonWorkerProjectExecutionController(
     }
 
     private fun pollNativeResult() {
-        val deadline = System.currentTimeMillis() + EXECUTION_TIMEOUT_MS
-        while (System.currentTimeMillis() < deadline) {
+        while (true) {
             val raw = try {
                 EmbeddedPythonBridge.nativeSnapshot()
             } catch (error: Throwable) {
@@ -195,9 +244,6 @@ class EmbeddedPythonWorkerProjectExecutionController(
             }
         }
 
-        executionState.completeInternalError(
-            "SIFTALPHA_WORKER_PROJECT_EXECUTION_FAILURE=timeout",
-        )
     }
 
     private fun failNativeBoundary(operation: String, error: Throwable) {
@@ -215,7 +261,6 @@ class EmbeddedPythonWorkerProjectExecutionController(
     private companion object {
         private const val TAG = "SiftAlphaRWorker"
         private const val POLL_MS = 50L
-        private const val EXECUTION_TIMEOUT_MS = 30_000L
 
         private val ACTIVE_STATES = setOf(
             EmbeddedPythonWorkerProtocol.PROJECT_EXECUTION_PREPARING,
