@@ -1086,3 +1086,24 @@ before wheel selection.
 This slice does not download/install artifacts and does not change M routing.
 
 VersionCode advances to `125`; versionName remains `0.8.0-alpha45`.
+
+
+## 2026-09-18 · alpha45 Slice 6 — Environment Plan Composition
+
+Connected the previously separate alpha45 contracts into one deterministic R-side planning path:
+
+`pylock document → root/runtime compatibility → environment markers → package markers →
+Requires-Python → Android/pure wheel selection → DependencyFingerprintV1`.
+
+The planner receives explicit Android API facts and never consults ambient process environment state.
+False package markers are filtered, unsupported expressions fail closed, incompatible root/runtime
+constraints are structured failures, and multiple active entries for one normalized distribution are
+rejected instead of being merged implicitly.
+
+The resulting plan contains the exact selected wheel for every active package and the dependency
+fingerprint which will become the input to EnvironmentIdentity/generation preparation.
+
+This is still a non-I/O planning slice: no artifact download, extraction, site-packages installation,
+Worker loading or M routing is changed yet.
+
+VersionCode advances to `126`; versionName remains `0.8.0-alpha45`.
