@@ -274,6 +274,30 @@ class ProjectRuntimeController(
 
     fun runtimeUnsupportedReason(): String = host.runtimeUnsupportedReason()
 
+    fun wrapCancelableExternalActivity(
+        project: V04ProjectGateway.RuntimeProject,
+        action: Action,
+        command: RuntimeCommand,
+    ): RuntimeCommand {
+        val operation = when (action) {
+            Action.PREPARE -> "prepare"
+            Action.START -> "start"
+            Action.STATUS -> "status"
+            Action.LOGS -> "logs"
+            Action.CLEAN -> "clean"
+            Action.STOP,
+            Action.CLONE_GITHUB,
+            -> null
+        } ?: return command
+        return command.copy(
+            shellScript = host.wrapProjectActivity(
+                runtimeId = host.runtimeId(project.folderName),
+                operation = operation,
+                shellScript = command.shellScript,
+            ),
+        )
+    }
+
     /**
      * Resolve a one-shot Python launch at START time. Project metadata remains authoritative; this
      * action-time read is intentionally not used by card refresh.

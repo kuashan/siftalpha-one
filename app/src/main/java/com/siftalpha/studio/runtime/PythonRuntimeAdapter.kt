@@ -28,11 +28,7 @@ class PythonRuntimeAdapter(
     )
 
     override fun prepare(project: RuntimeProjectSpec): RuntimeCommand = RuntimeCommand(
-        shellScript = host.wrapUbuntuCancelable(
-            runtimeId = host.runtimeId(project.folderName),
-            operation = "prepare",
-            inner = buildPrepare(project),
-        ),
+        shellScript = host.wrapUbuntu(buildPrepare(project)),
         label = "${project.name} · 准备环境",
         description = "${project.name} · 准备环境",
     )

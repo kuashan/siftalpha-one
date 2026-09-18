@@ -176,6 +176,7 @@ SIFTALPHA_RUNNER
             shellScript = """
                 ${host.hostPreamble()}
                 ${host.hostProcessHelpers()}
+                ${host.stopProjectActivities(runtimeId)}
                 pid_file="${'$'}runtime_dir/${runtimeId}.pid"
                 pgid_file="${'$'}runtime_dir/${runtimeId}.pgid"
                 launch_log="${'$'}runtime_dir/${runtimeId}.launch.log"

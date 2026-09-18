@@ -166,6 +166,7 @@ open class V04Activity : StudioActivity() {
     private val embeddedStartExecutor = Executors.newSingleThreadExecutor()
     private val embeddedStartInFlight = mutableSetOf<String>()
     private val projectActivities = ProjectActivityRegistry()
+    private val externalActivityTokens = mutableMapOf<Int, ProjectActivityRegistry.Token>()
     private val cancelledExternalExecutions = mutableSetOf<Int>()
     private val embeddedLastSnapshots = mutableMapOf<String, EmbeddedPythonSnapshot>()
     private val embeddedRuntimeOwnership = mutableMapOf<String, RuntimeOwnership>()
@@ -245,6 +246,7 @@ open class V04Activity : StudioActivity() {
             // Never consume such an unmatched result: registerPending() will immediately reconcile it.
             val item = pending.remove(result.executionId) ?: return@runOnUiThread
             TermuxResultBus.consume(result.executionId)
+            externalActivityTokens.remove(result.executionId)?.let(projectActivities::finish)
             if (cancelledExternalExecutions.remove(result.executionId)) {
                 return@runOnUiThread
             }
@@ -2176,7 +2178,12 @@ open class V04Activity : StudioActivity() {
             )
             return false
         }
-        val id = send(command, renderToSystemOutput = false)
+        val managedCommand = runtime.wrapCancelableExternalActivity(
+            project = project,
+            action = action,
+            command = command,
+        )
+        val id = send(managedCommand, renderToSystemOutput = false)
         if (id == null) {
             if (silentRecovery) {
                 recoveryProjects.remove(stateKey)
@@ -2186,6 +2193,28 @@ open class V04Activity : StudioActivity() {
                 refresh()
             }
             return false
+        }
+        if (action != ProjectRuntimeController.Action.STOP) {
+            val activityKind = if (automaticObservation) {
+                ProjectActivityRegistry.Kind.OBSERVATION
+            } else {
+                when (action) {
+                    ProjectRuntimeController.Action.PREPARE -> ProjectActivityRegistry.Kind.PREPARE
+                    ProjectRuntimeController.Action.START -> ProjectActivityRegistry.Kind.START
+                    ProjectRuntimeController.Action.STATUS -> ProjectActivityRegistry.Kind.STATUS
+                    ProjectRuntimeController.Action.LOGS -> ProjectActivityRegistry.Kind.LOGS
+                    ProjectRuntimeController.Action.CLEAN -> ProjectActivityRegistry.Kind.CLEAN
+                    ProjectRuntimeController.Action.STOP,
+                    ProjectRuntimeController.Action.CLONE_GITHUB,
+                    -> null
+                }
+            }
+            if (activityKind != null) {
+                val token = projectActivities.begin(stateKey, activityKind) {
+                    cancelledExternalExecutions += id
+                }
+                externalActivityTokens[id] = token
+            }
         }
         if (action == ProjectRuntimeController.Action.START) {
             richResults.remove(stateKey)

@@ -20,6 +20,14 @@ interface RuntimeCommandHost {
     fun wrapUbuntuCancelable(runtimeId: String, operation: String, inner: String): String =
         wrapUbuntu(inner)
 
+    fun wrapProjectActivity(
+        runtimeId: String,
+        operation: String,
+        shellScript: String,
+    ): String = shellScript
+
+    fun stopProjectActivities(runtimeId: String): String = ""
+
     fun hostPreamble(): String
     fun hostProcessHelpers(): String
 }
@@ -125,6 +133,70 @@ class TermuxProotRuntimeHost(
             activity_code=${'$'}?
             rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
             exit "${'$'}activity_code"
+        """.trimIndent()
+    }
+
+    override fun wrapProjectActivity(
+        runtimeId: String,
+        operation: String,
+        shellScript: String,
+    ): String {
+        require(runtimeId.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid runtime id" }
+        require(operation.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid operation id" }
+        val runner = """
+            set +e
+            activity_pid_file="${'$'}1"
+            activity_pgid_file="${'$'}2"
+            activity_has_group="${'$'}3"
+            activity_script="${'$'}4"
+            printf '%s\n' "${'$'}${'$'}" >"${'$'}activity_pid_file"
+            if [ "${'$'}activity_has_group" = '1' ]; then
+              printf '%s\n' "${'$'}${'$'}" >"${'$'}activity_pgid_file"
+            fi
+            bash -lc "${'$'}activity_script"
+            activity_code=${'$'}?
+            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
+            exit "${'$'}activity_code"
+        """.trimIndent()
+        return """
+            ${hostPreamble()}
+            ${hostProcessHelpers()}
+            activity_pid_file="${'$'}runtime_dir/$runtimeId.activity.$operation.pid"
+            activity_pgid_file="${'$'}runtime_dir/$runtimeId.activity.$operation.pgid"
+            old_pid="${'$'}(cat "${'$'}activity_pid_file" 2>/dev/null || true)"
+            old_pgid="${'$'}(cat "${'$'}activity_pgid_file" 2>/dev/null || true)"
+            if siftalpha_pid_alive "${'$'}old_pid" || { [ -n "${'$'}old_pgid" ] && siftalpha_group_alive "${'$'}old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -c ${sh(runner)} siftalpha "${'$'}activity_pid_file" "${'$'}activity_pgid_file" 1 ${sh(shellScript)}
+            else
+              bash -c ${sh(runner)} siftalpha "${'$'}activity_pid_file" "${'$'}activity_pgid_file" 0 ${sh(shellScript)}
+            fi
+        """.trimIndent()
+    }
+
+    override fun stopProjectActivities(runtimeId: String): String {
+        require(runtimeId.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid runtime id" }
+        return """
+            siftalpha_activity_stop_failed=0
+            for activity_name in prepare start status logs clean; do
+              activity_pid_file="${'$'}runtime_dir/$runtimeId.activity.${'$'}activity_name.pid"
+              activity_pgid_file="${'$'}runtime_dir/$runtimeId.activity.${'$'}activity_name.pgid"
+              activity_pid="${'$'}(cat "${'$'}activity_pid_file" 2>/dev/null || true)"
+              activity_pgid="${'$'}(cat "${'$'}activity_pgid_file" 2>/dev/null || true)"
+              if [ -n "${'$'}activity_pid" ] || [ -n "${'$'}activity_pgid" ]; then
+                if ! siftalpha_stop_tree "${'$'}activity_pid" "${'$'}activity_pgid"; then
+                  siftalpha_activity_stop_failed=1
+                  printf 'SIFTALPHA_ACTIVITY_STOP_FAILED=%s\n' "${'$'}activity_name"
+                else
+                  printf 'SIFTALPHA_ACTIVITY_STOPPED=%s\n' "${'$'}activity_name"
+                fi
+              fi
+              rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
+            done
         """.trimIndent()
     }
 

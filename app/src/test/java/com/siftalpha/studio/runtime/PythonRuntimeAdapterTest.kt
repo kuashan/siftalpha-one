@@ -62,7 +62,8 @@ class PythonRuntimeAdapterTest {
         val script = command.shellScript
 
         assertEquals("Sample · 准备环境", command.label)
-        assertTrue(script.contains("HOST_CANCELABLE_BEGIN:runtime-id:prepare"))
+        assertTrue(script.contains("HOST_WRAP_BEGIN"))
+        assertFalse(script.contains("HOST_CANCELABLE_BEGIN:runtime-id:prepare"))
         assertTrue(script.contains("python3 -m venv"))
         assertTrue(script.contains("python3 -m pip --version"))
         assertTrue(script.contains("apt-get install -y python3-venv python3-pip"))

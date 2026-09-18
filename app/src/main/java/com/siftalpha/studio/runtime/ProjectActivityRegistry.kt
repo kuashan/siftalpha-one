@@ -8,6 +8,7 @@ class ProjectActivityRegistry {
         START,
         STATUS,
         LOGS,
+        CLEAN,
         OBSERVATION,
     }
 
