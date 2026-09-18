@@ -38,6 +38,10 @@ enum class EmbeddedPythonProjectFixture(
         assetPath = "siftalphax/project-fixtures/project-f-system-exit-nonzero",
         projectIdentity = "fixture-project-f-system-exit-nonzero",
     ),
+    PROJECT_G_WORKER_SMOKE(
+        assetPath = "siftalphax/project-fixtures/project-g-worker-smoke",
+        projectIdentity = "alpha44-worker-cpython-smoke",
+    ),
     PROJECT_MISSING_ENTRYPOINT(
         assetPath = "siftalphax/project-fixtures/project-missing-entrypoint",
         projectIdentity = "fixture-project-missing-entrypoint",

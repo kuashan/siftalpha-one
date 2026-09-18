@@ -86,6 +86,46 @@ class EmbeddedPythonWorkerService : Service() {
             }
             return result
         }
+
+        override fun startCpythonSmokeV1(
+            expectedWorkerInstanceId: String?,
+            expectedProcessBindingId: String?,
+        ): Int {
+            if (Binder.getCallingUid() != applicationInfo.uid) {
+                return EmbeddedPythonWorkerProtocol.CPYTHON_SMOKE_START_REJECTED_INVALID_REQUEST
+            }
+            if (Binder.getCallingPid() == Process.myPid() || !isDedicatedWorkerProcess()) {
+                return EmbeddedPythonWorkerProtocol.CPYTHON_SMOKE_START_REJECTED_WRONG_PROCESS
+            }
+
+            val result = smokeController.start(
+                context = applicationContext,
+                expectedWorkerInstanceId = expectedWorkerInstanceId,
+                expectedProcessBindingId = expectedProcessBindingId,
+            )
+            Log.i(
+                TAG,
+                "cp python smoke start result=$result pid=${Process.myPid()} " +
+                    "workerInstanceId=${processState.workerInstanceId} " +
+                    "bindingState=${processState.bindingState()}",
+            )
+            return result
+        }
+
+        override fun getCpythonSmokeState(): Int = smokeController.snapshot().state
+
+        override fun hasCpythonSmokeExitCode(): Boolean =
+            smokeController.snapshot().hasExitCode
+
+        override fun getCpythonSmokeExitCode(): Int = smokeController.snapshot().exitCode
+
+        override fun getCpythonSmokeStdout(): String = smokeController.snapshot().stdout
+
+        override fun getCpythonSmokeStderr(): String = smokeController.snapshot().stderr
+
+        override fun getCpythonSmokePythonPid(): Int = smokeController.snapshot().pythonPid
+
+        override fun getCpythonSmokeSessionId(): String = smokeController.snapshot().sessionId
     }
 
     private val terminationHandler by lazy(LazyThreadSafetyMode.NONE) {
@@ -142,5 +182,6 @@ class EmbeddedPythonWorkerService : Service() {
         // Companion object state is process-local. Service recreation in this process cannot
         // reset the binding; a fresh OS worker process creates a fresh state object instead.
         private val processState = EmbeddedPythonWorkerProcessState()
+        private val smokeController = EmbeddedPythonWorkerCpythonSmokeController(processState)
     }
 }
