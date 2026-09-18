@@ -440,6 +440,47 @@ class EmbeddedPythonNativeSmokeTest {
             root.deleteRecursively()
         }
     }
+    @Test
+    fun signalHandlersWorkAcrossSequentialEmbeddedSessions() {
+        assumeArm64()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val session = readySession(context)
+        val home = EmbeddedPythonFiles.prepare(context)
+
+        fun runSignalFixture(label: String): EmbeddedPythonSnapshot {
+            val root = File(home.parentFile, "projects/signal-$label-" + UUID.randomUUID())
+            check(root.mkdirs())
+            File(root, "main.py").writeText(
+                "import signal\n" +
+                    "def stop_handler(signum, frame):\n" +
+                    "    pass\n" +
+                    "signal.signal(signal.SIGTERM, stop_handler)\n" +
+                    "print('SIFTALPHA_X_SIGNAL_HANDLER_REGISTERED=$label')\n",
+            )
+            try {
+                session.start(
+                    projectIdentity = "signal-$label",
+                    executionRoot = root,
+                    entrypoint = "main.py",
+                    workingDirectory = ".",
+                )
+                awaitState(session, EmbeddedPythonState.SUCCEEDED, 5_000L)
+                return session.snapshot()
+            } finally {
+                root.deleteRecursively()
+            }
+        }
+
+        val first = runSignalFixture("FIRST")
+        assertEquals(0, first.exitCode)
+        assertTrue(first.stdout.contains("SIFTALPHA_X_SIGNAL_HANDLER_REGISTERED=FIRST"))
+
+        val second = runSignalFixture("SECOND")
+        assertEquals(0, second.exitCode)
+        assertTrue(second.generation > first.generation)
+        assertTrue(second.stdout.contains("SIFTALPHA_X_SIGNAL_HANDLER_REGISTERED=SECOND"))
+    }
+
     private fun androidAppPrivateAlias(file: File): File {
         val path = file.absolutePath
         val userPrefix = "/data/user/0/"

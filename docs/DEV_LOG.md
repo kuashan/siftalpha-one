@@ -936,3 +936,26 @@ path. Worker migration remains gated on capability parity.
 JVM/CI coverage is updated for automatic routing and compatibility semantics. Real-device regression
 for the user's Oracle Cloud long-running project remains pending and must be executed after Source + CI
 review before this compatibility repair is considered closed.
+
+
+## 2026-09-18 · alpha44 R Compatibility Repair — CPython main-thread signal semantics
+
+Oracle Cloud real-device regression reached Embedded R successfully
+(`ENGINE=CPYTHON`, `TERMUX=NOT_USED`, `PROOT=NOT_USED`) and exposed a deeper R compatibility defect:
+`signal.signal(SIGTERM, ...)` failed with
+`ValueError: signal only works in main thread of the main interpreter`.
+
+Root cause was the alpha29 re-entry bootstrap design: CPython was initialized on a temporary native
+bootstrap thread which then exited, while every real project session executed on a different detached
+thread. That made standard-library signal registration impossible even though ordinary Python code and
+STOP/re-entry fixtures passed.
+
+The repair keeps one process-lifetime native execution thread. CPython is initialized on that thread,
+its main-interpreter thread state is detached between sessions and restored for each project execution,
+and all sessions are serialized onto the same thread. This preserves the existing single-session R
+contract, STOP control thread, re-entry behavior, and process-lifetime interpreter while restoring
+CPython main-thread semantics required by ordinary scripts.
+
+A real-device instrumentation regression was added to register `SIGTERM` handlers in two sequential
+Embedded R sessions. OCI compatibility remains pending until the new artifact passes CI and the real
+Oracle Cloud project is rerun on device.

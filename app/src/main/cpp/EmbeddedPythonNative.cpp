@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -312,16 +313,20 @@ std::mutex gSessionMutex;
 std::shared_ptr<Session> gSession;
 SessionSnapshot gLastTerminalSnapshot;
 
-// CPython is initialized once for the process. Py_InitializeFromConfig() creates
-// the main thread state on the calling worker and returns with it attached. The
-// bootstrap state is detached immediately with PyEval_SaveThread() and retained
-// for the process lifetime; it is never reused for an execution session and
-// there is deliberately no Py_FinalizeEx() in this Android process.
+// CPython is initialized once on one persistent execution thread. That thread must
+// remain alive for the process lifetime because CPython's signal module permits
+// signal.signal() only on the main thread of the main interpreter. Every project
+// session is therefore serialized back onto the same execution thread.
 std::once_flag gPythonRuntimeOnce;
 std::mutex gPythonRuntimeMutex;
 bool gPythonRuntimeReady = false;
 std::string gPythonRuntimeError;
 PyThreadState* gPythonBootstrapThreadState = nullptr;
+
+std::once_flag gPythonExecutionThreadOnce;
+std::mutex gPythonExecutionMutex;
+std::condition_variable gPythonExecutionCv;
+std::shared_ptr<Session> gPendingExecutionSession;
 
 void setRuntimePhase(Session* session, RuntimePhase phase) {
     {
@@ -595,79 +600,61 @@ bool ensurePythonRuntime(const std::string& home, std::string* failure) {
     std::call_once(gPythonRuntimeOnce, [&]() {
         if (Py_IsInitialized()) {
             std::lock_guard<std::mutex> lock(gPythonRuntimeMutex);
-            gPythonRuntimeReady = true;
+            gPythonRuntimeError =
+                "SIFTALPHA_X_CPYTHON_RUNTIME_ALREADY_INITIALIZED_OUTSIDE_EXECUTION_THREAD";
             return;
         }
 
-        PyThreadState* bootstrapState = nullptr;
-        std::string initializationError;
-        try {
-            // Keep the initialization-created main thread state off every execution
-            // worker. The temporary bootstrap thread exits only after SaveThread has
-            // detached the state and released the GIL.
-            std::thread bootstrapThread([&]() {
-                PyConfig config;
-                PyConfig_InitPythonConfig(&config);
-                config.use_environment = 0;
-                config.user_site_directory = 0;
-                config.install_signal_handlers = 0;
-                config.parse_argv = 0;
+        PyConfig config;
+        PyConfig_InitPythonConfig(&config);
+        config.use_environment = 0;
+        config.user_site_directory = 0;
+        config.install_signal_handlers = 0;
+        config.parse_argv = 0;
 
-                char program[] = "siftalpha-x";
-                char* argv[] = {program, nullptr};
-                PyStatus status = PyConfig_SetBytesArgv(&config, 1, argv);
-                if (PyStatus_Exception(status)) {
-                    initializationError =
-                        status.err_msg == nullptr ? "CPython argv setup failed" : status.err_msg;
-                    PyConfig_Clear(&config);
-                    return;
-                }
-
-                status = PyConfig_SetBytesString(&config, &config.home, home.c_str());
-                if (PyStatus_Exception(status)) {
-                    initializationError =
-                        status.err_msg == nullptr ? "CPython home setup failed" : status.err_msg;
-                    PyConfig_Clear(&config);
-                    return;
-                }
-
-                status = Py_InitializeFromConfig(&config);
-                PyConfig_Clear(&config);
-                if (PyStatus_Exception(status)) {
-                    initializationError =
-                        status.err_msg == nullptr ? "CPython initialization failed" : status.err_msg;
-                    return;
-                }
-
-                // Py_InitializeFromConfig() created and attached the main thread
-                // state to this temporary bootstrap thread. Release the GIL and
-                // detach it before that thread exits.
-                bootstrapState = PyEval_SaveThread();
-                if (bootstrapState == nullptr) {
-                    initializationError = "CPython bootstrap thread state was not created";
-                }
-            });
-            bootstrapThread.join();
-        } catch (const std::exception& exception) {
-            initializationError = std::string("CPython bootstrap thread failed: ") + exception.what();
+        char program[] = "siftalpha-x";
+        char* argv[] = {program, nullptr};
+        PyStatus status = PyConfig_SetBytesArgv(&config, 1, argv);
+        if (PyStatus_Exception(status)) {
+            std::lock_guard<std::mutex> lock(gPythonRuntimeMutex);
+            gPythonRuntimeError =
+                status.err_msg == nullptr ? "CPython argv setup failed" : status.err_msg;
+            PyConfig_Clear(&config);
+            return;
         }
 
+        status = PyConfig_SetBytesString(&config, &config.home, home.c_str());
+        if (PyStatus_Exception(status)) {
+            std::lock_guard<std::mutex> lock(gPythonRuntimeMutex);
+            gPythonRuntimeError =
+                status.err_msg == nullptr ? "CPython home setup failed" : status.err_msg;
+            PyConfig_Clear(&config);
+            return;
+        }
+
+        status = Py_InitializeFromConfig(&config);
+        PyConfig_Clear(&config);
+        if (PyStatus_Exception(status)) {
+            std::lock_guard<std::mutex> lock(gPythonRuntimeMutex);
+            gPythonRuntimeError =
+                status.err_msg == nullptr ? "CPython initialization failed" : status.err_msg;
+            return;
+        }
+
+        // This is the main-interpreter main thread state. Detach it between
+        // sessions, but keep both the state and this OS thread alive forever.
+        PyThreadState* bootstrapState = PyEval_SaveThread();
         std::lock_guard<std::mutex> lock(gPythonRuntimeMutex);
-        if (bootstrapState != nullptr && initializationError.empty()) {
-            // This detached main thread state is retained for the process lifetime.
-            // It is the state required by a future Py_FinalizeEx(), which this
-            // Android process deliberately never performs.
-            gPythonBootstrapThreadState = bootstrapState;
-            gPythonRuntimeReady = true;
-        } else {
-            gPythonRuntimeError = initializationError.empty()
-                ? "SIFTALPHA_X_CPYTHON_RUNTIME_INIT_FAILED"
-                : initializationError;
+        if (bootstrapState == nullptr) {
+            gPythonRuntimeError = "CPython bootstrap thread state was not created";
+            return;
         }
+        gPythonBootstrapThreadState = bootstrapState;
+        gPythonRuntimeReady = true;
     });
 
     std::lock_guard<std::mutex> lock(gPythonRuntimeMutex);
-    if (gPythonRuntimeReady) {
+    if (gPythonRuntimeReady && gPythonBootstrapThreadState != nullptr) {
         return true;
     }
     if (failure != nullptr) {
@@ -677,6 +664,7 @@ bool ensurePythonRuntime(const std::string& home, std::string* failure) {
     }
     return false;
 }
+
 std::string parentDirectory(const std::string& path) {
     const std::size_t separator = path.find_last_of('/');
     if (separator == std::string::npos) {
@@ -1295,7 +1283,7 @@ void runSession(const std::shared_ptr<Session>& session) {
     }
 
     setRuntimePhase(session.get(), RuntimePhase::GIL_ACQUIRE_BEGIN);
-    PyGILState_STATE pythonGilState = PyGILState_Ensure();
+    PyEval_RestoreThread(gPythonBootstrapThreadState);
     setRuntimePhase(session.get(), RuntimePhase::GIL_ACQUIRED);
     session->pythonThreadId.store(
         PyThread_get_thread_ident(),
@@ -1472,7 +1460,7 @@ void runSession(const std::shared_ptr<Session>& session) {
 
     session->pythonReady.store(false, std::memory_order_release);
     setRuntimePhase(session.get(), RuntimePhase::GIL_RELEASE_BEGIN);
-    PyGILState_Release(pythonGilState);
+    gPythonBootstrapThreadState = PyEval_SaveThread();
     setRuntimePhase(session.get(), RuntimePhase::GIL_RELEASED);
     session->pythonThreadId.store(0, std::memory_order_release);
     workingDirectory.restore();
@@ -1487,6 +1475,44 @@ void runSession(const std::shared_ptr<Session>& session) {
     publishTerminalSession(session);
     logSessionResult(session.get());
     setRuntimePhase(session.get(), RuntimePhase::WORKER_EXIT);
+}
+
+bool queueExecutionSession(const std::shared_ptr<Session>& session) {
+    try {
+        std::call_once(gPythonExecutionThreadOnce, []() {
+            std::thread([]() {
+                for (;;) {
+                    std::shared_ptr<Session> next;
+                    {
+                        std::unique_lock<std::mutex> lock(gPythonExecutionMutex);
+                        gPythonExecutionCv.wait(lock, []() {
+                            return gPendingExecutionSession != nullptr;
+                        });
+                        next = gPendingExecutionSession;
+                        gPendingExecutionSession.reset();
+                    }
+                    runSession(next);
+                }
+            }).detach();
+        });
+    } catch (const std::exception& exception) {
+        __android_log_print(
+            ANDROID_LOG_ERROR,
+            kLogTag,
+            "SIFTALPHA_X_EXECUTION_THREAD_START_FAILED=%s",
+            exception.what());
+        return false;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(gPythonExecutionMutex);
+        if (gPendingExecutionSession != nullptr) {
+            return false;
+        }
+        gPendingExecutionSession = session;
+    }
+    gPythonExecutionCv.notify_one();
+    return true;
 }
 
 std::string snapshotJson(const SessionSnapshot& snapshot) {
@@ -1634,9 +1660,13 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeStart(
         gSession = session;
     }
     setRuntimePhase(session.get(), RuntimePhase::SESSION_CREATED);
-    std::thread([session]() {
-        runSession(session);
-    }).detach();
+    if (!queueExecutionSession(session)) {
+        std::lock_guard<std::mutex> lock(gSessionMutex);
+        if (gSession.get() == session.get()) {
+            gSession.reset();
+        }
+        return JNI_FALSE;
+    }
     return JNI_TRUE;
 }
 
