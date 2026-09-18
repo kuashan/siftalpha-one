@@ -279,6 +279,15 @@ class EmbeddedPythonWorkerProjectExecutionInstrumentedTest {
             dependencyLayerBinding = DependencyLayerBinding.STDLIB_ONLY,
         )
 
+    private fun IEmbeddedPythonWorker.bind(binding: RuntimeLoadBindingV1): Int =
+        bindRuntimeLoadV1(
+            binding.projectIdentity,
+            binding.projectSourceGeneration.value,
+            binding.runtimeProvenanceDigest.value,
+            binding.dependencyLayerBinding.wireValue,
+            binding.processBindingId.value,
+        )
+
     private class WorkerConnection {
         private val connected = CountDownLatch(1)
         private var remote: IEmbeddedPythonWorker? = null
