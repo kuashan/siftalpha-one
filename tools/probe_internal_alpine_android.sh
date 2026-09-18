@@ -125,8 +125,10 @@ make -C "$PROOT_SRC/src"   CC="$CC"   STRIP="$STRIP"   OBJCOPY="$OBJCOPY"   OBJD
 install -m 0755 "$PROOT_SRC/src/proot" "$OUTPUT_DIR/libproot.so"
 install -m 0755 "$PROOT_SRC/src/loader/loader" "$OUTPUT_DIR/libproot-loader.so"
 
-"$READELF" -h "$OUTPUT_DIR/libproot.so" | grep -q "AArch64"
-"$READELF" -h "$OUTPUT_DIR/libproot-loader.so" | grep -q "AArch64"
+"$READELF" -h "$OUTPUT_DIR/libproot.so" >"$WORK/libproot.readelf.txt"
+"$READELF" -h "$OUTPUT_DIR/libproot-loader.so" >"$WORK/libproot-loader.readelf.txt"
+grep -q "AArch64" "$WORK/libproot.readelf.txt"
+grep -q "AArch64" "$WORK/libproot-loader.readelf.txt"
 
 ALPINE_NAME="alpine-minirootfs-${ALPINE_VERSION}-aarch64.tar.gz"
 ALPINE_BASE="https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/aarch64"
