@@ -44,5 +44,5 @@ jobs:
         with:
           name: internal-alpine-probe
           path: internal-alpine-probe
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14

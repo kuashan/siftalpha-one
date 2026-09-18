@@ -45,6 +45,24 @@ download_verified   "https://github.com/termux/proot/archive/refs/tags/v${PROOT_
 unzip -q "$PROOT_ZIP" -d "$WORK"
 PROOT_SRC="$WORK/proot-${PROOT_VERSION}"
 
+# Android NDK r27 uses modern C99 diagnostics. PRoot 5.1.107.92's ashmem/memfd
+# extension uses strcmp/memset without directly including string.h, which older
+# toolchains accepted as an implicit declaration. Keep the upstream source
+# immutable and apply this narrow, auditable build-time compatibility patch.
+python3 - "$PROOT_SRC/src/extension/ashmem_memfd/ashmem_memfd.c" <<'PY'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+text = path.read_text()
+include = "#include <string.h>\n"
+if include not in text:
+    marker = "#include <sys/types.h>\n"
+    if marker not in text:
+        raise SystemExit("ashmem_memfd include anchor changed")
+    text = text.replace(marker, marker + include, 1)
+    path.write_text(text)
+PY
+
 TALLOC_TGZ="$WORK/talloc.tar.gz"
 download_verified   "https://download.samba.org/pub/talloc/talloc-${TALLOC_VERSION}.tar.gz"   "$TALLOC_SHA256"   "$TALLOC_TGZ"
 tar -xzf "$TALLOC_TGZ" -C "$WORK"
