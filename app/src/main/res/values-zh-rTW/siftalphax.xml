@@ -14,4 +14,7 @@
     <string name="siftalpha_x_no_output">尚無輸出</string>
     <string name="siftalpha_x_copy_all">複製全部</string>
     <string name="siftalpha_x_copied">已複製</string>
+    <string name="internal_runtime_notification_channel">內部執行環境</string>
+    <string name="internal_runtime_notification_title">SiftAlpha 內部執行環境正在執行</string>
+    <string name="internal_runtime_notification_text">%1$d 個內部專案正在背景執行</string>
 </resources>

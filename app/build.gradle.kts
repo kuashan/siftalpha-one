@@ -63,11 +63,11 @@ android {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        // alpha43-r20 adds app-private /dev/shm compatibility to Internal Alpine; External remains frozen.
-        // Listener facts remain observation-only and use the existing Web probe chain.
-        // Final source validation is cloud-only; real-device acceptance remains separate.
-        versionCode = 146
-        versionName = "0.8.0-alpha43-r20"
+        // alpha43-r21 keeps user-started Internal Alpine sessions alive with an Android foreground
+        // service and stabilizes Web presentation identity across Activity lifecycle changes.
+        // External Runtime, Worker architecture and project execution semantics remain frozen.
+        versionCode = 147
+        versionName = "0.8.0-alpha43-r21"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

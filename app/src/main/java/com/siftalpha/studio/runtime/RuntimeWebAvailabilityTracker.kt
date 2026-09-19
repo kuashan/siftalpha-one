@@ -21,6 +21,7 @@ class RuntimeWebAvailabilityTracker(
         val reachable: Boolean,
         val checkedAtEpochMs: Long,
         val generation: Int,
+        val lifecycleGeneration: Int,
     )
 
     private val handler = Handler(Looper.getMainLooper())
@@ -40,7 +41,8 @@ class RuntimeWebAvailabilityTracker(
         lifecycleGeneration += 1
         handler.removeCallbacksAndMessages(null)
         scheduledVersions.clear()
-        results.clear()
+        // Retain the last verified fact as presentation identity only. A fresh foreground
+        // lifecycle probe is still required before the endpoint is reported AVAILABLE.
         inFlight.clear()
     }
 
@@ -61,7 +63,25 @@ class RuntimeWebAvailabilityTracker(
         val urls = candidateUrls.distinct()
         return urls.firstOrNull { url ->
             val result = results[key(projectKey, url)] ?: return@firstOrNull false
-            result.generation == generation(projectKey) && result.reachable
+            result.generation == generation(projectKey) &&
+                result.lifecycleGeneration == lifecycleGeneration &&
+                result.reachable
+        }
+    }
+
+    /**
+     * Returns the last verified reachable URL for stable presentation identity. Project
+     * invalidation still fences old executions, while lifecycle changes only make it stale.
+     */
+    fun lastKnownReachableUrl(
+        projectKey: String,
+        candidateUrls: List<String>,
+    ): String? {
+        val projectGeneration = generation(projectKey)
+        return candidateUrls.distinct().firstOrNull { url ->
+            results[key(projectKey, url)]?.let { result ->
+                result.generation == projectGeneration && result.reachable
+            } == true
         }
     }
 
@@ -83,7 +103,10 @@ class RuntimeWebAvailabilityTracker(
         val urls = candidateUrls.distinct()
         urls.forEach { url -> ensureProbe(projectKey, url, now) }
         val current = urls.mapNotNull { url ->
-            results[key(projectKey, url)]?.takeIf { it.generation == generation(projectKey) }
+            results[key(projectKey, url)]?.takeIf {
+                it.generation == generation(projectKey) &&
+                    it.lifecycleGeneration == lifecycleGeneration
+            }
         }
         return when {
             current.any { it.reachable } -> true
@@ -103,7 +126,7 @@ class RuntimeWebAvailabilityTracker(
                 if (generation != generation(projectKey)) return@post
                 val key = key(projectKey, url)
                 val previous = results[key]
-                results[key] = ProbeResult(reachable, checkedAt, generation)
+                results[key] = ProbeResult(reachable, checkedAt, generation, lifecycleGeneration)
                 scheduleRecheck(projectKey, url, checkedAt, RECHECK_INTERVAL_MS)
                 if (previous?.reachable != reachable) onChanged()
                 callback(reachable)
@@ -117,7 +140,11 @@ class RuntimeWebAvailabilityTracker(
         val generation = generation(projectKey)
         val lifecycle = lifecycleGeneration
         val cached = results[key]
-        if (cached != null && cached.generation == generation) {
+        if (
+            cached != null &&
+            cached.generation == generation &&
+            cached.lifecycleGeneration == lifecycleGeneration
+        ) {
             val age = (now - cached.checkedAtEpochMs).coerceAtLeast(0L)
             if (age < RECHECK_INTERVAL_MS) {
                 scheduleRecheck(projectKey, url, cached.checkedAtEpochMs, RECHECK_INTERVAL_MS - age)
@@ -134,7 +161,7 @@ class RuntimeWebAvailabilityTracker(
                 if (generation != generation(projectKey)) return@post
                 inFlight.remove(key)
                 val previous = results[key]
-                results[key] = ProbeResult(reachable, checkedAt, generation)
+                results[key] = ProbeResult(reachable, checkedAt, generation, lifecycleGeneration)
                 scheduleRecheck(projectKey, url, checkedAt, RECHECK_INTERVAL_MS)
                 if (previous?.reachable != reachable) onChanged()
             }

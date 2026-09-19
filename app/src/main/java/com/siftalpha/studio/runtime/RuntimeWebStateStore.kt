@@ -15,6 +15,8 @@ class RuntimeWebStateStore(context: Context) {
         val framework: String?,
         val detectedAtEpochMs: Long,
         val source: RuntimeWebCandidateSource = RuntimeWebCandidateSource.UNKNOWN,
+        val verifiedUrl: String? = null,
+        val verifiedAtEpochMs: Long = 0L,
     )
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -26,6 +28,8 @@ class RuntimeWebStateStore(context: Context) {
         source = prefs.getString(key(projectKey, "source"), null)
             ?.let { raw -> runCatching { RuntimeWebCandidateSource.valueOf(raw) }.getOrDefault(RuntimeWebCandidateSource.UNKNOWN) }
             ?: RuntimeWebCandidateSource.UNKNOWN,
+        verifiedUrl = prefs.getString(key(projectKey, "verified_url"), null),
+        verifiedAtEpochMs = prefs.getLong(key(projectKey, "verified_at"), 0L),
     )
 
     fun rememberCandidateUrl(
@@ -34,11 +38,24 @@ class RuntimeWebStateStore(context: Context) {
         framework: String?,
         source: RuntimeWebCandidateSource = RuntimeWebCandidateSource.EXPLICIT,
     ) {
-        prefs.edit()
+        val previousUrl = prefs.getString(key(projectKey, "url"), null)
+        val editor = prefs.edit()
             .putString(key(projectKey, "url"), url)
             .putString(key(projectKey, "framework"), framework)
             .putString(key(projectKey, "source"), source.name)
             .putLong(key(projectKey, "detected_at"), System.currentTimeMillis())
+        if (previousUrl != url) {
+            editor
+                .remove(key(projectKey, "verified_url"))
+                .remove(key(projectKey, "verified_at"))
+        }
+        editor.apply()
+    }
+
+    fun rememberVerifiedUrl(projectKey: String, url: String) {
+        prefs.edit()
+            .putString(key(projectKey, "verified_url"), url)
+            .putLong(key(projectKey, "verified_at"), System.currentTimeMillis())
             .apply()
     }
 
@@ -63,6 +80,8 @@ class RuntimeWebStateStore(context: Context) {
             .remove(key(projectKey, "framework"))
             .remove(key(projectKey, "source"))
             .remove(key(projectKey, "detected_at"))
+            .remove(key(projectKey, "verified_url"))
+            .remove(key(projectKey, "verified_at"))
             .apply()
     }
 

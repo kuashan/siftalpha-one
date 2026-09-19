@@ -904,3 +904,17 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - This is an Internal Linux compatibility fix, not a Flask, OCI or situation-monitor project patch. External Runtime, Termux transport, Worker code, Web Discovery policy and session ownership remain unchanged.
 - Added JVM regression coverage for the exact base bind ordering: Android `/dev` first, app-private `/dev/shm` overlay second, followed by `/proc` and `/sys`.
 - Cloud CI / probe / APK and renewed real-device acceptance must be bound to the final r20 HEAD before any REAL_DEVICE_PASS claim.
+
+
+## 2026-09-19 · alpha43-r21 Internal Background Survival + Stable Web Presentation
+
+- Starting source baseline: `aae07f415b2109964eb5f40fca0650e1a6ed1127`, version `0.8.0-alpha43-r20` / `146`.
+- Added `InternalRuntimeForegroundService` as a thin Android process-liveness lease for active Internal Alpine sessions. It does not execute projects, own PIDs, supervise Runtime state, or implement STOP.
+- Each Internal Alpine session acquires a unique session lease after successful process launch and releases that lease only when that exact process reaches a terminal state. Multiple sessions therefore cannot stop each other's foreground protection.
+- Android manifest now declares foreground-service and special-use permissions/type. The foreground notification is user-visible, localized, ongoing, and opens SiftAlpha.
+- External Runtime, Termux transport, Worker architecture, PID ownership and project-scoped STOP semantics are unchanged.
+- Web availability now retains the last verified fact across Activity stop/start while treating it as presentation identity only. A new foreground lifecycle still requires a fresh endpoint probe before reporting AVAILABLE.
+- `RuntimeWebStateStore` persists the last verified Web URL for the current execution candidate. START/STOP/CLEAN/terminal invalidation keeps the existing execution boundary and prevents stale Web identity from crossing runs.
+- Unified Open now selects WEB from verified presentation identity rather than only the instantaneous probe result, so a temporary DETECTING state cannot fall through to Rich Result.
+- Added JVM coverage for independent foreground session leases, verified-Web presentation priority, and verified Web identity remaining expected while a fresh probe is pending.
+- W0 Cloud Build, Internal Alpine Probe, APK evidence and real-device external-browser refresh acceptance are pending for the final r21 HEAD.

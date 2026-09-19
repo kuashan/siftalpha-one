@@ -34,6 +34,20 @@ class RuntimeWebUiStatusTest {
     }
 
     @Test
+    fun previouslyVerifiedWebRemainsExpectedWhileForegroundProbeIsPending() {
+        val web = com.siftalpha.studio.presentation.ProjectUiSnapshot.Web.resolve(
+            profileEnabled = false,
+            hasCandidateRuntimeUrl = true,
+            hasConfiguredLocalUrl = false,
+            runtimeState = RuntimeState.RUNNING,
+            endpointReachable = null,
+            verifiedWebIdentity = true,
+        )
+        assertEquals(true, web.expected)
+        assertEquals(RuntimeWebUiStatus.DETECTING, web.status)
+    }
+
+    @Test
     fun runningWithVerifiedEndpointIsAvailable() {
         assertEquals(
             RuntimeWebUiStatus.AVAILABLE,

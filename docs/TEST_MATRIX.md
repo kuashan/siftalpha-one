@@ -419,3 +419,13 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - External Runtime production code: unchanged.
 - W0 Cloud Build / Internal Alpine Probe / APK: pending for final r20 HEAD.
 - Real-device acceptance: pending. First retest is the same `primary:AcodeProjects/situation-monitor` launch; expected result is no `/dev/shm` traceback, process remains RUNNING, then existing Web Discovery + Endpoint Probe may proceed.
+
+
+### alpha43-r21 Internal Background Survival + Stable Web Presentation
+
+- Internal Alpine long-running session: foreground-service lease must be acquired after launch and released on the exact session's terminal transition.
+- Multi-session isolation: releasing one session lease must not remove foreground protection for sibling Internal sessions.
+- External Runtime / Termux: unchanged.
+- Web presentation: a previously verified Web execution remains PresentationTarget.WEB while foreground endpoint revalidation is pending; Rich Result must not temporarily replace it.
+- Endpoint truth remains strict: AVAILABLE still requires a fresh current-lifecycle probe; retained/persisted verification only stabilizes presentation identity.
+- Real-device acceptance: start `primary:AcodeProjects/situation-monitor`, open in the configured external browser, refresh after 30 seconds and 2 minutes, return to SiftAlpha, confirm Web stays Web during DETECTING/AVAILABLE, then STOP and rerun.

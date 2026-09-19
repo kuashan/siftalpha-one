@@ -8,10 +8,10 @@ enum class PresentationTarget {
 
 object PresentationTargetResolver {
     fun resolve(
-        webAvailable: Boolean,
+        webPresentationKnown: Boolean,
         richResultAvailable: Boolean,
     ): PresentationTarget = when {
-        webAvailable -> PresentationTarget.WEB
+        webPresentationKnown -> PresentationTarget.WEB
         richResultAvailable -> PresentationTarget.RICH_RESULT
         else -> PresentationTarget.NONE
     }

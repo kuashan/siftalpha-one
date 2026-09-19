@@ -663,7 +663,21 @@ open class V04Activity : StudioActivity() {
         } else {
             null
         }
-        val reachableWebFramework = when (reachableWebUrl) {
+        if (
+            endpointReachable == true &&
+            reachableWebUrl != null &&
+            webSnapshot.verifiedUrl != reachableWebUrl
+        ) {
+            webStateStore.rememberVerifiedUrl(stateKey, reachableWebUrl)
+        }
+        val lastKnownWebUrl = if (::webAvailability.isInitialized) {
+            webAvailability.lastKnownReachableUrl(stateKey, candidateWebUrls)
+        } else {
+            null
+        }
+        val persistedVerifiedWebUrl = webSnapshot.verifiedUrl?.takeIf { it in candidateWebUrls }
+        val verifiedWebUrl = reachableWebUrl ?: lastKnownWebUrl ?: persistedVerifiedWebUrl
+        val reachableWebFramework = when (reachableWebUrl ?: verifiedWebUrl) {
             webSnapshot.candidateUrl -> webSnapshot.framework ?: webProfile.framework
             configuredWebUrl -> webProfile.framework ?: webSnapshot.framework
             else -> webProfile.framework ?: webSnapshot.framework
@@ -674,13 +688,14 @@ open class V04Activity : StudioActivity() {
             hasConfiguredLocalUrl = configuredWebUrl != null,
             runtimeState = typedState,
             endpointReachable = endpointReachable,
+            verifiedWebIdentity = verifiedWebUrl != null,
             reachableUrl = reachableWebUrl,
             framework = reachableWebFramework,
         )
         val webUiStatus = web.status
         val richResult = richResults[stateKey]
         val presentationTarget = PresentationTargetResolver.resolve(
-            webAvailable = reachableWebUrl != null,
+            webPresentationKnown = verifiedWebUrl != null,
             richResultAvailable = richResult != null,
         )
         val pendingItem = pending.values.firstOrNull { item ->
@@ -1078,7 +1093,7 @@ open class V04Activity : StudioActivity() {
                 projectName = summary.name,
                 folderName = project.folderName,
                 runtimeState = typedState,
-                webUrl = reachableWebUrl,
+                webUrl = verifiedWebUrl,
                 webFramework = reachableWebFramework,
                 richResult = richResult,
             )
@@ -3527,7 +3542,12 @@ open class V04Activity : StudioActivity() {
         webFramework: String?,
         richResult: RichResultDocument?,
     ) {
-        when (PresentationTargetResolver.resolve(webUrl != null, richResult != null)) {
+        when (
+            PresentationTargetResolver.resolve(
+                webPresentationKnown = webUrl != null,
+                richResultAvailable = richResult != null,
+            )
+        ) {
             PresentationTarget.WEB -> openBrowserForProject(
                 projectKey = projectKey,
                 folderName = folderName,

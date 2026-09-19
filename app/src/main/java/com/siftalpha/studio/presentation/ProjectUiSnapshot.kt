@@ -237,11 +237,13 @@ data class ProjectUiSnapshot(
                 hasConfiguredLocalUrl: Boolean,
                 runtimeState: RuntimeState,
                 endpointReachable: Boolean?,
+                verifiedWebIdentity: Boolean = false,
                 reachableUrl: String? = null,
                 framework: String? = null,
             ): Web {
                 // A discovered URL is only a candidate until Android verifies the endpoint.
-                val expected = profileEnabled || hasConfiguredLocalUrl || endpointReachable == true
+                val expected =
+                    profileEnabled || hasConfiguredLocalUrl || verifiedWebIdentity || endpointReachable == true
                 return Web(
                     expected = expected,
                     status = RuntimeWebUiStatus.resolve(

@@ -6,6 +6,10 @@
     <!-- Runtime Agent 只连接 127.0.0.1；INTERNET 是 Android Socket 所需的普通权限，不弹窗。 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Internal long-running projects use a user-visible foreground service so Android does not
+         freeze the app process while the user is interacting with an external browser. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <!-- Android 11+ package visibility：允许发现 Termux，以及能够处理网页的浏览器应用。 -->
     <queries>
@@ -90,6 +94,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".runtime.InternalRuntimeForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps user-started app-private Python runtime projects and localhost web services active while the user interacts with another app." />
+        </service>
 
         <!-- Termux 通过 PendingIntent 把命令结果返回到这里 -->
         <service

@@ -9,7 +9,18 @@ class PresentationTargetResolverTest {
     fun webDashboardWinsWhenRichResultAlsoExists() {
         assertEquals(
             PresentationTarget.WEB,
-            PresentationTargetResolver.resolve(webAvailable = true, richResultAvailable = true),
+            PresentationTargetResolver.resolve(webPresentationKnown = true, richResultAvailable = true),
+        )
+    }
+
+    @Test
+    fun verifiedWebIdentityWinsEvenWhileEndpointIsBeingRevalidated() {
+        assertEquals(
+            PresentationTarget.WEB,
+            PresentationTargetResolver.resolve(
+                webPresentationKnown = true,
+                richResultAvailable = true,
+            ),
         )
     }
 
@@ -17,7 +28,7 @@ class PresentationTargetResolverTest {
     fun richResultIsUsedWhenWebIsUnavailable() {
         assertEquals(
             PresentationTarget.RICH_RESULT,
-            PresentationTargetResolver.resolve(webAvailable = false, richResultAvailable = true),
+            PresentationTargetResolver.resolve(webPresentationKnown = false, richResultAvailable = true),
         )
     }
 
@@ -25,7 +36,7 @@ class PresentationTargetResolverTest {
     fun noWebAndNoRichResultHasNoOpenTarget() {
         assertEquals(
             PresentationTarget.NONE,
-            PresentationTargetResolver.resolve(webAvailable = false, richResultAvailable = false),
+            PresentationTargetResolver.resolve(webPresentationKnown = false, richResultAvailable = false),
         )
     }
 
@@ -33,7 +44,7 @@ class PresentationTargetResolverTest {
     fun rawLogPresenceDoesNotCreateAnOpenTarget() {
         assertEquals(
             PresentationTarget.NONE,
-            PresentationTargetResolver.resolve(webAvailable = false, richResultAvailable = false),
+            PresentationTargetResolver.resolve(webPresentationKnown = false, richResultAvailable = false),
         )
     }
 }

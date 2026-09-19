@@ -14,4 +14,7 @@
     <string name="siftalpha_x_no_output">No output yet</string>
     <string name="siftalpha_x_copy_all">Copy all</string>
     <string name="siftalpha_x_copied">Copied</string>
+    <string name="internal_runtime_notification_channel">Internal runtime</string>
+    <string name="internal_runtime_notification_title">SiftAlpha internal runtime is active</string>
+    <string name="internal_runtime_notification_text">%1$d internal project(s) running in the background</string>
 </resources>

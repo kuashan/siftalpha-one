@@ -2,6 +2,7 @@ package com.siftalpha.studio.siftalphax
 
 import android.content.Context
 import android.system.Os
+import com.siftalpha.studio.runtime.InternalRuntimeForegroundService
 import com.siftalpha.studio.runtime.InterruptibleProjectTreeDelete
 import com.siftalpha.studio.runtime.RuntimeOperationContract
 import android.system.OsConstants
@@ -555,19 +556,30 @@ class InternalAlpineSession private constructor(context: Context) {
             process = managed,
         )
         records[projectIdentity] = record
+        try {
+            InternalRuntimeForegroundService.acquire(appContext, sessionId)
+        } catch (error: Throwable) {
+            records.remove(projectIdentity, record)
+            InternalAlpineProcessControl.terminate(managed)
+            throw IllegalStateException("INTERNAL_RUNTIME_FOREGROUND_SERVICE_FAILED", error)
+        }
         monitor.execute {
-            val code = runCatching { process.waitFor() }.getOrElse { -1 }
-            managed.cleanup()
-            record.exitCode = code
-            record.finishedAt = System.currentTimeMillis()
-            record.state = if (record.stopRequested) {
-                EmbeddedPythonState.STOPPED
-            } else if (code == 0) {
-                EmbeddedPythonState.SUCCEEDED
-            } else {
-                EmbeddedPythonState.FAILED
+            try {
+                val code = runCatching { process.waitFor() }.getOrElse { -1 }
+                managed.cleanup()
+                record.exitCode = code
+                record.finishedAt = System.currentTimeMillis()
+                record.state = if (record.stopRequested) {
+                    EmbeddedPythonState.STOPPED
+                } else if (code == 0) {
+                    EmbeddedPythonState.SUCCEEDED
+                } else {
+                    EmbeddedPythonState.FAILED
+                }
+                record.process = null
+            } finally {
+                InternalRuntimeForegroundService.release(appContext, sessionId)
             }
-            record.process = null
         }
         return snapshotOf(record)
     }

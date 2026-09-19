@@ -14,4 +14,7 @@
     <string name="siftalpha_x_no_output">아직 출력이 없습니다</string>
     <string name="siftalpha_x_copy_all">모두 복사</string>
     <string name="siftalpha_x_copied">복사했습니다</string>
+    <string name="internal_runtime_notification_channel">내부 런타임</string>
+    <string name="internal_runtime_notification_title">SiftAlpha 내부 런타임 실행 중</string>
+    <string name="internal_runtime_notification_text">내부 프로젝트 %1$d개가 백그라운드에서 실행 중</string>
 </resources>
