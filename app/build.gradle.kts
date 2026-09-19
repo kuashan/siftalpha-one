@@ -64,6 +64,7 @@ android {
         minSdk = 26
         targetSdk = 36
         // alpha43-r18 adds project-scoped Internal Alpine listener discovery; External remains frozen.
+        // Listener facts remain observation-only and use the existing Web probe chain.
         // Final source validation is cloud-only; real-device acceptance remains separate.
         versionCode = 144
         versionName = "0.8.0-alpha43-r18"
