@@ -63,11 +63,11 @@ android {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        // alpha43-r22 accelerates Internal/External Web discovery with bounded startup fast paths.
-        // Rich Result presentation, External execution and Worker architecture remain unchanged.
-        // Final validation remains cloud-only; real-device acceptance is separate.
-        versionCode = 148
-        versionName = "0.8.0-alpha43-r22"
+        // alpha43-r23 adds ownership-verified Web hints before full listener discovery.
+        // Hints never become Web evidence without current-project PID/socket ownership proof.
+        // Rich Result, External execution semantics and Worker freeze remain unchanged.
+        versionCode = 149
+        versionName = "0.8.0-alpha43-r23"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

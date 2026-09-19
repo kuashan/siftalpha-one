@@ -65,6 +65,34 @@ class InternalAlpineWebDiscoveryTest {
         }
     }
 
+
+    @Test
+    fun hintedPortMustBelongToCurrentProjectBeforeFastPathCanPublishIt() {
+        val proc = fakeProcRoot()
+        try {
+            projectTree(proc, rootPid = 100, childPid = 101)
+            socketFd(proc, pid = 101, fd = 3, inode = 12345)
+            socketFd(proc, pid = 999, fd = 4, inode = 54321)
+            writeTcpTables(
+                proc = proc,
+                rows = listOf(
+                    tcpRow(port = 9234, inode = 12345),
+                    tcpRow(port = 5173, inode = 54321),
+                ),
+            )
+
+            val observation = InternalAlpineWebDiscovery.observe(
+                procRoot = proc,
+                rootPid = 100,
+                preferredHints = listOf(5173, 9234),
+            )
+
+            assertEquals(listOf(9234), observation.ports)
+        } finally {
+            proc.deleteRecursively()
+        }
+    }
+
     @Test
     fun unrelatedPidListenerCannotBecomeCurrentProjectCandidate() {
         val proc = fakeProcRoot()

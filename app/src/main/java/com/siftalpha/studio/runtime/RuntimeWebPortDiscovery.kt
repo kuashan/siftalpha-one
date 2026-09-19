@@ -32,7 +32,7 @@ object RuntimeWebPortDiscovery {
     private const val D = "$"
     private const val MAX_RUNTIME_CANDIDATES = 6
 
-    private val preferredPorts = listOf(
+    private val genericPreferredPorts = listOf(
         5173, // Vite
         3000, // Next / common Node dev server
         8000, // FastAPI / common app server
@@ -48,12 +48,19 @@ object RuntimeWebPortDiscovery {
         3001,
     )
 
-    fun rankCandidates(candidates: Collection<Int>): List<Int> {
+    fun rankCandidates(
+        candidates: Collection<Int>,
+        preferredHints: Collection<Int> = emptyList(),
+    ): List<Int> {
         val valid = candidates.filter { it in 1..65535 }.distinct()
-        val preferred = preferredPorts.filter { it in valid }
-        val remainder = valid.filterNot { it in preferredPorts }.sorted()
+        val preferredOrder = orderedPreferredPorts(preferredHints)
+        val preferred = preferredOrder.filter { it in valid }
+        val remainder = valid.filterNot { it in preferredOrder }.sorted()
         return preferred + remainder
     }
+
+    private fun orderedPreferredPorts(preferredHints: Collection<Int>): List<Int> =
+        (preferredHints.filter { it in 1..65535 } + genericPreferredPorts).distinct()
 
     internal fun diagnosticStatus(
         observation: RuntimeWebDiscoveryObservation,
@@ -70,8 +77,8 @@ object RuntimeWebPortDiscovery {
         else -> RuntimeWebDiscoveryDiagnosticStatus.NO_HTTP_ENDPOINT
     }
 
-    fun shellSnippet(): String {
-        val preferred = preferredPorts.joinToString(" ")
+    fun shellSnippet(preferredHints: Collection<Int> = emptyList()): String {
+        val preferred = orderedPreferredPorts(preferredHints).joinToString(" ")
         val guestScript = guestDiscoveryScript(preferred)
         val quotedGuestScript = shellQuote(guestScript)
         return """

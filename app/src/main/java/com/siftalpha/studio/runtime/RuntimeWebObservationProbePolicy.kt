@@ -10,6 +10,7 @@ object RuntimeWebObservationProbePolicy {
 
     data class Input(
         val webLogDiscoveryAllowed: Boolean,
+        val runtimeHintDiscoveryAllowed: Boolean = false,
         val probeCount: Int,
         val maxProbeCount: Int,
         val candidateExists: Boolean,
@@ -20,7 +21,7 @@ object RuntimeWebObservationProbePolicy {
         require(input.probeCount >= 0) { "probeCount must not be negative" }
         require(input.maxProbeCount > 0) { "maxProbeCount must be positive" }
 
-        if (!input.webLogDiscoveryAllowed) return false
+        if (!input.webLogDiscoveryAllowed && !input.runtimeHintDiscoveryAllowed) return false
         if (input.probeCount >= input.maxProbeCount) return false
         if (input.endpointVerified) return false
 

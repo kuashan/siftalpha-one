@@ -163,6 +163,7 @@ class ProjectRuntimeController(
 
     fun internalAlpineWebObservationFor(
         snapshot: EmbeddedPythonSnapshot,
+        webHintPorts: List<Int> = emptyList(),
     ): InternalAlpineWebObservation? {
         if (
             snapshot.engine != InternalPythonBackend.ALPINE ||
@@ -175,6 +176,7 @@ class ProjectRuntimeController(
             projectIdentity = snapshot.projectIdentity,
             expectedSessionId = snapshot.sessionId,
             expectedGeneration = snapshot.generation,
+            preferredHints = webHintPorts,
         )
     }
 
@@ -603,8 +605,9 @@ class ProjectRuntimeController(
         project: V04ProjectGateway.RuntimeProject,
         pythonLaunchInvocation: PythonLaunchInvocation?,
         webLogDiscoveryAllowed: Boolean = false,
+        webHintPorts: List<Int> = emptyList(),
     ): RuntimeCommand {
-        val context = executionContext(project, webLogDiscoveryAllowed)
+        val context = executionContext(project, webLogDiscoveryAllowed, webHintPorts)
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
             ?: return selectionError(project, context.selection)
         if (pythonLaunchInvocation != null && resolved.primary != RuntimeKind.PYTHON) {
@@ -648,8 +651,9 @@ class ProjectRuntimeController(
     fun status(
         project: V04ProjectGateway.RuntimeProject,
         webLogDiscoveryAllowed: Boolean = false,
+        webHintPorts: List<Int> = emptyList(),
     ): RuntimeCommand {
-        val context = executionContext(project, webLogDiscoveryAllowed)
+        val context = executionContext(project, webLogDiscoveryAllowed, webHintPorts)
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
             ?: return unresolvedStatus(context)
         return when (resolved.primary) {
@@ -674,8 +678,9 @@ class ProjectRuntimeController(
     fun logs(
         project: V04ProjectGateway.RuntimeProject,
         webLogDiscoveryAllowed: Boolean = false,
+        webHintPorts: List<Int> = emptyList(),
     ): RuntimeCommand {
-        val context = executionContext(project, webLogDiscoveryAllowed)
+        val context = executionContext(project, webLogDiscoveryAllowed, webHintPorts)
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
         return when (resolved?.primary) {
             RuntimeKind.PYTHON -> PythonDependencyDiagnostics.appendRuntimeLogDiagnosis(
@@ -752,6 +757,7 @@ class ProjectRuntimeController(
     private fun executionContext(
         project: V04ProjectGateway.RuntimeProject,
         webLogDiscoveryAllowed: Boolean = false,
+        webHintPorts: List<Int> = emptyList(),
     ): ExecutionContext {
         val facts = gateway.runtimeFacts(project.summary.documentId)
         val selection = ProjectRuntimeExecutionPlanner.select(
@@ -781,6 +787,7 @@ class ProjectRuntimeController(
                 declaredRun = facts.declaredRun,
                 relativePaths = facts.relativePaths,
                 webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+                webHintPorts = webHintPorts.filter { it in 1..65535 }.distinct(),
             ),
             selection = selection,
         )

@@ -468,3 +468,14 @@ Production external runtime 仍主要依赖 Termux + PRoot + Ubuntu + Python 作
 - Endpoint verification uses a bounded startup retry burst (150/300/600 ms after early misses), then returns to the existing 2-second health cadence.
 - External Web discovery temporarily uses a 500 ms observation cadence only while its bounded LOGS discovery budget remains useful; it returns to 2 seconds after endpoint verification or budget exhaustion.
 - Unified Open remains presentation-neutral: a valid Rich Result stays usable while Web is only DETECTING; verified Web keeps the existing priority when both presentation targets exist.
+
+
+## alpha43-r23 Web Hint architecture (2026-09-19)
+
+- Web hints are an acceleration layer, not a new Web truth source.
+- Ordered evidence preference: detected/configured project port, framework default, bounded common ports, then existing complete listener discovery.
+- Every hinted port must cross the existing current-project ownership boundary before becoming a Web candidate.
+- Internal ownership proof is current Alpine session/generation + project PID tree + socket inode.
+- External ownership proof remains managed PID/PGID and Runtime Identity/PRoot guest PID scope.
+- Android loopback reachability is the second gate after ownership; only verified Runtime candidates can establish Web presentation identity.
+- Rich Result remains an independent presentation capability. Hint discovery must not alter Rich Result parsing, lifecycle or viewer semantics.

@@ -662,7 +662,7 @@ SIFTALPHA_RUNNER
               rm -f "${'$'}pid_file" "${'$'}pgid_file"
             fi
             siftalpha_web_procfs_output="${'$'}(
-              ${RuntimeWebPortDiscovery.shellSnippet()}
+              ${RuntimeWebPortDiscovery.shellSnippet(project.webHintPorts)}
             )"
             printf '%s\n' "${'$'}siftalpha_web_procfs_output"
             if printf '%s\n' "${'$'}siftalpha_web_procfs_output" | grep -q '^SIFTALPHA_WEB_AUTODISCOVERY=PASS '; then

@@ -45,17 +45,26 @@ internal object InternalAlpineWebDiscovery {
     fun observe(
         procRoot: File,
         rootPid: Int,
+        preferredHints: Collection<Int> = emptyList(),
     ): InternalAlpineWebObservation {
         if (rootPid <= 0) return InternalAlpineWebObservation.empty()
         val projectPids = linkedSetOf(rootPid).apply {
             addAll(InternalAlpineProcessControl.descendantPids(procRoot, rootPid.toLong()))
         }.take(MAX_PROJECT_PIDS)
-        return observePids(procRoot, projectPids)
+        ownedHintPort(procRoot, projectPids, preferredHints)?.let { port ->
+            return InternalAlpineWebObservation(
+                projectPidCount = projectPids.size,
+                socketInodeCount = 1,
+                ports = listOf(port),
+            )
+        }
+        return observePids(procRoot, projectPids, preferredHints)
     }
 
     internal fun observePids(
         procRoot: File,
         projectPids: Collection<Int>,
+        preferredHints: Collection<Int> = emptyList(),
     ): InternalAlpineWebObservation {
         val scopedPids = projectPids
             .filter { it > 0 }
@@ -91,8 +100,98 @@ internal object InternalAlpineWebDiscovery {
         return InternalAlpineWebObservation(
             projectPidCount = scopedPids.size,
             socketInodeCount = socketInodes.size,
-            ports = RuntimeWebPortDiscovery.rankCandidates(ports),
+            ports = RuntimeWebPortDiscovery.rankCandidates(ports, preferredHints),
         )
+    }
+
+    /**
+     * Hint fast path: inspect only hinted LISTEN ports first, then prove that the matching socket
+     * inode is owned by the current project PID tree. A reachable port from another project cannot
+     * pass this check.
+     */
+    private fun ownedHintPort(
+        procRoot: File,
+        projectPids: Collection<Int>,
+        preferredHints: Collection<Int>,
+    ): Int? {
+        val hints = preferredHints.filter { it in 1..65535 }.distinct()
+        if (hints.isEmpty() || projectPids.isEmpty()) return null
+        val representativePid = projectPids.firstOrNull { it > 0 } ?: return null
+        val tables = listOf(
+            File(procRoot, "net/tcp"),
+            File(procRoot, "net/tcp6"),
+            File(procRoot, "$representativePid/net/tcp"),
+            File(procRoot, "$representativePid/net/tcp6"),
+        ).distinctBy { it.absolutePath }
+
+        val inodePorts = buildMap<Long, Int> {
+            tables.forEach { table ->
+                hintedListeningInodes(table, hints).forEach { (inode, port) ->
+                    val existing = get(inode)
+                    if (
+                        existing == null ||
+                        hints.indexOf(port) < hints.indexOf(existing)
+                    ) {
+                        put(inode, port)
+                    }
+                }
+            }
+        }
+        if (inodePorts.isEmpty()) return null
+
+        var bestIndex = Int.MAX_VALUE
+        projectPids
+            .asSequence()
+            .filter { it > 0 }
+            .distinct()
+            .take(MAX_PROJECT_PIDS)
+            .forEach { pid ->
+                val fdDirectory = File(procRoot, "$pid/fd")
+                val descriptors = runCatching { fdDirectory.listFiles().orEmpty() }
+                    .getOrDefault(emptyArray())
+                    .take(MAX_FDS_PER_PID)
+                descriptors.forEach { descriptor ->
+                    val target = runCatching {
+                        Files.readSymbolicLink(descriptor.toPath()).toString()
+                    }.getOrNull() ?: return@forEach
+                    val inode = socketLink.matchEntire(target)
+                        ?.groupValues
+                        ?.getOrNull(1)
+                        ?.toLongOrNull()
+                        ?: return@forEach
+                    val port = inodePorts[inode] ?: return@forEach
+                    val index = hints.indexOf(port)
+                    if (index >= 0 && index < bestIndex) bestIndex = index
+                    if (bestIndex == 0) return hints[0]
+                }
+            }
+        return hints.getOrNull(bestIndex)
+    }
+
+    private fun hintedListeningInodes(
+        table: File,
+        hints: List<Int>,
+    ): List<Pair<Long, Int>> {
+        if (!table.exists()) return emptyList()
+        val hintSet = hints.toSet()
+        return runCatching {
+            table.bufferedReader().useLines { lines ->
+                lines.drop(1)
+                    .take(MAX_NET_TABLE_ROWS)
+                    .mapNotNull { line ->
+                        val fields = line.trim().split(Regex("\\s+"))
+                        if (fields.size < 10 || fields[3].uppercase() != LISTEN_STATE) {
+                            return@mapNotNull null
+                        }
+                        val portHex = fields[1].substringAfterLast(':')
+                        val port = portHex.toIntOrNull(16) ?: return@mapNotNull null
+                        if (port !in hintSet) return@mapNotNull null
+                        val inode = fields[9].toLongOrNull() ?: return@mapNotNull null
+                        inode to port
+                    }
+                    .toList()
+            }
+        }.getOrDefault(emptyList())
     }
 
     internal fun belongsToExecution(

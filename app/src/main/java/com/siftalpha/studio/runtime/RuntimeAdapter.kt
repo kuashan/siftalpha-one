@@ -37,6 +37,8 @@ data class RuntimeProjectSpec(
     val pythonLaunchInvocation: PythonLaunchInvocation? = null,
     /** M-owned Web capability gate for weak Runtime log URL discovery. */
     val webLogDiscoveryAllowed: Boolean = false,
+    /** Ordered hints only; Runtime ownership discovery must verify a port before publishing it. */
+    val webHintPorts: List<Int> = emptyList(),
 )
 
 interface RuntimeAdapter {

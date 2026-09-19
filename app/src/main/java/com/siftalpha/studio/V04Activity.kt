@@ -72,6 +72,7 @@ import com.siftalpha.studio.runtime.RuntimeWebAvailabilityTracker
 import com.siftalpha.studio.runtime.RuntimeWebCandidateSource
 import com.siftalpha.studio.runtime.RuntimeWebDetectionCadence
 import com.siftalpha.studio.runtime.RuntimeWebDiscoveryScopePolicy
+import com.siftalpha.studio.runtime.RuntimeWebHintPolicy
 import com.siftalpha.studio.runtime.RuntimeWebStateStore
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
 import com.siftalpha.studio.runtime.RuntimeWebUrl
@@ -111,7 +112,7 @@ open class V04Activity : StudioActivity() {
         val project: V04ProjectGateway.RuntimeProject,
         val generation: Long,
         val webLogDiscoveryAllowed: Boolean,
-        val configuredLocalUrl: String?,
+        val webHintPorts: List<Int>,
         var finalLogsRequested: Boolean = false,
         var finalLogsCompleted: Boolean = false,
         var webLogProbeCount: Int = 0,
@@ -134,6 +135,7 @@ open class V04Activity : StudioActivity() {
         val controlRequest: RuntimeControlRequest? = null,
         val launchInvocation: PythonLaunchInvocation? = null,
         val webLogDiscoveryAllowed: Boolean = false,
+        val webHintPorts: List<Int> = emptyList(),
     )
 
     private data class BrowserTarget(
@@ -171,6 +173,7 @@ open class V04Activity : StudioActivity() {
     private lateinit var projectRuntimeSelectionStore: ProjectRuntimeSelectionStore
     private val recoveryProjects = mutableSetOf<String>()
     private val failureReasons = mutableMapOf<String, String>()
+    private val webProfileCache = mutableMapOf<String, WebProjectInspector.Profile>()
     /** Activity-lifetime Rich Result cache; raw output remains owned by ProjectOutputPanelController. */
     private val richResults = mutableMapOf<String, RichResultDocument>()
     private val refreshHandler = Handler(Looper.getMainLooper())
@@ -649,6 +652,7 @@ open class V04Activity : StudioActivity() {
     ): android.view.View {
         val summary = project.summary
         val stateKey = summary.documentId
+        webProfileCache[stateKey] = webProfile
         restoreStoredState(stateKey)
         val embeddedCandidate = runCatching {
             runtime.embeddedPythonSnapshotFor(stateKey)
@@ -663,8 +667,16 @@ open class V04Activity : StudioActivity() {
         val embeddedActive = embeddedSnapshot?.let(::isEmbeddedActive) == true
         val webSnapshot = webStateStore.snapshot(stateKey)
         val configuredWebUrl = webProfile.configuredLocalUrl()
-        val candidateWebUrls = listOfNotNull(webSnapshot.candidateUrl, configuredWebUrl).distinct()
-        val endpointReachable = if (::webAvailability.isInitialized) {
+        // Project configuration and framework defaults are hints, not ownership proof. Only a
+        // Runtime-published project-owned candidate is eligible for endpoint verification.
+        val candidateWebUrls = listOfNotNull(webSnapshot.candidateUrl).distinct()
+        val endpointReachable = if (
+            candidateWebUrls.isEmpty() &&
+            typedState == RuntimeState.RUNNING &&
+            webProfile.enabled
+        ) {
+            null
+        } else if (::webAvailability.isInitialized) {
             webAvailability.endpointReachable(stateKey, typedState, candidateWebUrls)
         } else {
             null
@@ -1775,6 +1787,11 @@ open class V04Activity : StudioActivity() {
         val profile = webProfile ?: runCatching {
             webInspector.inspect(project.summary.documentId)
         }.getOrNull()
+        profile?.let { webProfileCache[project.summary.documentId] = it }
+        val webHintPorts = RuntimeWebHintPolicy.ports(
+            detectedPort = profile?.port,
+            framework = profile?.framework,
+        )
         dispatch(
             project = project,
             action = ProjectRuntimeController.Action.START,
@@ -1783,6 +1800,7 @@ open class V04Activity : StudioActivity() {
             controlRequest = controlRequest ?: selectedRuntimeControlRequest(project),
             launchInvocation = launchInvocation,
             webLogDiscoveryAllowed = profile?.enabled == true,
+            webHintPorts = webHintPorts,
         )
     }
 
@@ -2564,9 +2582,7 @@ open class V04Activity : StudioActivity() {
             } else {
                 snapshot.stdout
             }
-            val webCapabilityEnabled = runCatching {
-                webInspector.inspect(stateKey).enabled
-            }.getOrDefault(false)
+            val webCapabilityEnabled = webProfileCache[stateKey]?.enabled == true
             RuntimeWebDiscoveryScopePolicy.candidateFromOutput(
                 output = safeStdout,
                 webCapabilityEnabled = webCapabilityEnabled,
@@ -2634,12 +2650,21 @@ open class V04Activity : StudioActivity() {
 
         val expectedSessionId = snapshot.sessionId
         val expectedGeneration = snapshot.generation
+        val cachedProfile = webProfileCache[stateKey]
         internalWebObservationExecutor.execute {
+            val resolvedProfile = cachedProfile ?: runCatching {
+                webInspector.inspect(stateKey)
+            }.getOrNull()
+            val hintPorts = RuntimeWebHintPolicy.ports(
+                detectedPort = resolvedProfile?.port,
+                framework = resolvedProfile?.framework,
+            )
             val observation = runCatching {
-                runtime.internalAlpineWebObservationFor(snapshot)
+                runtime.internalAlpineWebObservationFor(snapshot, hintPorts)
             }.getOrNull()
             refreshHandler.post {
                 internalWebObservationInFlight.remove(stateKey)
+                resolvedProfile?.let { webProfileCache[stateKey] = it }
                 if (!activityStarted || isFinishing || isDestroyed || observation == null) {
                     return@post
                 }
@@ -2773,6 +2798,7 @@ open class V04Activity : StudioActivity() {
         controlRequest: RuntimeControlRequest? = null,
         launchInvocation: PythonLaunchInvocation? = null,
         webLogDiscoveryAllowed: Boolean = false,
+        webHintPorts: List<Int> = emptyList(),
         automaticObservation: Boolean = false,
         observationGeneration: Long? = null,
     ): Boolean {
@@ -2797,6 +2823,7 @@ open class V04Activity : StudioActivity() {
                         controlRequest = controlRequest,
                         launchInvocation = launchInvocation,
                         webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+                        webHintPorts = webHintPorts,
                     ),
                 )
                 refresh()
@@ -2880,22 +2907,26 @@ open class V04Activity : StudioActivity() {
                             project = project,
                             pythonLaunchInvocation = null,
                             webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+                            webHintPorts = webHintPorts,
                         )
                     } else {
                         runtime.start(
                             project = project,
                             pythonLaunchInvocation = launchInvocation,
                             webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+                            webHintPorts = webHintPorts,
                         )
                     }
                 ProjectRuntimeController.Action.STOP -> runtime.stop(project)
                 ProjectRuntimeController.Action.STATUS -> runtime.status(
                     project = project,
                     webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+                    webHintPorts = webHintPorts,
                 )
                 ProjectRuntimeController.Action.LOGS -> runtime.logs(
                     project = project,
                     webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+                    webHintPorts = webHintPorts,
                 )
                 ProjectRuntimeController.Action.CLEAN -> runtime.clean(project)
                 ProjectRuntimeController.Action.CLONE_GITHUB -> error("clone requires spec")
@@ -2972,7 +3003,7 @@ open class V04Activity : StudioActivity() {
             beginExternalObservation(
                 project = project,
                 webLogDiscoveryAllowed = webLogDiscoveryAllowed,
-                configuredLocalUrl = browserConfiguredUrl,
+                webHintPorts = webHintPorts,
             )
         }
         if (
@@ -3051,6 +3082,7 @@ open class V04Activity : StudioActivity() {
             controlRequest = deferred.controlRequest,
             launchInvocation = deferred.launchInvocation,
             webLogDiscoveryAllowed = deferred.webLogDiscoveryAllowed,
+            webHintPorts = deferred.webHintPorts,
         )
     }
 
@@ -3338,9 +3370,17 @@ open class V04Activity : StudioActivity() {
     private fun beginExternalObservation(
         project: V04ProjectGateway.RuntimeProject,
         webLogDiscoveryAllowed: Boolean,
-        configuredLocalUrl: String? = null,
+        webHintPorts: List<Int> = emptyList(),
     ) {
         val stateKey = project.summary.documentId
+        val resolvedHints = if (webHintPorts.isNotEmpty()) {
+            webHintPorts
+        } else {
+            val profile = webProfileCache[stateKey] ?: runCatching {
+                webInspector.inspect(stateKey)
+            }.getOrNull()?.also { webProfileCache[stateKey] = it }
+            RuntimeWebHintPolicy.ports(profile?.port, profile?.framework)
+        }
         externalObservationRunnables[stateKey]?.let(refreshHandler::removeCallbacks)
         val generation = (externalObservationGenerations[stateKey] ?: 0L) + 1L
         externalObservationGenerations[stateKey] = generation
@@ -3348,9 +3388,7 @@ open class V04Activity : StudioActivity() {
             project = project,
             generation = generation,
             webLogDiscoveryAllowed = webLogDiscoveryAllowed,
-            configuredLocalUrl = configuredLocalUrl ?: runCatching {
-                webInspector.inspect(stateKey).configuredLocalUrl()
-            }.getOrNull(),
+            webHintPorts = resolvedHints,
         )
     }
 
@@ -3436,6 +3474,7 @@ open class V04Activity : StudioActivity() {
                     project = observation.project,
                     action = ProjectRuntimeController.Action.STATUS,
                     webLogDiscoveryAllowed = observation.webLogDiscoveryAllowed,
+                    webHintPorts = observation.webHintPorts,
                     automaticObservation = true,
                     observationGeneration = observation.generation,
                 )
@@ -3460,6 +3499,7 @@ open class V04Activity : StudioActivity() {
             project = observation.project,
             action = ProjectRuntimeController.Action.LOGS,
             webLogDiscoveryAllowed = observation.webLogDiscoveryAllowed,
+            webHintPorts = observation.webHintPorts,
             automaticObservation = true,
             observationGeneration = observation.generation,
         )
@@ -3472,10 +3512,7 @@ open class V04Activity : StudioActivity() {
     private fun webObservationProbeAllowed(observation: ExternalObservation): Boolean {
         val stateKey = observation.project.summary.documentId
         val snapshot = webStateStore.snapshot(stateKey)
-        val candidateUrls = listOfNotNull(
-            snapshot.candidateUrl,
-            observation.configuredLocalUrl,
-        ).distinct()
+        val candidateUrls = listOfNotNull(snapshot.candidateUrl).distinct()
         val endpointVerified = ::webAvailability.isInitialized &&
             webAvailability.reachableUrl(
                 projectKey = stateKey,
@@ -3485,6 +3522,7 @@ open class V04Activity : StudioActivity() {
         return RuntimeWebObservationProbePolicy.shouldProbe(
             RuntimeWebObservationProbePolicy.Input(
                 webLogDiscoveryAllowed = observation.webLogDiscoveryAllowed,
+                runtimeHintDiscoveryAllowed = observation.webHintPorts.isNotEmpty(),
                 probeCount = observation.webLogProbeCount,
                 maxProbeCount = EXTERNAL_WEB_LOG_PROBE_MAX,
                 candidateExists = candidateUrls.isNotEmpty(),
@@ -3509,6 +3547,7 @@ open class V04Activity : StudioActivity() {
             project = observation.project,
             action = ProjectRuntimeController.Action.LOGS,
             webLogDiscoveryAllowed = observation.webLogDiscoveryAllowed,
+            webHintPorts = observation.webHintPorts,
             automaticObservation = true,
             observationGeneration = observation.generation,
         )

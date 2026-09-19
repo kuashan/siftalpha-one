@@ -266,4 +266,33 @@ class RuntimeWebPortDiscoveryTest {
         listenPortCount = listenPortCount,
         httpEndpointReachable = httpEndpointReachable,
     )
+
+    @Test
+    fun projectHintsOutrankGenericPreferredPortsButCannotInventPorts() {
+        assertEquals(
+            listOf(9234, 5173, 3000, 12000),
+            RuntimeWebPortDiscovery.rankCandidates(
+                candidates = listOf(12000, 3000, 9234, 5173),
+                preferredHints = listOf(9234),
+            ),
+        )
+        assertEquals(
+            listOf(5173, 3000),
+            RuntimeWebPortDiscovery.rankCandidates(
+                candidates = listOf(3000, 5173),
+                preferredHints = listOf(9234),
+            ),
+        )
+    }
+
+    @Test
+    fun shellProbePlacesProjectHintsBeforeGenericPreferredPorts() {
+        val script = RuntimeWebPortDiscovery.shellSnippet(listOf(9234, 8000))
+
+        val hinted = script.indexOf("for web_preferred in 9234 8000")
+        assertTrue("project hints must lead the preferred ordering", hinted >= 0)
+        assertTrue("ownership-scoped candidate extraction must remain present", "siftalpha_web_candidate_ports" in script)
+        assertFalse("hinting must not introduce an all-port scan", "seq 1 65535" in script)
+    }
+
 }

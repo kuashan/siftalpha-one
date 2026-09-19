@@ -441,3 +441,20 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Existing Web+Rich Result priority remains unchanged: verified Web wins only after Web presentation identity is known.
 - Real-device Internal acceptance: run `primary:AcodeProjects/situation-monitor` and measure transition from listener startup to Web AVAILABLE; Open/refresh/background survival from r21 must remain passing.
 - Real-device External acceptance: start a known Web project through Termux and confirm faster initial Web discovery without changing START/STOP/STATUS/LOGS semantics.
+
+
+### alpha43-r23 Ownership-Verified Web Hints
+
+- Hint order: project-detected port > framework default > bounded common port set.
+- Hints must never directly create Web availability or presentation identity.
+- Internal hint fast path must accept a hinted LISTEN port only when its socket inode belongs to the exact current project PID tree/session/generation.
+- A common port owned by another project must be rejected even when it has higher hint priority.
+- Internal no-match path must fall back to the existing bounded full PID/socket discovery.
+- External dynamic hints must only reorder candidates already discovered inside the current project PID/PGID or verified PRoot guest identity scope.
+- Unknown External projects may use bounded procfs hint discovery without enabling weak Runtime-log URL discovery.
+- Explicit/configured local URLs are hints only; Android endpoint verification starts only after Runtime ownership discovery publishes the candidate.
+- Rich Result parser/lifecycle/viewer remain unchanged; hint-triggered LOGS must not suppress Rich Result inspection or erase an existing result.
+- No global process scan and no port-range scan.
+- Real-device Internal: verify `situation-monitor` reaches Web AVAILABLE faster and still survives external-browser backgrounding.
+- Real-device isolation: while another project owns a common port, start a different project and confirm SiftAlpha never opens the other project's page.
+- Real-device Rich Result: run a Rich Result project with no verified Web endpoint and confirm unified Open still opens Rich Result.

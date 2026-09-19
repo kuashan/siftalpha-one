@@ -501,6 +501,7 @@ class InternalAlpineSession private constructor(context: Context) {
         projectIdentity: String,
         expectedSessionId: String,
         expectedGeneration: Long,
+        preferredHints: Collection<Int> = emptyList(),
     ): InternalAlpineWebObservation? {
         val record = records[projectIdentity] ?: return null
         if (!InternalAlpineWebDiscovery.belongsToExecution(
@@ -515,7 +516,11 @@ class InternalAlpineSession private constructor(context: Context) {
         if (!EmbeddedPythonStatePolicy.canStop(record.state)) return null
         val managed = record.process ?: return InternalAlpineWebObservation.empty()
         val hostPid = managed.hostPid() ?: return InternalAlpineWebObservation.empty()
-        return InternalAlpineWebDiscovery.observe(File("/proc"), hostPid)
+        return InternalAlpineWebDiscovery.observe(
+            procRoot = File("/proc"),
+            rootPid = hostPid,
+            preferredHints = preferredHints,
+        )
     }
 
     fun start(

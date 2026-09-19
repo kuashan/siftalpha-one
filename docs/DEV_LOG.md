@@ -931,3 +931,18 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Rich Result parser, detection policy, lifecycle policy and viewer production code are unchanged. Added regression coverage that Web DETECTING does not displace an available Rich Result and that repeated empty fast observations cannot erase an existing Rich Result.
 - No Worker, no OCI/situation-monitor patch, no External execution-path rewrite, no global PID scan and no port-range scan were introduced.
 - W0 Cloud Build, Internal Alpine Probe, APK evidence and real-device acceptance are pending for the final r22 HEAD.
+
+
+## 2026-09-19 · alpha43-r23 Ownership-Verified Web Hints
+
+- Starting source baseline: `c00fe450784ec7d63167abdd6228434688c37e96`, version `0.8.0-alpha43-r22` / `148`.
+- Added `RuntimeWebHintPolicy` with ordered, bounded hints: project-detected/source/config port first, then framework default, then a nine-port common fallback set.
+- Hints are never Web evidence. A configured/default/common port must still pass current-project PID/socket ownership discovery before it can be published as a Runtime Web candidate.
+- Internal Alpine now has a hint fast path: inspect only hinted LISTEN entries first, map their socket inodes back to the current project PID tree, and publish the highest-priority owned hint when matched. If no owned hint matches, the existing complete bounded PID/socket discovery remains the fallback.
+- External Runtime carries the same ordered hints into the existing project-scoped `RuntimeWebPortDiscovery`; dynamic project hints are checked before generic preferred ports, while the existing PID/PGID and PRoot guest identity boundaries remain authoritative.
+- Unknown External projects may perform the existing bounded automatic LOGS command for procfs hint discovery, but `webLogDiscoveryAllowed` is not widened. Weak Runtime-log URL discovery therefore remains disabled unless the project was independently identified as Web-capable.
+- The UI no longer treats `.project.json`/framework local URLs as ownership proof. Only a Runtime-published candidate enters endpoint verification. This prevents another project already listening on a common loopback port from being misidentified.
+- Cached `WebProjectInspector.Profile` facts are reused during the 180 ms Internal session poll; project-file inspection is no longer repeated on every active snapshot poll.
+- Rich Result production code remains unchanged. Regression coverage confirms automatic hint LOGS still participate in Rich Result inspection, Web hints cannot invent candidate ports, and an unrelated project's hinted listener cannot pass Internal ownership verification.
+- No global PID scan, no 1..65535 port scan, no Worker, no OCI/situation-monitor source patch, and no External START/STOP ownership rewrite were introduced.
+- W0 Cloud Build, Internal Alpine Probe, signed APK evidence and real-device acceptance are pending for the final r23 HEAD.

@@ -46,4 +46,15 @@ class RichResultDetectionPolicyTest {
             )
         }
     }
+
+    @Test
+    fun webHintDiscoveryDoesNotSuppressRichResultInspection() {
+        assertTrue(
+            RichResultDetectionPolicy.shouldInspectOutput(
+                action = ProjectRuntimeController.Action.LOGS,
+                webLogDiscoveryAllowed = false,
+            ),
+        )
+    }
+
 }

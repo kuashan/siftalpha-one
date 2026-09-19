@@ -60,6 +60,23 @@ class RuntimeWebObservationProbePolicyTest {
         )
     }
 
+
+    @Test
+    fun runtimeHintsPermitOwnedProcfsDiscoveryWithoutEnablingWeakLogUrlDiscovery() {
+        assertTrue(
+            RuntimeWebObservationProbePolicy.shouldProbe(
+                RuntimeWebObservationProbePolicy.Input(
+                    webLogDiscoveryAllowed = false,
+                    runtimeHintDiscoveryAllowed = true,
+                    probeCount = 0,
+                    maxProbeCount = 3,
+                    candidateExists = false,
+                    endpointVerified = false,
+                ),
+            ),
+        )
+    }
+
     @Test
     fun discoveryDisabledStopsLogsRegardlessOfCandidateFacts() {
         assertFalse(

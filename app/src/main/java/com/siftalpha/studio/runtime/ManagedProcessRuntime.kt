@@ -85,14 +85,14 @@ SIFTALPHA_RUNNER
                     echo 'SIFTALPHA_STATUS=RUNNING'
                     printf 'SIFTALPHA_HOST_PID=%s\n' "${'$'}old_pid"
                     [ -n "${'$'}old_pgid" ] && printf 'SIFTALPHA_HOST_PGID=%s\n' "${'$'}old_pgid"
-                    ${RuntimeWebPortDiscovery.shellSnippet()}
+                    ${RuntimeWebPortDiscovery.shellSnippet(project.webHintPorts)}
                     proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${host.sh(inspectInner)} || true
                     exit 0
                   fi
                   if [ -n "${'$'}old_pgid" ] && kill -0 -- "-${'$'}old_pgid" 2>/dev/null; then
                     echo 'SIFTALPHA_STATUS=RUNNING'
                     printf 'SIFTALPHA_HOST_PGID=%s\n' "${'$'}old_pgid"
-                    ${RuntimeWebPortDiscovery.shellSnippet()}
+                    ${RuntimeWebPortDiscovery.shellSnippet(project.webHintPorts)}
                     proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${host.sh(inspectInner)} || true
                     exit 0
                   fi
@@ -136,7 +136,7 @@ SIFTALPHA_RUNNER
                 pgid="${'$'}(cat "${'$'}pgid_file" 2>/dev/null || true)"
                 if kill -0 "${'$'}pid" 2>/dev/null || { [ -n "${'$'}pgid" ] && kill -0 -- "-${'$'}pgid" 2>/dev/null; }; then
                   echo 'SIFTALPHA_STATUS=RUNNING'
-                  ${RuntimeWebPortDiscovery.shellSnippet()}
+                  ${RuntimeWebPortDiscovery.shellSnippet(project.webHintPorts)}
                   proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${host.sh(inspectInner)} || true
                   exit 0
                 fi
@@ -307,7 +307,7 @@ SIFTALPHA_RUNNER
                 else
                   rm -f "${'$'}pid_file" "${'$'}pgid_file"
                 fi
-                ${RuntimeWebPortDiscovery.shellSnippet()}
+                ${RuntimeWebPortDiscovery.shellSnippet(project.webHintPorts)}
                 proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${host.sh(logsInner)} || true
                 if [ -s "${'$'}launch_log" ]; then
                   echo '--- launcher ---'
