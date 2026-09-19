@@ -154,13 +154,18 @@ object ProjectActionPolicy {
 
         if (snapshot.pending != null) {
             runtimeActions.forEach { actions[it] = disabled(DisableReason.PENDING_OPERATION) }
-            actions[Action.STOP] = enabled()
+            val stopAlreadyPending = snapshot.pending.operation == ProjectUiSnapshot.Operation.STOP
+            actions[Action.STOP] = if (stopAlreadyPending) {
+                disabled(DisableReason.PENDING_OPERATION)
+            } else {
+                enabled()
+            }
             actions[Action.CONFIGURE] = disabled(DisableReason.PENDING_OPERATION)
             actions[Action.OPEN_BROWSER] = disabled(DisableReason.PENDING_OPERATION)
             return result(
                 actions = actions,
                 summary = MessageKey.PENDING_OPERATION,
-                primaryAction = Action.STOP,
+                primaryAction = Action.STOP.takeUnless { stopAlreadyPending },
                 directSecondaryAction = null,
                 disableReason = null,
                 detailEntry = DetailEntry.RUNTIME,

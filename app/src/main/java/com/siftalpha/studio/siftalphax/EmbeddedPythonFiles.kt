@@ -4,6 +4,8 @@ import android.content.Context
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import com.siftalpha.studio.runtime.InterruptibleProjectTreeDelete
+import com.siftalpha.studio.runtime.RuntimeOperationContract
 
 object EmbeddedPythonFiles {
     private const val ASSET_ROOT = "siftalphax/python"
@@ -14,8 +16,13 @@ object EmbeddedPythonFiles {
         val home = runtimeHome(context.filesDir)
         val marker = File(home, READY_MARKER)
         if (!marker.isFile || !File(home, "lib/python3.14/os.py").isFile) {
-            if (home.exists()) check(home.deleteRecursively()) {
-                "Unable to clear private CPython Runtime Base"
+            if (home.exists()) {
+                InterruptibleProjectTreeDelete.delete(
+                    environmentRoot = home,
+                    allowedParent = checkNotNull(home.parentFile),
+                    deadlineNanos = System.nanoTime() +
+                        RuntimeOperationContract.PREPARE_TIMEOUT_MS * 1_000_000L,
+                )
             }
             check(home.mkdirs() || home.isDirectory) { "Unable to create private CPython directory" }
             copyAssetTree(context, ASSET_ROOT, home)

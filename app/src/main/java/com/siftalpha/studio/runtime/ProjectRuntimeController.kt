@@ -484,15 +484,25 @@ class ProjectRuntimeController(
             Action.STATUS -> "status"
             Action.LOGS -> "logs"
             Action.CLEAN -> "clean"
-            Action.STOP,
-            Action.CLONE_GITHUB,
-            -> null
+            Action.STOP -> "stop"
+            Action.CLONE_GITHUB -> null
         } ?: return command
         return command.copy(
             shellScript = host.wrapProjectActivity(
                 runtimeId = host.runtimeId(project.folderName),
                 operation = operation,
                 shellScript = command.shellScript,
+                timeoutMs = RuntimeOperationContract.timeoutMs(
+                    when (action) {
+                        Action.PREPARE -> RuntimeOperationAction.PREPARE
+                        Action.START -> RuntimeOperationAction.START
+                        Action.STATUS -> RuntimeOperationAction.STATUS
+                        Action.LOGS -> RuntimeOperationAction.LOGS
+                        Action.STOP -> RuntimeOperationAction.STOP
+                        Action.CLEAN -> RuntimeOperationAction.CLEAN
+                        Action.CLONE_GITHUB -> error("clone has no runtime operation")
+                    },
+                ),
             ),
         )
     }

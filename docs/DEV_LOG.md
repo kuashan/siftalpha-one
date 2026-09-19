@@ -824,3 +824,14 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 **alpha43 real-device acceptance = PASS**
 
 本条记录封存 alpha43 当前基线；不表示 Embedded R 或 M/R/X 已完成，也不启动后续版本开发。
+
+## 2026-09-19 · alpha43-r14 Runtime Control Lifecycle Unification Audit + Repair
+
+- Source baseline: `239434ba77c6c1b3ef8e4c8ef302c0d08f4ae859`, branch `codex/siftalpha-no-worker-alpha43`.
+- Added a provider-neutral, project-scoped operation lifecycle for PREPARE / START / STATUS / LOGS / STOP / CLEAN. STOPPING, CHECKING and CLEANING are no longer represented as RECOVERING; RECOVERING remains reserved for foreground/process reconciliation.
+- External project activities now have per-operation hard deadlines and a PID/PGID-scoped watchdog without depending on GNU `timeout`. Late, cancelled and timed-out results are fenced from newer operations.
+- Internal Embedded CPython and Internal Alpine project-environment cleanup now uses an interrupt-aware, deadline-aware, no-follow-symlink tree deletion contract; shared runtime/cache/rootfs and sibling projects are outside the deletion target.
+- Runtime operation metadata is persisted minimally so Activity recreation can distinguish unfinished work from recovery reconciliation. Existing pure-Python External supplemental-Node detection remains unchanged.
+- Added symmetric lifecycle, policy, watchdog, cancellation, project-isolation and storage-preservation JVM coverage.
+- Internal Alpine Probe / W0 Cloud Build: source change submitted; CI result pending.
+- Real-device Runtime Control matrix: not executed in this source/CI phase.

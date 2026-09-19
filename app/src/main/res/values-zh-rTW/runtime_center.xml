@@ -37,11 +37,16 @@
     <string name="runtime_lifecycle_preparing">環境準備中</string>
     <string name="runtime_lifecycle_ready_to_run">可以執行</string>
     <string name="runtime_lifecycle_detecting">檢測中</string>
+    <string name="runtime_lifecycle_starting">啟動中</string>
+    <string name="runtime_lifecycle_checking">狀態檢查中</string>
+    <string name="runtime_lifecycle_stopping">停止中</string>
+    <string name="runtime_lifecycle_cleaning">環境清理中</string>
     <string name="runtime_lifecycle_needs_configuration">需要設定</string>
     <string name="runtime_lifecycle_running">執行中</string>
     <string name="runtime_lifecycle_stopped">已停止</string>
     <string name="runtime_lifecycle_run_failed">執行失敗</string>
     <string name="runtime_lifecycle_recovering">復原中</string>
+    <string name="runtime_operation_timed_out">操作逾時，已結束目前專案操作</string>
     <string name="runtime_failure_reason">失敗原因：%1$s</string>
     <string name="runtime_policy_runtime_recovering">正在復原執行狀態</string>
     <string name="runtime_policy_reason_runtime_recovering">正在確認實際執行狀態</string>

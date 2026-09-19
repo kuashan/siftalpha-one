@@ -15,6 +15,10 @@ enum class RuntimeLifecycleState {
     PREPARING,
     READY_TO_RUN,
     DETECTING,
+    STARTING,
+    CHECKING,
+    STOPPING,
+    CLEANING,
     NEEDS_CONFIGURATION,
     RUNNING,
     STOPPED,
@@ -27,6 +31,10 @@ enum class RuntimeLifecycleState {
             PREPARING -> R.string.runtime_lifecycle_preparing
             READY_TO_RUN -> R.string.runtime_lifecycle_ready_to_run
             DETECTING -> R.string.runtime_lifecycle_detecting
+            STARTING -> R.string.runtime_lifecycle_starting
+            CHECKING -> R.string.runtime_lifecycle_checking
+            STOPPING -> R.string.runtime_lifecycle_stopping
+            CLEANING -> R.string.runtime_lifecycle_cleaning
             NEEDS_CONFIGURATION -> R.string.runtime_lifecycle_needs_configuration
             RUNNING -> R.string.runtime_lifecycle_running
             STOPPED -> R.string.runtime_lifecycle_stopped
@@ -55,24 +63,27 @@ object RuntimeLifecycleResolver {
         processActive: Boolean = false,
         recoveryInProgress: Boolean = false,
     ): RuntimeLifecycleState {
-        if (recoveryInProgress) return RuntimeLifecycleState.RECOVERING
+        // A user-issued operation has priority over a stale recovery marker. Recovery is only
+        // shown while no current operation is accepted for the project.
+        if (operation == RuntimeLifecycleOperation.NONE && recoveryInProgress) {
+            return RuntimeLifecycleState.RECOVERING
+        }
 
         when (operation) {
             RuntimeLifecycleOperation.PREPARE -> return RuntimeLifecycleState.PREPARING
-            RuntimeLifecycleOperation.START,
+            RuntimeLifecycleOperation.START -> return RuntimeLifecycleState.STARTING
             RuntimeLifecycleOperation.STATUS,
             RuntimeLifecycleOperation.LOGS,
-            -> return RuntimeLifecycleState.DETECTING
-            RuntimeLifecycleOperation.STOP,
-            RuntimeLifecycleOperation.CLEAN,
-            -> return RuntimeLifecycleState.RECOVERING
+            -> return RuntimeLifecycleState.CHECKING
+            RuntimeLifecycleOperation.STOP -> return RuntimeLifecycleState.STOPPING
+            RuntimeLifecycleOperation.CLEAN -> return RuntimeLifecycleState.CLEANING
             RuntimeLifecycleOperation.NONE -> Unit
         }
 
         // Internal preparation is app-owned and does not have an External Pending executionId.
         // Its RuntimeState is therefore authoritative while the environment is still not READY.
         if (runtimeState == RuntimeState.PREPARING) return RuntimeLifecycleState.PREPARING
-        if (runtimeState == RuntimeState.STARTING) return RuntimeLifecycleState.DETECTING
+        if (runtimeState == RuntimeState.STARTING) return RuntimeLifecycleState.STARTING
 
         if (environmentReady != true) return RuntimeLifecycleState.ENVIRONMENT_NOT_PREPARED
         if (configurationRequired) return RuntimeLifecycleState.NEEDS_CONFIGURATION
@@ -81,8 +92,12 @@ object RuntimeLifecycleResolver {
             runtimeState == RuntimeState.RUNNING || processActive ->
                 RuntimeLifecycleState.RUNNING
             runtimeState == RuntimeState.PREPARING ||
-                runtimeState == RuntimeState.STARTING ->
-                RuntimeLifecycleState.DETECTING
+            runtimeState == RuntimeState.STARTING ->
+                if (runtimeState == RuntimeState.STARTING) {
+                    RuntimeLifecycleState.STARTING
+                } else {
+                    RuntimeLifecycleState.PREPARING
+                }
             runtimeState == RuntimeState.EXITED_ERROR ||
                 runtimeState == RuntimeState.ENVIRONMENT_ERROR ->
                 RuntimeLifecycleState.RUN_FAILED

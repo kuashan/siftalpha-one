@@ -2,6 +2,8 @@ package com.siftalpha.studio.siftalphax
 
 import android.content.Context
 import android.system.Os
+import com.siftalpha.studio.runtime.InterruptibleProjectTreeDelete
+import com.siftalpha.studio.runtime.RuntimeOperationContract
 import android.system.OsConstants
 import java.io.File
 import java.nio.file.Files
@@ -260,7 +262,14 @@ class InternalAlpineEnvironmentManager(context: Context) {
                 "BACKEND=ALPINE\nSOURCE_FINGERPRINT=" + source.sourceFingerprint +
                     "\nENVIRONMENT_KEY=" + environmentKey + "\n",
             )
-            if (environmentRoot.exists()) check(environmentRoot.deleteRecursively())
+            if (environmentRoot.exists()) {
+                InterruptibleProjectTreeDelete.delete(
+                    environmentRoot = environmentRoot,
+                    allowedParent = checkNotNull(environmentRoot.parentFile),
+                    deadlineNanos = System.nanoTime() +
+                        RuntimeOperationContract.PREPARE_TIMEOUT_MS * 1_000_000L,
+                )
+            }
             check(temp.renameTo(environmentRoot)) { "Unable to activate Internal Alpine environment" }
             return PreparationResult(true, Outcome.READY_ENVIRONMENT_INSTALLED, environmentRoot, environmentKey)
         } catch (error: Throwable) {
@@ -275,7 +284,12 @@ class InternalAlpineEnvironmentManager(context: Context) {
         InternalAlpineProcessControl.throwIfCancelled()
         val root = InternalAlpineFiles.projectEnvironmentRoot(appContext, projectIdentity)
         if (root.exists()) {
-            check(root.deleteRecursively()) { "Unable to clean Internal Alpine project environment" }
+            InterruptibleProjectTreeDelete.delete(
+                environmentRoot = root,
+                allowedParent = checkNotNull(root.parentFile),
+                deadlineNanos = System.nanoTime() +
+                    RuntimeOperationContract.CLEAN_TIMEOUT_MS * 1_000_000L,
+            )
         }
         InternalAlpineProcessControl.throwIfCancelled()
     }

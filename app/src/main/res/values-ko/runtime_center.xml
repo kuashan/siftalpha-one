@@ -37,11 +37,16 @@
     <string name="runtime_lifecycle_preparing">환경 준비 중</string>
     <string name="runtime_lifecycle_ready_to_run">실행 가능</string>
     <string name="runtime_lifecycle_detecting">감지 중</string>
+    <string name="runtime_lifecycle_starting">시작 중</string>
+    <string name="runtime_lifecycle_checking">상태 확인 중</string>
+    <string name="runtime_lifecycle_stopping">중지 중</string>
+    <string name="runtime_lifecycle_cleaning">환경 정리 중</string>
     <string name="runtime_lifecycle_needs_configuration">구성 필요</string>
     <string name="runtime_lifecycle_running">실행 중</string>
     <string name="runtime_lifecycle_stopped">중지됨</string>
     <string name="runtime_lifecycle_run_failed">실행 실패</string>
     <string name="runtime_lifecycle_recovering">복구 중</string>
+    <string name="runtime_operation_timed_out">작업 시간이 초과되어 프로젝트 작업을 종료했습니다</string>
     <string name="runtime_failure_reason">실패 원인: %1$s</string>
     <string name="runtime_policy_runtime_recovering">실행 상태 복구 중</string>
     <string name="runtime_policy_reason_runtime_recovering">실제 실행 상태 확인 중</string>

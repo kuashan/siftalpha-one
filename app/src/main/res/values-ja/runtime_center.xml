@@ -37,11 +37,16 @@
     <string name="runtime_lifecycle_preparing">環境を準備中</string>
     <string name="runtime_lifecycle_ready_to_run">実行可能</string>
     <string name="runtime_lifecycle_detecting">検出中</string>
+    <string name="runtime_lifecycle_starting">起動中</string>
+    <string name="runtime_lifecycle_checking">状態確認中</string>
+    <string name="runtime_lifecycle_stopping">停止中</string>
+    <string name="runtime_lifecycle_cleaning">環境をクリーンアップ中</string>
     <string name="runtime_lifecycle_needs_configuration">設定が必要</string>
     <string name="runtime_lifecycle_running">実行中</string>
     <string name="runtime_lifecycle_stopped">停止</string>
     <string name="runtime_lifecycle_run_failed">実行失敗</string>
     <string name="runtime_lifecycle_recovering">復旧中</string>
+    <string name="runtime_operation_timed_out">操作がタイムアウトしました。プロジェクト操作を終了しました</string>
     <string name="runtime_failure_reason">失敗理由：%1$s</string>
     <string name="runtime_policy_runtime_recovering">実行状態を復旧中</string>
     <string name="runtime_policy_reason_runtime_recovering">実際の実行状態を確認中</string>

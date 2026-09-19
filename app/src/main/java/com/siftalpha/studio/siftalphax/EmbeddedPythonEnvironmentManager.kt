@@ -2,6 +2,8 @@ package com.siftalpha.studio.siftalphax
 
 import android.content.Context
 import android.os.Build
+import com.siftalpha.studio.runtime.InterruptibleProjectTreeDelete
+import com.siftalpha.studio.runtime.RuntimeOperationContract
 import java.io.File
 
 class EmbeddedPythonEnvironmentManager(context: Context) {
@@ -77,7 +79,12 @@ class EmbeddedPythonEnvironmentManager(context: Context) {
         require(projectIdentity.isNotBlank()) { "projectIdentity must not be blank" }
         val root = EmbeddedPythonFiles.projectEnvironmentRoot(appContext, projectIdentity)
         if (root.exists()) {
-            check(root.deleteRecursively()) { "Unable to clean Embedded Python project environment" }
+            InterruptibleProjectTreeDelete.delete(
+                environmentRoot = root,
+                allowedParent = checkNotNull(root.parentFile),
+                deadlineNanos = System.nanoTime() +
+                    RuntimeOperationContract.CLEAN_TIMEOUT_MS * 1_000_000L,
+            )
         }
     }
 

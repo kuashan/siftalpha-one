@@ -51,6 +51,12 @@ import com.siftalpha.studio.runtime.RuntimeLifecycleState
 import com.siftalpha.studio.runtime.RuntimePresentationState
 import com.siftalpha.studio.runtime.RuntimeLifecycleStore
 import com.siftalpha.studio.runtime.RuntimeKind
+import com.siftalpha.studio.runtime.RuntimeOperationAction
+import com.siftalpha.studio.runtime.RuntimeOperationPhase
+import com.siftalpha.studio.runtime.RuntimeOperationProvider
+import com.siftalpha.studio.runtime.RuntimeOperationRecord
+import com.siftalpha.studio.runtime.RuntimeOperationStore
+import com.siftalpha.studio.runtime.RuntimeOperationTracker
 import com.siftalpha.studio.runtime.RuntimeOwnership
 import com.siftalpha.studio.runtime.RuntimeOwnershipPolicy
 import com.siftalpha.studio.runtime.RuntimeResult
@@ -79,6 +85,7 @@ import com.siftalpha.studio.siftalphax.InternalAlpineSession
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSnapshot
 import com.siftalpha.studio.siftalphax.EmbeddedPythonState
 import com.siftalpha.studio.runtime.TermuxResultBus
+import java.util.concurrent.CancellationException
 import java.util.concurrent.Executors
 
 /** Import/get project -> isolated venv -> dependencies -> run/stop/status/logs. */
@@ -151,6 +158,7 @@ open class V04Activity : StudioActivity() {
     private lateinit var projectOutputs: ProjectOutputPanelController
     private lateinit var prepareLiveProgress: PrepareLiveProgressController
     private lateinit var lifecycleStore: RuntimeLifecycleStore
+    private lateinit var operationStore: RuntimeOperationStore
     private lateinit var projectRuntimeSelectionStore: ProjectRuntimeSelectionStore
     private val recoveryProjects = mutableSetOf<String>()
     private val failureReasons = mutableMapOf<String, String>()
@@ -168,6 +176,8 @@ open class V04Activity : StudioActivity() {
     private val deferredManualActions = mutableMapOf<String, DeferredManualAction>()
     private val embeddedStartExecutor = Executors.newSingleThreadExecutor()
     private val embeddedStartInFlight = mutableSetOf<String>()
+    private val operationTracker = RuntimeOperationTracker()
+    private val operationDeadlineRunnables = mutableMapOf<String, Runnable>()
     private val projectActivities = ProjectActivityRegistry()
     private val externalActivityTokens = mutableMapOf<Int, ProjectActivityRegistry.Token>()
     private val cancelledExternalExecutions = mutableSetOf<Int>()
@@ -275,6 +285,12 @@ open class V04Activity : StudioActivity() {
             } else {
                 result
             }
+            finishOperation(
+                projectId = item.documentId ?: item.folderName,
+                generation = null,
+                phase = externalOperationPhase(safeResult),
+                executionId = result.executionId,
+            )
             if (item.action == ProjectRuntimeController.Action.CLONE_GITHUB) {
                 renderResult(safeResult)
             } else if (!item.automaticObservation || item.action == ProjectRuntimeController.Action.LOGS) {
@@ -306,6 +322,7 @@ open class V04Activity : StudioActivity() {
         )
         secretStore = ProjectSecretStore(this)
         lifecycleStore = RuntimeLifecycleStore(this)
+        operationStore = RuntimeOperationStore(this)
         secretPolicyInspector = ProjectSecretPolicyInspector(this)
         configurationInspector = ProjectConfigurationInspector(this)
         webInspector = WebProjectInspector(this)
@@ -348,6 +365,7 @@ open class V04Activity : StudioActivity() {
         pending.keys.toList().forEach { id ->
             TermuxResultBus.consume(id)?.let(resultListener)
         }
+        reconcilePersistedOperations()
         recoverPersistedRuntimeStates()
         resumeExternalObservations()
     }
@@ -378,6 +396,8 @@ open class V04Activity : StudioActivity() {
         externalObservations.keys.toList().forEach(::invalidateExternalObservation)
         externalObservationRunnables.clear()
         deferredManualActions.clear()
+        operationDeadlineRunnables.values.forEach(refreshHandler::removeCallbacks)
+        operationDeadlineRunnables.clear()
         embeddedStartExecutor.shutdownNow()
         refreshExecutor.shutdownNow()
         super.onDestroy()
@@ -666,14 +686,16 @@ open class V04Activity : StudioActivity() {
                 (item.documentId == null && item.folderName == project.folderName)) &&
                 ObservationPresentationPolicy.isUserVisiblePending(item.automaticObservation)
         }
+        val trackedOperation = currentOperation(stateKey)
         val deferredManualAction = deferredManualActions[stateKey]
         val internalCleanPending = ProjectRuntimeController.Action.CLEAN.takeIf {
             ProjectActivityRegistry.Kind.CLEAN in projectActivities.activeKinds(stateKey)
         }
-        val visiblePendingAction = pendingItem?.action ?: deferredManualAction?.action ?: internalCleanPending
+        val visiblePendingAction = pendingItem?.action ?: deferredManualAction?.action ?:
+            internalCleanPending ?: trackedOperation?.action?.toControllerAction()
         val pendingExecutionId = pendingItem?.let { visibleItem ->
             pending.entries.firstOrNull { it.value === visibleItem }?.key
-        }
+        } ?: trackedOperation?.executionId
         val configurationRequired =
             configurationSnapshot.preflight.missingRequired.isNotEmpty()
         var lifecycleEnvironmentReady = environmentReady(stateKey, runtimeSelection)
@@ -812,6 +834,8 @@ open class V04Activity : StudioActivity() {
         val environmentLabel = when {
             lifecycleState == RuntimeLifecycleState.PREPARING ->
                 getString(R.string.runtime_lifecycle_preparing)
+            lifecycleState == RuntimeLifecycleState.CLEANING ->
+                getString(R.string.runtime_lifecycle_cleaning)
             lifecycleEnvironmentReady == true -> getString(R.string.runtime_state_env_ready)
             lifecycleEnvironmentReady == false -> getString(R.string.runtime_state_env_not_ready)
             else -> getString(R.string.runtime_environment_unknown)
@@ -846,7 +870,13 @@ open class V04Activity : StudioActivity() {
                 snapshot.failureReason != null -> snapshot.lifecycleState.uiLabel(this)
             terminalState != null -> terminalState.uiLabel(this, lifecycleEnvironmentReady)
             presentationState != typedState -> presentationState.uiLabel(this)
-            states[stateKey] != null && snapshot.lifecycleState == RuntimeLifecycleState.DETECTING ->
+            states[stateKey] != null && snapshot.lifecycleState in setOf(
+                RuntimeLifecycleState.DETECTING,
+                RuntimeLifecycleState.STARTING,
+                RuntimeLifecycleState.CHECKING,
+                RuntimeLifecycleState.STOPPING,
+                RuntimeLifecycleState.CLEANING,
+            ) ->
                 states.getValue(stateKey)
             else -> snapshot.lifecycleState.uiLabel(this)
         }
@@ -1297,6 +1327,7 @@ open class V04Activity : StudioActivity() {
         controlPath: RuntimeControlPath = RuntimeControlPath.EXTERNAL_PROVIDER,
     ): Boolean {
         val stateKey = project.summary.documentId
+        val trackedOperation = currentOperation(stateKey, includeHidden = true)
         val projectPending = pending.values.any { item ->
             item.documentId == stateKey ||
                 (item.documentId == null && item.folderName == project.folderName)
@@ -1308,6 +1339,19 @@ open class V04Activity : StudioActivity() {
             recoveryProjects.contains(stateKey) &&
             action != ProjectRuntimeController.Action.STATUS &&
             action != ProjectRuntimeController.Action.STOP
+        ) {
+            return false
+        }
+        if (trackedOperation != null && action != ProjectRuntimeController.Action.STOP) {
+            // Recovery STATUS is the one deliberate exception: it reconciles an operation record
+            // left by Activity/process recreation and does not begin a second user operation.
+            if (!(action == ProjectRuntimeController.Action.STATUS && recoveryProjects.contains(stateKey))) {
+                return false
+            }
+        }
+        if (
+            trackedOperation?.action == RuntimeOperationAction.STOP &&
+            action == ProjectRuntimeController.Action.STOP
         ) {
             return false
         }
@@ -1341,6 +1385,230 @@ open class V04Activity : StudioActivity() {
             return false
         }
         return true
+    }
+
+    private fun ProjectRuntimeController.Action.toRuntimeOperationAction(): RuntimeOperationAction? = when (this) {
+        ProjectRuntimeController.Action.PREPARE -> RuntimeOperationAction.PREPARE
+        ProjectRuntimeController.Action.START -> RuntimeOperationAction.START
+        ProjectRuntimeController.Action.STATUS -> RuntimeOperationAction.STATUS
+        ProjectRuntimeController.Action.LOGS -> RuntimeOperationAction.LOGS
+        ProjectRuntimeController.Action.STOP -> RuntimeOperationAction.STOP
+        ProjectRuntimeController.Action.CLEAN -> RuntimeOperationAction.CLEAN
+        ProjectRuntimeController.Action.CLONE_GITHUB -> null
+    }
+
+    private fun RuntimeOperationAction.toControllerAction(): ProjectRuntimeController.Action = when (this) {
+        RuntimeOperationAction.PREPARE -> ProjectRuntimeController.Action.PREPARE
+        RuntimeOperationAction.START -> ProjectRuntimeController.Action.START
+        RuntimeOperationAction.STATUS -> ProjectRuntimeController.Action.STATUS
+        RuntimeOperationAction.LOGS -> ProjectRuntimeController.Action.LOGS
+        RuntimeOperationAction.STOP -> ProjectRuntimeController.Action.STOP
+        RuntimeOperationAction.CLEAN -> ProjectRuntimeController.Action.CLEAN
+    }
+
+    private fun currentOperation(
+        projectId: String,
+        includeHidden: Boolean = false,
+    ): RuntimeOperationRecord? {
+        if (!::operationStore.isInitialized) return null
+        val local = operationTracker.current(projectId)
+        if (local != null) {
+            return local.takeUnless { it.terminal || (!includeHidden && !it.userVisible) }
+        }
+        return operationStore.read(projectId)?.takeUnless {
+            it.terminal || (!includeHidden && !it.userVisible)
+        }
+    }
+
+    private fun beginOperation(
+        project: V04ProjectGateway.RuntimeProject,
+        action: RuntimeOperationAction,
+        provider: RuntimeOperationProvider,
+        executionId: Int? = null,
+        userVisible: Boolean = true,
+    ): RuntimeOperationRecord? {
+        val projectId = project.summary.documentId
+        val persisted = operationStore.read(projectId)
+        if (persisted != null) {
+            if (!persisted.terminal && persisted.deadlineAtEpochMs > System.currentTimeMillis()) {
+                return null
+            }
+            if (!persisted.terminal) {
+                expireOperation(project, persisted)
+            }
+            operationStore.clear(projectId)
+        }
+        operationTracker.seed(projectId, operationStore.lastGeneration(projectId))
+        operationTracker.current(projectId)?.let { current ->
+            if (!current.terminal) {
+                if (current.deadlineAtEpochMs > System.currentTimeMillis()) return null
+                expireOperation(project, current)
+            }
+            operationTracker.clearTerminal(projectId, current.generation)
+        }
+        val record = operationTracker.begin(
+            projectId = projectId,
+            provider = provider,
+            action = action,
+            executionId = executionId,
+            userVisible = userVisible,
+        ) ?: return null
+        operationStore.write(record)
+        scheduleOperationDeadline(project, record)
+        return record
+    }
+
+    private fun finishOperation(
+        projectId: String,
+        generation: Long?,
+        phase: RuntimeOperationPhase,
+        executionId: Int? = null,
+    ) {
+        if (!::operationStore.isInitialized) return
+        val record = currentOperation(projectId, includeHidden = true)
+            ?: operationTracker.current(projectId)?.takeUnless { it.terminal }
+            ?: operationStore.read(projectId)?.takeUnless { it.terminal }
+        if (record == null || (generation != null && record.generation != generation)) return
+        if (executionId != null && record.executionId != executionId) return
+        if (!record.terminal) {
+            operationTracker.finish(projectId, record.generation, phase)
+        }
+        operationTracker.current(projectId)?.let { terminal ->
+            if (terminal.terminal) operationTracker.clearTerminal(projectId, terminal.generation)
+        }
+        operationStore.clear(projectId)
+        operationDeadlineRunnables.remove(projectId)?.let(refreshHandler::removeCallbacks)
+    }
+
+    /**
+     * Reconciliation is intentionally separate from operation pending. A recreated Activity
+     * never treats an old operation record as RECOVERING forever: External records get one real
+     * STATUS probe, while Internal state is read from its app-owned snapshot.
+     */
+    private fun reconcilePersistedOperations() {
+        if (!::operationStore.isInitialized || !::gateway.isInitialized) return
+        val projects = runCatching { gateway.projects() }.getOrElse { return }
+        projects.forEach { project ->
+            val key = project.summary.documentId
+            val record = operationStore.read(key) ?: return@forEach
+            if (record.terminal) {
+                operationStore.clear(key)
+                return@forEach
+            }
+            if (record.deadlineAtEpochMs <= System.currentTimeMillis()) {
+                expireOperation(project, record)
+                return@forEach
+            }
+            when (record.provider) {
+                RuntimeOperationProvider.EXTERNAL -> {
+                    operationStore.clear(key)
+                    recoveryProjects += key
+                }
+                RuntimeOperationProvider.INTERNAL -> {
+                    operationStore.clear(key)
+                    refreshEmbeddedProject(project)
+                }
+            }
+        }
+    }
+
+    private fun cancelOperation(projectId: String) {
+        finishOperation(projectId, generation = null, phase = RuntimeOperationPhase.CANCELLED)
+    }
+
+    private fun scheduleOperationDeadline(
+        project: V04ProjectGateway.RuntimeProject,
+        record: RuntimeOperationRecord,
+    ) {
+        operationDeadlineRunnables[record.projectId]?.let(refreshHandler::removeCallbacks)
+        lateinit var runnable: Runnable
+        runnable = Runnable {
+            val current = currentOperation(record.projectId, includeHidden = true)
+            if (current?.generation != record.generation) return@Runnable
+            val remaining = record.deadlineAtEpochMs - System.currentTimeMillis()
+            if (remaining > 0L) {
+                refreshHandler.postDelayed(runnable, remaining)
+            } else {
+                expireOperation(project, record)
+            }
+        }
+        operationDeadlineRunnables[record.projectId] = runnable
+        refreshHandler.postDelayed(runnable, (record.deadlineAtEpochMs - System.currentTimeMillis()).coerceAtLeast(1L))
+    }
+
+    private fun expireOperation(
+        project: V04ProjectGateway.RuntimeProject,
+        record: RuntimeOperationRecord,
+    ) {
+        val current = currentOperation(record.projectId, includeHidden = true)
+        if (current?.generation != record.generation) return
+        finishOperation(record.projectId, record.generation, RuntimeOperationPhase.TIMED_OUT)
+        pending.entries
+            .filter { it.value.documentId == record.projectId || it.value.folderName == project.folderName }
+            .map { it.key }
+            .forEach { executionId ->
+                cancelledExternalExecutions += executionId
+                pending.remove(executionId)
+                externalActivityTokens.remove(executionId)?.let(projectActivities::finish)
+            }
+        projectActivities.cancelProject(record.projectId)
+        if (::prepareLiveProgress.isInitialized) prepareLiveProgress.finish(project.folderName)
+        recoveryProjects.remove(record.projectId)
+        if (
+            record.provider == RuntimeOperationProvider.EXTERNAL &&
+            record.action != RuntimeOperationAction.STOP &&
+            ::backend.isInitialized
+        ) {
+            // The normal External wrapper owns its own watchdog. This is only the Android-side
+            // fallback when the result callback itself is lost: issue the same project-scoped
+            // STOP tree command without creating another user-visible Pending entry.
+            runCatching {
+                val stop = runtime.wrapCancelableExternalActivity(
+                    project = project,
+                    action = ProjectRuntimeController.Action.STOP,
+                    command = runtime.stop(project),
+                )
+                backend.execute(stop)
+            }
+        }
+        failureReasons[record.projectId] = "RUNTIME_OPERATION_TIMED_OUT:${record.action.name}"
+        if (record.action == RuntimeOperationAction.PREPARE ||
+            record.action == RuntimeOperationAction.CLEAN
+        ) {
+            typedStates[record.projectId] = RuntimeState.ENVIRONMENT_ERROR
+        } else if (record.action == RuntimeOperationAction.START ||
+            record.action == RuntimeOperationAction.STOP
+        ) {
+            typedStates[record.projectId] = RuntimeState.EXITED_ERROR
+        }
+        states[record.projectId] = getString(R.string.runtime_operation_timed_out)
+        refresh()
+        if (!record.userVisible && externalObservations.containsKey(record.projectId)) {
+            scheduleExternalObservation(project, delayMs = EXTERNAL_OBSERVATION_INTERVAL_MS)
+        }
+    }
+
+    private fun internalOperationPhase(result: Result<*>): RuntimeOperationPhase {
+        if (result.isSuccess) return RuntimeOperationPhase.SUCCESS
+        val error = result.exceptionOrNull()
+        return if (
+            error is CancellationException ||
+            error is InterruptedException ||
+            error?.message?.contains("CANCEL", ignoreCase = true) == true
+        ) {
+            RuntimeOperationPhase.CANCELLED
+        } else if (error is com.siftalpha.studio.runtime.InterruptibleProjectTreeDelete.TimedOut) {
+            RuntimeOperationPhase.TIMED_OUT
+        } else {
+            RuntimeOperationPhase.FAILED
+        }
+    }
+
+    private fun externalOperationPhase(result: RuntimeResult): RuntimeOperationPhase = when {
+        "SIFTALPHA_OPERATION_RESULT=TIMED_OUT" in result.stdout ||
+            "SIFTALPHA_ERROR=OPERATION_TIMEOUT" in result.stdout -> RuntimeOperationPhase.TIMED_OUT
+        result.exitCode == 0 && result.internalErrorMessage.isBlank() -> RuntimeOperationPhase.SUCCESS
+        else -> RuntimeOperationPhase.FAILED
     }
 
     private fun ProjectRuntimeController.Action.toUiOperation(): ProjectUiSnapshot.Operation? = when (this) {
@@ -1705,6 +1973,11 @@ open class V04Activity : StudioActivity() {
     private fun prepareEmbeddedProject(project: V04ProjectGateway.RuntimeProject) {
         val stateKey = project.summary.documentId
         if (stateKey in embeddedStartInFlight) return
+        val operation = beginOperation(
+            project = project,
+            action = RuntimeOperationAction.PREPARE,
+            provider = RuntimeOperationProvider.INTERNAL,
+        ) ?: return
         embeddedStartInFlight += stateKey
         setEnvironmentReady(stateKey, ProjectRuntimeSelection.EMBEDDED_R, null)
         typedStates[stateKey] = RuntimeState.PREPARING
@@ -1765,6 +2038,11 @@ open class V04Activity : StudioActivity() {
             }
             runOnUiThread {
                 embeddedStartInFlight.remove(stateKey)
+                finishOperation(
+                    projectId = stateKey,
+                    generation = operation.generation,
+                    phase = internalOperationPhase(result),
+                )
                 if (!projectActivities.finish(token)) return@runOnUiThread
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 val prepared = result.getOrNull()
@@ -1825,6 +2103,11 @@ open class V04Activity : StudioActivity() {
             toast(getString(R.string.runtime_embedded_r_active))
             return
         }
+        val operation = beginOperation(
+            project = project,
+            action = RuntimeOperationAction.CLEAN,
+            provider = RuntimeOperationProvider.INTERNAL,
+        ) ?: return
 
         states[stateKey] = getString(R.string.runtime_action_cleaning)
         failureReasons.remove(stateKey)
@@ -1848,6 +2131,11 @@ open class V04Activity : StudioActivity() {
                 runtime.cleanEmbeddedPythonEnvironment(project)
             }
             runOnUiThread {
+                finishOperation(
+                    projectId = stateKey,
+                    generation = operation.generation,
+                    phase = internalOperationPhase(result),
+                )
                 if (!projectActivities.finish(token)) return@runOnUiThread
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 recoveryProjects.remove(stateKey)
@@ -1939,6 +2227,11 @@ open class V04Activity : StudioActivity() {
             toast(getString(R.string.runtime_embedded_r_active))
             return
         }
+        val operation = beginOperation(
+            project = project,
+            action = RuntimeOperationAction.START,
+            provider = RuntimeOperationProvider.INTERNAL,
+        ) ?: return
         embeddedStartInFlight += stateKey
         richResults.remove(stateKey)
         typedStates[stateKey] = RuntimeState.STARTING
@@ -1967,6 +2260,11 @@ open class V04Activity : StudioActivity() {
             }
             runOnUiThread {
                 embeddedStartInFlight.remove(stateKey)
+                finishOperation(
+                    projectId = stateKey,
+                    generation = operation.generation,
+                    phase = internalOperationPhase(result),
+                )
                 if (!projectActivities.finish(token)) return@runOnUiThread
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 val snapshot = result.getOrNull()
@@ -2020,6 +2318,7 @@ open class V04Activity : StudioActivity() {
         invalidateExternalObservation(stateKey)
         deferredManualActions.remove(stateKey)
         recoveryProjects.remove(stateKey)
+        cancelOperation(stateKey)
 
         val cancelledInternal = projectActivities.cancelProject(stateKey)
         projectPending.forEach { (executionId, _) ->
@@ -2081,10 +2380,20 @@ open class V04Activity : StudioActivity() {
     }
 
     private fun requestEmbeddedStop(project: V04ProjectGateway.RuntimeProject) {
+        val operation = beginOperation(
+            project = project,
+            action = RuntimeOperationAction.STOP,
+            provider = RuntimeOperationProvider.INTERNAL,
+        ) ?: return
         val accepted = runCatching {
             runtime.requestEmbeddedPythonStop(project.summary.documentId)
         }.getOrDefault(false)
         if (!accepted) {
+            finishOperation(
+                projectId = project.summary.documentId,
+                generation = operation.generation,
+                phase = RuntimeOperationPhase.FAILED,
+            )
             toast(getString(R.string.runtime_stop_failed))
             refreshEmbeddedProject(project)
             return
@@ -2108,6 +2417,24 @@ open class V04Activity : StudioActivity() {
         manualAction: EmbeddedPythonObservationPolicy.ManualAction? = null,
     ) {
         val stateKey = project.summary.documentId
+        val operation = when (manualAction) {
+            EmbeddedPythonObservationPolicy.ManualAction.STATUS -> beginOperation(
+                project = project,
+                action = RuntimeOperationAction.STATUS,
+                provider = RuntimeOperationProvider.INTERNAL,
+            )
+            EmbeddedPythonObservationPolicy.ManualAction.LOGS -> beginOperation(
+                project = project,
+                action = RuntimeOperationAction.LOGS,
+                provider = RuntimeOperationProvider.INTERNAL,
+            )
+            null -> null
+        }
+        if (manualAction != null && operation == null) return
+        if (manualAction != null) {
+            states[stateKey] = getString(R.string.runtime_action_checking)
+            refresh()
+        }
         val checkedEnvironmentReady = if (
             manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS
         ) {
@@ -2160,6 +2487,9 @@ open class V04Activity : StudioActivity() {
             if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
                 persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
             }
+            operation?.let {
+                finishOperation(stateKey, it.generation, RuntimeOperationPhase.SUCCESS)
+            }
             refresh()
             return
         }
@@ -2173,7 +2503,11 @@ open class V04Activity : StudioActivity() {
         if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
             persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
         }
-        if (changed) refresh()
+        val hadManualOperation = operation != null
+        operation?.let {
+            finishOperation(stateKey, it.generation, RuntimeOperationPhase.SUCCESS)
+        }
+        if (changed || hadManualOperation) refresh()
         if (isEmbeddedActive(snapshot)) scheduleEmbeddedPolling(project)
     }
 
@@ -2215,6 +2549,15 @@ open class V04Activity : StudioActivity() {
 
         val mappedState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot)
         typedStates[stateKey] = mappedState
+        currentOperation(stateKey)
+            ?.takeIf { it.action == RuntimeOperationAction.STOP && mappedState !in ACTIVE_RUNTIME_STATES }
+            ?.let { operation ->
+                finishOperation(
+                    projectId = stateKey,
+                    generation = operation.generation,
+                    phase = RuntimeOperationPhase.SUCCESS,
+                )
+            }
         states[stateKey] = mappedState.uiLabel(this)
         if (mappedState == RuntimeState.EXITED_ERROR && snapshot.stderr.isNotBlank()) {
             failureReasons[stateKey] = snapshot.stderr.trim().lineSequence().lastOrNull().orEmpty()
@@ -2434,6 +2777,27 @@ open class V04Activity : StudioActivity() {
             }
             return false
         }
+        val operation = if (!silentRecovery) {
+            val actionContract = action.toRuntimeOperationAction()
+            actionContract?.let {
+                beginOperation(
+                    project = project,
+                    action = it,
+                    provider = RuntimeOperationProvider.EXTERNAL,
+                    executionId = id,
+                    userVisible = !automaticObservation,
+                )
+            }
+        } else {
+            null
+        }
+        if (!silentRecovery && action.toRuntimeOperationAction() != null && operation == null) {
+            // The command was dispatched only after the stable identity checks above, so a
+            // persisted live record here means a stale UI callback raced this dispatch. Do not
+            // let its result mutate a newer operation.
+            cancelledExternalExecutions += id
+            return false
+        }
         if (action != ProjectRuntimeController.Action.STOP) {
             val activityKind = if (automaticObservation) {
                 ProjectActivityRegistry.Kind.OBSERVATION
@@ -2613,6 +2977,8 @@ open class V04Activity : StudioActivity() {
         val stateKey = item.documentId ?: item.folderName
         val stdout = result.stdout
         val success = result.exitCode == 0 && result.internalErrorMessage.isBlank()
+        val timedOut = "SIFTALPHA_OPERATION_RESULT=TIMED_OUT" in stdout ||
+            "SIFTALPHA_ERROR=OPERATION_TIMEOUT" in stdout
         val runtimeState = RuntimeState.fromOutput(stdout)
         if (runtimeState != RuntimeState.UNKNOWN) {
             typedStates[stateKey] = runtimeState
@@ -2806,6 +3172,10 @@ open class V04Activity : StudioActivity() {
                 refresh()
                 if (!success) runtimeError(result)
             }
+        }
+        if (timedOut) {
+            states[stateKey] = getString(R.string.runtime_operation_timed_out)
+            failureReasons[stateKey] = "RUNTIME_OPERATION_TIMED_OUT:${item.action.name}"
         }
         if (item.automaticObservation) {
             // A manual request accepted during automatic observation gets the first safe

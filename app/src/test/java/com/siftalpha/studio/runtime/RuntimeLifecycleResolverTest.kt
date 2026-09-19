@@ -19,6 +19,13 @@ class RuntimeLifecycleResolverTest {
             ),
         )
         assertEquals(
+            RuntimeLifecycleState.STARTING,
+            RuntimeLifecycleResolver.resolve(
+                environmentReady = true,
+                runtimeState = RuntimeState.STARTING,
+            ),
+        )
+        assertEquals(
             RuntimeLifecycleState.PREPARING,
             RuntimeLifecycleResolver.resolve(
                 environmentReady = null,
@@ -27,11 +34,27 @@ class RuntimeLifecycleResolverTest {
             ),
         )
         assertEquals(
-            RuntimeLifecycleState.DETECTING,
+            RuntimeLifecycleState.CHECKING,
             RuntimeLifecycleResolver.resolve(
                 environmentReady = true,
                 runtimeState = RuntimeState.UNKNOWN,
                 operation = RuntimeLifecycleOperation.STATUS,
+            ),
+        )
+        assertEquals(
+            RuntimeLifecycleState.STOPPING,
+            RuntimeLifecycleResolver.resolve(
+                environmentReady = true,
+                runtimeState = RuntimeState.RUNNING,
+                operation = RuntimeLifecycleOperation.STOP,
+            ),
+        )
+        assertEquals(
+            RuntimeLifecycleState.CLEANING,
+            RuntimeLifecycleResolver.resolve(
+                environmentReady = true,
+                runtimeState = RuntimeState.UNKNOWN,
+                operation = RuntimeLifecycleOperation.CLEAN,
             ),
         )
         assertEquals(

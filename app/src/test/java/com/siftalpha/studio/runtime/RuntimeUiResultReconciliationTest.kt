@@ -17,8 +17,10 @@ class RuntimeUiResultReconciliationTest {
     private class Gate<T> {
         private val pending = mutableMapOf<Int, T>()
         private val cached = mutableMapOf<Int, String>()
+        private val cancelled = mutableSetOf<Int>()
 
         fun publish(id: Int, result: String): Pair<T, String>? {
+            if (id in cancelled) return null
             val item = pending.remove(id)
             return if (item == null) {
                 cached[id] = result
@@ -32,6 +34,12 @@ class RuntimeUiResultReconciliationTest {
             pending[id] = item
             val result = cached.remove(id) ?: return null
             return pending.remove(id)?.let { it to result }
+        }
+
+        fun cancel(id: Int) {
+            cancelled += id
+            pending.remove(id)
+            cached.remove(id)
         }
     }
 
@@ -55,5 +63,15 @@ class RuntimeUiResultReconciliationTest {
 
         assertEquals("STATUS", delivered?.first)
         assertEquals("SIFTALPHA_STATUS=RUNNING", delivered?.second)
+    }
+
+    @Test
+    fun `cancelled operation cannot be resurrected by a late result`() {
+        val gate = Gate<String>()
+        assertNull(gate.register(1015, "CLEAN"))
+        gate.cancel(1015)
+
+        assertNull(gate.publish(1015, "SIFTALPHA_ENV=CLEANED"))
+        assertNull(gate.register(1015, "START"))
     }
 }

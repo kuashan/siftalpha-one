@@ -279,6 +279,46 @@ class ProjectActionPolicyTest {
     }
 
     @Test
+    fun `pending stop does not create a second stop operation`() {
+        val policy = ProjectActionPolicy.resolve(
+            snapshot(
+                lifecycle = RuntimeState.RUNNING,
+                stopCapability = true,
+                pending = ProjectUiSnapshot.PendingOperation(ProjectUiSnapshot.Operation.STOP),
+            ),
+        )
+
+        assertFalse(policy.isEnabled(ProjectActionPolicy.Action.STOP))
+        assertEquals(null, policy.primaryAction)
+        assertEquals(
+            ProjectActionPolicy.DisableReason.PENDING_OPERATION,
+            policy.reasonFor(ProjectActionPolicy.Action.STOP),
+        )
+    }
+
+    @Test
+    fun `same operation phase has the same action policy for internal and external selection`() {
+        val operations = ProjectUiSnapshot.Operation.entries
+        operations.forEach { operation ->
+            val base = snapshot(
+                lifecycle = if (operation == ProjectUiSnapshot.Operation.START) {
+                    RuntimeState.STARTING
+                } else {
+                    RuntimeState.RUNNING
+                },
+                stopCapability = true,
+                pending = ProjectUiSnapshot.PendingOperation(operation),
+            )
+            val internal = ProjectActionPolicy.resolve(base, ProjectRuntimeSelection.EMBEDDED_R)
+            val external = ProjectActionPolicy.resolve(base, ProjectRuntimeSelection.TERMUX)
+            assertEquals(operation, base.pending?.operation)
+            assertEquals(internal.actions, external.actions)
+            assertEquals(internal.primaryAction, external.primaryAction)
+            assertEquals(internal.summary, external.summary)
+        }
+    }
+
+    @Test
     fun `every policy result has a complete and self-consistent action matrix`() {
         val policy = ProjectActionPolicy.resolve(snapshot())
 
