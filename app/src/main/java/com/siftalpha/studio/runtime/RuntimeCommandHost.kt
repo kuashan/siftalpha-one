@@ -143,21 +143,6 @@ class TermuxProotRuntimeHost(
     ): String {
         require(runtimeId.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid runtime id" }
         require(operation.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid operation id" }
-        val runner = """
-            set +e
-            activity_pid_file="${'$'}1"
-            activity_pgid_file="${'$'}2"
-            activity_has_group="${'$'}3"
-            activity_script="${'$'}4"
-            printf '%s\n' "${'$'}${'$'}" >"${'$'}activity_pid_file"
-            if [ "${'$'}activity_has_group" = '1' ]; then
-              printf '%s\n' "${'$'}${'$'}" >"${'$'}activity_pgid_file"
-            fi
-            bash -lc "${'$'}activity_script"
-            activity_code=${'$'}?
-            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
-            exit "${'$'}activity_code"
-        """.trimIndent()
         return """
             ${hostPreamble()}
             ${hostProcessHelpers()}
@@ -170,11 +155,21 @@ class TermuxProotRuntimeHost(
               exit 80
             fi
             rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
+            set +e
             if command -v setsid >/dev/null 2>&1; then
-              setsid bash -c ${sh(runner)} siftalpha "${'$'}activity_pid_file" "${'$'}activity_pgid_file" 1 ${sh(shellScript)}
+              setsid bash -lc ${sh(shellScript)} &
+              activity_pid=${'$'}!
+              printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pid_file"
+              printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pgid_file"
             else
-              bash -c ${sh(runner)} siftalpha "${'$'}activity_pid_file" "${'$'}activity_pgid_file" 0 ${sh(shellScript)}
+              bash -lc ${sh(shellScript)} &
+              activity_pid=${'$'}!
+              printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pid_file"
             fi
+            wait "${'$'}activity_pid"
+            activity_code=${'$'}?
+            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
+            exit "${'$'}activity_code"
         """.trimIndent()
     }
 

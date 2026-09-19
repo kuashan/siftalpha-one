@@ -113,7 +113,6 @@ class ProjectRuntimeController(
     }
 
     /**
-     * Resolves the M control action    /**
      * Resolves the M control action to the existing Embedded R or External Provider path.
      *
      * The default request remains External Provider so the experimental Embedded R path is explicit.
@@ -269,7 +268,6 @@ class ProjectRuntimeController(
         }
     }
 
-    /** M-only control entry for an explicitly selected Python project; Termux is not involved. */
     /** M-only control entry for an explicitly selected Python project; Termux is not involved. */
     fun startEmbeddedPython(
         project: V04ProjectGateway.RuntimeProject,
