@@ -59,26 +59,30 @@ internal object InternalAlpineProcessControl {
         }
     }
 
-    fun terminate(process: Process, gracefulMillis: Long = 1500L) {
+    fun terminate(managed: InternalAlpineManagedProcess, gracefulMillis: Long = 1500L) {
+        val process = managed.process
         val procRoot = File("/proc")
-        val rootPid = runCatching { process.pid() }
-            .getOrNull()
-            ?.takeIf { it in 1..Int.MAX_VALUE.toLong() }
+        val rootPid = managed.hostPid()?.toLong()
         val descendants = rootPid?.let { descendantPids(procRoot, it) }.orEmpty()
 
         descendants.forEach { signal(it, OsConstants.SIGTERM) }
+        rootPid?.toInt()?.let { signal(it, OsConstants.SIGTERM) }
         runCatching { process.destroy() }
         runCatching { process.waitFor(gracefulMillis, TimeUnit.MILLISECONDS) }
 
-        val stillAlive = process.isAlive || descendants.any { pidAlive(procRoot, it) }
-        if (!stillAlive) return
-
-        val refreshed = rootPid?.let { descendantPids(procRoot, it) }.orEmpty()
-        (descendants + refreshed).distinct().forEach { signal(it, OsConstants.SIGKILL) }
-        if (process.isAlive) {
-            runCatching { process.destroyForcibly() }
-            runCatching { process.waitFor(gracefulMillis, TimeUnit.MILLISECONDS) }
+        val stillAlive = process.isAlive ||
+            rootPid?.toInt()?.let { pidAlive(procRoot, it) } == true ||
+            descendants.any { pidAlive(procRoot, it) }
+        if (stillAlive) {
+            val refreshed = rootPid?.let { descendantPids(procRoot, it) }.orEmpty()
+            (descendants + refreshed).distinct().forEach { signal(it, OsConstants.SIGKILL) }
+            rootPid?.toInt()?.let { signal(it, OsConstants.SIGKILL) }
+            if (process.isAlive) {
+                runCatching { process.destroyForcibly() }
+                runCatching { process.waitFor(gracefulMillis, TimeUnit.MILLISECONDS) }
+            }
         }
+        managed.cleanup()
     }
 
     internal fun descendantPids(procRoot: File, rootPid: Long): List<Int> {
@@ -232,21 +236,22 @@ class InternalAlpineEnvironmentManager(context: Context) {
         marker.writeText("READY=1\n")
     }
 
-    private fun runCommand(builder: ProcessBuilder, logFile: File, failurePrefix: String) {
+    private fun runCommand(builder: InternalAlpineCommand, logFile: File, failurePrefix: String) {
         logFile.parentFile?.mkdirs()
-        builder.redirectErrorStream(true)
-        builder.redirectOutput(logFile)
-        val process = builder.start()
+        builder.redirectErrorStream(true).redirectOutput(logFile)
+        val managed = builder.start()
+        val process = managed.process
         try {
             while (true) {
                 if (process.waitFor(250, TimeUnit.MILLISECONDS)) break
                 if (Thread.currentThread().isInterrupted) throw InterruptedException("Internal Alpine operation cancelled")
             }
         } catch (cancelled: InterruptedException) {
-            InternalAlpineProcessControl.terminate(process)
+            InternalAlpineProcessControl.terminate(managed)
             Thread.currentThread().interrupt()
             throw IllegalStateException("INTERNAL_ALPINE_OPERATION_CANCELLED", cancelled)
         }
+        managed.cleanup()
         if (process.exitValue() != 0) {
             error(failurePrefix + ": exit=" + process.exitValue() + "\n" + readTail(logFile, 12_000))
         }
@@ -287,7 +292,7 @@ class InternalAlpineSession(context: Context) {
         val stderr: File,
         val startedAt: Long,
         @Volatile var state: EmbeddedPythonState,
-        @Volatile var process: Process?,
+        @Volatile var process: InternalAlpineManagedProcess?,
         @Volatile var finishedAt: Long? = null,
         @Volatile var exitCode: Int? = null,
         @Volatile var stopRequested: Boolean = false,
@@ -316,16 +321,16 @@ class InternalAlpineSession(context: Context) {
         val generation = nextGeneration.incrementAndGet()
         val safeEntrypoint = entrypoint.replace("'", "'\"'\"'")
         val shell = "exec /siftalpha-env/venv/bin/python '/workspace/" + safeEntrypoint + "'"
-        val builder = InternalAlpineFiles.buildCommand(
+        val command = InternalAlpineFiles.buildCommand(
             appContext,
             layout,
             shell,
             binds = listOf(executionRoot to "/workspace", environmentRoot to "/siftalpha-env"),
             workingDirectory = "/workspace",
         )
-        builder.redirectOutput(stdout)
-        builder.redirectError(stderr)
-        val process = builder.start()
+        command.redirectOutput(stdout).redirectError(stderr)
+        val managed = command.start()
+        val process = managed.process
         val record = Record(
             sessionId = sessionId,
             projectIdentity = projectIdentity,
@@ -336,11 +341,12 @@ class InternalAlpineSession(context: Context) {
             stderr = stderr,
             startedAt = System.currentTimeMillis(),
             state = EmbeddedPythonState.RUNNING,
-            process = process,
+            process = managed,
         )
         records[projectIdentity] = record
         monitor.execute {
             val code = runCatching { process.waitFor() }.getOrElse { -1 }
+            managed.cleanup()
             record.exitCode = code
             record.finishedAt = System.currentTimeMillis()
             record.state = if (record.stopRequested) {
@@ -359,8 +365,8 @@ class InternalAlpineSession(context: Context) {
         val record = records[projectIdentity] ?: return false
         if (!EmbeddedPythonStatePolicy.canStop(record.state)) return false
         record.stopRequested = true
-        val process = record.process ?: return false
-        InternalAlpineProcessControl.terminate(process)
+        val managed = record.process ?: return false
+        InternalAlpineProcessControl.terminate(managed)
         return true
     }
 
