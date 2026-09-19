@@ -67,6 +67,47 @@ SIFTALPHA_PROOT_WRAPPER
     """.trimIndent()
 }
 
+internal object TermuxProjectActivityContract {
+    fun wrap(
+        runtimeId: String,
+        operation: String,
+        quotedShellScript: String,
+        hostPreamble: String,
+        hostProcessHelpers: String,
+    ): String {
+        require(runtimeId.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid runtime id" }
+        require(operation.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid operation id" }
+        return """
+            ${hostPreamble}
+            ${hostProcessHelpers}
+            activity_pid_file="\$runtime_dir/$runtimeId.activity.\$operation.pid"
+            activity_pgid_file="\$runtime_dir/$runtimeId.activity.\$operation.pgid"
+            old_pid="\$(cat "\$activity_pid_file" 2>/dev/null || true)"
+            old_pgid="\$(cat "\$activity_pgid_file" 2>/dev/null || true)"
+            if siftalpha_pid_alive "\$old_pid" || { [ -n "\$old_pgid" ] && siftalpha_group_alive "\$old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "\$activity_pid_file" "\$activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=\$!
+              printf '%s\\n' "\$activity_pid" >"\$activity_pid_file"
+              printf '%s\\n' "\$activity_pid" >"\$activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=\$!
+              printf '%s\\n' "\$activity_pid" >"\$activity_pid_file"
+            fi
+            wait "\$activity_pid"
+            activity_code=\$?
+            rm -f -- "\$activity_pid_file" "\$activity_pgid_file"
+            exit "\$activity_code"
+        """.trimIndent()
+    }
+}
+
 class TermuxProotRuntimeHost(
     private val gateway: V04ProjectGateway,
 ) : RuntimeCommandHost {
@@ -140,38 +181,13 @@ class TermuxProotRuntimeHost(
         runtimeId: String,
         operation: String,
         shellScript: String,
-    ): String {
-        require(runtimeId.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid runtime id" }
-        require(operation.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid operation id" }
-        return """
-            ${hostPreamble()}
-            ${hostProcessHelpers()}
-            activity_pid_file="${'$'}runtime_dir/$runtimeId.activity.$operation.pid"
-            activity_pgid_file="${'$'}runtime_dir/$runtimeId.activity.$operation.pgid"
-            old_pid="${'$'}(cat "${'$'}activity_pid_file" 2>/dev/null || true)"
-            old_pgid="${'$'}(cat "${'$'}activity_pgid_file" 2>/dev/null || true)"
-            if siftalpha_pid_alive "${'$'}old_pid" || { [ -n "${'$'}old_pgid" ] && siftalpha_group_alive "${'$'}old_pgid"; }; then
-              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
-              exit 80
-            fi
-            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
-            set +e
-            if command -v setsid >/dev/null 2>&1; then
-              setsid bash -lc ${sh(shellScript)} &
-              activity_pid=${'$'}!
-              printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pid_file"
-              printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pgid_file"
-            else
-              bash -lc ${sh(shellScript)} &
-              activity_pid=${'$'}!
-              printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pid_file"
-            fi
-            wait "${'$'}activity_pid"
-            activity_code=${'$'}?
-            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
-            exit "${'$'}activity_code"
-        """.trimIndent()
-    }
+    ): String = TermuxProjectActivityContract.wrap(
+        runtimeId = runtimeId,
+        operation = operation,
+        quotedShellScript = sh(shellScript),
+        hostPreamble = hostPreamble(),
+        hostProcessHelpers = hostProcessHelpers(),
+    )
 
     override fun stopProjectActivities(runtimeId: String): String {
         require(runtimeId.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid runtime id" }

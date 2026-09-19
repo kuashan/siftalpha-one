@@ -21,6 +21,35 @@ import java.io.File
  * resolved into one executable primary Runtime; Python may still compose the accepted supplemental
  * Vite/Node build path, while a Node-primary project now owns its complete lifecycle directly.
  */
+internal object InternalPythonPreparationFallbackPolicy {
+    private val alpineCapabilityErrors = listOf(
+        "no_compatible_wheel",
+        "project_requires_python_incompatible",
+        "unsupported_environment_marker",
+        "dependency_conflict",
+        "unsupported_dependency_manifest",
+        "not supported by internal python preparation",
+        "requirements options and nested requirement files are not supported",
+        "direct url requirements are not supported",
+        "unsupported requirement syntax",
+        "unsupported version specifier",
+        "dynamic project dependencies are not supported",
+        "pyproject.toml without a [project] table",
+    )
+
+    fun backendFor(error: Throwable): InternalPythonBackend? {
+        val text = generateSequence(error) { it.cause }
+            .mapNotNull { it.message }
+            .joinToString("\n")
+            .lowercase()
+        return if (alpineCapabilityErrors.any { text.contains(it) }) {
+            InternalPythonBackend.ALPINE
+        } else {
+            null
+        }
+    }
+}
+
 class ProjectRuntimeController(
     private val gateway: V04ProjectGateway,
     private val embeddedPythonSession: EmbeddedPythonSession? = null,
@@ -243,7 +272,7 @@ class ProjectRuntimeController(
                     backend = InternalPythonBackend.CPYTHON,
                 )
             } catch (error: Throwable) {
-                if (!shouldFallbackToAlpine(error)) throw error
+                if (InternalPythonPreparationFallbackPolicy.backendFor(error) != InternalPythonBackend.ALPINE) throw error
                 cpythonError = error
             }
         }
@@ -356,27 +385,6 @@ class ProjectRuntimeController(
             pyprojectText = pyproject,
             alpineSource = InternalAlpineDependencySource.fromProjectFiles(requirements, pyproject),
         )
-    }
-
-    private fun shouldFallbackToAlpine(error: Throwable): Boolean {
-        val text = generateSequence(error) { it.cause }
-            .mapNotNull { it.message }
-            .joinToString("\n")
-            .lowercase()
-        return listOf(
-            "no_compatible_wheel",
-            "project_requires_python_incompatible",
-            "unsupported_environment_marker",
-            "dependency_conflict",
-            "unsupported_dependency_manifest",
-            "not supported by internal python preparation",
-            "requirements options and nested requirement files are not supported",
-            "direct url requirements are not supported",
-            "unsupported requirement syntax",
-            "unsupported version specifier",
-            "dynamic project dependencies are not supported",
-            "pyproject.toml without a [project] table",
-        ).any { text.contains(it.lowercase()) }
     }
 
     private fun embeddedPythonDependencyInput(
