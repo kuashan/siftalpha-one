@@ -409,3 +409,13 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - JVM coverage: explicit URL/log compatibility, empty-stdout scoped listener discovery, unrelated-PID exclusion, no-listener no-candidate, and stale session/generation fencing.
 - W0 Cloud Build / Internal Alpine Probe: pending for the final HEAD.
 - Real-device Internal matrix: pending. Required first checks are `primary:AcodeProjects/situation-monitor` Web discovery and `primary:AcodeProjects/OCI` network observation.
+
+
+### alpha43-r20 Internal Alpine Shared Memory Compatibility
+
+- r19 real-device result: FAIL for `primary:AcodeProjects/situation-monitor` before Web availability; Flask reached server setup but CPython 3.12 sharedctypes terminated with `FileNotFoundError: /dev/shm`.
+- Expected r20 behavior: every Internal Alpine command sees an app-private writable directory at guest `/dev/shm`, including project execution and environment preparation.
+- JVM regression: verify base bind order keeps Android `/dev` while overlaying app-private storage specifically at `/dev/shm`.
+- External Runtime production code: unchanged.
+- W0 Cloud Build / Internal Alpine Probe / APK: pending for final r20 HEAD.
+- Real-device acceptance: pending. First retest is the same `primary:AcodeProjects/situation-monitor` launch; expected result is no `/dev/shm` traceback, process remains RUNNING, then existing Web Discovery + Endpoint Probe may proceed.

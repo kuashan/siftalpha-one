@@ -26,6 +26,36 @@ class InternalAlpineRuntimeTest {
     }
 
     @Test
+    fun internalAlpineBindsAppPrivateSharedMemoryAfterAndroidDev() {
+        val root = Files.createTempDirectory("siftalpha-alpine-shm-bind").toFile()
+        try {
+            val layout = InternalAlpineLayout(
+                rootfs = File(root, "rootfs"),
+                proot = File(root, "proot"),
+                loader = File(root, "loader"),
+                tempDirectory = File(root, "tmp"),
+                sharedMemoryDirectory = File(root, "shm").apply { mkdirs() },
+            )
+
+            assertEquals(
+                listOf(
+                    "-b",
+                    "/dev",
+                    "-b",
+                    layout.sharedMemoryDirectory.canonicalPath + ":/dev/shm",
+                    "-b",
+                    "/proc",
+                    "-b",
+                    "/sys",
+                ),
+                InternalAlpineFiles.baseBindArguments(layout),
+            )
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun requirementsTakePrecedenceAndFingerprintIsStable() {
         val first = InternalAlpineDependencySource.fromProjectFiles(
             requirementsText = "oci>=2.161,<3\r\n",

@@ -17,6 +17,7 @@ data class InternalAlpineLayout(
     val proot: File,
     val loader: File,
     val tempDirectory: File,
+    val sharedMemoryDirectory: File,
 )
 
 data class InternalAlpineManagedProcess(
@@ -111,9 +112,23 @@ object InternalAlpineFiles {
         }
         val temp = File(appContext.cacheDir, "siftalpha-proot-tmp")
         check(temp.mkdirs() || temp.isDirectory) { "Unable to create Internal Alpine temp directory" }
+        val sharedMemory = File(base, "shm")
+        check(sharedMemory.mkdirs() || sharedMemory.isDirectory) {
+            "Unable to create Internal Alpine shared memory directory"
+        }
+        val guestSharedMemory = File(rootfs, "dev/shm")
+        check(guestSharedMemory.mkdirs() || guestSharedMemory.isDirectory) {
+            "Unable to create Internal Alpine /dev/shm mount point"
+        }
         File(rootfs, "workspace").mkdirs()
         File(rootfs, "siftalpha-env").mkdirs()
-        return InternalAlpineLayout(rootfs.canonicalFile, proot, loader, temp.canonicalFile)
+        return InternalAlpineLayout(
+            rootfs.canonicalFile,
+            proot,
+            loader,
+            temp.canonicalFile,
+            sharedMemory.canonicalFile,
+        )
     }
 
     fun provenance(context: Context): String =
@@ -157,13 +172,8 @@ object InternalAlpineFiles {
             "--kill-on-exit",
             "-r",
             layout.rootfs.absolutePath,
-            "-b",
-            "/dev",
-            "-b",
-            "/proc",
-            "-b",
-            "/sys",
         )
+        cmd += baseBindArguments(layout)
         binds.forEach { (host, guest) ->
             require(host.exists()) { "Internal Alpine bind source missing: $host" }
             require(guest.startsWith("/")) { "Internal Alpine bind target must be absolute" }
@@ -212,6 +222,17 @@ object InternalAlpineFiles {
         }
         return InternalAlpineCommand(builder, pidFile)
     }
+
+    internal fun baseBindArguments(layout: InternalAlpineLayout): List<String> = listOf(
+        "-b",
+        "/dev",
+        "-b",
+        layout.sharedMemoryDirectory.canonicalPath + ":/dev/shm",
+        "-b",
+        "/proc",
+        "-b",
+        "/sys",
+    )
 
     internal fun extractTar(input: InputStream, targetDir: File) {
         val root = targetDir.toPath().toAbsolutePath().normalize()

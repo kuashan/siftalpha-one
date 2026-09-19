@@ -893,3 +893,14 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - The constructor is private to prevent a second Activity-local session from being created accidentally. External Runtime, network configuration, Worker code and r18 Web Discovery remain unchanged.
 - Added JVM coverage proving separate Context instances resolve to the same process-scoped session; raised the installable version to `0.8.0-alpha43-r19` / `145`.
 - W0 Cloud Build, Internal Alpine Probe, APK evidence and real-device Internal acceptance must be run against the final r19 HEAD; CI PASS must not be recorded as REAL_DEVICE_PASS.
+
+
+## 2026-09-19 · alpha43-r20 Internal Alpine Shared Memory Compatibility
+
+- Starting source baseline: `5ea612802ffbb9280a82061f86fdc499ad43b15b`, version `0.8.0-alpha43-r19` / `145`.
+- r19 real-device evidence from `primary:AcodeProjects/situation-monitor` reached Flask/Werkzeug startup, then failed in CPython 3.12 `multiprocessing.heap.Arena._choose_dir()` because `/dev/shm` did not exist inside Internal Alpine.
+- Root cause is runtime-generic: Internal Alpine binds Android host `/dev`, and Android does not provide the conventional Linux `/dev/shm` path expected by CPython multiprocessing/sharedctypes. The tzlocal UTC warning was non-fatal.
+- Added one app-private shared-memory backing directory next to the Internal Alpine rootfs and bind it after `/dev` as guest `/dev/shm`. The rootfs mount point is also ensured before launch.
+- This is an Internal Linux compatibility fix, not a Flask, OCI or situation-monitor project patch. External Runtime, Termux transport, Worker code, Web Discovery policy and session ownership remain unchanged.
+- Added JVM regression coverage for the exact base bind ordering: Android `/dev` first, app-private `/dev/shm` overlay second, followed by `/proc` and `/sys`.
+- Cloud CI / probe / APK and renewed real-device acceptance must be bound to the final r20 HEAD before any REAL_DEVICE_PASS claim.
