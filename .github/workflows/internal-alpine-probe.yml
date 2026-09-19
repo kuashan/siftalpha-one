@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/internal-alpine-probe.yml
       - tools/probe_internal_alpine_android.sh
+      - tools/prepare_internal_alpine_android.sh
   workflow_dispatch:
 
 permissions:
