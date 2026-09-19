@@ -1,7 +1,6 @@
 package com.siftalpha.studio.runtime
 
 import com.siftalpha.studio.project.EmbeddedPythonEntrypointPolicy
-import org.json.JSONObject
 import org.tomlj.Toml
 import org.tomlj.TomlTable
 
@@ -128,11 +127,149 @@ object ProjectStartContractResolver {
 
     internal fun packageStartCommand(text: String?): String? {
         if (text.isNullOrBlank()) return null
-        val root = runCatching { JSONObject(text) }.getOrNull() ?: return null
-        return root.optJSONObject("scripts")
-            ?.optString("start")
+        val scriptsObjectStart = jsonObjectValueStart(text, "scripts") ?: return null
+        return jsonStringValue(text, scriptsObjectStart, "start")
             ?.trim()
             ?.takeIf { it.isNotBlank() }
+    }
+
+    private fun jsonObjectValueStart(text: String, key: String): Int? {
+        var index = skipJsonWhitespace(text, 0)
+        if (text.getOrNull(index) != '{') return null
+        index += 1
+        while (true) {
+            index = skipJsonWhitespace(text, index)
+            if (text.getOrNull(index) == '}') return null
+            val keyToken = readJsonString(text, index) ?: return null
+            index = skipJsonWhitespace(text, keyToken.second)
+            if (text.getOrNull(index) != ':') return null
+            index = skipJsonWhitespace(text, index + 1)
+            if (keyToken.first == key) {
+                return index.takeIf { text.getOrNull(it) == '{' }
+            }
+            index = skipJsonValue(text, index) ?: return null
+            index = skipJsonWhitespace(text, index)
+            when (text.getOrNull(index)) {
+                ',' -> index += 1
+                '}' -> return null
+                else -> return null
+            }
+        }
+    }
+
+    private fun jsonStringValue(text: String, objectStart: Int, key: String): String? {
+        var index = objectStart
+        if (text.getOrNull(index) != '{') return null
+        index += 1
+        while (true) {
+            index = skipJsonWhitespace(text, index)
+            if (text.getOrNull(index) == '}') return null
+            val keyToken = readJsonString(text, index) ?: return null
+            index = skipJsonWhitespace(text, keyToken.second)
+            if (text.getOrNull(index) != ':') return null
+            index = skipJsonWhitespace(text, index + 1)
+            if (keyToken.first == key) {
+                return readJsonString(text, index)?.first
+            }
+            index = skipJsonValue(text, index) ?: return null
+            index = skipJsonWhitespace(text, index)
+            when (text.getOrNull(index)) {
+                ',' -> index += 1
+                '}' -> return null
+                else -> return null
+            }
+        }
+    }
+
+    private fun readJsonString(text: String, start: Int): Pair<String, Int>? {
+        if (text.getOrNull(start) != '"') return null
+        val out = StringBuilder()
+        var index = start + 1
+        while (index < text.length) {
+            val char = text[index++]
+            when (char) {
+                '"' -> return out.toString() to index
+                '\\' -> {
+                    if (index >= text.length) return null
+                    when (val escaped = text[index++]) {
+                        '"' -> out.append('"')
+                        '\\' -> out.append('\\')
+                        '/' -> out.append('/')
+                        'b' -> out.append('\b')
+                        'f' -> out.append('\u000C')
+                        'n' -> out.append('\n')
+                        'r' -> out.append('\r')
+                        't' -> out.append('\t')
+                        'u' -> {
+                            if (index + 4 > text.length) return null
+                            val code = text.substring(index, index + 4).toIntOrNull(16) ?: return null
+                            out.append(code.toChar())
+                            index += 4
+                        }
+                        else -> return null
+                    }
+                }
+                else -> {
+                    if (char.code < 0x20) return null
+                    out.append(char)
+                }
+            }
+        }
+        return null
+    }
+
+    private fun skipJsonWhitespace(text: String, start: Int): Int {
+        var index = start
+        while (index < text.length && text[index].isWhitespace()) index += 1
+        return index
+    }
+
+    private fun skipJsonValue(text: String, start: Int): Int? {
+        val index = skipJsonWhitespace(text, start)
+        return when (text.getOrNull(index)) {
+            '"' -> readJsonString(text, index)?.second
+            '{' -> skipJsonComposite(text, index, '{', '}')
+            '[' -> skipJsonComposite(text, index, '[', ']')
+            null -> null
+            else -> {
+                var end = index
+                while (
+                    end < text.length &&
+                    !text[end].isWhitespace() &&
+                    text[end] !in charArrayOf(',', '}', ']')
+                ) {
+                    end += 1
+                }
+                end.takeIf { it > index }
+            }
+        }
+    }
+
+    private fun skipJsonComposite(
+        text: String,
+        start: Int,
+        opening: Char,
+        closing: Char,
+    ): Int? {
+        if (text.getOrNull(start) != opening) return null
+        var depth = 1
+        var index = start + 1
+        while (index < text.length) {
+            when (text[index]) {
+                '"' -> {
+                    val string = readJsonString(text, index) ?: return null
+                    index = string.second
+                    continue
+                }
+                opening -> depth += 1
+                closing -> {
+                    depth -= 1
+                    if (depth == 0) return index + 1
+                }
+            }
+            index += 1
+        }
+        return null
     }
 
     internal fun pyprojectSingleScript(text: String?): String? {
