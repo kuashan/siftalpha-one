@@ -26,6 +26,18 @@ class InternalAlpineRuntimeTest {
     }
 
     @Test
+    fun pythonRuntimeBootstrapRetriesBoundedApkFailures() {
+        val command = InternalAlpinePythonRuntimeBootstrap.installCommand(maxAttempts = 4)
+
+        assertTrue(command.contains("apk add --no-cache ca-certificates python3 py3-pip py3-virtualenv"))
+        assertTrue(command.contains("SIFTALPHA_INTERNAL_ALPINE_APK_RETRY"))
+        assertTrue(command.contains("SIFTALPHA_INTERNAL_ALPINE_APK_FAILED"))
+        assertTrue(command.contains("if [ \"\$apk_attempt\" -ge \"4\" ]"))
+        assertTrue(command.contains("sleep_seconds=\$((apk_attempt * 2))"))
+        assertTrue(command.indexOf("apk add --no-cache") < command.indexOf("python3 --version"))
+    }
+
+    @Test
     fun tarExtractorPreservesFilesAndGuestAbsoluteSymlinks() {
         val root = Files.createTempDirectory("siftalpha-alpine-tar").toFile()
         try {

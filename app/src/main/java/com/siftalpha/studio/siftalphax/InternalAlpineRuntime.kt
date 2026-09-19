@@ -50,6 +50,37 @@ data class InternalAlpineDependencySource(
     }
 }
 
+internal object InternalAlpinePythonRuntimeBootstrap {
+    private const val DEFAULT_MAX_ATTEMPTS = 4
+
+    fun installCommand(maxAttempts: Int = DEFAULT_MAX_ATTEMPTS): String {
+        require(maxAttempts >= 1) { "maxAttempts must be positive" }
+        return """
+            set -eu
+            apk_attempt=1
+            while :; do
+              set +e
+              apk add --no-cache ca-certificates python3 py3-pip py3-virtualenv
+              apk_code=${'$'}?
+              set -e
+              if [ "${'$'}apk_code" -eq 0 ]; then
+                break
+              fi
+              if [ "${'$'}apk_attempt" -ge "$maxAttempts" ]; then
+                printf 'SIFTALPHA_INTERNAL_ALPINE_APK_FAILED attempt=%s/%s exit=%s\n' "${'$'}apk_attempt" "$maxAttempts" "${'$'}apk_code"
+                exit "${'$'}apk_code"
+              fi
+              printf 'SIFTALPHA_INTERNAL_ALPINE_APK_RETRY attempt=%s/%s exit=%s\n' "${'$'}apk_attempt" "$maxAttempts" "${'$'}apk_code"
+              sleep_seconds=${'$'}((apk_attempt * 2))
+              sleep "${'$'}sleep_seconds"
+              apk_attempt=${'$'}((apk_attempt + 1))
+            done
+            python3 --version
+            virtualenv --version
+        """.trimIndent()
+    }
+}
+
 internal object InternalAlpineProcessControl {
     private const val MAX_DESCENDANTS = 2048
 
@@ -233,7 +264,7 @@ class InternalAlpineEnvironmentManager(context: Context) {
             builder = InternalAlpineFiles.buildCommand(
                 appContext,
                 layout,
-                "set -eu; apk add --no-cache ca-certificates python3 py3-pip py3-virtualenv; python3 --version; virtualenv --version",
+                InternalAlpinePythonRuntimeBootstrap.installCommand(),
             ),
             logFile = log,
             failurePrefix = "INTERNAL_ALPINE_PYTHON_RUNTIME_PREPARE_FAILED",
