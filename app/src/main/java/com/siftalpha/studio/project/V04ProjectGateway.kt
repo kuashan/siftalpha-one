@@ -76,17 +76,8 @@ class V04ProjectGateway(private val context: Context) {
         fileName: String,
         maxBytes: Int = MAX_ROOT_TEXT_BYTES,
     ): String? {
-        require(
-            fileName in setOf(
-                "pyproject.toml",
-                "requirements.txt",
-                "render.yaml",
-                "render.yml",
-                "Procfile",
-                "package.json",
-            ),
-        ) {
-            "该根文件不在运行声明/依赖读取白名单中"
+        require(fileName in setOf("pyproject.toml", "requirements.txt")) {
+            "只有 pyproject.toml / requirements.txt 可通过此接口读取"
         }
         require(maxBytes in 1..MAX_ROOT_TEXT_BYTES) { "根文件读取上限无效" }
         val file = projectStore.listProjectChildren(projectDocumentId)

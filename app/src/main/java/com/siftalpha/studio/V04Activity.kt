@@ -2268,7 +2268,6 @@ open class V04Activity : StudioActivity() {
     private fun startEmbeddedProject(
         project: V04ProjectGateway.RuntimeProject,
         requiredConfiguration: Boolean = false,
-        webHintPorts: List<Int> = emptyList(),
     ) {
         val stateKey = project.summary.documentId
         val route = runCatching {
@@ -2328,7 +2327,6 @@ open class V04Activity : StudioActivity() {
                 runtime.startEmbeddedPython(
                     project = project,
                     requiredConfiguration = requiredConfiguration,
-                    webHintPorts = webHintPorts,
                 )
             }
             runOnUiThread {
@@ -2959,11 +2957,7 @@ open class V04Activity : StudioActivity() {
                 ProjectRuntimeController.Action.PREPARE ->
                     prepareEmbeddedProject(project)
                 ProjectRuntimeController.Action.START ->
-                    startEmbeddedProject(
-                        project = project,
-                        requiredConfiguration = requiredConfiguration,
-                        webHintPorts = webHintPorts,
-                    )
+                    startEmbeddedProject(project, requiredConfiguration)
                 ProjectRuntimeController.Action.STOP ->
                     requestEmbeddedStop(project)
                 else -> Unit

@@ -50,7 +50,6 @@ data class EmbeddedPythonCapabilityFacts(
     val hasExternalDependencyRequirement: Boolean,
     val hasProtectedConfigurationRequirement: Boolean,
     val embeddedRuntimeAvailable: Boolean,
-    val internalShellRuntimeAvailable: Boolean = false,
 )
 
 object EmbeddedPythonCapabilityRouting {
@@ -91,11 +90,7 @@ object EmbeddedPythonCapabilityRouting {
         }
 
         val declaredRun = facts.declaredRun?.trim().orEmpty()
-        if (
-            declaredRun.isNotBlank() &&
-            !isDirectPythonRun(declaredRun, safeEntrypoint) &&
-            !facts.internalShellRuntimeAvailable
-        ) {
+        if (declaredRun.isNotBlank() && !isDirectPythonRun(declaredRun, safeEntrypoint)) {
             return rejected(RuntimeControlReason.DECLARED_RUN_UNSUPPORTED)
         }
 

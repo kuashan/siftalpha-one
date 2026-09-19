@@ -506,3 +506,12 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - HTTP readiness: 200, 404, 503 and other valid 100-599 responses mean AVAILABLE once the current candidate is verified; a raw TCP listener with no HTTP response must not become AVAILABLE.
 - OCI: verify the previously working Internal Web returns. If it still stays SEARCHING with `INTERNAL_WEB_DISCOVERY=NO_CANDIDATE`, capture the new run diagnostics before changing PID/socket discovery because that implementation did not change in r26.
 - Background protection regression: active Internal Runtime retains Foreground Service + PARTIAL_WAKE_LOCK; STOP releases only the current project/session lease.
+
+
+### alpha43-r27 unified start-contract rollback
+
+- Internal Python projects must no longer execute `render.yaml`, `Procfile`, root `package.json scripts.start`, or `pyproject.toml` scripts as replacement launch commands.
+- situation-monitor Internal Runtime should return to direct resolved-entrypoint execution and must not emit `SIFTALPHA_X_START_SOURCE=RENDER_YAML` or `SIFTALPHA_X_ASSIGNED_PORT`.
+- Four-stage Web state presentation remains active and must still progress based on listener ownership plus HTTP readiness.
+- Active Internal Runtime sessions must still acquire Foreground Service + PARTIAL_WAKE_LOCK protection; STOP must release only the current project/session lease.
+- OCI and other projects previously working under the r24 entrypoint model must be rechecked for Web availability before any further discovery changes.

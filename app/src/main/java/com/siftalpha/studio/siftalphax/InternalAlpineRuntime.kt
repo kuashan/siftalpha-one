@@ -478,7 +478,6 @@ class InternalAlpineSession private constructor(context: Context) {
         val stdout: File,
         val stderr: File,
         val startedAt: Long,
-        val startupHintPorts: List<Int>,
         @Volatile var state: EmbeddedPythonState,
         @Volatile var process: InternalAlpineManagedProcess?,
         @Volatile var finishedAt: Long? = null,
@@ -520,7 +519,7 @@ class InternalAlpineSession private constructor(context: Context) {
         return InternalAlpineWebDiscovery.observe(
             procRoot = File("/proc"),
             rootPid = hostPid,
-            preferredHints = (record.startupHintPorts + preferredHints).distinct(),
+            preferredHints = preferredHints,
         )
     }
 
@@ -529,10 +528,6 @@ class InternalAlpineSession private constructor(context: Context) {
         executionRoot: File,
         entrypoint: String,
         environmentRoot: File,
-        launchCommand: String? = null,
-        startSource: String = "ENTRYPOINT_FALLBACK",
-        assignedPort: Int? = null,
-        startupHintPorts: List<Int> = emptyList(),
     ): EmbeddedPythonSnapshot {
         check(canStart(projectIdentity)) { "Internal Alpine project session is already active" }
         val layout = InternalAlpineFiles.prepare(appContext)
@@ -542,33 +537,7 @@ class InternalAlpineSession private constructor(context: Context) {
         val stderr = File(sessionRoot, "stderr.log")
         val generation = nextGeneration.incrementAndGet()
         val safeEntrypoint = entrypoint.replace("'", "'\"'\"'")
-        val safeStartSource = startSource.replace("'", "")
-        val shellCommand = launchCommand?.takeIf { it.isNotBlank() }
-        val safeLaunchCommand = shellCommand?.replace("'", "'\"'\"'")
-        val portPrelude = assignedPort
-            ?.takeIf { it in 1..65535 }
-            ?.let { "export PORT=$it; printf 'SIFTALPHA_X_ASSIGNED_PORT=%s\\n' '$it'; " }
-            .orEmpty()
-        val shell = buildString {
-            append("export PYTHONUNBUFFERED=1; ")
-            append("export VIRTUAL_ENV=/siftalpha-env/venv; ")
-            append("export PATH=/siftalpha-env/venv/bin:\$PATH; ")
-            append("printf 'SIFTALPHA_X_START_SOURCE=%s\\n' '")
-            append(safeStartSource)
-            append("'; ")
-            append("printf 'SIFTALPHA_X_BACKGROUND_PROTECTION=FOREGROUND_SERVICE+PARTIAL_WAKE_LOCK\\n'; ")
-            append(portPrelude)
-            if (safeLaunchCommand != null) {
-                append("printf 'SIFTALPHA_X_START_SHELL=NON_LOGIN\\n'; ")
-                append("exec /bin/sh -c '")
-                append(safeLaunchCommand)
-                append("'")
-            } else {
-                append("exec /siftalpha-env/venv/bin/python -u '/workspace/")
-                append(safeEntrypoint)
-                append("'")
-            }
-        }
+        val shell = "exec /siftalpha-env/venv/bin/python '/workspace/" + safeEntrypoint + "'"
         val command = InternalAlpineFiles.buildCommand(
             appContext,
             layout,
@@ -588,7 +557,6 @@ class InternalAlpineSession private constructor(context: Context) {
             stdout = stdout,
             stderr = stderr,
             startedAt = System.currentTimeMillis(),
-            startupHintPorts = startupHintPorts.filter { it in 1..65535 }.distinct(),
             state = EmbeddedPythonState.RUNNING,
             process = managed,
         )

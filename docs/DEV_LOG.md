@@ -991,3 +991,17 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Worker remains frozen. Foreground Service + PARTIAL_WAKE_LOCK and the SEARCHING -> LISTENER_FOUND -> STARTING_WEB -> AVAILABLE model remain unchanged.
 - versionCode 152 / versionName 0.8.0-alpha43-r26.
 - Cloud CI and real-device revalidation pending.
+
+
+## 2026-09-20 · alpha43-r27 remove unified deployment start contracts
+
+- Real-device testing showed the r25/r26 unified deployment start-contract integration changed Internal Runtime launch semantics and introduced Web regressions.
+- Removed the new Internal Runtime resolver/integration for `render.yaml`, `render.yml`, `Procfile`, root `package.json scripts.start`, and `pyproject.toml` script declarations.
+- Internal Python launch behavior is restored to the r24 model: resolve the established Python entrypoint and execute it directly. No deployment manifest may replace that Internal launch command in r27.
+- Removed assigned-`PORT` and deployment-command shell launch state introduced only for the unified start-contract feature.
+- Preserved the r25/r26 Web readiness model: SEARCHING -> LISTENER_FOUND -> STARTING_WEB -> AVAILABLE, including HTTP readiness verification.
+- Preserved Foreground Service + PARTIAL_WAKE_LOCK protection for active Internal Runtime session leases.
+- Preserved Worker freeze, current-project-only STOP semantics, External Runtime behavior, Rich Result behavior, and existing Web ownership/discovery logic.
+- Existing pre-r25 Runtime-specific behavior is not broadly deleted; this rollback is limited to the newly introduced unified start-contract feature.
+- versionCode 153 / versionName 0.8.0-alpha43-r27.
+- Cloud CI and real-device verification pending.

@@ -126,14 +126,6 @@ class ProjectRuntimeController(
     fun embeddedPythonCanStart(project: V04ProjectGateway.RuntimeProject): Boolean {
         val projectId = project.summary.documentId
         val files = internalDependencyFiles(projectId)
-        val startContract = internalStartContract(
-            projectDocumentId = projectId,
-            fallbackEntrypoint = gateway.resolveEmbeddedPythonEntrypoint(projectId),
-        )
-        if (startContract?.requiresShell == true) {
-            val alpineBinding = internalAlpineEnvironmentManager?.loadBinding(projectId, files.alpineSource)
-            return alpineBinding != null && internalAlpineSession?.canStart(projectId) == true
-        }
         val cpythonBinding = runCatching {
             val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
                 files.requirementsText,
@@ -236,8 +228,6 @@ class ProjectRuntimeController(
                 (embeddedPythonSession != null && embeddedPythonEnvironmentManager != null) ||
                     (internalAlpineSession != null && internalAlpineEnvironmentManager != null)
                 ),
-            internalShellRuntimeAvailable =
-                internalAlpineSession != null && internalAlpineEnvironmentManager != null,
         )
         return if (action == Action.PREPARE) {
             EmbeddedPythonCapabilityRouting.resolvePreparation(
@@ -257,16 +247,6 @@ class ProjectRuntimeController(
     ): Boolean {
         val projectId = project.summary.documentId
         val files = internalDependencyFiles(projectId)
-        val startContract = internalStartContract(
-            projectDocumentId = projectId,
-            fallbackEntrypoint = gateway.resolveEmbeddedPythonEntrypoint(projectId),
-        )
-        if (startContract?.requiresShell == true) {
-            return internalAlpineEnvironmentManager?.loadBinding(
-                projectIdentity = projectId,
-                source = files.alpineSource,
-            ) != null
-        }
         val cpythonReady = runCatching {
             val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
                 files.requirementsText,
@@ -313,16 +293,11 @@ class ProjectRuntimeController(
         }
         val projectId = project.summary.documentId
         val files = internalDependencyFiles(projectId)
-        val startContract = internalStartContract(
-            projectDocumentId = projectId,
-            fallbackEntrypoint = gateway.resolveEmbeddedPythonEntrypoint(projectId),
-        )
-        val requiresShellRuntime = startContract?.requiresShell == true
         val cpythonSession = embeddedPythonSession
         val cpythonManager = embeddedPythonEnvironmentManager
         var cpythonError: Throwable? = null
 
-        if (cpythonSession != null && cpythonManager != null && !requiresShellRuntime) {
+        if (cpythonSession != null && cpythonManager != null) {
             progress?.invoke(
                 listOf(
                     "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
@@ -369,16 +344,6 @@ class ProjectRuntimeController(
             }
         }
 
-        if (requiresShellRuntime) {
-            progress?.invoke(
-                listOf(
-                    "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
-                    "SIFTALPHA_X_PROJECT_ID=" + projectId,
-                    "SIFTALPHA_X_INTERNAL_PREPARE_STAGE=ALPINE_START_CONTRACT",
-                    "SIFTALPHA_X_START_SOURCE=" + startContract?.source?.name.orEmpty(),
-                ).joinToString("\n"),
-            )
-        }
         val alpineManager = internalAlpineEnvironmentManager
             ?: throw cpythonError ?: error("Internal Alpine environment manager is unavailable")
         val stager = embeddedPythonProjectStager
@@ -410,7 +375,6 @@ class ProjectRuntimeController(
     fun startEmbeddedPython(
         project: V04ProjectGateway.RuntimeProject,
         requiredConfiguration: Boolean = false,
-        webHintPorts: List<Int> = emptyList(),
     ): EmbeddedPythonSnapshot {
         val stager = checkNotNull(embeddedPythonProjectStager) { "Internal project staging is unavailable" }
         val route = resolveControlPath(
@@ -440,22 +404,10 @@ class ProjectRuntimeController(
         val alpineBinding = internalAlpineEnvironmentManager?.loadBinding(projectId, files.alpineSource)
         val entrypoint = gateway.resolveEmbeddedPythonEntrypoint(projectId)
             ?: error("EMBEDDED_R_ENTRYPOINT_UNRESOLVED")
-        val startContract = internalStartContract(projectId, entrypoint)
-        val shellContract = startContract?.takeIf { it.requiresShell }
-        val assignedPort = if (shellContract?.requiresPortEnvironment == true) {
-            InternalRuntimePortAllocator.choose(
-                listOfNotNull(shellContract.explicitPort) + webHintPorts,
-            )
-        } else {
-            null
-        }
-        val startupHintPorts = (
-            listOfNotNull(shellContract?.explicitPort, assignedPort) + webHintPorts
-        ).filter { it in 1..65535 }.distinct()
         val stagedRoot = stager.stage(projectId, entrypoint)
 
         return try {
-            val snapshot = if (cpythonBinding != null && shellContract == null) {
+            val snapshot = if (cpythonBinding != null) {
                 val session = checkNotNull(embeddedPythonSession) { "Embedded CPython is unavailable" }
                 val current = session.snapshot()
                 check(EmbeddedPythonStatePolicy.canStart(current.state)) {
@@ -480,11 +432,6 @@ class ProjectRuntimeController(
                     executionRoot = stagedRoot,
                     entrypoint = entrypoint,
                     environmentRoot = binding.environmentRoot,
-                    launchCommand = shellContract?.command,
-                    startSource = startContract?.source?.name
-                        ?: ProjectStartContractResolver.Source.ENTRYPOINT_FALLBACK.name,
-                    assignedPort = assignedPort,
-                    startupHintPorts = startupHintPorts,
                 )
             }
             synchronized(embeddedStagingRoots) {
@@ -496,22 +443,6 @@ class ProjectRuntimeController(
             stager.cleanup(stagedRoot)
             throw error
         }
-    }
-
-    private fun internalStartContract(
-        projectDocumentId: String,
-        fallbackEntrypoint: String?,
-    ): ProjectStartContractResolver.Contract? {
-        val facts = gateway.runtimeFacts(projectDocumentId)
-        return ProjectStartContractResolver.resolve(
-            declaredRun = facts.declaredRun,
-            renderYaml = gateway.readProjectRootText(projectDocumentId, "render.yaml")
-                ?: gateway.readProjectRootText(projectDocumentId, "render.yml"),
-            procfile = gateway.readProjectRootText(projectDocumentId, "Procfile"),
-            packageJson = gateway.readProjectRootText(projectDocumentId, "package.json"),
-            pyprojectToml = gateway.readProjectRootText(projectDocumentId, "pyproject.toml"),
-            fallbackEntrypoint = fallbackEntrypoint,
-        )
     }
 
     private fun internalDependencyFiles(projectDocumentId: String): InternalDependencyFiles {

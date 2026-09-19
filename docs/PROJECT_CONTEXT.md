@@ -506,3 +506,8 @@ Production external runtime 仍主要依赖 Termux + PRoot + Ubuntu + Python 作
 ## alpha43-r26 targeted correction
 
 r26 is a minimal correction to the r25 start/readiness integration. Deployment commands keep the project venv environment by using a non-login shell. HTTP readiness means that a local candidate speaks HTTP, not that the application returned a success status; therefore any valid HTTP 100-599 response is Browser-ready. PID/socket ownership discovery, Worker freeze, STOP scope and Foreground Service + PARTIAL_WAKE_LOCK architecture are unchanged.
+
+
+## alpha43-r27 rollback boundary
+
+The r25/r26 unified deployment start-contract integration has been removed from Internal Runtime. Internal Python execution again follows the established resolved-entrypoint path. Four-stage Web readiness and Foreground Service + PARTIAL_WAKE_LOCK remain active. This is a targeted rollback of the new deployment-manifest command takeover, not a rollback of External Runtime, Web ownership discovery, STOP scope, Rich Result, or the Worker freeze.
