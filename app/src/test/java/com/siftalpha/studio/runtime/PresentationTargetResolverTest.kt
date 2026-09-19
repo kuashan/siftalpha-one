@@ -25,6 +25,17 @@ class PresentationTargetResolverTest {
     }
 
     @Test
+    fun richResultRemainsOpenTargetWhileWebIsOnlyDetecting() {
+        assertEquals(
+            PresentationTarget.RICH_RESULT,
+            PresentationTargetResolver.resolve(
+                webPresentationKnown = false,
+                richResultAvailable = true,
+            ),
+        )
+    }
+
+    @Test
     fun richResultIsUsedWhenWebIsUnavailable() {
         assertEquals(
             PresentationTarget.RICH_RESULT,

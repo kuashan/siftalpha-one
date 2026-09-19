@@ -6,10 +6,9 @@ import android.os.Looper
 /**
  * Activity-lifetime cache and scheduler for loopback Web listener checks.
  *
- * A confirmed result is revalidated in the background on a short cadence. The last result stays
- * visible while that recheck is in flight, avoiding Browser-button flicker; a failed recheck then
- * disables the entry immediately. Results are dropped whenever the Activity leaves the foreground,
- * and a lifecycle generation rejects any probe that started before that pause.
+ * New candidates get a short bounded retry burst so a listener that is still finishing startup
+ * can become AVAILABLE quickly. Once a listener has been verified, health checks return to the
+ * normal low-frequency cadence.
  */
 class RuntimeWebAvailabilityTracker(
     private val probe: (String) -> Boolean = { RuntimeWebEndpointProbe.isListening(it) },
@@ -22,6 +21,8 @@ class RuntimeWebAvailabilityTracker(
         val checkedAtEpochMs: Long,
         val generation: Int,
         val lifecycleGeneration: Int,
+        val consecutiveFailures: Int,
+        val everReachable: Boolean,
     )
 
     private val handler = Handler(Looper.getMainLooper())
@@ -88,9 +89,8 @@ class RuntimeWebAvailabilityTracker(
     /**
      * Returns the latest tri-state endpoint fact while scheduling any missing probe.
      *
-     * A null result means that a candidate exists but no probe result is available yet. That is
-     * intentionally different from false: the card can show Detecting/Starting instead of
-     * reporting a verified failure during the first render.
+     * A new candidate remains DETECTING through the bounded startup retry burst instead of briefly
+     * showing UNAVAILABLE after one early connection miss.
      */
     fun endpointReachable(
         projectKey: String,
@@ -110,8 +110,14 @@ class RuntimeWebAvailabilityTracker(
         }
         return when {
             current.any { it.reachable } -> true
-            current.size == urls.size -> false
-            else -> null
+            current.size != urls.size -> null
+            current.any {
+                RuntimeWebDetectionCadence.initialVerificationPending(
+                    everReachable = it.everReachable,
+                    consecutiveFailures = it.consecutiveFailures,
+                )
+            } -> null
+            else -> false
         }
     }
 
@@ -126,9 +132,24 @@ class RuntimeWebAvailabilityTracker(
                 if (generation != generation(projectKey)) return@post
                 val key = key(projectKey, url)
                 val previous = results[key]
-                results[key] = ProbeResult(reachable, checkedAt, generation, lifecycleGeneration)
-                scheduleRecheck(projectKey, url, checkedAt, RECHECK_INTERVAL_MS)
-                if (previous?.reachable != reachable) onChanged()
+                val current = nextResult(
+                    previous = previous,
+                    reachable = reachable,
+                    checkedAt = checkedAt,
+                    generation = generation,
+                    lifecycle = lifecycleGeneration,
+                )
+                results[key] = current
+                scheduleRecheck(
+                    projectKey = projectKey,
+                    url = url,
+                    checkedAt = checkedAt,
+                    delayMs = RuntimeWebDetectionCadence.endpointRecheckDelay(
+                        everReachable = current.everReachable,
+                        consecutiveFailures = current.consecutiveFailures,
+                    ),
+                )
+                notifyIfPresentationChanged(previous, current)
                 callback(reachable)
             }
         }.start()
@@ -145,9 +166,13 @@ class RuntimeWebAvailabilityTracker(
             cached.generation == generation &&
             cached.lifecycleGeneration == lifecycleGeneration
         ) {
+            val delay = RuntimeWebDetectionCadence.endpointRecheckDelay(
+                everReachable = cached.everReachable,
+                consecutiveFailures = cached.consecutiveFailures,
+            )
             val age = (now - cached.checkedAtEpochMs).coerceAtLeast(0L)
-            if (age < RECHECK_INTERVAL_MS) {
-                scheduleRecheck(projectKey, url, cached.checkedAtEpochMs, RECHECK_INTERVAL_MS - age)
+            if (age < delay) {
+                scheduleRecheck(projectKey, url, cached.checkedAtEpochMs, delay - age)
                 return
             }
         }
@@ -161,11 +186,68 @@ class RuntimeWebAvailabilityTracker(
                 if (generation != generation(projectKey)) return@post
                 inFlight.remove(key)
                 val previous = results[key]
-                results[key] = ProbeResult(reachable, checkedAt, generation, lifecycleGeneration)
-                scheduleRecheck(projectKey, url, checkedAt, RECHECK_INTERVAL_MS)
-                if (previous?.reachable != reachable) onChanged()
+                val current = nextResult(
+                    previous = previous,
+                    reachable = reachable,
+                    checkedAt = checkedAt,
+                    generation = generation,
+                    lifecycle = lifecycleGeneration,
+                )
+                results[key] = current
+                scheduleRecheck(
+                    projectKey = projectKey,
+                    url = url,
+                    checkedAt = checkedAt,
+                    delayMs = RuntimeWebDetectionCadence.endpointRecheckDelay(
+                        everReachable = current.everReachable,
+                        consecutiveFailures = current.consecutiveFailures,
+                    ),
+                )
+                notifyIfPresentationChanged(previous, current)
             }
         }.start()
+    }
+
+    private fun nextResult(
+        previous: ProbeResult?,
+        reachable: Boolean,
+        checkedAt: Long,
+        generation: Int,
+        lifecycle: Int,
+    ): ProbeResult {
+        val sameExecution = previous?.generation == generation
+        val previousFailures = if (
+            sameExecution && previous?.lifecycleGeneration == lifecycle
+        ) {
+            previous.consecutiveFailures
+        } else {
+            0
+        }
+        val everReachable = reachable || (sameExecution && previous?.everReachable == true)
+        return ProbeResult(
+            reachable = reachable,
+            checkedAtEpochMs = checkedAt,
+            generation = generation,
+            lifecycleGeneration = lifecycle,
+            consecutiveFailures = if (reachable) 0 else previousFailures + 1,
+            everReachable = everReachable,
+        )
+    }
+
+    private fun notifyIfPresentationChanged(previous: ProbeResult?, current: ProbeResult) {
+        val previousPending = previous?.let {
+            RuntimeWebDetectionCadence.initialVerificationPending(
+                everReachable = it.everReachable,
+                consecutiveFailures = it.consecutiveFailures,
+            )
+        } ?: true
+        val currentPending = RuntimeWebDetectionCadence.initialVerificationPending(
+            everReachable = current.everReachable,
+            consecutiveFailures = current.consecutiveFailures,
+        )
+        if (previous?.reachable != current.reachable || previousPending != currentPending) {
+            onChanged()
+        }
     }
 
     private fun scheduleRecheck(
@@ -200,8 +282,4 @@ class RuntimeWebAvailabilityTracker(
     private fun keyPrefix(projectKey: String): String = "${projectKey.length}:$projectKey:"
 
     private fun key(projectKey: String, url: String): String = "${keyPrefix(projectKey)}$url"
-
-    companion object {
-        private const val RECHECK_INTERVAL_MS = 2_000L
-    }
 }

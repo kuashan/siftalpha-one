@@ -63,11 +63,11 @@ android {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        // alpha43-r21 keeps user-started Internal Alpine sessions alive with an Android foreground
-        // service and stabilizes Web presentation identity across Activity lifecycle changes.
-        // External Runtime, Worker architecture and project execution semantics remain frozen.
-        versionCode = 147
-        versionName = "0.8.0-alpha43-r21"
+        // alpha43-r22 accelerates Internal/External Web discovery with bounded startup fast paths.
+        // Rich Result presentation, External execution and Worker architecture remain unchanged.
+        // Final validation remains cloud-only; real-device acceptance is separate.
+        versionCode = 148
+        versionName = "0.8.0-alpha43-r22"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

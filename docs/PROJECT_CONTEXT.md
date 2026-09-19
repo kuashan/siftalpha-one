@@ -458,3 +458,13 @@ alpha43 真实设备通过的是当前 External Runtime Provider 下的 M-facing
 - production sandboxing
 
 Production external runtime 仍主要依赖 Termux + PRoot + Ubuntu + Python 作为 External Runtime Provider。Embedded CPython 仍只是 R 当前第一个实现方向，不是完整 R。
+
+
+## alpha43-r22 Fast Web Detection direction (2026-09-19)
+
+- r21 real-device acceptance confirmed Internal Alpine background survival and stable Web presentation across external-browser use.
+- r22 is a performance-only follow-up for Web detection. It must not change Rich Result parsing, lifecycle, viewer behavior, External execution semantics, project-scoped STOP, Worker freeze, or OCI/project source.
+- Internal Alpine heavy PID/socket/procfs listener observation runs off the Activity main thread and stops once the current execution has a URL candidate.
+- Endpoint verification uses a bounded startup retry burst (150/300/600 ms after early misses), then returns to the existing 2-second health cadence.
+- External Web discovery temporarily uses a 500 ms observation cadence only while its bounded LOGS discovery budget remains useful; it returns to 2 seconds after endpoint verification or budget exhaustion.
+- Unified Open remains presentation-neutral: a valid Rich Result stays usable while Web is only DETECTING; verified Web keeps the existing priority when both presentation targets exist.

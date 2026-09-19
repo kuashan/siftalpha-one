@@ -918,3 +918,16 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Unified Open now selects WEB from verified presentation identity rather than only the instantaneous probe result, so a temporary DETECTING state cannot fall through to Rich Result.
 - Added JVM coverage for independent foreground session leases, verified-Web presentation priority, and verified Web identity remaining expected while a fresh probe is pending.
 - W0 Cloud Build, Internal Alpine Probe, APK evidence and real-device external-browser refresh acceptance are pending for the final r21 HEAD.
+
+
+## 2026-09-19 · alpha43-r22 Fast Web Detection
+
+- Starting source baseline: `b772074818e65755a5f365c212d1d518f2faf94d`, version `0.8.0-alpha43-r21` / `147`.
+- Internal Alpine Web listener observation was removed from the Activity main-thread polling path. A dedicated single-thread observation executor performs the bounded project PID/socket/procfs scan and publishes only session/generation-matched results back to the UI thread.
+- Internal heavy listener discovery now stops as soon as the current execution has a Web URL candidate. Endpoint verification then uses the lightweight loopback probe path.
+- New endpoint candidates use a bounded startup verification burst: 150 ms, 300 ms and 600 ms follow-up checks after early connection misses. After that, or after the first successful verification, the normal 2-second health cadence resumes.
+- During this bounded startup burst the UI remains DETECTING rather than flashing UNAVAILABLE after one early miss.
+- External Runtime observation now uses a 500 ms cadence only while bounded Web LOGS discovery is still useful. Up to three discovery LOGS probes are front-loaded (one STATUS between probes); after verification or budget exhaustion the existing 2-second observation cadence resumes.
+- Rich Result parser, detection policy, lifecycle policy and viewer production code are unchanged. Added regression coverage that Web DETECTING does not displace an available Rich Result and that repeated empty fast observations cannot erase an existing Rich Result.
+- No Worker, no OCI/situation-monitor patch, no External execution-path rewrite, no global PID scan and no port-range scan were introduced.
+- W0 Cloud Build, Internal Alpine Probe, APK evidence and real-device acceptance are pending for the final r22 HEAD.

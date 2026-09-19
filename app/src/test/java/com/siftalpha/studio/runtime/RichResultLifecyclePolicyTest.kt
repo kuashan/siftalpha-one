@@ -26,6 +26,15 @@ class RichResultLifecyclePolicyTest {
     }
 
     @Test
+    fun repeatedEmptyFastWebDiscoveryObservationsCannotEraseCurrentResult() {
+        var current: RichResultDocument? = first
+        repeat(6) {
+            current = RichResultLifecyclePolicy.merge(current, detected = null)
+        }
+        assertEquals(first, current)
+    }
+
+    @Test
     fun laterValidObservationReplacesCurrentResult() {
         assertEquals(second, RichResultLifecyclePolicy.merge(first, detected = second))
     }

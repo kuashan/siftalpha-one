@@ -70,6 +70,7 @@ import com.siftalpha.studio.runtime.ProjectStatusGuidancePolicy
 import com.siftalpha.studio.runtime.ProjectStatusPresentationPolicy
 import com.siftalpha.studio.runtime.RuntimeWebAvailabilityTracker
 import com.siftalpha.studio.runtime.RuntimeWebCandidateSource
+import com.siftalpha.studio.runtime.RuntimeWebDetectionCadence
 import com.siftalpha.studio.runtime.RuntimeWebDiscoveryScopePolicy
 import com.siftalpha.studio.runtime.RuntimeWebStateStore
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
@@ -115,6 +116,12 @@ open class V04Activity : StudioActivity() {
         var finalLogsCompleted: Boolean = false,
         var webLogProbeCount: Int = 0,
         var statusesSinceWebLogProbe: Int = 0,
+    )
+
+    private data class InternalWebObservationRecord(
+        val sessionId: String,
+        val generation: Long,
+        val observation: InternalAlpineWebObservation,
     )
 
     private data class DeferredManualAction(
@@ -177,6 +184,9 @@ open class V04Activity : StudioActivity() {
     private val externalObservationRunnables = mutableMapOf<String, Runnable>()
     private val deferredManualActions = mutableMapOf<String, DeferredManualAction>()
     private val embeddedStartExecutor = Executors.newSingleThreadExecutor()
+    private val internalWebObservationExecutor = Executors.newSingleThreadExecutor()
+    private val internalWebObservationInFlight = mutableSetOf<String>()
+    private val internalWebObservationCache = mutableMapOf<String, InternalWebObservationRecord>()
     private val embeddedStartInFlight = mutableSetOf<String>()
     private val operationTracker = RuntimeOperationTracker()
     private val operationDeadlineRunnables = mutableMapOf<String, Runnable>()
@@ -401,6 +411,7 @@ open class V04Activity : StudioActivity() {
         operationDeadlineRunnables.values.forEach(refreshHandler::removeCallbacks)
         operationDeadlineRunnables.clear()
         embeddedStartExecutor.shutdownNow()
+        internalWebObservationExecutor.shutdownNow()
         refreshExecutor.shutdownNow()
         super.onDestroy()
     }
@@ -2526,11 +2537,12 @@ open class V04Activity : StudioActivity() {
         manualAction: EmbeddedPythonObservationPolicy.ManualAction? = null,
     ): Boolean {
         val stateKey = project.summary.documentId
-        val internalWebObservation = if (snapshot.engine == InternalPythonBackend.ALPINE) {
-            runtime.internalAlpineWebObservationFor(snapshot)
-        } else {
-            null
-        }
+        val internalWebObservation = internalWebObservationCache[stateKey]
+            ?.takeIf {
+                it.sessionId == snapshot.sessionId &&
+                    it.generation == snapshot.generation
+            }
+            ?.observation
         val internalWebChanged = reconcileInternalWebDiscovery(
             projectKey = stateKey,
             snapshot = snapshot,
@@ -2567,6 +2579,9 @@ open class V04Activity : StudioActivity() {
                     source = candidate.source,
                 )
             }
+        }
+        if (snapshot.engine == InternalPythonBackend.ALPINE && isEmbeddedActive(snapshot)) {
+            scheduleInternalWebObservation(project, snapshot)
         }
 
         val mappedState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot)
@@ -2606,6 +2621,56 @@ open class V04Activity : StudioActivity() {
         return true
     }
 
+    private fun scheduleInternalWebObservation(
+        project: V04ProjectGateway.RuntimeProject,
+        snapshot: EmbeddedPythonSnapshot,
+    ) {
+        if (!activityStarted || isFinishing || isDestroyed) return
+        if (snapshot.engine != InternalPythonBackend.ALPINE || !isEmbeddedActive(snapshot)) return
+        if (!::webStateStore.isInitialized) return
+        val stateKey = project.summary.documentId
+        if (webStateStore.snapshot(stateKey).candidateUrl != null) return
+        if (!internalWebObservationInFlight.add(stateKey)) return
+
+        val expectedSessionId = snapshot.sessionId
+        val expectedGeneration = snapshot.generation
+        internalWebObservationExecutor.execute {
+            val observation = runCatching {
+                runtime.internalAlpineWebObservationFor(snapshot)
+            }.getOrNull()
+            refreshHandler.post {
+                internalWebObservationInFlight.remove(stateKey)
+                if (!activityStarted || isFinishing || isDestroyed || observation == null) {
+                    return@post
+                }
+                val latest = runCatching {
+                    runtime.embeddedPythonSnapshotFor(stateKey)
+                }.getOrNull() ?: return@post
+                if (
+                    latest.sessionId != expectedSessionId ||
+                    latest.generation != expectedGeneration ||
+                    !isEmbeddedActive(latest)
+                ) {
+                    return@post
+                }
+                internalWebObservationCache[stateKey] = InternalWebObservationRecord(
+                    sessionId = expectedSessionId,
+                    generation = expectedGeneration,
+                    observation = observation,
+                )
+                if (
+                    reconcileInternalWebDiscovery(
+                        projectKey = stateKey,
+                        snapshot = latest,
+                        observation = observation,
+                    )
+                ) {
+                    refresh()
+                }
+            }
+        }
+    }
+
     private fun reconcileInternalWebDiscovery(
         projectKey: String,
         snapshot: EmbeddedPythonSnapshot,
@@ -2619,6 +2684,8 @@ open class V04Activity : StudioActivity() {
                 EmbeddedPythonState.STOPPED,
             )
         ) {
+            internalWebObservationCache.remove(projectKey)
+            internalWebObservationInFlight.remove(projectKey)
             if (::webAvailability.isInitialized) webAvailability.invalidate(projectKey)
             if (current.candidateUrl == null) return false
             webStateStore.clear(projectKey)
@@ -2646,6 +2713,8 @@ open class V04Activity : StudioActivity() {
     }
 
     private fun invalidateInternalWebDiscovery(projectKey: String) {
+        internalWebObservationCache.remove(projectKey)
+        internalWebObservationInFlight.remove(projectKey)
         if (::webStateStore.isInitialized) webStateStore.clear(projectKey)
         if (::webAvailability.isInitialized) webAvailability.invalidate(projectKey)
     }
@@ -2670,6 +2739,8 @@ open class V04Activity : StudioActivity() {
             RuntimeControlRequest.EXTERNAL_PROVIDER,
         )
         embeddedLastSnapshots.remove(projectDocumentId)
+        internalWebObservationCache.remove(projectDocumentId)
+        internalWebObservationInFlight.remove(projectDocumentId)
         if (embeddedPollProject?.summary?.documentId == projectDocumentId) {
             embeddedPollProject = null
             refreshHandler.removeCallbacks(embeddedPollRunnable)
@@ -3322,16 +3393,19 @@ open class V04Activity : StudioActivity() {
 
     private fun scheduleExternalObservation(
         project: V04ProjectGateway.RuntimeProject,
-        delayMs: Long = EXTERNAL_OBSERVATION_INTERVAL_MS,
+        delayMs: Long? = null,
     ) {
         val stateKey = project.summary.documentId
         val observation = externalObservations[stateKey] ?: return
         if (!activityStarted || isFinishing || isDestroyed) return
+        val resolvedDelayMs = delayMs ?: RuntimeWebDetectionCadence.externalObservationDelay(
+            webDiscoveryStillUseful = webObservationProbeAllowed(observation),
+        )
         val runnable = externalObservationRunnables.getOrPut(stateKey) {
             Runnable { runExternalObservation(stateKey) }
         }
         refreshHandler.removeCallbacks(runnable)
-        refreshHandler.postDelayed(runnable, delayMs.coerceAtLeast(0L))
+        refreshHandler.postDelayed(runnable, resolvedDelayMs.coerceAtLeast(0L))
         // Keep the local read above as an ownership guard: a replaced generation must not reuse
         // a runnable that was scheduled for an older project observation.
         if (externalObservations[stateKey]?.generation != observation.generation) {
@@ -4226,7 +4300,8 @@ open class V04Activity : StudioActivity() {
         private const val REFRESH_DEBOUNCE_MS = 120L
         private const val EMBEDDED_POLL_INTERVAL_MS = 180L
         private const val EXTERNAL_OBSERVATION_INTERVAL_MS = 2_000L
-        private const val EXTERNAL_WEB_LOG_PROBE_EVERY_STATUS = 3
+        private const val EXTERNAL_WEB_LOG_PROBE_EVERY_STATUS =
+            RuntimeWebDetectionCadence.FAST_EXTERNAL_WEB_LOG_STATUS_INTERVAL
         private const val EXTERNAL_WEB_LOG_PROBE_MAX = 3
         private var RUNTIME_STATES_LANGUAGE_TAG: String? = null
     }

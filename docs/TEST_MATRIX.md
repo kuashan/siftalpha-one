@@ -429,3 +429,15 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Web presentation: a previously verified Web execution remains PresentationTarget.WEB while foreground endpoint revalidation is pending; Rich Result must not temporarily replace it.
 - Endpoint truth remains strict: AVAILABLE still requires a fresh current-lifecycle probe; retained/persisted verification only stabilizes presentation identity.
 - Real-device acceptance: start `primary:AcodeProjects/situation-monitor`, open in the configured external browser, refresh after 30 seconds and 2 minutes, return to SiftAlpha, confirm Web stays Web during DETECTING/AVAILABLE, then STOP and rerun.
+
+
+### alpha43-r22 Fast Web Detection
+
+- Internal Alpine: bounded PID/socket/procfs observation must execute off the Activity main thread.
+- Internal Alpine: once a current-execution Web candidate exists, heavy listener discovery must stop; endpoint health remains on the lightweight probe path.
+- Endpoint startup verification: first misses retry at 150/300/600 ms and remain DETECTING; after the bounded burst, a still-closed endpoint becomes UNAVAILABLE and uses the normal 2-second cadence.
+- External Runtime: Web discovery observation may run at 500 ms only while the bounded discovery budget is useful; after verification/budget exhaustion it must return to 2 seconds.
+- Rich Result: Web DETECTING with a valid Rich Result still resolves Open to RICH_RESULT; empty STATUS/LOGS observations must preserve the current Rich Result.
+- Existing Web+Rich Result priority remains unchanged: verified Web wins only after Web presentation identity is known.
+- Real-device Internal acceptance: run `primary:AcodeProjects/situation-monitor` and measure transition from listener startup to Web AVAILABLE; Open/refresh/background survival from r21 must remain passing.
+- Real-device External acceptance: start a known Web project through Termux and confirm faster initial Web discovery without changing START/STOP/STATUS/LOGS semantics.
