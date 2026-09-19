@@ -69,6 +69,11 @@ object RuntimeLifecycleResolver {
             RuntimeLifecycleOperation.NONE -> Unit
         }
 
+        // Internal preparation is app-owned and does not have an External Pending executionId.
+        // Its RuntimeState is therefore authoritative while the environment is still not READY.
+        if (runtimeState == RuntimeState.PREPARING) return RuntimeLifecycleState.PREPARING
+        if (runtimeState == RuntimeState.STARTING) return RuntimeLifecycleState.DETECTING
+
         if (environmentReady != true) return RuntimeLifecycleState.ENVIRONMENT_NOT_PREPARED
         if (configurationRequired) return RuntimeLifecycleState.NEEDS_CONFIGURATION
 

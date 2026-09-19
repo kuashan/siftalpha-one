@@ -34,7 +34,7 @@
     <string name="runtime_state_env_not_ready">環境未準備</string>
     <string name="runtime_embedded_r_environment_ready">内蔵ランタイム：すぐに実行できます</string>
     <string name="runtime_lifecycle_environment_not_prepared">環境未準備</string>
-    <string name="runtime_lifecycle_preparing">準備中</string>
+    <string name="runtime_lifecycle_preparing">環境を準備中</string>
     <string name="runtime_lifecycle_ready_to_run">実行可能</string>
     <string name="runtime_lifecycle_detecting">検出中</string>
     <string name="runtime_lifecycle_needs_configuration">設定が必要</string>
@@ -56,6 +56,7 @@
     <string name="runtime_policy_runtime_host_unavailable">この端末ではランタイムを実行できません。プロジェクトファイルは引き続き管理できます。</string>
     <string name="runtime_policy_runtime_selection_required">プロジェクトのランタイムを安全に特定できません。先に状態を確認するか、実行環境をクリーンアップしてください。</string>
     <string name="runtime_policy_runtime_active">プロジェクトのプロセスはまだ Studio が管理しています。停止または状態確認ができます。</string>
+    <string name="runtime_policy_environment_preparing">実行環境を準備しています。いつでもこのプロジェクトを停止できます。</string>
     <string name="runtime_policy_web_endpoint_pending">プロジェクトのプロセスは起動しましたが、Web エンドポイントはまだ確認できていません。</string>
     <string name="runtime_policy_configuration_required">プロジェクトに必須設定がありません。先に設定を開いてください。</string>
     <string name="runtime_policy_environment_prepare_required">実行環境が準備されていません。先に準備してください。</string>

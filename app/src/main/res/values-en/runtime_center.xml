@@ -34,7 +34,7 @@
     <string name="runtime_state_env_not_ready">Environment not prepared</string>
     <string name="runtime_embedded_r_environment_ready">Embedded runtime: ready to run</string>
     <string name="runtime_lifecycle_environment_not_prepared">Environment not prepared</string>
-    <string name="runtime_lifecycle_preparing">Preparing</string>
+    <string name="runtime_lifecycle_preparing">Preparing environment</string>
     <string name="runtime_lifecycle_ready_to_run">Ready to run</string>
     <string name="runtime_lifecycle_detecting">Detecting</string>
     <string name="runtime_lifecycle_needs_configuration">Configuration required</string>
@@ -56,6 +56,7 @@
     <string name="runtime_policy_runtime_host_unavailable">Runtime execution is unavailable on this device; project files can still be managed.</string>
     <string name="runtime_policy_runtime_selection_required">Studio cannot safely determine the project runtime. Check status or clean the runtime environment first.</string>
     <string name="runtime_policy_runtime_active">The project process is still managed by Studio. You can stop it or check its status.</string>
+    <string name="runtime_policy_environment_preparing">Preparing the runtime environment. You can stop this project at any time.</string>
     <string name="runtime_policy_web_endpoint_pending">The project process has started, but its Web endpoint is not verified yet.</string>
     <string name="runtime_policy_configuration_required">Required project configuration is missing. Open configuration first.</string>
     <string name="runtime_policy_environment_prepare_required">The runtime environment is not prepared. Prepare it first.</string>

@@ -809,10 +809,12 @@ open class V04Activity : StudioActivity() {
         if (selectedProjectDocumentId != null) {
             box.addView(section(getString(R.string.runtime_workspace_environment)))
         }
-        val environmentLabel = when (lifecycleEnvironmentReady) {
-            true -> getString(R.string.runtime_state_env_ready)
-            false -> getString(R.string.runtime_state_env_not_ready)
-            null -> getString(R.string.runtime_environment_unknown)
+        val environmentLabel = when {
+            lifecycleState == RuntimeLifecycleState.PREPARING ->
+                getString(R.string.runtime_lifecycle_preparing)
+            lifecycleEnvironmentReady == true -> getString(R.string.runtime_state_env_ready)
+            lifecycleEnvironmentReady == false -> getString(R.string.runtime_state_env_not_ready)
+            else -> getString(R.string.runtime_environment_unknown)
         }
         box.addView(text(getString(R.string.runtime_environment_label, environmentLabel), 12f, false).apply {
             setTextColor(
@@ -1714,11 +1716,14 @@ open class V04Activity : StudioActivity() {
         projectOutputs.write(
             project.folderName,
             listOf(
+                getString(R.string.runtime_prepare_live_title),
+                "",
                 "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
                 "SIFTALPHA_X_PROJECT_ID=" + stateKey,
                 "SIFTALPHA_X_ENVIRONMENT_STAGE=PREPARING",
             ).joinToString("\n"),
             expand = true,
+            forceFollowTail = true,
         )
         refresh()
         val token = projectActivities.begin(
@@ -1726,7 +1731,36 @@ open class V04Activity : StudioActivity() {
             ProjectActivityRegistry.Kind.PREPARE,
         )
         val future = embeddedStartExecutor.submit {
-            val result = runCatching { runtime.prepareEmbeddedPythonEnvironment(project) }
+            val result = runCatching {
+                runtime.prepareEmbeddedPythonEnvironment(project) { liveText ->
+                    val safeLiveText = runCatching {
+                        secretStore.redactRuntimeText(project.folderName, liveText)
+                    }.getOrElse {
+                        liveText.lineSequence()
+                            .map { line -> line.trimEnd() }
+                            .filter { line -> line.startsWith("SIFTALPHA_X_") }
+                            .joinToString("\n")
+                    }
+                    runOnUiThread {
+                        if (
+                            !isFinishing &&
+                            !isDestroyed &&
+                            ProjectActivityRegistry.Kind.PREPARE in projectActivities.activeKinds(stateKey)
+                        ) {
+                            projectOutputs.write(
+                                project.folderName,
+                                listOf(
+                                    getString(R.string.runtime_prepare_live_title),
+                                    "",
+                                    safeLiveText,
+                                ).joinToString("\n"),
+                                expand = true,
+                                forceFollowTail = true,
+                            )
+                        }
+                    }
+                }
+            }
             runOnUiThread {
                 embeddedStartInFlight.remove(stateKey)
                 if (!projectActivities.finish(token)) return@runOnUiThread

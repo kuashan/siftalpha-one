@@ -39,6 +39,7 @@ object ProjectActionPolicy {
         RUNTIME_HOST_UNAVAILABLE("runtime_policy_runtime_host_unavailable"),
         RUNTIME_SELECTION_REQUIRED("runtime_policy_runtime_selection_required"),
         RUNTIME_ACTIVE("runtime_policy_runtime_active"),
+        ENVIRONMENT_PREPARING("runtime_policy_environment_preparing"),
         WEB_ENDPOINT_PENDING("runtime_policy_web_endpoint_pending"),
         RUNTIME_RECOVERING("runtime_policy_runtime_recovering"),
         CONFIGURATION_REQUIRED("runtime_policy_configuration_required"),
@@ -200,7 +201,7 @@ object ProjectActionPolicy {
         } else {
             disabled(DisableReason.RUNTIME_HOST_UNAVAILABLE)
         }
-        actions[Action.CLEAN] = if (snapshot.runtime.supported) {
+        actions[Action.CLEAN] = if (embeddedRSelected || snapshot.runtime.supported) {
             enabled()
         } else {
             disabled(DisableReason.RUNTIME_HOST_UNAVAILABLE)
@@ -230,7 +231,10 @@ object ProjectActionPolicy {
             actions[Action.STOP] = enabled()
             primaryAction = Action.STOP
             secondaryAction = Action.STATUS
-            if (
+            if (snapshot.lifecycle == RuntimeState.PREPARING) {
+                message = MessageKey.ENVIRONMENT_PREPARING
+                detailEntry = DetailEntry.ENVIRONMENT
+            } else if (
                 snapshot.lifecycle == RuntimeState.RUNNING &&
                 snapshot.web.expected &&
                 snapshot.web.status != RuntimeWebUiStatus.AVAILABLE

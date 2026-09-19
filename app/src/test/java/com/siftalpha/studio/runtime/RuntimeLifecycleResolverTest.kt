@@ -19,6 +19,14 @@ class RuntimeLifecycleResolverTest {
             ),
         )
         assertEquals(
+            RuntimeLifecycleState.PREPARING,
+            RuntimeLifecycleResolver.resolve(
+                environmentReady = null,
+                runtimeState = RuntimeState.PREPARING,
+                operation = RuntimeLifecycleOperation.NONE,
+            ),
+        )
+        assertEquals(
             RuntimeLifecycleState.DETECTING,
             RuntimeLifecycleResolver.resolve(
                 environmentReady = true,

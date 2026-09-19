@@ -301,6 +301,50 @@ class ProjectActionPolicyTest {
     }
 
     @Test
+    fun embeddedRPreparingUsesEnvironmentPreparingSummaryAndKeepsCleanRuntimeIndependent() {
+        val policy = ProjectActionPolicy.resolve(
+            snapshot(
+                runtime = ProjectUiSnapshot.Runtime(
+                    selection = ProjectUiSnapshot.Runtime.Selection(
+                        status = ProjectUiSnapshot.Runtime.SelectionStatus.RESOLVED,
+                        primary = RuntimeKind.PYTHON,
+                    ),
+                    supported = false,
+                    stopCapability = true,
+                ),
+                lifecycle = RuntimeState.PREPARING,
+                environment = ProjectUiSnapshot.Environment(ProjectUiSnapshot.Readiness.UNKNOWN),
+                stopCapability = true,
+            ),
+            runtimeSelection = ProjectRuntimeSelection.EMBEDDED_R,
+        )
+
+        assertEquals(ProjectActionPolicy.MessageKey.ENVIRONMENT_PREPARING, policy.summary)
+        assertEquals(ProjectActionPolicy.Action.STOP, policy.primaryAction)
+        assertTrue(policy.isEnabled(ProjectActionPolicy.Action.STOP))
+    }
+
+    @Test
+    fun embeddedRCleanDoesNotDependOnExternalRuntimeHost() {
+        val policy = ProjectActionPolicy.resolve(
+            snapshot(
+                runtime = ProjectUiSnapshot.Runtime(
+                    selection = ProjectUiSnapshot.Runtime.Selection(
+                        status = ProjectUiSnapshot.Runtime.SelectionStatus.RESOLVED,
+                        primary = RuntimeKind.PYTHON,
+                    ),
+                    supported = false,
+                ),
+                lifecycle = RuntimeState.STOPPED_BY_USER,
+                environment = ProjectUiSnapshot.Environment(ProjectUiSnapshot.Readiness.READY),
+            ),
+            runtimeSelection = ProjectRuntimeSelection.EMBEDDED_R,
+        )
+
+        assertTrue(policy.isEnabled(ProjectActionPolicy.Action.CLEAN))
+    }
+
+    @Test
     fun embeddedRSelectionRequiresItsOwnPreparedEnvironment() {
         val policy = ProjectActionPolicy.resolve(
             snapshot(

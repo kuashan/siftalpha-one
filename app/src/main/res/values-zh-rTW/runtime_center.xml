@@ -34,7 +34,7 @@
     <string name="runtime_state_env_not_ready">環境未準備</string>
     <string name="runtime_embedded_r_environment_ready">內建執行環境：可直接執行</string>
     <string name="runtime_lifecycle_environment_not_prepared">環境未準備</string>
-    <string name="runtime_lifecycle_preparing">準備中</string>
+    <string name="runtime_lifecycle_preparing">環境準備中</string>
     <string name="runtime_lifecycle_ready_to_run">可以執行</string>
     <string name="runtime_lifecycle_detecting">檢測中</string>
     <string name="runtime_lifecycle_needs_configuration">需要設定</string>
@@ -56,6 +56,7 @@
     <string name="runtime_policy_runtime_host_unavailable">此裝置目前不支援執行環境，只能管理專案檔案。</string>
     <string name="runtime_policy_runtime_selection_required">無法安全判定專案執行環境，請先檢查狀態或清理執行環境。</string>
     <string name="runtime_policy_runtime_active">專案程序仍由 Studio 管理，可以停止或查看狀態。</string>
+    <string name="runtime_policy_environment_preparing">正在準備執行環境，可以隨時停止目前專案。</string>
     <string name="runtime_policy_web_endpoint_pending">專案程序已啟動，但 Web 端點尚未確認可連線。</string>
     <string name="runtime_policy_configuration_required">專案缺少必要設定，請先開啟設定。</string>
     <string name="runtime_policy_environment_prepare_required">執行環境尚未準備，請先準備環境。</string>

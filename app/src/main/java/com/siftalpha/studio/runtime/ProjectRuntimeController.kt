@@ -248,6 +248,7 @@ class ProjectRuntimeController(
 
     fun prepareEmbeddedPythonEnvironment(
         project: V04ProjectGateway.RuntimeProject,
+        progress: ((String) -> Unit)? = null,
     ): InternalEnvironmentPreparationResult {
         val route = resolveControlPath(
             project = project,
@@ -264,6 +265,14 @@ class ProjectRuntimeController(
         var cpythonError: Throwable? = null
 
         if (cpythonSession != null && cpythonManager != null) {
+            progress?.invoke(
+                listOf(
+                    "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                    "SIFTALPHA_X_PROJECT_ID=" + projectId,
+                    "SIFTALPHA_X_ENVIRONMENT_STAGE=PREPARING",
+                    "SIFTALPHA_X_INTERNAL_PREPARE_STAGE=CPYTHON",
+                ).joinToString("\n"),
+            )
             try {
                 val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
                     files.requirementsText,
@@ -289,6 +298,16 @@ class ProjectRuntimeController(
             } catch (error: Throwable) {
                 if (InternalPythonPreparationFallbackPolicy.backendFor(error) != InternalPythonBackend.ALPINE) throw error
                 cpythonError = error
+                progress?.invoke(
+                    listOf(
+                        "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                        "SIFTALPHA_X_PROJECT_ID=" + projectId,
+                        "SIFTALPHA_X_ENVIRONMENT_STAGE=PREPARING",
+                        "SIFTALPHA_X_INTERNAL_PREPARE_STAGE=ALPINE_FALLBACK",
+                        "SIFTALPHA_X_INTERNAL_PREPARE_FALLBACK_REASON=" +
+                            error.message.orEmpty().lineSequence().firstOrNull().orEmpty(),
+                    ).joinToString("\n"),
+                )
             }
         }
 
@@ -302,6 +321,7 @@ class ProjectRuntimeController(
                 projectIdentity = projectId,
                 stagedProject = staged,
                 source = files.alpineSource,
+                progress = progress,
             )
             InternalEnvironmentPreparationResult(
                 ready = prepared.ready,

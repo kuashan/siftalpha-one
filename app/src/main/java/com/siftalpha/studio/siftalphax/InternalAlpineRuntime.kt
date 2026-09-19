@@ -175,12 +175,14 @@ class InternalAlpineEnvironmentManager(context: Context) {
         projectIdentity: String,
         stagedProject: File,
         source: InternalAlpineDependencySource,
+        progress: ((String) -> Unit)? = null,
     ): PreparationResult {
         require(projectIdentity.isNotBlank())
         InternalAlpineProcessControl.throwIfCancelled()
+        progress?.invoke(progressText(projectIdentity, "ALPINE_RUNTIME", ""))
         val layout = InternalAlpineFiles.prepare(appContext)
         InternalAlpineProcessControl.throwIfCancelled()
-        ensurePythonRuntime(layout)
+        ensurePythonRuntime(layout, projectIdentity, progress)
         InternalAlpineProcessControl.throwIfCancelled()
         loadBinding(projectIdentity, source)?.let {
             return PreparationResult(true, Outcome.READY_REUSED, it.environmentRoot, it.environmentKey)
@@ -216,6 +218,9 @@ class InternalAlpineEnvironmentManager(context: Context) {
                 ),
                 logFile = log,
                 failurePrefix = "INTERNAL_ALPINE_DEPENDENCY_PREPARE_FAILED",
+                projectIdentity = projectIdentity,
+                stage = "ALPINE_PROJECT_DEPENDENCIES",
+                progress = progress,
             )
             val environmentKey = environmentKey(projectIdentity, source.sourceFingerprint)
             File(temp, READY_MARKER).writeText(
@@ -261,7 +266,11 @@ class InternalAlpineEnvironmentManager(context: Context) {
         return LoadBinding(root, key)
     }
 
-    private fun ensurePythonRuntime(layout: InternalAlpineLayout) {
+    private fun ensurePythonRuntime(
+        layout: InternalAlpineLayout,
+        projectIdentity: String,
+        progress: ((String) -> Unit)?,
+    ) {
         InternalAlpineProcessControl.throwIfCancelled()
         val marker = File(layout.rootfs, PYTHON_READY_MARKER)
         if (
@@ -279,6 +288,9 @@ class InternalAlpineEnvironmentManager(context: Context) {
             ),
             logFile = log,
             failurePrefix = "INTERNAL_ALPINE_PYTHON_RUNTIME_PREPARE_FAILED",
+            projectIdentity = projectIdentity,
+            stage = "ALPINE_PYTHON_RUNTIME",
+            progress = progress,
         )
         InternalAlpineProcessControl.throwIfCancelled()
         marker.writeText("READY=1\n")
@@ -288,16 +300,36 @@ class InternalAlpineEnvironmentManager(context: Context) {
         builder: InternalAlpineCommand,
         logFile: File,
         failurePrefix: String,
+        projectIdentity: String,
+        stage: String,
+        progress: ((String) -> Unit)?,
     ) {
         logFile.parentFile?.mkdirs()
         builder.redirectErrorStream(true).redirectOutput(logFile)
+        progress?.invoke(progressText(projectIdentity, stage, ""))
         val managed = builder.start()
         val process = managed.process
+        var lastProgressText = ""
+        var lastProgressAt = 0L
+
+        fun publishProgress(force: Boolean = false) {
+            val callback = progress ?: return
+            val now = System.currentTimeMillis()
+            if (!force && now - lastProgressAt < PROGRESS_INTERVAL_MS) return
+            val tail = readTail(logFile, PROGRESS_TAIL_CHARS)
+            if (!force && tail == lastProgressText) return
+            lastProgressText = tail
+            lastProgressAt = now
+            callback(progressText(projectIdentity, stage, tail))
+        }
+
         try {
             while (true) {
                 if (process.waitFor(250, TimeUnit.MILLISECONDS)) break
+                publishProgress()
                 if (Thread.currentThread().isInterrupted) throw InterruptedException("Internal Alpine operation cancelled")
             }
+            publishProgress(force = true)
         } catch (cancelled: InterruptedException) {
             InternalAlpineProcessControl.terminate(managed)
             Thread.currentThread().interrupt()
@@ -306,6 +338,23 @@ class InternalAlpineEnvironmentManager(context: Context) {
         managed.cleanup()
         if (process.exitValue() != 0) {
             error(failurePrefix + ": exit=" + process.exitValue() + "\n" + readTail(logFile, 12_000))
+        }
+    }
+
+    private fun progressText(
+        projectIdentity: String,
+        stage: String,
+        tail: String,
+    ): String = buildString {
+        appendLine("SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R")
+        appendLine("SIFTALPHA_X_PROJECT_ID=" + projectIdentity)
+        appendLine("SIFTALPHA_X_ENVIRONMENT_STAGE=PREPARING")
+        append("SIFTALPHA_X_INTERNAL_PREPARE_STAGE=")
+        append(stage)
+        if (tail.isNotBlank()) {
+            appendLine()
+            appendLine()
+            append(tail.trimEnd())
         }
     }
 
@@ -319,6 +368,8 @@ class InternalAlpineEnvironmentManager(context: Context) {
     companion object {
         private const val READY_MARKER = "siftalpha-alpine-environment-ready.txt"
         private const val PYTHON_READY_MARKER = ".siftalpha-python-runtime-ready"
+        private const val PROGRESS_INTERVAL_MS = 750L
+        private const val PROGRESS_TAIL_CHARS = 16_000
 
         internal fun readTail(file: File, maxChars: Int): String {
             if (!file.isFile) return ""
