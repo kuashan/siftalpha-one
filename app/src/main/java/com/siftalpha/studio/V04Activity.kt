@@ -1145,6 +1145,8 @@ open class V04Activity : StudioActivity() {
             ProjectActionPolicy.MessageKey.RUNTIME_SELECTION_REQUIRED ->
                 R.string.runtime_policy_runtime_selection_required
             ProjectActionPolicy.MessageKey.RUNTIME_ACTIVE -> R.string.runtime_policy_runtime_active
+            ProjectActionPolicy.MessageKey.ENVIRONMENT_PREPARING ->
+                R.string.runtime_policy_environment_preparing
             ProjectActionPolicy.MessageKey.WEB_ENDPOINT_PENDING -> R.string.runtime_policy_web_endpoint_pending
             ProjectActionPolicy.MessageKey.RUNTIME_RECOVERING -> R.string.runtime_policy_runtime_recovering
             ProjectActionPolicy.MessageKey.CONFIGURATION_REQUIRED ->
