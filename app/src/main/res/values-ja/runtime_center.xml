@@ -50,9 +50,6 @@
     <string name="runtime_failure_reason">失敗理由：%1$s</string>
     <string name="runtime_policy_runtime_recovering">実行状態を復旧中</string>
     <string name="runtime_policy_reason_runtime_recovering">実際の実行状態を確認中</string>
-    <string name="runtime_web_status_searching">SEARCHING · Web サービスを検索中</string>
-    <string name="runtime_web_status_listener_found">LISTENER_FOUND · プロジェクトの待受ポートを検出</string>
-    <string name="runtime_web_status_starting_web">STARTING_WEB · Web サービスを起動中</string>
     <string name="runtime_web_status_available">開く</string>
     <string name="runtime_web_status_detecting">検出中</string>
     <string name="runtime_web_status_waiting">実行待ち</string>

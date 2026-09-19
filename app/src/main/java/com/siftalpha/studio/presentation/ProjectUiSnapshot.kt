@@ -237,7 +237,6 @@ data class ProjectUiSnapshot(
                 hasConfiguredLocalUrl: Boolean,
                 runtimeState: RuntimeState,
                 endpointReachable: Boolean?,
-                listenerFound: Boolean = false,
                 verifiedWebIdentity: Boolean = false,
                 reachableUrl: String? = null,
                 framework: String? = null,
@@ -260,7 +259,6 @@ data class ProjectUiSnapshot(
                         hasConfiguredLocalUrl = hasConfiguredLocalUrl,
                         runtimeState = runtimeState,
                         endpointReachable = endpointReachable,
-                        listenerFound = listenerFound,
                     )
                 }
                 return Web(

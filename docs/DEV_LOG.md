@@ -965,43 +965,12 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - W0 Cloud Build, Internal Alpine Probe, signed APK evidence and real-device acceptance are pending for the final r24 HEAD.
 
 
-## 2026-09-20 · alpha43-r25 Project Start Contracts + Web Readiness + Background Protection
+## 2026-09-20 · alpha43-r28 r24 + wake-only baseline
 
-- Baseline: `0a3c19194a77ef9b2926f03b46193a38074bca17`, version `0.8.0-alpha43-r24` / `150`.
-- Added read-only `ProjectStartContractResolver` with precedence: explicit `.project.json run` > `render.yaml/render.yml startCommand` > `Procfile web` > root `package.json scripts.start` > single `pyproject.toml [project.scripts]/[tool.poetry.scripts]` > Python entrypoint fallback.
-- Direct `python/python3 <entrypoint>` declarations preserve the existing Embedded CPython path. Shell-style deployment commands require Internal Alpine and no longer silently fall back to `python app.py`.
-- Internal environment preparation now selects Internal Alpine whenever the resolved start contract requires a shell, so stale CPython readiness cannot claim the project is ready for an incompatible launch path.
-- Internal Alpine START accepts the resolved project command, sets `VIRTUAL_ENV` and prepends the project venv to `PATH`, exports `PYTHONUNBUFFERED=1`, and uses `python -u` for entrypoint fallback.
-- `$PORT` deployment commands receive a SiftAlpha-selected free loopback port before launch. Explicit/assigned ports are retained as current-session high-priority ownership hints; they are still not Web evidence without PID/socket ownership.
-- Added diagnostics: `SIFTALPHA_X_START_SOURCE`, `SIFTALPHA_X_ASSIGNED_PORT` when applicable, and `SIFTALPHA_X_BACKGROUND_PROTECTION=FOREGROUND_SERVICE+PARTIAL_WAKE_LOCK`.
-- Web presentation now uses `SEARCHING -> LISTENER_FOUND -> STARTING_WEB -> AVAILABLE`. PID/socket ownership establishes LISTENER_FOUND; a new lightweight HTTP readiness probe gates AVAILABLE. A listener that has not yet returned a usable HTTP response is STARTING_WEB after bounded confirmation.
-- Existing verified-Web lifecycle continuity remains: foreground resume may temporarily keep AVAILABLE while a fresh HTTP readiness probe runs.
-- Internal Runtime foreground protection now adds an Android `PARTIAL_WAKE_LOCK` for the lifetime of one or more active Internal Runtime session leases. The wake lock is released when the last lease ends and does not create a Worker/executor/supervisor.
-- Added `android.permission.WAKE_LOCK`. No OCI-specific or situation-monitor-specific source patch was added.
-- Internal Browser is intentionally not part of r25.
-- Cloud CI, signed APK and real-device acceptance are pending for the final r25 HEAD.
-
-
-## 2026-09-20 · alpha43-r26 r25 real-device regression repair
-
-- Real-device evidence from r25 showed situation-monitor correctly selecting `RENDER_YAML` and assigning port 5001, then exiting 127 with `/bin/sh: gunicorn: not found`.
-- Root cause: the r25 deployment-command path exported the project venv into `PATH` and then invoked `/bin/sh -lc`; login-shell initialization may replace the inherited PATH. r26 uses non-login `/bin/sh -c` and emits `SIFTALPHA_X_START_SHELL=NON_LOGIN`.
-- r25 also replaced TCP-only Web availability with HTTP readiness. The first implementation accepted only 2xx-4xx. r26 treats any valid HTTP status 100-599 as Web-ready because a 5xx response still proves a Browser target exists; application health remains visible inside the Web app.
-- Internal Alpine PID/socket ownership discovery itself is unchanged from r24/r25.
-- Worker remains frozen. Foreground Service + PARTIAL_WAKE_LOCK and the SEARCHING -> LISTENER_FOUND -> STARTING_WEB -> AVAILABLE model remain unchanged.
-- versionCode 152 / versionName 0.8.0-alpha43-r26.
-- Cloud CI and real-device revalidation pending.
-
-
-## 2026-09-20 · alpha43-r27 remove unified deployment start contracts
-
-- Real-device testing showed the r25/r26 unified deployment start-contract integration changed Internal Runtime launch semantics and introduced Web regressions.
-- Removed the new Internal Runtime resolver/integration for `render.yaml`, `render.yml`, `Procfile`, root `package.json scripts.start`, and `pyproject.toml` script declarations.
-- Internal Python launch behavior is restored to the r24 model: resolve the established Python entrypoint and execute it directly. No deployment manifest may replace that Internal launch command in r27.
-- Removed assigned-`PORT` and deployment-command shell launch state introduced only for the unified start-contract feature.
-- Preserved the r25/r26 Web readiness model: SEARCHING -> LISTENER_FOUND -> STARTING_WEB -> AVAILABLE, including HTTP readiness verification.
-- Preserved Foreground Service + PARTIAL_WAKE_LOCK protection for active Internal Runtime session leases.
-- Preserved Worker freeze, current-project-only STOP semantics, External Runtime behavior, Rich Result behavior, and existing Web ownership/discovery logic.
-- Existing pre-r25 Runtime-specific behavior is not broadly deleted; this rollback is limited to the newly introduced unified start-contract feature.
-- versionCode 153 / versionName 0.8.0-alpha43-r27.
+- Restored the r24 Web discovery/readiness/presentation behavior exactly.
+- Removed the later four-stage Web presentation integration and HTTP readiness probe.
+- Removed the later unified deployment start-contract integration.
+- Retained only the Internal Runtime background-protection delta: Foreground Service + PARTIAL_WAKE_LOCK while active Internal Runtime session leases exist.
+- Worker remains frozen. STOP remains current-project-only. External Runtime behavior is unchanged.
+- versionCode 154 / versionName 0.8.0-alpha43-r28.
 - Cloud CI and real-device verification pending.

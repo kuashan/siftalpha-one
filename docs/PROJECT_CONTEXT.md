@@ -493,21 +493,6 @@ Production external runtime 仍主要依赖 Termux + PRoot + Ubuntu + Python 作
 - Rich Result remains independent; it has no network port and is not persisted as a new run's result.
 
 
-## alpha43-r25 Runtime start/readiness/background model (2026-09-20)
+## alpha43-r28 current test baseline
 
-- Project-owned deployment declarations are first-class M inputs. SiftAlpha reads common root start declarations without executing them during inspection and executes the selected contract only after explicit START.
-- Internal Python shell contracts are hosted by Internal Alpine. Direct Python entrypoint contracts may stay on Embedded CPython when otherwise compatible.
-- Known/assigned deployment ports are hints only. Current-session PID/socket ownership remains the boundary before listener evidence is published.
-- Web readiness is staged: SEARCHING (no owned listener), LISTENER_FOUND (owned socket), STARTING_WEB (owned listener but HTTP not yet ready), AVAILABLE (HTTP ready).
-- Internal Runtime background protection is now session-lease Foreground Service + PARTIAL_WAKE_LOCK. This protects Runtime execution; it does not promise that a third-party browser tab's JavaScript timers run unthrottled in the background.
-- Internal Browser remains a separate presentation decision and is not required for r25 background Runtime protection.
-
-
-## alpha43-r26 targeted correction
-
-r26 is a minimal correction to the r25 start/readiness integration. Deployment commands keep the project venv environment by using a non-login shell. HTTP readiness means that a local candidate speaks HTTP, not that the application returned a success status; therefore any valid HTTP 100-599 response is Browser-ready. PID/socket ownership discovery, Worker freeze, STOP scope and Foreground Service + PARTIAL_WAKE_LOCK architecture are unchanged.
-
-
-## alpha43-r27 rollback boundary
-
-The r25/r26 unified deployment start-contract integration has been removed from Internal Runtime. Internal Python execution again follows the established resolved-entrypoint path. Four-stage Web readiness and Foreground Service + PARTIAL_WAKE_LOCK remain active. This is a targeted rollback of the new deployment-manifest command takeover, not a rollback of External Runtime, Web ownership discovery, STOP scope, Rich Result, or the Worker freeze.
+This build intentionally uses r24 behavior as the product baseline and adds only Internal Runtime Foreground Service + PARTIAL_WAKE_LOCK protection. The later unified deployment start-contract integration, four-stage Web presentation, and HTTP readiness probe are not part of this test baseline.

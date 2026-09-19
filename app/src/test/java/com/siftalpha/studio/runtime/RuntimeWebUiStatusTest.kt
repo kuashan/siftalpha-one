@@ -6,72 +6,41 @@ import org.junit.Test
 class RuntimeWebUiStatusTest {
 
     @Test
-    fun runningWithoutWebEvidenceIsSearching() {
+    fun runningWithoutWebEvidenceUsesAutoDetect() {
         assertEquals(
-            RuntimeWebUiStatus.SEARCHING,
+            RuntimeWebUiStatus.AUTO_DETECT,
             RuntimeWebUiStatus.resolve(
                 profileEnabled = false,
                 hasCandidateRuntimeUrl = false,
                 hasConfiguredLocalUrl = false,
                 runtimeState = RuntimeState.RUNNING,
-                endpointReachable = null,
-            ),
-        )
-    }
-
-    @Test
-    fun runningWebProfileWithoutListenerIsSearching() {
-        assertEquals(
-            RuntimeWebUiStatus.SEARCHING,
-            RuntimeWebUiStatus.resolve(
-                profileEnabled = true,
-                hasCandidateRuntimeUrl = false,
-                hasConfiguredLocalUrl = false,
-                runtimeState = RuntimeState.RUNNING,
-                endpointReachable = null,
-            ),
-        )
-    }
-
-    @Test
-    fun ownedListenerBeforeHttpProbeIsListenerFound() {
-        assertEquals(
-            RuntimeWebUiStatus.LISTENER_FOUND,
-            RuntimeWebUiStatus.resolve(
-                profileEnabled = true,
-                hasCandidateRuntimeUrl = true,
-                hasConfiguredLocalUrl = false,
-                runtimeState = RuntimeState.RUNNING,
-                endpointReachable = null,
-                listenerFound = true,
-            ),
-        )
-    }
-
-    @Test
-    fun ownedListenerWithFailedHttpReadinessIsStartingWeb() {
-        assertEquals(
-            RuntimeWebUiStatus.STARTING_WEB,
-            RuntimeWebUiStatus.resolve(
-                profileEnabled = true,
-                hasCandidateRuntimeUrl = true,
-                hasConfiguredLocalUrl = false,
-                runtimeState = RuntimeState.RUNNING,
                 endpointReachable = false,
-                listenerFound = true,
             ),
         )
     }
 
     @Test
-    fun previouslyVerifiedWebRemainsAvailableWhileForegroundProbeIsPending() {
+    fun runningWithUnknownProbeStateIsDetecting() {
+        assertEquals(
+            RuntimeWebUiStatus.DETECTING,
+            RuntimeWebUiStatus.resolve(
+                profileEnabled = true,
+                hasCandidateRuntimeUrl = true,
+                hasConfiguredLocalUrl = false,
+                runtimeState = RuntimeState.RUNNING,
+                endpointReachable = null,
+            ),
+        )
+    }
+
+    @Test
+    fun previouslyVerifiedWebRemainsExpectedWhileForegroundProbeIsPending() {
         val web = com.siftalpha.studio.presentation.ProjectUiSnapshot.Web.resolve(
             profileEnabled = false,
             hasCandidateRuntimeUrl = true,
             hasConfiguredLocalUrl = false,
             runtimeState = RuntimeState.RUNNING,
             endpointReachable = null,
-            listenerFound = true,
             verifiedWebIdentity = true,
         )
         assertEquals(true, web.expected)
@@ -79,21 +48,20 @@ class RuntimeWebUiStatusTest {
     }
 
     @Test
-    fun verifiedListenerWithFreshHttpFailureShowsStartingWeb() {
+    fun confirmedFailureStillDowngradesVerifiedIdentity() {
         val web = com.siftalpha.studio.presentation.ProjectUiSnapshot.Web.resolve(
             profileEnabled = true,
             hasCandidateRuntimeUrl = true,
             hasConfiguredLocalUrl = false,
             runtimeState = RuntimeState.RUNNING,
             endpointReachable = false,
-            listenerFound = true,
             verifiedWebIdentity = true,
         )
-        assertEquals(RuntimeWebUiStatus.STARTING_WEB, web.status)
+        assertEquals(RuntimeWebUiStatus.UNAVAILABLE, web.status)
     }
 
     @Test
-    fun runningWithHttpReadyEndpointIsAvailable() {
+    fun runningWithVerifiedEndpointIsAvailable() {
         assertEquals(
             RuntimeWebUiStatus.AVAILABLE,
             RuntimeWebUiStatus.resolve(
@@ -102,7 +70,34 @@ class RuntimeWebUiStatusTest {
                 hasConfiguredLocalUrl = false,
                 runtimeState = RuntimeState.RUNNING,
                 endpointReachable = true,
-                listenerFound = true,
+            ),
+        )
+    }
+
+    @Test
+    fun completedNegativeProbeIsExplainableUnavailableState() {
+        assertEquals(
+            RuntimeWebUiStatus.UNAVAILABLE,
+            RuntimeWebUiStatus.resolve(
+                profileEnabled = true,
+                hasCandidateRuntimeUrl = true,
+                hasConfiguredLocalUrl = false,
+                runtimeState = RuntimeState.RUNNING,
+                endpointReachable = false,
+            ),
+        )
+    }
+
+    @Test
+    fun candidateUrlWithClosedEndpointIsUnavailable() {
+        assertEquals(
+            RuntimeWebUiStatus.UNAVAILABLE,
+            RuntimeWebUiStatus.resolve(
+                profileEnabled = false,
+                hasCandidateRuntimeUrl = true,
+                hasConfiguredLocalUrl = false,
+                runtimeState = RuntimeState.RUNNING,
+                endpointReachable = false,
             ),
         )
     }
@@ -131,6 +126,20 @@ class RuntimeWebUiStatusTest {
                 hasConfiguredLocalUrl = false,
                 runtimeState = RuntimeState.UNKNOWN,
                 endpointReachable = null,
+            ),
+        )
+    }
+
+    @Test
+    fun configuredUrlWithClosedEndpointIsUnavailable() {
+        assertEquals(
+            RuntimeWebUiStatus.UNAVAILABLE,
+            RuntimeWebUiStatus.resolve(
+                profileEnabled = true,
+                hasCandidateRuntimeUrl = false,
+                hasConfiguredLocalUrl = true,
+                runtimeState = RuntimeState.RUNNING,
+                endpointReachable = false,
             ),
         )
     }

@@ -63,10 +63,12 @@ android {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        // alpha43-r27 removes the r25/r26 unified deployment start-contract integration while
-        // retaining four-stage Web readiness and foreground-service + partial-wake-lock protection.
-        versionCode = 153
-        versionName = "0.8.0-alpha43-r27"
+        // alpha43-r24 closes Web continuity gaps: bounded Internal discovery retries, stable
+        // foreground Web presentation, CPython foreground-runtime leases, and learned endpoints.
+        // Rich Result, External execution semantics and Worker freeze remain unchanged.
+        // alpha43-r28 = r24 behavior plus Internal Runtime partial wake-lock protection only.
+        versionCode = 154
+        versionName = "0.8.0-alpha43-r28"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

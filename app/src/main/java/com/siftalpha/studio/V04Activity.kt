@@ -740,9 +740,6 @@ open class V04Activity : StudioActivity() {
             hasConfiguredLocalUrl = configuredWebUrl != null,
             runtimeState = typedState,
             endpointReachable = endpointReachable,
-            listenerFound =
-                webSnapshot.source == RuntimeWebCandidateSource.PID_SOCKET &&
-                    !webSnapshot.candidateUrl.isNullOrBlank(),
             verifiedWebIdentity = verifiedWebUrl != null,
             reachableUrl = reachableWebUrl,
             framework = reachableWebFramework,

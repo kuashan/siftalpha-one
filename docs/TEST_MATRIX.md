@@ -481,37 +481,11 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Real-device learned endpoint: after one ownership-verified successful Web run, STOP/START and confirm the previous port is tried first but a changed project port is rediscovered and replaces it safely.
 
 
-### alpha43-r25 Project Start Contracts / Web Readiness / Background Protection
+### alpha43-r28 r24 + wake-only acceptance
 
-- Start-contract precedence must be deterministic: declared project run > Render startCommand > Procfile web > package start > single pyproject script > entrypoint fallback.
-- A direct declared `python app.py` must not force an Alpine fallback; shell deployment commands must select the Alpine-capable internal environment.
-- `render.yaml` Web service commands such as `gunicorn app:app --bind 0.0.0.0:$PORT` must be preserved exactly until explicit START.
-- `$PORT` must receive a free 1..65535 port before Internal Alpine launch, and the assigned port must enter session-scoped Web ownership hints.
-- Internal Alpine shell launch must expose the project venv through `VIRTUAL_ENV` + `PATH`; entrypoint fallback must be unbuffered.
-- PID/socket candidate present + HTTP probe pending => LISTENER_FOUND.
-- PID/socket candidate present + repeated HTTP-not-ready result => STARTING_WEB.
-- HTTP response code 2xx-4xx => AVAILABLE.
-- Running Web-capable project without listener evidence => SEARCHING.
-- Previously verified current-execution Web may remain AVAILABLE during foreground lifecycle revalidation.
-- Foreground-service lease count > 0 => partial wake lock policy true; zero leases => false.
-- Last Internal Runtime session release must stop the foreground service and release its wake lock; sibling session leases remain independent.
-- Real device: situation-monitor Internal Alpine should log RENDER_YAML as start source, an assigned port for $PORT, progress through the four Web states, and reach AVAILABLE if Gunicorn becomes ready.
-- Real device: OCI Internal Runtime should continue server-side/background work after SiftAlpha goes to background; verify the foreground notification remains and compare activity before/after returning.
-- Internal Browser remains out of scope.
-
-
-### alpha43-r26 targeted regression tests
-
-- situation-monitor: Render start source must remain RENDER_YAML; assigned PORT must be present; deployment command must run through NON_LOGIN shell and resolve `gunicorn` from the project venv.
-- HTTP readiness: 200, 404, 503 and other valid 100-599 responses mean AVAILABLE once the current candidate is verified; a raw TCP listener with no HTTP response must not become AVAILABLE.
-- OCI: verify the previously working Internal Web returns. If it still stays SEARCHING with `INTERNAL_WEB_DISCOVERY=NO_CANDIDATE`, capture the new run diagnostics before changing PID/socket discovery because that implementation did not change in r26.
-- Background protection regression: active Internal Runtime retains Foreground Service + PARTIAL_WAKE_LOCK; STOP releases only the current project/session lease.
-
-
-### alpha43-r27 unified start-contract rollback
-
-- Internal Python projects must no longer execute `render.yaml`, `Procfile`, root `package.json scripts.start`, or `pyproject.toml` scripts as replacement launch commands.
-- situation-monitor Internal Runtime should return to direct resolved-entrypoint execution and must not emit `SIFTALPHA_X_START_SOURCE=RENDER_YAML` or `SIFTALPHA_X_ASSIGNED_PORT`.
-- Four-stage Web state presentation remains active and must still progress based on listener ownership plus HTTP readiness.
-- Active Internal Runtime sessions must still acquire Foreground Service + PARTIAL_WAKE_LOCK protection; STOP must release only the current project/session lease.
-- OCI and other projects previously working under the r24 entrypoint model must be rechecked for Web availability before any further discovery changes.
+- Web discovery/status behavior must match r24; no SEARCHING -> LISTENER_FOUND -> STARTING_WEB -> AVAILABLE four-stage presentation is present.
+- No RuntimeWebHttpReadinessProbe is used.
+- No unified render.yaml / Procfile / package.json scripts.start / pyproject.toml command takeover is present.
+- Active Internal Runtime sessions retain Foreground Service + PARTIAL_WAKE_LOCK protection.
+- STOP releases only the current project/session lease and must not stop sibling projects.
+- Re-test OCI and situation-monitor Web behavior against the r24 baseline, then separately test background execution continuity.
