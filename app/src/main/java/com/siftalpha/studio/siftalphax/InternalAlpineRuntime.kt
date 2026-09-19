@@ -552,7 +552,7 @@ class InternalAlpineSession private constructor(context: Context) {
         val shell = buildString {
             append("export PYTHONUNBUFFERED=1; ")
             append("export VIRTUAL_ENV=/siftalpha-env/venv; ")
-            append("export PATH=/siftalpha-env/venv/bin:$PATH; ")
+            append("export PATH=/siftalpha-env/venv/bin:\$PATH; ")
             append("printf 'SIFTALPHA_X_START_SOURCE=%s\\n' '")
             append(safeStartSource)
             append("'; ")
