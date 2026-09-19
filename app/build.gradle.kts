@@ -63,7 +63,7 @@ android {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        // alpha43-r16 restores foreground External project activity execution semantics.
+        // alpha43-r16 final-source Probe coverage for foreground External project activity semantics.
         versionCode = 142
         versionName = "0.8.0-alpha43-r16"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
