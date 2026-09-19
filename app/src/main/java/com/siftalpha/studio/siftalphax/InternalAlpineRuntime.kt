@@ -1,6 +1,8 @@
 package com.siftalpha.studio.siftalphax
 
 import android.content.Context
+import android.system.Os
+import android.system.OsConstants
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.LinkOption
@@ -48,6 +50,71 @@ data class InternalAlpineDependencySource(
     }
 }
 
+internal object InternalAlpineProcessControl {
+    private const val MAX_DESCENDANTS = 2048
+
+    fun throwIfCancelled() {
+        if (Thread.currentThread().isInterrupted) {
+            throw InterruptedException("Internal Alpine operation cancelled")
+        }
+    }
+
+    fun terminate(process: Process, gracefulMillis: Long = 1500L) {
+        val procRoot = File("/proc")
+        val rootPid = runCatching { process.pid() }
+            .getOrNull()
+            ?.takeIf { it in 1..Int.MAX_VALUE.toLong() }
+        val descendants = rootPid?.let { descendantPids(procRoot, it) }.orEmpty()
+
+        descendants.forEach { signal(it, OsConstants.SIGTERM) }
+        runCatching { process.destroy() }
+        runCatching { process.waitFor(gracefulMillis, TimeUnit.MILLISECONDS) }
+
+        val stillAlive = process.isAlive || descendants.any { pidAlive(procRoot, it) }
+        if (!stillAlive) return
+
+        val refreshed = rootPid?.let { descendantPids(procRoot, it) }.orEmpty()
+        (descendants + refreshed).distinct().forEach { signal(it, OsConstants.SIGKILL) }
+        if (process.isAlive) {
+            runCatching { process.destroyForcibly() }
+            runCatching { process.waitFor(gracefulMillis, TimeUnit.MILLISECONDS) }
+        }
+    }
+
+    internal fun descendantPids(procRoot: File, rootPid: Long): List<Int> {
+        if (rootPid !in 1..Int.MAX_VALUE.toLong()) return emptyList()
+        val root = rootPid.toInt()
+        val visited = linkedSetOf<Int>()
+        val result = mutableListOf<Int>()
+
+        fun visit(parent: Int) {
+            if (visited.size >= MAX_DESCENDANTS || !visited.add(parent)) return
+            val childrenFile = File(procRoot, "$parent/task/$parent/children")
+            val children = runCatching { childrenFile.readText() }
+                .getOrDefault("")
+                .trim()
+                .split(Regex("\\s+"))
+                .mapNotNull { it.toIntOrNull() }
+                .filter { it > 0 }
+            children.forEach { child ->
+                visit(child)
+                if (child != root && child !in result) result += child
+            }
+        }
+
+        visit(root)
+        return result
+    }
+
+    private fun pidAlive(procRoot: File, pid: Int): Boolean =
+        pid > 0 && File(procRoot, pid.toString()).exists()
+
+    private fun signal(pid: Int, signal: Int) {
+        if (pid <= 0) return
+        runCatching { Os.kill(pid, signal) }
+    }
+}
+
 class InternalAlpineEnvironmentManager(context: Context) {
     private val appContext = context.applicationContext
 
@@ -69,8 +136,11 @@ class InternalAlpineEnvironmentManager(context: Context) {
         source: InternalAlpineDependencySource,
     ): PreparationResult {
         require(projectIdentity.isNotBlank())
+        InternalAlpineProcessControl.throwIfCancelled()
         val layout = InternalAlpineFiles.prepare(appContext)
+        InternalAlpineProcessControl.throwIfCancelled()
         ensurePythonRuntime(layout)
+        InternalAlpineProcessControl.throwIfCancelled()
         loadBinding(projectIdentity, source)?.let {
             return PreparationResult(true, Outcome.READY_REUSED, it.environmentRoot, it.environmentKey)
         }
@@ -140,6 +210,7 @@ class InternalAlpineEnvironmentManager(context: Context) {
     }
 
     private fun ensurePythonRuntime(layout: InternalAlpineLayout) {
+        InternalAlpineProcessControl.throwIfCancelled()
         val marker = File(layout.rootfs, PYTHON_READY_MARKER)
         if (
             marker.isFile &&
@@ -157,6 +228,7 @@ class InternalAlpineEnvironmentManager(context: Context) {
             logFile = log,
             failurePrefix = "INTERNAL_ALPINE_PYTHON_RUNTIME_PREPARE_FAILED",
         )
+        InternalAlpineProcessControl.throwIfCancelled()
         marker.writeText("READY=1\n")
     }
 
@@ -171,21 +243,12 @@ class InternalAlpineEnvironmentManager(context: Context) {
                 if (Thread.currentThread().isInterrupted) throw InterruptedException("Internal Alpine operation cancelled")
             }
         } catch (cancelled: InterruptedException) {
-            terminate(process)
+            InternalAlpineProcessControl.terminate(process)
             Thread.currentThread().interrupt()
             throw IllegalStateException("INTERNAL_ALPINE_OPERATION_CANCELLED", cancelled)
         }
         if (process.exitValue() != 0) {
             error(failurePrefix + ": exit=" + process.exitValue() + "\n" + readTail(logFile, 12_000))
-        }
-    }
-
-    private fun terminate(process: Process) {
-        process.destroy()
-        runCatching { process.waitFor(1500, TimeUnit.MILLISECONDS) }
-        if (process.isAlive) {
-            process.destroyForcibly()
-            runCatching { process.waitFor(1500, TimeUnit.MILLISECONDS) }
         }
     }
 
@@ -297,9 +360,7 @@ class InternalAlpineSession(context: Context) {
         if (!EmbeddedPythonStatePolicy.canStop(record.state)) return false
         record.stopRequested = true
         val process = record.process ?: return false
-        process.destroy()
-        runCatching { process.waitFor(1500, TimeUnit.MILLISECONDS) }
-        if (process.isAlive) process.destroyForcibly()
+        InternalAlpineProcessControl.terminate(process)
         return true
     }
 

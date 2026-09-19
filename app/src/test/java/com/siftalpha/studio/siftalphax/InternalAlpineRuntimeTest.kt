@@ -48,6 +48,34 @@ class InternalAlpineRuntimeTest {
     }
 
     @Test
+    fun processTreeDiscoveryIsProjectRootScopedAndLeafFirst() {
+        val proc = Files.createTempDirectory("siftalpha-proc-tree").toFile()
+        try {
+            fun children(pid: Int, value: String) {
+                val file = File(proc, "$pid/task/$pid/children")
+                file.parentFile.mkdirs()
+                file.writeText(value)
+                File(proc, pid.toString()).mkdirs()
+            }
+            children(100, "101 102\n")
+            children(101, "103\n")
+            children(102, "")
+            children(103, "")
+            children(999, "1000\n")
+            children(1000, "")
+
+            assertEquals(
+                listOf(103, 101, 102),
+                InternalAlpineProcessControl.descendantPids(proc, 100L),
+            )
+            assertFalse(999 in InternalAlpineProcessControl.descendantPids(proc, 100L))
+            assertFalse(1000 in InternalAlpineProcessControl.descendantPids(proc, 100L))
+        } finally {
+            proc.deleteRecursively()
+        }
+    }
+
+    @Test
     fun tarExtractorCopiesHardLinksAndSkipsMetadataRecords() {
         val root = Files.createTempDirectory("siftalpha-alpine-hardlink").toFile()
         try {

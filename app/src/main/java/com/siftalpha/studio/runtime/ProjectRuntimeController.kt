@@ -100,16 +100,22 @@ class ProjectRuntimeController(
     }
 
     fun embeddedPythonSnapshotFor(projectDocumentId: String): EmbeddedPythonSnapshot? {
-        internalAlpineSession?.snapshot(projectDocumentId)?.let { snapshot ->
-            cleanupEmbeddedStaging(snapshot)
-            return snapshot
-        }
-        val session = embeddedPythonSession ?: return null
-        val snapshot = runCatching { session.snapshot() }.getOrNull() ?: return null
-        cleanupEmbeddedStaging(snapshot)
-        return snapshot.takeIf {
-            it.sessionId.isNotBlank() && it.projectIdentity == projectDocumentId
-        }
+        val alpine = internalAlpineSession?.snapshot(projectDocumentId)
+        val cpython = embeddedPythonSession
+            ?.let { runCatching { it.snapshot() }.getOrNull() }
+            ?.takeIf {
+                it.sessionId.isNotBlank() && it.projectIdentity == projectDocumentId
+            }
+        val candidates = listOfNotNull(alpine, cpython)
+        candidates
+            .filter { EmbeddedPythonStatePolicy.isTerminal(it.state) }
+            .forEach(::cleanupEmbeddedStaging)
+        val selected = candidates
+            .filter { EmbeddedPythonStatePolicy.canStop(it.state) }
+            .maxByOrNull { it.startedAtEpochMs ?: Long.MIN_VALUE }
+            ?: candidates.maxByOrNull { it.startedAtEpochMs ?: Long.MIN_VALUE }
+        selected?.let(::cleanupEmbeddedStaging)
+        return selected
     }
 
     /**
@@ -359,6 +365,9 @@ class ProjectRuntimeController(
             .lowercase()
         return listOf(
             "no_compatible_wheel",
+            "project_requires_python_incompatible",
+            "unsupported_environment_marker",
+            "dependency_conflict",
             "unsupported_dependency_manifest",
             "not supported by internal python preparation",
             "requirements options and nested requirement files are not supported",

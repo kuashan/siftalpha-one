@@ -31,6 +31,7 @@ object InternalAlpineFiles {
 
     @Synchronized
     fun prepare(context: Context): InternalAlpineLayout {
+        throwIfCancelled()
         val appContext = context.applicationContext
         val base = File(appContext.filesDir, PRIVATE_ROOT)
         check(base.mkdirs() || base.isDirectory) { "Unable to create Internal Alpine base" }
@@ -138,6 +139,7 @@ object InternalAlpineFiles {
         val root = targetDir.toPath().toAbsolutePath().normalize()
         val header = ByteArray(512)
         while (true) {
+            throwIfCancelled()
             val count = readFully(input, header)
             if (count == 0) break
             check(count == 512) { "Truncated Internal Alpine tar header" }
@@ -222,6 +224,7 @@ object InternalAlpineFiles {
             }
             check(File(temp, "bin/busybox").exists()) { "Internal Alpine busybox missing after extraction" }
             refreshDns(context, temp)
+            throwIfCancelled()
             File(temp, READY_MARKER).writeText(expectedMarker)
             if (rootfs.exists()) check(rootfs.deleteRecursively()) { "Unable to replace Internal Alpine rootfs" }
             check(temp.renameTo(rootfs)) { "Unable to activate Internal Alpine rootfs" }
@@ -236,6 +239,7 @@ object InternalAlpineFiles {
         context.assets.open(ASSET_ROOTFS).use { input ->
             val buffer = ByteArray(64 * 1024)
             while (true) {
+                throwIfCancelled()
                 val count = input.read(buffer)
                 if (count < 0) break
                 digest.update(buffer, 0, count)
@@ -332,6 +336,12 @@ object InternalAlpineFiles {
             val count = input.read(buffer, 0, remaining.toInt())
             check(count > 0) { "Truncated rootfs tar padding" }
             remaining -= count
+        }
+    }
+
+    private fun throwIfCancelled() {
+        if (Thread.currentThread().isInterrupted) {
+            throw InterruptedException("Internal Alpine operation cancelled")
         }
     }
 
