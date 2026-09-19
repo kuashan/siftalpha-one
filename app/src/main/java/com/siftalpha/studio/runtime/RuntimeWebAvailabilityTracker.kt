@@ -4,14 +4,14 @@ import android.os.Handler
 import android.os.Looper
 
 /**
- * Activity-lifetime cache and scheduler for loopback Web listener checks.
+ * Activity-lifetime cache and scheduler for loopback HTTP readiness checks.
  *
  * New candidates get a short bounded retry burst. A previously verified endpoint remains
  * provisionally AVAILABLE across Activity lifecycle changes while a fresh foreground probe runs;
  * only repeated fresh failures downgrade it.
  */
 class RuntimeWebAvailabilityTracker(
-    private val probe: (String) -> Boolean = { RuntimeWebEndpointProbe.isListening(it) },
+    private val probe: (String) -> Boolean = { RuntimeWebHttpReadinessProbe.isReady(it) },
     private val clock: () -> Long = { System.currentTimeMillis() },
     private val onChanged: () -> Unit,
 ) {

@@ -50,6 +50,9 @@
     <string name="runtime_failure_reason">失败原因：%1$s</string>
     <string name="runtime_policy_runtime_recovering">正在恢复运行状态</string>
     <string name="runtime_policy_reason_runtime_recovering">正在确认真实运行状态</string>
+    <string name="runtime_web_status_searching">SEARCHING · 正在寻找 Web 服务</string>
+    <string name="runtime_web_status_listener_found">LISTENER_FOUND · 已找到当前项目监听端口</string>
+    <string name="runtime_web_status_starting_web">STARTING_WEB · Web 服务启动中</string>
     <string name="runtime_web_status_available">可打开</string>
     <string name="runtime_web_status_detecting">检测中</string>
     <string name="runtime_web_status_waiting">等待运行</string>

@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import com.siftalpha.studio.MainActivity
 import com.siftalpha.studio.R
 
@@ -22,10 +23,13 @@ import com.siftalpha.studio.R
  */
 class InternalRuntimeForegroundService : Service() {
 
+    private var wakeLock: PowerManager.WakeLock? = null
+
     override fun onCreate() {
         super.onCreate()
         runningService = this
         ensureChannel()
+        syncWakeLock()
         promote(projects.size().coerceAtLeast(1))
         if (projects.isEmpty()) stopSelf()
     }
@@ -37,6 +41,7 @@ class InternalRuntimeForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        releaseWakeLock()
         if (runningService === this) runningService = null
         super.onDestroy()
     }
@@ -58,8 +63,33 @@ class InternalRuntimeForegroundService : Service() {
 
     private fun refreshNotification() {
         val count = projects.size()
+        syncWakeLock()
         if (count <= 0) return
         promote(count)
+    }
+
+    private fun syncWakeLock() {
+        val count = projects.size()
+        if (!InternalRuntimePowerPolicy.shouldHoldWakeLock(count)) {
+            releaseWakeLock()
+            return
+        }
+        val current = wakeLock
+        if (current?.isHeld == true) return
+        val manager = getSystemService(PowerManager::class.java)
+        val created = current ?: manager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            WAKE_LOCK_TAG,
+        ).apply {
+            setReferenceCounted(false)
+        }.also { wakeLock = it }
+        if (!created.isHeld) created.acquire()
+    }
+
+    private fun releaseWakeLock() {
+        val current = wakeLock ?: return
+        if (current.isHeld) current.release()
+        wakeLock = null
     }
 
     private fun promote(count: Int) {
@@ -97,6 +127,7 @@ class InternalRuntimeForegroundService : Service() {
     companion object {
         private const val CHANNEL_ID = "siftalpha_internal_runtime"
         private const val NOTIFICATION_ID = 0x5341
+        private const val WAKE_LOCK_TAG = "SiftAlpha:InternalRuntime"
         private val projects = InternalRuntimeProjectSet()
 
         @Volatile
@@ -152,4 +183,12 @@ internal class InternalRuntimeProjectSet {
 
     @Synchronized
     fun isEmpty(): Boolean = ids.isEmpty()
+}
+
+
+internal object InternalRuntimePowerPolicy {
+    fun shouldHoldWakeLock(activeLeaseCount: Int): Boolean {
+        require(activeLeaseCount >= 0)
+        return activeLeaseCount > 0
+    }
 }

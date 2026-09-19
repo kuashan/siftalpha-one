@@ -963,3 +963,20 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Rich Result parser/lifecycle/viewer production code remains unchanged.
 - No Worker, no global PID scan, no 1..65535 port scan, no OCI/situation-monitor project patch and no External START/STOP rewrite were introduced.
 - W0 Cloud Build, Internal Alpine Probe, signed APK evidence and real-device acceptance are pending for the final r24 HEAD.
+
+
+## 2026-09-20 · alpha43-r25 Project Start Contracts + Web Readiness + Background Protection
+
+- Baseline: `0a3c19194a77ef9b2926f03b46193a38074bca17`, version `0.8.0-alpha43-r24` / `150`.
+- Added read-only `ProjectStartContractResolver` with precedence: explicit `.project.json run` > `render.yaml/render.yml startCommand` > `Procfile web` > root `package.json scripts.start` > single `pyproject.toml [project.scripts]/[tool.poetry.scripts]` > Python entrypoint fallback.
+- Direct `python/python3 <entrypoint>` declarations preserve the existing Embedded CPython path. Shell-style deployment commands require Internal Alpine and no longer silently fall back to `python app.py`.
+- Internal environment preparation now selects Internal Alpine whenever the resolved start contract requires a shell, so stale CPython readiness cannot claim the project is ready for an incompatible launch path.
+- Internal Alpine START accepts the resolved project command, sets `VIRTUAL_ENV` and prepends the project venv to `PATH`, exports `PYTHONUNBUFFERED=1`, and uses `python -u` for entrypoint fallback.
+- `$PORT` deployment commands receive a SiftAlpha-selected free loopback port before launch. Explicit/assigned ports are retained as current-session high-priority ownership hints; they are still not Web evidence without PID/socket ownership.
+- Added diagnostics: `SIFTALPHA_X_START_SOURCE`, `SIFTALPHA_X_ASSIGNED_PORT` when applicable, and `SIFTALPHA_X_BACKGROUND_PROTECTION=FOREGROUND_SERVICE+PARTIAL_WAKE_LOCK`.
+- Web presentation now uses `SEARCHING -> LISTENER_FOUND -> STARTING_WEB -> AVAILABLE`. PID/socket ownership establishes LISTENER_FOUND; a new lightweight HTTP readiness probe gates AVAILABLE. A listener that has not yet returned a usable HTTP response is STARTING_WEB after bounded confirmation.
+- Existing verified-Web lifecycle continuity remains: foreground resume may temporarily keep AVAILABLE while a fresh HTTP readiness probe runs.
+- Internal Runtime foreground protection now adds an Android `PARTIAL_WAKE_LOCK` for the lifetime of one or more active Internal Runtime session leases. The wake lock is released when the last lease ends and does not create a Worker/executor/supervisor.
+- Added `android.permission.WAKE_LOCK`. No OCI-specific or situation-monitor-specific source patch was added.
+- Internal Browser is intentionally not part of r25.
+- Cloud CI, signed APK and real-device acceptance are pending for the final r25 HEAD.

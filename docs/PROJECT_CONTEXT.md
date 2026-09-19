@@ -491,3 +491,13 @@ Production external runtime 仍主要依赖 Termux + PRoot + Ubuntu + Python 作
 - Foreground Activity lifecycle no longer invalidates user-visible Web identity. Fresh reachability is revalidated silently and repeated failures are required before downgrade.
 - Internal Runtime foreground-service leases now cover both Internal Alpine and Embedded CPython sessions. The service remains a process-liveness lease, not a Worker/executor/supervisor.
 - Rich Result remains independent; it has no network port and is not persisted as a new run's result.
+
+
+## alpha43-r25 Runtime start/readiness/background model (2026-09-20)
+
+- Project-owned deployment declarations are first-class M inputs. SiftAlpha reads common root start declarations without executing them during inspection and executes the selected contract only after explicit START.
+- Internal Python shell contracts are hosted by Internal Alpine. Direct Python entrypoint contracts may stay on Embedded CPython when otherwise compatible.
+- Known/assigned deployment ports are hints only. Current-session PID/socket ownership remains the boundary before listener evidence is published.
+- Web readiness is staged: SEARCHING (no owned listener), LISTENER_FOUND (owned socket), STARTING_WEB (owned listener but HTTP not yet ready), AVAILABLE (HTTP ready).
+- Internal Runtime background protection is now session-lease Foreground Service + PARTIAL_WAKE_LOCK. This protects Runtime execution; it does not promise that a third-party browser tab's JavaScript timers run unthrottled in the background.
+- Internal Browser remains a separate presentation decision and is not required for r25 background Runtime protection.

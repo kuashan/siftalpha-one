@@ -25,6 +25,13 @@ class InternalRuntimeForegroundServiceTest {
     }
 
     @Test
+    fun wakeLockPolicyTracksActiveInternalRuntimeLeases() {
+        assertFalse(InternalRuntimePowerPolicy.shouldHoldWakeLock(0))
+        assertTrue(InternalRuntimePowerPolicy.shouldHoldWakeLock(1))
+        assertTrue(InternalRuntimePowerPolicy.shouldHoldWakeLock(2))
+    }
+
+    @Test
     fun failedLeaseCanBeRolledBackAndReacquired() {
         val leases = InternalRuntimeProjectSet()
 

@@ -479,3 +479,22 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Real-device situation-monitor: verify no permanent DETECTING after an early empty discovery, verify fast availability, external-browser background survival, and stable AVAILABLE when returning to SiftAlpha.
 - Real-device OCI: test both reported Internal engines; background SiftAlpha + browser, use another app, then return and verify Runtime survival and silent Web revalidation.
 - Real-device learned endpoint: after one ownership-verified successful Web run, STOP/START and confirm the previous port is tried first but a changed project port is rediscovered and replaces it safely.
+
+
+### alpha43-r25 Project Start Contracts / Web Readiness / Background Protection
+
+- Start-contract precedence must be deterministic: declared project run > Render startCommand > Procfile web > package start > single pyproject script > entrypoint fallback.
+- A direct declared `python app.py` must not force an Alpine fallback; shell deployment commands must select the Alpine-capable internal environment.
+- `render.yaml` Web service commands such as `gunicorn app:app --bind 0.0.0.0:$PORT` must be preserved exactly until explicit START.
+- `$PORT` must receive a free 1..65535 port before Internal Alpine launch, and the assigned port must enter session-scoped Web ownership hints.
+- Internal Alpine shell launch must expose the project venv through `VIRTUAL_ENV` + `PATH`; entrypoint fallback must be unbuffered.
+- PID/socket candidate present + HTTP probe pending => LISTENER_FOUND.
+- PID/socket candidate present + repeated HTTP-not-ready result => STARTING_WEB.
+- HTTP response code 2xx-4xx => AVAILABLE.
+- Running Web-capable project without listener evidence => SEARCHING.
+- Previously verified current-execution Web may remain AVAILABLE during foreground lifecycle revalidation.
+- Foreground-service lease count > 0 => partial wake lock policy true; zero leases => false.
+- Last Internal Runtime session release must stop the foreground service and release its wake lock; sibling session leases remain independent.
+- Real device: situation-monitor Internal Alpine should log RENDER_YAML as start source, an assigned port for $PORT, progress through the four Web states, and reach AVAILABLE if Gunicorn becomes ready.
+- Real device: OCI Internal Runtime should continue server-side/background work after SiftAlpha goes to background; verify the foreground notification remains and compare activity before/after returning.
+- Internal Browser remains out of scope.

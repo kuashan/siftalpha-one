@@ -4,23 +4,28 @@ import android.content.Context
 import com.siftalpha.studio.R
 
 /**
- * Single source of truth for the Web availability shown by the project card and Browser button.
+ * Single source of truth for Web readiness shown by the project card and Browser button.
  *
- * A URL candidate alone is not proof that a project is Web-enabled. AVAILABLE is reserved for a
- * RUNNING project whose loopback endpoint was recently verified. AUTO_DETECT means that Studio has
- * no static Web profile, configured endpoint, or discovered URL candidate to present.
+ * Running Web projects progress through SEARCHING -> LISTENER_FOUND -> STARTING_WEB -> AVAILABLE.
+ * Listener ownership and HTTP readiness are deliberately separate facts.
  */
 enum class RuntimeWebUiStatus {
+    SEARCHING,
+    LISTENER_FOUND,
+    STARTING_WEB,
     AVAILABLE,
-    DETECTING,
     UNAVAILABLE,
     WAITING,
-    AUTO_DETECT;
+    AUTO_DETECT,
+    /** Kept only for source compatibility with older presentation paths; new resolve() never emits it. */
+    DETECTING;
 
     fun uiLabel(context: Context): String = context.getString(
         when (this) {
+            SEARCHING, DETECTING -> R.string.runtime_web_status_searching
+            LISTENER_FOUND -> R.string.runtime_web_status_listener_found
+            STARTING_WEB -> R.string.runtime_web_status_starting_web
             AVAILABLE -> R.string.runtime_web_status_available
-            DETECTING -> R.string.runtime_web_status_detecting
             UNAVAILABLE -> R.string.runtime_web_not_found_title
             WAITING -> R.string.runtime_web_status_waiting
             AUTO_DETECT -> R.string.runtime_web_status_auto_detect
@@ -34,12 +39,14 @@ enum class RuntimeWebUiStatus {
             hasConfiguredLocalUrl: Boolean,
             runtimeState: RuntimeState,
             endpointReachable: Boolean? = null,
+            listenerFound: Boolean = false,
         ): RuntimeWebUiStatus = when {
-            !profileEnabled && !hasCandidateRuntimeUrl && !hasConfiguredLocalUrl ->
-                AUTO_DETECT
             runtimeState == RuntimeState.RUNNING && endpointReachable == true -> AVAILABLE
-            runtimeState == RuntimeState.RUNNING && endpointReachable == null -> DETECTING
-            runtimeState == RuntimeState.RUNNING -> UNAVAILABLE
+            runtimeState == RuntimeState.RUNNING && listenerFound && endpointReachable == null ->
+                LISTENER_FOUND
+            runtimeState == RuntimeState.RUNNING && listenerFound && endpointReachable == false ->
+                STARTING_WEB
+            runtimeState == RuntimeState.RUNNING -> SEARCHING
             profileEnabled || hasCandidateRuntimeUrl || hasConfiguredLocalUrl -> WAITING
             else -> AUTO_DETECT
         }

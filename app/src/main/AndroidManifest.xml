@@ -10,6 +10,7 @@
          freeze the app process while the user is interacting with an external browser. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Android 11+ package visibility：允许发现 Termux，以及能够处理网页的浏览器应用。 -->
     <queries>

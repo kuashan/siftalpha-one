@@ -63,11 +63,10 @@ android {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        // alpha43-r24 closes Web continuity gaps: bounded Internal discovery retries, stable
-        // foreground Web presentation, CPython foreground-runtime leases, and learned endpoints.
-        // Rich Result, External execution semantics and Worker freeze remain unchanged.
-        versionCode = 150
-        versionName = "0.8.0-alpha43-r24"
+        // alpha43-r25 adds deployment start contracts, four-stage Web readiness and Internal
+        // foreground-service + partial-wake-lock protection. Worker remains frozen.
+        versionCode = 151
+        versionName = "0.8.0-alpha43-r25"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
