@@ -59,7 +59,10 @@ internal object InternalAlpineProcessControl {
         }
     }
 
-    fun terminate(managed: InternalAlpineManagedProcess, gracefulMillis: Long = 1500L) {
+    fun terminate(
+        managed: InternalAlpineManagedProcess,
+        gracefulMillis: Long = 1500L,
+    ) {
         val process = managed.process
         val procRoot = File("/proc")
         val rootPid = managed.hostPid()?.toLong()
@@ -70,16 +73,19 @@ internal object InternalAlpineProcessControl {
         runCatching { process.destroy() }
         runCatching { process.waitFor(gracefulMillis, TimeUnit.MILLISECONDS) }
 
-        val stillAlive = process.isAlive ||
-            rootPid?.toInt()?.let { pidAlive(procRoot, it) } == true ||
-            descendants.any { pidAlive(procRoot, it) }
-        if (stillAlive) {
+        val rootAlive = rootPid?.toInt()?.let { pidAlive(procRoot, it) } == true
+        val childAlive = descendants.any { pidAlive(procRoot, it) }
+        if (process.isAlive || rootAlive || childAlive) {
             val refreshed = rootPid?.let { descendantPids(procRoot, it) }.orEmpty()
-            (descendants + refreshed).distinct().forEach { signal(it, OsConstants.SIGKILL) }
+            (descendants + refreshed).distinct().forEach {
+                signal(it, OsConstants.SIGKILL)
+            }
             rootPid?.toInt()?.let { signal(it, OsConstants.SIGKILL) }
             if (process.isAlive) {
                 runCatching { process.destroyForcibly() }
-                runCatching { process.waitFor(gracefulMillis, TimeUnit.MILLISECONDS) }
+                runCatching {
+                    process.waitFor(gracefulMillis, TimeUnit.MILLISECONDS)
+                }
             }
         }
         managed.cleanup()
@@ -236,7 +242,11 @@ class InternalAlpineEnvironmentManager(context: Context) {
         marker.writeText("READY=1\n")
     }
 
-    private fun runCommand(builder: InternalAlpineCommand, logFile: File, failurePrefix: String) {
+    private fun runCommand(
+        builder: InternalAlpineCommand,
+        logFile: File,
+        failurePrefix: String,
+    ) {
         logFile.parentFile?.mkdirs()
         builder.redirectErrorStream(true).redirectOutput(logFile)
         val managed = builder.start()
