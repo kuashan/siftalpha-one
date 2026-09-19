@@ -107,17 +107,21 @@ internal object TermuxProjectActivityContract {
             fi
             # Keep the Android-side Pending bounded even when a guest shell or PRoot command
             # stops producing output. This is a watchdog, not GNU timeout: Termux installations
-            # are not required to provide that utility.
-            (
-              wait "${'$'}activity_pid"
-              activity_wait_code=${'$'}?
-              printf '%s\n' "${'$'}activity_wait_code" >"${'$'}activity_status_file"
-              exit "${'$'}activity_wait_code"
-            ) &
-            activity_waiter=${'$'}!
+            # are not required to provide that utility. The parent shell owns activity_pid, so it
+            # must also perform the final wait; a background subshell cannot wait for a sibling
+            # child and would otherwise publish a false status immediately.
             activity_started_at=${'$'}SECONDS
             activity_timed_out=0
-            while [ ! -f "${'$'}activity_status_file" ]; do
+            activity_finished=0
+            while [ "${'$'}activity_finished" -eq 0 ]; do
+              activity_proc_state=''
+              if [ -r "/proc/${'$'}activity_pid/stat" ]; then
+                activity_proc_state="${'$'}(awk '{print ${'$'}3}' "/proc/${'$'}activity_pid/stat" 2>/dev/null || true)"
+              fi
+              if [ ! -e "/proc/${'$'}activity_pid" ] || [ "${'$'}activity_proc_state" = 'Z' ]; then
+                activity_finished=1
+                break
+              fi
               if [ "${'$'}((SECONDS - activity_started_at))" -ge "$timeoutSeconds" ]; then
                 activity_timed_out=1
                 siftalpha_stop_tree "${'$'}activity_pid" "${'$'}{activity_pgid:-}" || true
@@ -126,7 +130,7 @@ internal object TermuxProjectActivityContract {
               sleep 1
             done
             if [ "${'$'}activity_timed_out" -eq 1 ]; then
-              wait "${'$'}activity_waiter" 2>/dev/null || true
+              wait "${'$'}activity_pid" 2>/dev/null || true
               rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file" "${'$'}activity_status_file"
               printf 'SIFTALPHA_OPERATION=%s\n' "$operation"
               printf 'SIFTALPHA_OPERATION_RESULT=TIMED_OUT\n'
@@ -134,8 +138,8 @@ internal object TermuxProjectActivityContract {
               printf 'SIFTALPHA_ERROR=OPERATION_TIMEOUT\n'
               exit 124
             fi
-            wait "${'$'}activity_waiter" 2>/dev/null || true
-            activity_code=${'$'}(cat "${'$'}activity_status_file" 2>/dev/null || printf '1')
+            wait "${'$'}activity_pid" 2>/dev/null
+            activity_code=${'$'}?
             rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file" "${'$'}activity_status_file"
             exit "${'$'}activity_code"
         """.trimIndent()
