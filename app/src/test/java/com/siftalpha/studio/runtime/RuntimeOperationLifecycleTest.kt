@@ -125,4 +125,64 @@ class RuntimeOperationLifecycleTest {
         )
         assertTrue(internalClean.generation > 0L)
     }
+
+    @Test
+    fun onlyInternalOperationsReceiveAndroidDeadlines() {
+        val startedAt = 4_000L
+
+        RuntimeOperationAction.entries.forEach { action ->
+            assertEquals(
+                startedAt + RuntimeOperationContract.timeoutMs(action),
+                RuntimeOperationContract.deadlineAtEpochMs(
+                    provider = RuntimeOperationProvider.INTERNAL,
+                    action = action,
+                    startedAtEpochMs = startedAt,
+                ),
+            )
+            assertNull(
+                RuntimeOperationContract.deadlineAtEpochMs(
+                    provider = RuntimeOperationProvider.EXTERNAL,
+                    action = action,
+                    startedAtEpochMs = startedAt,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun externalOperationDoesNotExpireWhenClockPassesInternalTimeout() {
+        var now = 5_000L
+        val tracker = RuntimeOperationTracker { now }
+        val externalStatus = tracker.begin(
+            projectId = "external-project",
+            provider = RuntimeOperationProvider.EXTERNAL,
+            action = RuntimeOperationAction.STATUS,
+        )!!
+
+        assertNull(externalStatus.deadlineAtEpochMs)
+        now += RuntimeOperationContract.STATUS_TIMEOUT_MS + 1L
+
+        assertTrue(tracker.markExpired(now).isEmpty())
+        assertEquals(RuntimeOperationPhase.ACTIVE, tracker.current("external-project")?.phase)
+    }
+
+    @Test
+    fun internalOperationStillExpiresAfterItsProviderDeadline() {
+        var now = 6_000L
+        val tracker = RuntimeOperationTracker { now }
+        val internalStatus = tracker.begin(
+            projectId = "internal-project",
+            provider = RuntimeOperationProvider.INTERNAL,
+            action = RuntimeOperationAction.STATUS,
+        )!!
+
+        assertEquals(
+            now + RuntimeOperationContract.STATUS_TIMEOUT_MS,
+            internalStatus.deadlineAtEpochMs,
+        )
+        now += RuntimeOperationContract.STATUS_TIMEOUT_MS + 1L
+
+        assertEquals(1, tracker.markExpired(now).size)
+        assertEquals(RuntimeOperationPhase.TIMED_OUT, tracker.current("internal-project")?.phase)
+    }
 }

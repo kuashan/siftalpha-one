@@ -1430,10 +1430,11 @@ open class V04Activity : StudioActivity() {
         val projectId = project.summary.documentId
         val persisted = operationStore.read(projectId)
         if (persisted != null) {
-            if (!persisted.terminal && persisted.deadlineAtEpochMs > System.currentTimeMillis()) {
-                return null
-            }
             if (!persisted.terminal) {
+                val deadline = persisted.deadlineAtEpochMs
+                if (deadline == null || deadline > System.currentTimeMillis()) {
+                    return null
+                }
                 expireOperation(project, persisted)
             }
             operationStore.clear(projectId)
@@ -1441,7 +1442,8 @@ open class V04Activity : StudioActivity() {
         operationTracker.seed(projectId, operationStore.lastGeneration(projectId))
         operationTracker.current(projectId)?.let { current ->
             if (!current.terminal) {
-                if (current.deadlineAtEpochMs > System.currentTimeMillis()) return null
+                val deadline = current.deadlineAtEpochMs
+                if (deadline == null || deadline > System.currentTimeMillis()) return null
                 expireOperation(project, current)
             }
             operationTracker.clearTerminal(projectId, current.generation)
@@ -1495,7 +1497,7 @@ open class V04Activity : StudioActivity() {
                 operationStore.clear(key)
                 return@forEach
             }
-            if (record.deadlineAtEpochMs <= System.currentTimeMillis()) {
+            if (record.deadlineAtEpochMs?.let { it <= System.currentTimeMillis() } == true) {
                 expireOperation(project, record)
                 return@forEach
             }
@@ -1521,11 +1523,12 @@ open class V04Activity : StudioActivity() {
         record: RuntimeOperationRecord,
     ) {
         operationDeadlineRunnables[record.projectId]?.let(refreshHandler::removeCallbacks)
+        val deadline = record.deadlineAtEpochMs ?: return
         lateinit var runnable: Runnable
         runnable = Runnable {
             val current = currentOperation(record.projectId, includeHidden = true)
             if (current?.generation != record.generation) return@Runnable
-            val remaining = record.deadlineAtEpochMs - System.currentTimeMillis()
+            val remaining = deadline - System.currentTimeMillis()
             if (remaining > 0L) {
                 refreshHandler.postDelayed(runnable, remaining)
             } else {
@@ -1533,13 +1536,17 @@ open class V04Activity : StudioActivity() {
             }
         }
         operationDeadlineRunnables[record.projectId] = runnable
-        refreshHandler.postDelayed(runnable, (record.deadlineAtEpochMs - System.currentTimeMillis()).coerceAtLeast(1L))
+        refreshHandler.postDelayed(runnable, (deadline - System.currentTimeMillis()).coerceAtLeast(1L))
     }
 
     private fun expireOperation(
         project: V04ProjectGateway.RuntimeProject,
         record: RuntimeOperationRecord,
     ) {
+        // External completion belongs to the real Termux RuntimeResult. The Android operation
+        // tracker records and fences that result, but never turns elapsed wall-clock time into an
+        // External kill or terminal timeout. Only Internal records reach this deadline path.
+        if (record.provider == RuntimeOperationProvider.EXTERNAL) return
         val current = currentOperation(record.projectId, includeHidden = true)
         if (current?.generation != record.generation) return
         finishOperation(record.projectId, record.generation, RuntimeOperationPhase.TIMED_OUT)
@@ -1554,23 +1561,6 @@ open class V04Activity : StudioActivity() {
         projectActivities.cancelProject(record.projectId)
         if (::prepareLiveProgress.isInitialized) prepareLiveProgress.finish(project.folderName)
         recoveryProjects.remove(record.projectId)
-        if (
-            record.provider == RuntimeOperationProvider.EXTERNAL &&
-            record.action != RuntimeOperationAction.STOP &&
-            ::backend.isInitialized
-        ) {
-            // The normal External wrapper owns its own watchdog. This is only the Android-side
-            // fallback when the result callback itself is lost: issue the same project-scoped
-            // STOP tree command without creating another user-visible Pending entry.
-            runCatching {
-                val stop = runtime.wrapCancelableExternalActivity(
-                    project = project,
-                    action = ProjectRuntimeController.Action.STOP,
-                    command = runtime.stop(project),
-                )
-                backend.execute(stop)
-            }
-        }
         failureReasons[record.projectId] = "RUNTIME_OPERATION_TIMED_OUT:${record.action.name}"
         if (record.action == RuntimeOperationAction.PREPARE ||
             record.action == RuntimeOperationAction.CLEAN

@@ -1,0 +1,21 @@
+package com.siftalpha.studio.runtime
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class ExternalProjectActivityContractTest {
+    @Test
+    fun stopIsAProjectControlCommandNotANormalActivity() {
+        assertNull(
+            ExternalProjectActivityContract.operationFor(ProjectRuntimeController.Action.STOP),
+        )
+        assertNull(
+            ExternalProjectActivityContract.operationFor(ProjectRuntimeController.Action.CLONE_GITHUB),
+        )
+        assertEquals(
+            "status",
+            ExternalProjectActivityContract.operationFor(ProjectRuntimeController.Action.STATUS),
+        )
+    }
+}

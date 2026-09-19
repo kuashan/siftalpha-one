@@ -835,3 +835,11 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Added symmetric lifecycle, policy, watchdog, cancellation, project-isolation and storage-preservation JVM coverage.
 - Internal Alpine Probe / W0 Cloud Build: source change submitted; CI result pending.
 - Real-device Runtime Control matrix: not executed in this source/CI phase.
+
+## 2026-09-19 · alpha43-r15 External Runtime Regression Restoration
+
+- Restored External project activity execution to the r13 PID/PGID ownership plus natural `wait` contract; the wrapper no longer applies an elapsed-time watchdog or emits a synthetic timeout result.
+- External STOP is again a project-scoped control command rather than a normal activity wrapper.
+- Runtime operation deadlines are provider-aware: Internal retains its existing Android deadline path, while External operation records remain backend-result-owned and are reconciled through the real Termux result / recovery path.
+- Retained the r14 lifecycle states, operation store, generation and late-result fencing, project-scoped activity registry, PID/PGID ownership, and Pure Python supplemental-Node detection behavior.
+- Unit/build CI and Internal Alpine Probe are required for this source change; External real-device acceptance has not yet been executed.

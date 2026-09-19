@@ -32,15 +32,18 @@ data class RuntimeOperationRecord(
     val executionId: Int?,
     val generation: Long,
     val startedAtEpochMs: Long,
-    val deadlineAtEpochMs: Long,
+    /** Internal operations have a local deadline; External completion remains backend-owned. */
+    val deadlineAtEpochMs: Long?,
     val userVisible: Boolean = true,
     val phase: RuntimeOperationPhase = RuntimeOperationPhase.ACCEPTED,
 ) {
     init {
         require(projectId.isNotBlank()) { "projectId must not be blank" }
         require(generation > 0L) { "generation must be positive" }
-        require(deadlineAtEpochMs >= startedAtEpochMs) {
-            "deadline must not precede operation start"
+        if (deadlineAtEpochMs != null) {
+            require(deadlineAtEpochMs >= startedAtEpochMs) {
+                "deadline must not precede operation start"
+            }
         }
     }
 
@@ -81,6 +84,15 @@ object RuntimeOperationContract {
         RuntimeOperationAction.LOGS -> LOGS_TIMEOUT_MS
         RuntimeOperationAction.STOP -> STOP_TIMEOUT_MS
         RuntimeOperationAction.CLEAN -> CLEAN_TIMEOUT_MS
+    }
+
+    fun deadlineAtEpochMs(
+        provider: RuntimeOperationProvider,
+        action: RuntimeOperationAction,
+        startedAtEpochMs: Long,
+    ): Long? = when (provider) {
+        RuntimeOperationProvider.INTERNAL -> startedAtEpochMs + timeoutMs(action)
+        RuntimeOperationProvider.EXTERNAL -> null
     }
 
     fun lifecycleState(action: RuntimeOperationAction): RuntimeLifecycleState = when (action) {
@@ -136,7 +148,11 @@ class RuntimeOperationTracker(
             executionId = executionId,
             generation = generation,
             startedAtEpochMs = now,
-            deadlineAtEpochMs = now + RuntimeOperationContract.timeoutMs(action),
+            deadlineAtEpochMs = RuntimeOperationContract.deadlineAtEpochMs(
+                provider = provider,
+                action = action,
+                startedAtEpochMs = now,
+            ),
             userVisible = userVisible,
             phase = RuntimeOperationPhase.ACTIVE,
         ).also { current[projectId] = it }
@@ -172,7 +188,9 @@ class RuntimeOperationTracker(
 
     fun markExpired(now: Long = nowEpochMs()): List<RuntimeOperationRecord> = synchronized(lock) {
         current.values
-            .filter { !it.terminal && it.deadlineAtEpochMs <= now }
+            .filter { record ->
+                !record.terminal && record.deadlineAtEpochMs?.let { it <= now } == true
+            }
             .onEach { current[it.projectId] = it.withPhase(RuntimeOperationPhase.TIMED_OUT) }
     }
 }

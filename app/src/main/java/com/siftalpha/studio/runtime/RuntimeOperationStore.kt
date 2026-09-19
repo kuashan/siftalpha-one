@@ -29,8 +29,16 @@ class RuntimeOperationStore internal constructor(
         } ?: return null
         val generation = prefs.getLong(prefix + GENERATION, 0L)
         val started = prefs.getLong(prefix + STARTED, 0L)
-        val deadline = prefs.getLong(prefix + DEADLINE, 0L)
-        if (generation <= 0L || started <= 0L || deadline < started) return null
+        val persistedDeadline = if (prefs.contains(prefix + DEADLINE)) {
+            prefs.getLong(prefix + DEADLINE, 0L)
+        } else {
+            null
+        }
+        // r14 persisted External deadlines, but those deadlines were never part of the
+        // backend-owned External contract. Ignore such legacy values during reconciliation.
+        val deadline = if (provider == RuntimeOperationProvider.EXTERNAL) null else persistedDeadline
+        if (generation <= 0L || started <= 0L) return null
+        if (deadline != null && deadline < started) return null
         return RuntimeOperationRecord(
             projectId = prefs.getString(prefix + PROJECT, projectId) ?: projectId,
             provider = provider,
@@ -61,9 +69,10 @@ class RuntimeOperationStore internal constructor(
             .putLong(prefix + GENERATION, record.generation)
             .putLong(prefix + NEXT_GENERATION, record.generation)
             .putLong(prefix + STARTED, record.startedAtEpochMs)
-            .putLong(prefix + DEADLINE, record.deadlineAtEpochMs)
             .putBoolean(prefix + USER_VISIBLE, record.userVisible)
             .apply {
+                if (record.deadlineAtEpochMs == null) remove(prefix + DEADLINE)
+                else putLong(prefix + DEADLINE, record.deadlineAtEpochMs!!)
                 if (record.executionId == null) remove(prefix + EXECUTION_ID)
                 else putInt(prefix + EXECUTION_ID, record.executionId)
             }

@@ -14,6 +14,19 @@ import com.siftalpha.studio.siftalphax.InternalAlpineSession
 import com.siftalpha.studio.siftalphax.InternalPythonBackend
 import java.io.File
 
+internal object ExternalProjectActivityContract {
+    fun operationFor(action: ProjectRuntimeController.Action): String? = when (action) {
+        ProjectRuntimeController.Action.PREPARE -> "prepare"
+        ProjectRuntimeController.Action.START -> "start"
+        ProjectRuntimeController.Action.STATUS -> "status"
+        ProjectRuntimeController.Action.LOGS -> "logs"
+        ProjectRuntimeController.Action.CLEAN -> "clean"
+        ProjectRuntimeController.Action.STOP,
+        ProjectRuntimeController.Action.CLONE_GITHUB,
+        -> null
+    }
+}
+
 /**
  * Runtime-neutral project execution coordinator.
  *
@@ -478,31 +491,12 @@ class ProjectRuntimeController(
         action: Action,
         command: RuntimeCommand,
     ): RuntimeCommand {
-        val operation = when (action) {
-            Action.PREPARE -> "prepare"
-            Action.START -> "start"
-            Action.STATUS -> "status"
-            Action.LOGS -> "logs"
-            Action.CLEAN -> "clean"
-            Action.STOP -> "stop"
-            Action.CLONE_GITHUB -> null
-        } ?: return command
+        val operation = ExternalProjectActivityContract.operationFor(action) ?: return command
         return command.copy(
             shellScript = host.wrapProjectActivity(
                 runtimeId = host.runtimeId(project.folderName),
                 operation = operation,
                 shellScript = command.shellScript,
-                timeoutMs = RuntimeOperationContract.timeoutMs(
-                    when (action) {
-                        Action.PREPARE -> RuntimeOperationAction.PREPARE
-                        Action.START -> RuntimeOperationAction.START
-                        Action.STATUS -> RuntimeOperationAction.STATUS
-                        Action.LOGS -> RuntimeOperationAction.LOGS
-                        Action.STOP -> RuntimeOperationAction.STOP
-                        Action.CLEAN -> RuntimeOperationAction.CLEAN
-                        Action.CLONE_GITHUB -> error("clone has no runtime operation")
-                    },
-                ),
             ),
         )
     }

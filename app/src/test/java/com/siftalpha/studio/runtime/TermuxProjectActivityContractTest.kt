@@ -38,21 +38,29 @@ class TermuxProjectActivityContractTest {
     }
 
     @Test
-    fun watchdogIsProjectScopedAndDoesNotRequireGnuTimeout() {
+    fun externalActivityPreservesOwnershipAndWaitsForRealExit() {
         val script = TermuxProjectActivityContract.wrap(
             runtimeId = "project-a",
             operation = "clean",
             quotedShellScript = "'sleep 10'",
             hostPreamble = "set -e",
             hostProcessHelpers = "siftalpha_pid_alive() { return 1; }; siftalpha_stop_tree() { return 0; }",
-            timeoutMs = 2_000L,
         )
 
-        assertTrue(script.contains("activity_timed_out=0"))
-        assertTrue(script.contains("siftalpha_stop_tree \"\$activity_pid\""))
-        assertTrue(script.contains("SIFTALPHA_OPERATION_RESULT=TIMED_OUT"))
-        assertTrue(script.contains("SIFTALPHA_ERROR=OPERATION_TIMEOUT"))
-        assertTrue(!script.contains("command -v timeout"))
+        assertTrue(script.contains("activity_pid_file"))
+        assertTrue(script.contains("activity_pgid_file"))
+        assertTrue(script.contains("setsid bash -lc"))
+        assertTrue(script.contains("wait \"\$activity_pid\""))
+        assertTrue(script.indexOf("activity_pid_file") < script.indexOf("wait \"\$activity_pid\""))
+        assertTrue(script.indexOf("activity_pgid_file") < script.indexOf("wait \"\$activity_pid\""))
+        assertTrue(!script.contains("activity_timed_out"))
+        assertTrue(!script.contains("activity_started_at"))
+        assertTrue(!script.contains("SECONDS"))
+        assertTrue(!script.contains("/proc/\$activity_pid/stat"))
+        assertTrue(!script.contains("SIFTALPHA_OPERATION_RESULT=TIMED_OUT"))
+        assertTrue(!script.contains("SIFTALPHA_OPERATION_TIMEOUT_MS"))
+        assertTrue(!script.contains("SIFTALPHA_ERROR=OPERATION_TIMEOUT"))
+        assertTrue(!script.contains("siftalpha_stop_tree \"\$activity_pid\""))
         assertTrue(script.contains("project-a.activity.clean.pid"))
     }
 }

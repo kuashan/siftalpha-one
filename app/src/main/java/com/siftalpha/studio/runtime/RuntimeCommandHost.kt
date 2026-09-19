@@ -24,7 +24,6 @@ interface RuntimeCommandHost {
         runtimeId: String,
         operation: String,
         shellScript: String,
-        timeoutMs: Long = RuntimeOperationContract.STATUS_TIMEOUT_MS,
     ): String = shellScript
 
     fun stopProjectActivities(runtimeId: String): String = ""
@@ -75,25 +74,21 @@ internal object TermuxProjectActivityContract {
         quotedShellScript: String,
         hostPreamble: String,
         hostProcessHelpers: String,
-        timeoutMs: Long = RuntimeOperationContract.STATUS_TIMEOUT_MS,
     ): String {
         require(runtimeId.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid runtime id" }
         require(operation.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid operation id" }
-        require(timeoutMs > 0L) { "timeout must be positive" }
-        val timeoutSeconds = ((timeoutMs + 999L) / 1000L).coerceAtLeast(1L)
         return """
             ${hostPreamble}
             ${hostProcessHelpers}
             activity_pid_file="${'$'}runtime_dir/$runtimeId.activity.$operation.pid"
             activity_pgid_file="${'$'}runtime_dir/$runtimeId.activity.$operation.pgid"
-            activity_status_file="${'$'}activity_pid_file.status"
             old_pid="${'$'}(cat "${'$'}activity_pid_file" 2>/dev/null || true)"
             old_pgid="${'$'}(cat "${'$'}activity_pgid_file" 2>/dev/null || true)"
             if siftalpha_pid_alive "${'$'}old_pid" || { [ -n "${'$'}old_pgid" ] && siftalpha_group_alive "${'$'}old_pgid"; }; then
               echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
               exit 80
             fi
-            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file" "${'$'}activity_status_file"
+            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
             set +e
             if command -v setsid >/dev/null 2>&1; then
               setsid bash -lc ${quotedShellScript} &
@@ -105,42 +100,9 @@ internal object TermuxProjectActivityContract {
               activity_pid=${'$'}!
               printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pid_file"
             fi
-            # Keep the Android-side Pending bounded even when a guest shell or PRoot command
-            # stops producing output. This is a watchdog, not GNU timeout: Termux installations
-            # are not required to provide that utility. The parent shell owns activity_pid, so it
-            # must also perform the final wait; a background subshell cannot wait for a sibling
-            # child and would otherwise publish a false status immediately.
-            activity_started_at=${'$'}SECONDS
-            activity_timed_out=0
-            activity_finished=0
-            while [ "${'$'}activity_finished" -eq 0 ]; do
-              activity_proc_state=''
-              if [ -r "/proc/${'$'}activity_pid/stat" ]; then
-                activity_proc_state="${'$'}(awk '{print ${'$'}3}' "/proc/${'$'}activity_pid/stat" 2>/dev/null || true)"
-              fi
-              if [ ! -e "/proc/${'$'}activity_pid" ] || [ "${'$'}activity_proc_state" = 'Z' ]; then
-                activity_finished=1
-                break
-              fi
-              if [ "${'$'}((SECONDS - activity_started_at))" -ge "$timeoutSeconds" ]; then
-                activity_timed_out=1
-                siftalpha_stop_tree "${'$'}activity_pid" "${'$'}{activity_pgid:-}" || true
-                break
-              fi
-              sleep 1
-            done
-            if [ "${'$'}activity_timed_out" -eq 1 ]; then
-              wait "${'$'}activity_pid" 2>/dev/null || true
-              rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file" "${'$'}activity_status_file"
-              printf 'SIFTALPHA_OPERATION=%s\n' "$operation"
-              printf 'SIFTALPHA_OPERATION_RESULT=TIMED_OUT\n'
-              printf 'SIFTALPHA_OPERATION_TIMEOUT_MS=%s\n' "$timeoutMs"
-              printf 'SIFTALPHA_ERROR=OPERATION_TIMEOUT\n'
-              exit 124
-            fi
-            wait "${'$'}activity_pid" 2>/dev/null
+            wait "${'$'}activity_pid"
             activity_code=${'$'}?
-            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file" "${'$'}activity_status_file"
+            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
             exit "${'$'}activity_code"
         """.trimIndent()
     }
@@ -219,14 +181,12 @@ class TermuxProotRuntimeHost(
         runtimeId: String,
         operation: String,
         shellScript: String,
-        timeoutMs: Long,
     ): String = TermuxProjectActivityContract.wrap(
         runtimeId = runtimeId,
         operation = operation,
         quotedShellScript = sh(shellScript),
         hostPreamble = hostPreamble(),
         hostProcessHelpers = hostProcessHelpers(),
-        timeoutMs = timeoutMs,
     )
 
     override fun stopProjectActivities(runtimeId: String): String {
