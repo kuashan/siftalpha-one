@@ -32,6 +32,49 @@ class InternalRuntimeForegroundServiceTest {
     }
 
     @Test
+    fun foregroundReadyRequiresLeaseForegroundAndWakeLock() {
+        assertFalse(
+            InternalRuntimeForegroundReadyPolicy.isReady(
+                leaseActive = false,
+                foregroundActive = true,
+                wakeLockHeld = true,
+            ),
+        )
+        assertFalse(
+            InternalRuntimeForegroundReadyPolicy.isReady(
+                leaseActive = true,
+                foregroundActive = false,
+                wakeLockHeld = true,
+            ),
+        )
+        assertFalse(
+            InternalRuntimeForegroundReadyPolicy.isReady(
+                leaseActive = true,
+                foregroundActive = true,
+                wakeLockHeld = false,
+            ),
+        )
+        assertTrue(
+            InternalRuntimeForegroundReadyPolicy.isReady(
+                leaseActive = true,
+                foregroundActive = true,
+                wakeLockHeld = true,
+            ),
+        )
+    }
+
+    @Test
+    fun leaseMembershipCanBeObservedForReadyBarrierDiagnostics() {
+        val leases = InternalRuntimeProjectSet()
+
+        assertFalse(leases.contains("session-a"))
+        assertTrue(leases.acquire("session-a"))
+        assertTrue(leases.contains("session-a"))
+        assertTrue(leases.release("session-a"))
+        assertFalse(leases.contains("session-a"))
+    }
+
+    @Test
     fun failedLeaseCanBeRolledBackAndReacquired() {
         val leases = InternalRuntimeProjectSet()
 

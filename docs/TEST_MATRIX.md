@@ -489,3 +489,21 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Active Internal Runtime sessions retain Foreground Service + PARTIAL_WAKE_LOCK protection.
 - STOP releases only the current project/session lease and must not stop sibling projects.
 - Re-test OCI and situation-monitor Web behavior against the r24 baseline, then separately test background execution continuity.
+
+
+### alpha43-r29 first-layer background execution test
+
+- Baseline: r24 product/Web behavior must remain unchanged.
+- Before Internal Runtime launch, diagnostics/implementation must require an active session lease, foreground-service state and held PARTIAL_WAKE_LOCK.
+- Internal Alpine and Embedded CPython must not launch first and acquire foreground protection afterward.
+- Service-ready wait is bounded; failure must roll back the new lease and must not leave a phantom active lease.
+- Internal Alpine copied logs expose:
+  - SIFTALPHA_X_FGS_ACTIVE
+  - SIFTALPHA_X_WAKE_LOCK_HELD
+  - SIFTALPHA_X_RUNTIME_LAUNCH_AFTER_FGS
+  - SIFTALPHA_X_SERVICE_PID
+  - SIFTALPHA_X_RUNTIME_PID
+  - SIFTALPHA_X_RUNTIME_PID_ALIVE
+  - SIFTALPHA_X_RUNTIME_CPU_TICKS_START / NOW
+  - SIFTALPHA_X_FGS_HEARTBEAT_EPOCH_MS / AGE_MS
+- Real-device OCI acceptance: start OCI in Internal Runtime, confirm retries are progressing, background SiftAlpha for 5-10 minutes, return and copy logs. Compare heartbeat freshness, Runtime PID liveness, CPU ticks and OCI application log progress.

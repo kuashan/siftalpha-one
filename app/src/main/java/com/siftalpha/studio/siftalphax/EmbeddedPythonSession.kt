@@ -116,7 +116,13 @@ class EmbeddedPythonSession private constructor(context: Context) {
                 "EMBEDDED_R_PROCESS_ENVIRONMENT_RESTART_REQUIRED"
             }
         }
-        check(
+        val foreground = try {
+            InternalRuntimeForegroundService.acquireAndAwaitReady(appContext, spec.sessionId)
+        } catch (error: Throwable) {
+            throw IllegalStateException("INTERNAL_RUNTIME_FOREGROUND_SERVICE_FAILED", error)
+        }
+
+        val nativeStarted = runCatching {
             EmbeddedPythonBridge.nativeStart(
                 home.absolutePath,
                 spec.projectIdentity,
@@ -126,16 +132,14 @@ class EmbeddedPythonSession private constructor(context: Context) {
                 spec.workingDirectoryFile.absolutePath,
                 spec.sessionId,
                 spec.generation,
-            ),
-        ) {
-            "Embedded CPython did not accept the session"
+            )
+        }.getOrElse { error ->
+            InternalRuntimeForegroundService.release(appContext, spec.sessionId)
+            throw error
         }
-
-        try {
-            InternalRuntimeForegroundService.acquire(appContext, spec.sessionId)
-        } catch (error: Throwable) {
-            runCatching { EmbeddedPythonBridge.nativeRequestStop() }
-            throw IllegalStateException("INTERNAL_RUNTIME_FOREGROUND_SERVICE_FAILED", error)
+        if (!nativeStarted) {
+            InternalRuntimeForegroundService.release(appContext, spec.sessionId)
+            error("Embedded CPython did not accept the session")
         }
         monitorForegroundLease(spec.sessionId, spec.generation)
 
@@ -149,7 +153,11 @@ class EmbeddedPythonSession private constructor(context: Context) {
                 "SIFTALPHA_X_PROJECT_ID=" + spec.projectIdentity + " " +
                 "SIFTALPHA_X_ENVIRONMENT_KEY=" + spec.environmentKey.orEmpty() + " " +
                 "SIFTALPHA_X_SESSION_ID=" + spec.sessionId + " " +
-                "SIFTALPHA_X_GENERATION=" + spec.generation,
+                "SIFTALPHA_X_GENERATION=" + spec.generation + " " +
+                "SIFTALPHA_X_FGS_ACTIVE=" + (if (foreground.foregroundActive) "YES" else "NO") + " " +
+                "SIFTALPHA_X_WAKE_LOCK_HELD=" + (if (foreground.wakeLockHeld) "YES" else "NO") + " " +
+                "SIFTALPHA_X_RUNTIME_LAUNCH_AFTER_FGS=YES " +
+                "SIFTALPHA_X_SERVICE_PID=" + (foreground.servicePid ?: -1),
         )
         return snapshot()
     }

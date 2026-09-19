@@ -9,8 +9,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
+import android.os.Process
+import android.os.SystemClock
 import com.siftalpha.studio.MainActivity
 import com.siftalpha.studio.R
 
@@ -21,16 +25,51 @@ import com.siftalpha.studio.R
  * Internal Runtime implementations keep their existing lifecycle; a unique session lease only
  * keeps the hosting app process out of the cached/frozen state while that session is active.
  */
+data class InternalRuntimeForegroundDiagnostics(
+    val leaseActive: Boolean,
+    val foregroundActive: Boolean,
+    val wakeLockHeld: Boolean,
+    val servicePid: Int?,
+    val readyAtEpochMs: Long,
+    val heartbeatAtEpochMs: Long,
+) {
+    val ready: Boolean
+        get() = InternalRuntimeForegroundReadyPolicy.isReady(
+            leaseActive = leaseActive,
+            foregroundActive = foregroundActive,
+            wakeLockHeld = wakeLockHeld,
+        )
+}
+
+internal object InternalRuntimeForegroundReadyPolicy {
+    fun isReady(
+        leaseActive: Boolean,
+        foregroundActive: Boolean,
+        wakeLockHeld: Boolean,
+    ): Boolean = leaseActive && foregroundActive && wakeLockHeld
+}
+
 class InternalRuntimeForegroundService : Service() {
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private var foregroundActive = false
+    private val heartbeatHandler = Handler(Looper.getMainLooper())
+    private val heartbeatRunnable = object : Runnable {
+        override fun run() {
+            if (projects.isEmpty()) return
+            lastHeartbeatAtEpochMs = System.currentTimeMillis()
+            signalReadyChanged()
+            heartbeatHandler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
+        readyAtEpochMs = 0L
+        lastHeartbeatAtEpochMs = 0L
         runningService = this
         ensureChannel()
-        syncWakeLock()
-        promote(projects.size().coerceAtLeast(1))
+        refreshNotification()
         if (projects.isEmpty()) stopSelf()
     }
 
@@ -41,8 +80,11 @@ class InternalRuntimeForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        heartbeatHandler.removeCallbacks(heartbeatRunnable)
+        foregroundActive = false
         releaseWakeLock()
         if (runningService === this) runningService = null
+        signalReadyChanged()
         super.onDestroy()
     }
 
@@ -63,9 +105,22 @@ class InternalRuntimeForegroundService : Service() {
 
     private fun refreshNotification() {
         val count = projects.size()
-        syncWakeLock()
-        if (count <= 0) return
+        if (count <= 0) {
+            signalReadyChanged()
+            return
+        }
+        // Establish the Android foreground-service state before holding the CPU awake.
+        // Runtime launchers wait for both facts before creating the actual Runtime process.
         promote(count)
+        foregroundActive = true
+        syncWakeLock()
+        if (readyAtEpochMs <= 0L && wakeLock?.isHeld == true) {
+            readyAtEpochMs = System.currentTimeMillis()
+        }
+        lastHeartbeatAtEpochMs = System.currentTimeMillis()
+        heartbeatHandler.removeCallbacks(heartbeatRunnable)
+        heartbeatHandler.postDelayed(heartbeatRunnable, HEARTBEAT_INTERVAL_MS)
+        signalReadyChanged()
     }
 
     private fun syncWakeLock() {
@@ -128,29 +183,90 @@ class InternalRuntimeForegroundService : Service() {
         private const val CHANNEL_ID = "siftalpha_internal_runtime"
         private const val NOTIFICATION_ID = 0x5341
         private const val WAKE_LOCK_TAG = "SiftAlpha:InternalRuntime"
+        private const val READY_TIMEOUT_MS = 5_000L
+        private const val HEARTBEAT_INTERVAL_MS = 15_000L
         private val projects = InternalRuntimeProjectSet()
+        private val readyMonitor = Object()
 
         @Volatile
         private var runningService: InternalRuntimeForegroundService? = null
 
+        @Volatile
+        private var readyAtEpochMs = 0L
+
+        @Volatile
+        private var lastHeartbeatAtEpochMs = 0L
+
         fun acquire(context: Context, sessionLeaseId: String) {
+            acquireAndAwaitReady(context, sessionLeaseId)
+        }
+
+        fun acquireAndAwaitReady(
+            context: Context,
+            sessionLeaseId: String,
+            timeoutMs: Long = READY_TIMEOUT_MS,
+        ): InternalRuntimeForegroundDiagnostics {
             require(sessionLeaseId.isNotBlank())
-            if (!projects.acquire(sessionLeaseId)) return
+            require(timeoutMs > 0L)
+            val added = projects.acquire(sessionLeaseId)
             try {
                 val service = runningService
                 if (service != null) {
                     service.refreshNotification()
-                    return
+                } else {
+                    val appContext = context.applicationContext
+                    appContext.startForegroundService(
+                        Intent(appContext, InternalRuntimeForegroundService::class.java),
+                    )
                 }
-                val appContext = context.applicationContext
-                appContext.startForegroundService(
-                    Intent(appContext, InternalRuntimeForegroundService::class.java),
-                )
+
+                diagnostics(sessionLeaseId).takeIf { it.ready }?.let { return it }
+                check(Looper.myLooper() != Looper.getMainLooper()) {
+                    "INTERNAL_RUNTIME_FOREGROUND_READY_WAIT_REQUIRES_BACKGROUND_THREAD"
+                }
+
+                val deadline = SystemClock.elapsedRealtime() + timeoutMs
+                synchronized(readyMonitor) {
+                    while (true) {
+                        diagnostics(sessionLeaseId).takeIf { it.ready }?.let { return it }
+                        val remaining = deadline - SystemClock.elapsedRealtime()
+                        if (remaining <= 0L) {
+                            error("INTERNAL_RUNTIME_FOREGROUND_READY_TIMEOUT")
+                        }
+                        readyMonitor.wait(remaining)
+                    }
+                }
             } catch (error: Throwable) {
-                // A failed service start must not leave a phantom lease that prevents the next
-                // legitimate Internal Runtime session from starting foreground protection.
-                projects.release(sessionLeaseId)
+                if (added) {
+                    projects.release(sessionLeaseId)
+                    val appContext = context.applicationContext
+                    if (projects.isEmpty()) {
+                        appContext.stopService(
+                            Intent(appContext, InternalRuntimeForegroundService::class.java),
+                        )
+                    } else {
+                        runningService?.refreshNotification()
+                    }
+                }
                 throw error
+            }
+        }
+
+        fun diagnostics(sessionLeaseId: String): InternalRuntimeForegroundDiagnostics {
+            val service = runningService
+            return InternalRuntimeForegroundDiagnostics(
+                leaseActive = projects.contains(sessionLeaseId),
+                foregroundActive = service?.foregroundActive == true,
+                wakeLockHeld = service?.wakeLock?.isHeld == true,
+                servicePid = service?.let { Process.myPid() },
+                readyAtEpochMs = readyAtEpochMs,
+                heartbeatAtEpochMs = lastHeartbeatAtEpochMs,
+            )
+        }
+
+        private fun signalReadyChanged() {
+            synchronized(readyMonitor) {
+                readyMonitor.notifyAll()
             }
         }
 
@@ -162,6 +278,7 @@ class InternalRuntimeForegroundService : Service() {
             } else {
                 runningService?.refreshNotification()
             }
+            signalReadyChanged()
         }
     }
 }
@@ -183,6 +300,9 @@ internal class InternalRuntimeProjectSet {
 
     @Synchronized
     fun isEmpty(): Boolean = ids.isEmpty()
+
+    @Synchronized
+    fun contains(id: String): Boolean = ids.contains(id)
 }
 
 

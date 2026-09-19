@@ -496,3 +496,8 @@ Production external runtime 仍主要依赖 Termux + PRoot + Ubuntu + Python 作
 ## alpha43-r28 current test baseline
 
 This build intentionally uses r24 behavior as the product baseline and adds only Internal Runtime Foreground Service + PARTIAL_WAKE_LOCK protection. The later unified deployment start-contract integration, four-stage Web presentation, and HTTP readiness probe are not part of this test baseline.
+
+
+## alpha43-r29 background execution experiment
+
+r24 remains the known usable functional baseline. r29 does not alter Web behavior. It tests only the first-layer background hypothesis: Android foreground-service state and PARTIAL_WAKE_LOCK must be established before Internal Runtime launch, and the resulting service/process state must be observable through explicit diagnostics. If real-device OCI still stops progressing while FGS heartbeat, wake lock and Runtime PID remain healthy, the next investigation should distinguish Runtime scheduling from network/application progress before any larger ownership migration.

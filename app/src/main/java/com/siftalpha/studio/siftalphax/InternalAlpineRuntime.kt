@@ -463,6 +463,26 @@ class InternalAlpineEnvironmentManager(context: Context) {
     }
 }
 
+
+internal object InternalRuntimeProcDiagnostics {
+    fun cpuTicks(pid: Int): Long? {
+        if (pid <= 0) return null
+        val stat = runCatching { File("/proc/$pid/stat").readText() }.getOrNull() ?: return null
+        return cpuTicksFromStat(stat)
+    }
+
+    internal fun cpuTicksFromStat(stat: String): Long? {
+        val closingParen = stat.lastIndexOf(')')
+        if (closingParen < 0 || closingParen + 2 >= stat.length) return null
+        val fields = stat.substring(closingParen + 2)
+            .trim()
+            .split(Regex("""\s+"""))
+        val userTicks = fields.getOrNull(11)?.toLongOrNull() ?: return null
+        val systemTicks = fields.getOrNull(12)?.toLongOrNull() ?: return null
+        return userTicks + systemTicks
+    }
+}
+
 class InternalAlpineSession private constructor(context: Context) {
     private val appContext = context.applicationContext
     private val nextGeneration = AtomicLong(0L)
@@ -478,6 +498,10 @@ class InternalAlpineSession private constructor(context: Context) {
         val stdout: File,
         val stderr: File,
         val startedAt: Long,
+        val foregroundReadyAtEpochMs: Long,
+        val foregroundServicePid: Int?,
+        val runtimeHostPid: Int?,
+        val runtimeCpuTicksAtLaunch: Long?,
         @Volatile var state: EmbeddedPythonState,
         @Volatile var process: InternalAlpineManagedProcess?,
         @Volatile var finishedAt: Long? = null,
@@ -546,8 +570,22 @@ class InternalAlpineSession private constructor(context: Context) {
             workingDirectory = "/workspace",
         )
         command.redirectOutput(stdout).redirectError(stderr)
-        val managed = command.start()
+
+        val foreground = try {
+            InternalRuntimeForegroundService.acquireAndAwaitReady(appContext, sessionId)
+        } catch (error: Throwable) {
+            throw IllegalStateException("INTERNAL_RUNTIME_FOREGROUND_SERVICE_FAILED", error)
+        }
+
+        val managed = try {
+            command.start()
+        } catch (error: Throwable) {
+            InternalRuntimeForegroundService.release(appContext, sessionId)
+            throw error
+        }
         val process = managed.process
+        val runtimeHostPid = managed.hostPid()
+        val runtimeCpuTicksAtLaunch = runtimeHostPid?.let(InternalRuntimeProcDiagnostics::cpuTicks)
         val record = Record(
             sessionId = sessionId,
             projectIdentity = projectIdentity,
@@ -557,17 +595,14 @@ class InternalAlpineSession private constructor(context: Context) {
             stdout = stdout,
             stderr = stderr,
             startedAt = System.currentTimeMillis(),
+            foregroundReadyAtEpochMs = foreground.readyAtEpochMs,
+            foregroundServicePid = foreground.servicePid,
+            runtimeHostPid = runtimeHostPid,
+            runtimeCpuTicksAtLaunch = runtimeCpuTicksAtLaunch,
             state = EmbeddedPythonState.RUNNING,
             process = managed,
         )
         records[projectIdentity] = record
-        try {
-            InternalRuntimeForegroundService.acquire(appContext, sessionId)
-        } catch (error: Throwable) {
-            records.remove(projectIdentity, record)
-            InternalAlpineProcessControl.terminate(managed)
-            throw IllegalStateException("INTERNAL_RUNTIME_FOREGROUND_SERVICE_FAILED", error)
-        }
         monitor.execute {
             try {
                 val code = runCatching { process.waitFor() }.getOrElse { -1 }
@@ -618,9 +653,39 @@ class InternalAlpineSession private constructor(context: Context) {
             startedAtEpochMs = record.startedAt,
             finishedAtEpochMs = record.finishedAt,
             exitCode = record.exitCode,
-            stdout = InternalAlpineEnvironmentManager.readTail(record.stdout, 512 * 1024),
+            stdout = buildString {
+                appendLine(backgroundDiagnostics(record))
+                val projectStdout = InternalAlpineEnvironmentManager.readTail(record.stdout, 512 * 1024)
+                if (projectStdout.isNotBlank()) append(projectStdout)
+            }.trimEnd(),
             stderr = InternalAlpineEnvironmentManager.readTail(record.stderr, 512 * 1024),
         )
+
+    private fun backgroundDiagnostics(record: Record): String {
+        val foreground = InternalRuntimeForegroundService.diagnostics(record.sessionId)
+        val runtimePid = record.runtimeHostPid
+        val runtimeAlive = runtimePid?.let { File("/proc/$it").exists() } == true
+        val cpuTicksNow = runtimePid?.let(InternalRuntimeProcDiagnostics::cpuTicks)
+        val heartbeatAgeMs = foreground.heartbeatAtEpochMs
+            .takeIf { it > 0L }
+            ?.let { (System.currentTimeMillis() - it).coerceAtLeast(0L) }
+        return listOf(
+            "SIFTALPHA_X_FGS_REQUESTED=YES",
+            "SIFTALPHA_X_FGS_ACTIVE=" + yesNo(foreground.foregroundActive),
+            "SIFTALPHA_X_WAKE_LOCK_HELD=" + yesNo(foreground.wakeLockHeld),
+            "SIFTALPHA_X_RUNTIME_LAUNCH_AFTER_FGS=YES",
+            "SIFTALPHA_X_FGS_READY_AT_EPOCH_MS=" + record.foregroundReadyAtEpochMs,
+            "SIFTALPHA_X_SERVICE_PID=" + (record.foregroundServicePid ?: -1),
+            "SIFTALPHA_X_RUNTIME_PID=" + (runtimePid ?: -1),
+            "SIFTALPHA_X_RUNTIME_PID_ALIVE=" + yesNo(runtimeAlive),
+            "SIFTALPHA_X_RUNTIME_CPU_TICKS_START=" + (record.runtimeCpuTicksAtLaunch ?: -1L),
+            "SIFTALPHA_X_RUNTIME_CPU_TICKS_NOW=" + (cpuTicksNow ?: -1L),
+            "SIFTALPHA_X_FGS_HEARTBEAT_EPOCH_MS=" + foreground.heartbeatAtEpochMs,
+            "SIFTALPHA_X_FGS_HEARTBEAT_AGE_MS=" + (heartbeatAgeMs ?: -1L),
+        ).joinToString("\n")
+    }
+
+    private fun yesNo(value: Boolean): String = if (value) "YES" else "NO"
 
     companion object {
         @Volatile

@@ -123,6 +123,13 @@ class InternalAlpineRuntimeTest {
     }
 
     @Test
+    fun procCpuTicksParserHandlesProcessNamesWithSpaces() {
+        val stat = "123 (python worker) S 1 2 3 4 5 6 7 8 9 10 120 30 0 0 0"
+        assertEquals(150L, InternalRuntimeProcDiagnostics.cpuTicksFromStat(stat))
+        assertEquals(null, InternalRuntimeProcDiagnostics.cpuTicksFromStat("broken"))
+    }
+
+    @Test
     fun tarExtractorPreservesFilesAndGuestAbsoluteSymlinks() {
         val root = Files.createTempDirectory("siftalpha-alpine-tar").toFile()
         try {

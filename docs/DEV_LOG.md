@@ -974,3 +974,17 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Worker remains frozen. STOP remains current-project-only. External Runtime behavior is unchanged.
 - versionCode 154 / versionName 0.8.0-alpha43-r28.
 - Cloud CI and real-device verification pending.
+
+
+## 2026-09-20 · alpha43-r29 foreground-ready launch barrier
+
+- r24 remains the known usable product/Web baseline. No Web discovery, Web presentation, Rich Result, External Runtime, Worker, or STOP semantics are changed.
+- r28 wake-only result is recorded as REAL_DEVICE_FAIL for the OCI background-continuity goal: holding a PARTIAL_WAKE_LOCK after Runtime launch did not keep OCI progressing after SiftAlpha moved to background.
+- r29 changes ordering only: each Internal Runtime session acquires its foreground-service lease and waits until the service has successfully entered foreground state and holds PARTIAL_WAKE_LOCK before the Runtime process/interpreter is launched.
+- Internal Alpine launches only after the foreground-ready barrier. If service readiness times out or fails, the Runtime process is not created.
+- Embedded CPython uses the same pre-launch foreground-ready barrier.
+- Added bounded 5-second service-ready wait and 15-second service heartbeat state.
+- Added Internal Alpine diagnostics to copied logs: FGS requested/active, wake-lock held, launch-after-FGS, service PID, Runtime PID, Runtime PID alive, Runtime CPU ticks at launch/current, FGS heartbeat timestamp and heartbeat age.
+- These diagnostics are intended to distinguish service death, Runtime process death/freeze, and a still-running Runtime whose application/network work has stopped.
+- versionCode 155 / versionName 0.8.0-alpha43-r29.
+- Cloud CI and real-device verification pending.
