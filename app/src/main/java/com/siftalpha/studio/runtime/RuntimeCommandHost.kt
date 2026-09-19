@@ -80,8 +80,8 @@ internal object TermuxProjectActivityContract {
         return """
             ${hostPreamble}
             ${hostProcessHelpers}
-            activity_pid_file="${'$'}runtime_dir/$runtimeId.activity.${'$'}operation.pid"
-            activity_pgid_file="${'$'}runtime_dir/$runtimeId.activity.${'$'}operation.pgid"
+            activity_pid_file="${'$'}runtime_dir/$runtimeId.activity.$operation.pid"
+            activity_pgid_file="${'$'}runtime_dir/$runtimeId.activity.$operation.pgid"
             old_pid="${'$'}(cat "${'$'}activity_pid_file" 2>/dev/null || true)"
             old_pgid="${'$'}(cat "${'$'}activity_pgid_file" 2>/dev/null || true)"
             if siftalpha_pid_alive "${'$'}old_pid" || { [ -n "${'$'}old_pgid" ] && siftalpha_group_alive "${'$'}old_pgid"; }; then
