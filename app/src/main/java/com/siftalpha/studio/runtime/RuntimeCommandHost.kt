@@ -80,30 +80,491 @@ internal object TermuxProjectActivityContract {
         return """
             ${hostPreamble}
             ${hostProcessHelpers}
-            activity_pid_file="\$runtime_dir/$runtimeId.activity.\$operation.pid"
-            activity_pgid_file="\$runtime_dir/$runtimeId.activity.\$operation.pgid"
-            old_pid="\$(cat "\$activity_pid_file" 2>/dev/null || true)"
-            old_pgid="\$(cat "\$activity_pgid_file" 2>/dev/null || true)"
-            if siftalpha_pid_alive "\$old_pid" || { [ -n "\$old_pgid" ] && siftalpha_group_alive "\$old_pgid"; }; then
+            activity_pid_file="${'runtime_dir/$runtimeId.activity.@D@operation.pid"
+            activity_pgid_file="@D@runtime_dir/$runtimeId.activity.@D@operation.pgid"
+            old_pid="@D@(cat "@D@activity_pid_file" 2>/dev/null || true)"
+            old_pgid="@D@(cat "@D@activity_pgid_file" 2>/dev/null || true)"
+            if siftalpha_pid_alive "@D@old_pid" || { [ -n "@D@old_pgid" ] && siftalpha_group_alive "@D@old_pgid"; }; then
               echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
               exit 80
             fi
-            rm -f -- "\$activity_pid_file" "\$activity_pgid_file"
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
             set +e
             if command -v setsid >/dev/null 2>&1; then
               setsid bash -lc ${quotedShellScript} &
-              activity_pid=\$!
-              printf '%s\\n' "\$activity_pid" >"\$activity_pid_file"
-              printf '%s\\n' "\$activity_pid" >"\$activity_pgid_file"
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
             else
               bash -lc ${quotedShellScript} &
-              activity_pid=\$!
-              printf '%s\\n' "\$activity_pid" >"\$activity_pid_file"
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
             fi
-            wait "\$activity_pid"
-            activity_code=\$?
-            rm -f -- "\$activity_pid_file" "\$activity_pgid_file"
-            exit "\$activity_code"
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}runtime_dir/$runtimeId.activity.${'operation.pid"
+            activity_pgid_file="@D@runtime_dir/$runtimeId.activity.@D@operation.pgid"
+            old_pid="@D@(cat "@D@activity_pid_file" 2>/dev/null || true)"
+            old_pgid="@D@(cat "@D@activity_pgid_file" 2>/dev/null || true)"
+            if siftalpha_pid_alive "@D@old_pid" || { [ -n "@D@old_pgid" ] && siftalpha_group_alive "@D@old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}operation.pid"
+            activity_pgid_file="${'runtime_dir/$runtimeId.activity.@D@operation.pgid"
+            old_pid="@D@(cat "@D@activity_pid_file" 2>/dev/null || true)"
+            old_pgid="@D@(cat "@D@activity_pgid_file" 2>/dev/null || true)"
+            if siftalpha_pid_alive "@D@old_pid" || { [ -n "@D@old_pgid" ] && siftalpha_group_alive "@D@old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}runtime_dir/$runtimeId.activity.${'operation.pgid"
+            old_pid="@D@(cat "@D@activity_pid_file" 2>/dev/null || true)"
+            old_pgid="@D@(cat "@D@activity_pgid_file" 2>/dev/null || true)"
+            if siftalpha_pid_alive "@D@old_pid" || { [ -n "@D@old_pgid" ] && siftalpha_group_alive "@D@old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}operation.pgid"
+            old_pid="${'(cat "@D@activity_pid_file" 2>/dev/null || true)"
+            old_pgid="@D@(cat "@D@activity_pgid_file" 2>/dev/null || true)"
+            if siftalpha_pid_alive "@D@old_pid" || { [ -n "@D@old_pgid" ] && siftalpha_group_alive "@D@old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}(cat "${'activity_pid_file" 2>/dev/null || true)"
+            old_pgid="@D@(cat "@D@activity_pgid_file" 2>/dev/null || true)"
+            if siftalpha_pid_alive "@D@old_pid" || { [ -n "@D@old_pgid" ] && siftalpha_group_alive "@D@old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_pid_file" 2>/dev/null || true)"
+            old_pgid="${'(cat "@D@activity_pgid_file" 2>/dev/null || true)"
+            if siftalpha_pid_alive "@D@old_pid" || { [ -n "@D@old_pgid" ] && siftalpha_group_alive "@D@old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}(cat "${'activity_pgid_file" 2>/dev/null || true)"
+            if siftalpha_pid_alive "@D@old_pid" || { [ -n "@D@old_pgid" ] && siftalpha_group_alive "@D@old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_pgid_file" 2>/dev/null || true)"
+            if siftalpha_pid_alive "${'old_pid" || { [ -n "@D@old_pgid" ] && siftalpha_group_alive "@D@old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}old_pid" || { [ -n "${'old_pgid" ] && siftalpha_group_alive "@D@old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}old_pgid" ] && siftalpha_group_alive "${'old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}old_pgid"; }; then
+              echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
+              exit 80
+            fi
+            rm -f -- "${'activity_pid_file" "@D@activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_pid_file" "${'activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_pgid_file"
+            set +e
+            if command -v setsid >/dev/null 2>&1; then
+              setsid bash -lc ${quotedShellScript} &
+              activity_pid=${'!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}!
+              printf '%s\n' "${'activity_pid" >"@D@activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_pid" >"${'activity_pid_file"
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_pid_file"
+              printf '%s\n' "${'activity_pid" >"@D@activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_pid" >"${'activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=@D@!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_pgid_file"
+            else
+              bash -lc ${quotedShellScript} &
+              activity_pid=${'!
+              printf '%s\n' "@D@activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}!
+              printf '%s\n' "${'activity_pid" >"@D@activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_pid" >"${'activity_pid_file"
+            fi
+            wait "@D@activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_pid_file"
+            fi
+            wait "${'activity_pid"
+            activity_code=@D@?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_pid"
+            activity_code=${'?
+            rm -f -- "@D@activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}?
+            rm -f -- "${'activity_pid_file" "@D@activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_pid_file" "${'activity_pgid_file"
+            exit "@D@activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_pgid_file"
+            exit "${'activity_code"
+        """.trimIndent()
+    }
+}
+
+}activity_code"
         """.trimIndent()
     }
 }
