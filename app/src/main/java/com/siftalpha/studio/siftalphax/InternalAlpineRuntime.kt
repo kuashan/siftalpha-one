@@ -81,6 +81,52 @@ internal object InternalAlpinePythonRuntimeBootstrap {
     }
 }
 
+internal object InternalAlpineDependencyBootstrap {
+    private const val PIP_COMMON =
+        "--disable-pip-version-check --no-input --no-compile --timeout 30 --retries 4"
+
+    fun installCommand(kind: InternalAlpineDependencySource.Kind): String = buildString {
+        append("set -eu\n")
+        append("printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=CREATE_VENV\\n'\n")
+        append("virtualenv /siftalpha-env/venv\n")
+        append("printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=UPGRADE_PIP\\n'\n")
+        append("/siftalpha-env/venv/bin/python -m pip install ")
+        append(PIP_COMMON)
+        append(" --upgrade pip\n")
+        when (kind) {
+            InternalAlpineDependencySource.Kind.REQUIREMENTS_TXT -> {
+                append("printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=INSTALL_DEPENDENCIES\\n'\n")
+                append("/siftalpha-env/venv/bin/python -m pip install ")
+                append(PIP_COMMON)
+                append(" -r /workspace/requirements.txt\n")
+            }
+            InternalAlpineDependencySource.Kind.PYPROJECT_TOML -> {
+                append("printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=INSTALL_DEPENDENCIES\\n'\n")
+                append("/siftalpha-env/venv/bin/python -m pip install ")
+                append(PIP_COMMON)
+                append(" /workspace\n")
+            }
+            InternalAlpineDependencySource.Kind.NONE -> Unit
+        }
+        append("printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=PIP_CHECK\\n'\n")
+        append("/siftalpha-env/venv/bin/python -m pip check\n")
+        append("printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=VERIFY_PYTHON\\n'\n")
+        append("/siftalpha-env/venv/bin/python -c 'import sys; print(sys.version)'\n")
+    }
+}
+
+internal object InternalAlpinePrepareWatchdog {
+    const val HEARTBEAT_INTERVAL_MS = 5_000L
+    const val OUTPUT_IDLE_TIMEOUT_MS = 12L * 60L * 1_000L
+    const val HARD_TIMEOUT_MS = 30L * 60L * 1_000L
+
+    fun violation(elapsedMillis: Long, outputIdleMillis: Long): String? = when {
+        elapsedMillis >= HARD_TIMEOUT_MS -> "HARD_TIMEOUT"
+        outputIdleMillis >= OUTPUT_IDLE_TIMEOUT_MS -> "OUTPUT_IDLE_TIMEOUT"
+        else -> null
+    }
+}
+
 internal object InternalAlpineProcessControl {
     private const val MAX_DESCENDANTS = 2048
 
@@ -194,20 +240,7 @@ class InternalAlpineEnvironmentManager(context: Context) {
         check(temp.mkdirs())
         val log = File(temp, "prepare.log")
         try {
-            val command = buildString {
-                append("set -eu\n")
-                append("virtualenv /siftalpha-env/venv\n")
-                append("/siftalpha-env/venv/bin/python -m pip install --disable-pip-version-check --no-input --upgrade pip\n")
-                when (source.kind) {
-                    InternalAlpineDependencySource.Kind.REQUIREMENTS_TXT ->
-                        append("/siftalpha-env/venv/bin/python -m pip install --disable-pip-version-check --no-input -r /workspace/requirements.txt\n")
-                    InternalAlpineDependencySource.Kind.PYPROJECT_TOML ->
-                        append("/siftalpha-env/venv/bin/python -m pip install --disable-pip-version-check --no-input /workspace\n")
-                    InternalAlpineDependencySource.Kind.NONE -> Unit
-                }
-                append("/siftalpha-env/venv/bin/python -m pip check\n")
-                append("/siftalpha-env/venv/bin/python -c 'import sys; print(sys.version)'\n")
-            }
+            val command = InternalAlpineDependencyBootstrap.installCommand(source.kind)
             runCommand(
                 builder = InternalAlpineFiles.buildCommand(
                     appContext,
@@ -306,28 +339,59 @@ class InternalAlpineEnvironmentManager(context: Context) {
     ) {
         logFile.parentFile?.mkdirs()
         builder.redirectErrorStream(true).redirectOutput(logFile)
-        progress?.invoke(progressText(projectIdentity, stage, ""))
+        progress?.invoke(progressText(projectIdentity, stage, "", 0L, 0L, true))
         val managed = builder.start()
         val process = managed.process
-        var lastProgressText = ""
-        var lastProgressAt = 0L
+        val startedAt = System.currentTimeMillis()
+        var lastObservedTail = ""
+        var lastOutputChangedAt = startedAt
+        var lastPublishedAt = 0L
 
         fun publishProgress(force: Boolean = false) {
             val callback = progress ?: return
             val now = System.currentTimeMillis()
-            if (!force && now - lastProgressAt < PROGRESS_INTERVAL_MS) return
             val tail = readTail(logFile, PROGRESS_TAIL_CHARS)
-            if (!force && tail == lastProgressText) return
-            lastProgressText = tail
-            lastProgressAt = now
-            callback(progressText(projectIdentity, stage, tail))
+            if (tail != lastObservedTail) {
+                lastObservedTail = tail
+                lastOutputChangedAt = now
+            }
+            val dueHeartbeat = now - lastPublishedAt >= InternalAlpinePrepareWatchdog.HEARTBEAT_INTERVAL_MS
+            if (!force && !dueHeartbeat) return
+            lastPublishedAt = now
+            callback(
+                progressText(
+                    projectIdentity = projectIdentity,
+                    stage = stage,
+                    tail = tail,
+                    elapsedMillis = now - startedAt,
+                    outputIdleMillis = now - lastOutputChangedAt,
+                    processAlive = process.isAlive,
+                ),
+            )
         }
 
         try {
             while (true) {
                 if (process.waitFor(250, TimeUnit.MILLISECONDS)) break
                 publishProgress()
-                if (Thread.currentThread().isInterrupted) throw InterruptedException("Internal Alpine operation cancelled")
+                val now = System.currentTimeMillis()
+                val violation = InternalAlpinePrepareWatchdog.violation(
+                    elapsedMillis = now - startedAt,
+                    outputIdleMillis = now - lastOutputChangedAt,
+                )
+                if (violation != null) {
+                    InternalAlpineProcessControl.terminate(managed)
+                    error(
+                        failurePrefix +
+                            ": " + violation +
+                            " elapsed_sec=" + ((now - startedAt) / 1_000L) +
+                            " output_idle_sec=" + ((now - lastOutputChangedAt) / 1_000L) +
+                            "\n" + readTail(logFile, 12_000),
+                    )
+                }
+                if (Thread.currentThread().isInterrupted) {
+                    throw InterruptedException("Internal Alpine operation cancelled")
+                }
             }
             publishProgress(force = true)
         } catch (cancelled: InterruptedException) {
@@ -345,12 +409,17 @@ class InternalAlpineEnvironmentManager(context: Context) {
         projectIdentity: String,
         stage: String,
         tail: String,
+        elapsedMillis: Long = 0L,
+        outputIdleMillis: Long = 0L,
+        processAlive: Boolean = true,
     ): String = buildString {
         appendLine("SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R")
         appendLine("SIFTALPHA_X_PROJECT_ID=" + projectIdentity)
         appendLine("SIFTALPHA_X_ENVIRONMENT_STAGE=PREPARING")
-        append("SIFTALPHA_X_INTERNAL_PREPARE_STAGE=")
-        append(stage)
+        appendLine("SIFTALPHA_X_INTERNAL_PREPARE_STAGE=" + stage)
+        appendLine("SIFTALPHA_X_INTERNAL_PREPARE_PROCESS_ALIVE=" + processAlive)
+        appendLine("SIFTALPHA_X_INTERNAL_PREPARE_ELAPSED_SEC=" + (elapsedMillis / 1_000L))
+        append("SIFTALPHA_X_INTERNAL_PREPARE_OUTPUT_IDLE_SEC=" + (outputIdleMillis / 1_000L))
         if (tail.isNotBlank()) {
             appendLine()
             appendLine()

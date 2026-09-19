@@ -38,6 +38,46 @@ class InternalAlpineRuntimeTest {
     }
 
     @Test
+    fun dependencyBootstrapAvoidsInstallTimeBytecodeCompilationAndBoundsNetworkWaits() {
+        val command = InternalAlpineDependencyBootstrap.installCommand(
+            InternalAlpineDependencySource.Kind.REQUIREMENTS_TXT,
+        )
+
+        assertTrue(command.contains("--no-compile"))
+        assertTrue(command.contains("--timeout 30"))
+        assertTrue(command.contains("--retries 4"))
+        assertTrue(command.contains("SIFTALPHA_X_INTERNAL_PREPARE_STEP=CREATE_VENV"))
+        assertTrue(command.contains("SIFTALPHA_X_INTERNAL_PREPARE_STEP=INSTALL_DEPENDENCIES"))
+        assertTrue(command.contains("SIFTALPHA_X_INTERNAL_PREPARE_STEP=PIP_CHECK"))
+        assertTrue(command.contains("-r /workspace/requirements.txt"))
+    }
+
+    @Test
+    fun prepareWatchdogIsBoundedAndPrefersHardTimeout() {
+        assertEquals(
+            "OUTPUT_IDLE_TIMEOUT",
+            InternalAlpinePrepareWatchdog.violation(
+                elapsedMillis = InternalAlpinePrepareWatchdog.OUTPUT_IDLE_TIMEOUT_MS,
+                outputIdleMillis = InternalAlpinePrepareWatchdog.OUTPUT_IDLE_TIMEOUT_MS,
+            ),
+        )
+        assertEquals(
+            "HARD_TIMEOUT",
+            InternalAlpinePrepareWatchdog.violation(
+                elapsedMillis = InternalAlpinePrepareWatchdog.HARD_TIMEOUT_MS,
+                outputIdleMillis = InternalAlpinePrepareWatchdog.OUTPUT_IDLE_TIMEOUT_MS,
+            ),
+        )
+        assertEquals(
+            null,
+            InternalAlpinePrepareWatchdog.violation(
+                elapsedMillis = 60_000L,
+                outputIdleMillis = 30_000L,
+            ),
+        )
+    }
+
+    @Test
     fun tarExtractorPreservesFilesAndGuestAbsoluteSymlinks() {
         val root = Files.createTempDirectory("siftalpha-alpine-tar").toFile()
         try {
