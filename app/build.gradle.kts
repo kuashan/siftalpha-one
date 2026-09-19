@@ -63,10 +63,10 @@ android {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        // alpha43-r17 restores direct External execution with lightweight ownership metadata.
+        // alpha43-r18 adds project-scoped Internal Alpine listener discovery; External remains frozen.
         // Final source validation is cloud-only; real-device acceptance remains separate.
-        versionCode = 143
-        versionName = "0.8.0-alpha43-r17"
+        versionCode = 144
+        versionName = "0.8.0-alpha43-r18"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

@@ -400,3 +400,12 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 | RD-43-11 | Automatic LOGS bounded behavior | PASS / source + unit + behavior evidence | Web discovery 最多 3 次有界 LOGS probe；终态一次 final LOGS；不声称后台无限刷新。 |
 
 **alpha43 real-device acceptance = PASS**
+
+### alpha43-r18 Internal Runtime Reliability Repair
+
+- Internal Alpine Web Discovery: source change adds project PID-tree/socket-inode observation and reuses the existing endpoint probe; real-device validation is pending.
+- Internal Alpine network audit: `refreshDns()` and the PRoot guest environment were reviewed; no SiftAlpha network defect is proven from the available OCI disconnect evidence, so no network code was changed.
+- External Runtime r17 production code: unchanged.
+- JVM coverage: explicit URL/log compatibility, empty-stdout scoped listener discovery, unrelated-PID exclusion, no-listener no-candidate, and stale session/generation fencing.
+- W0 Cloud Build / Internal Alpine Probe: pending for the final HEAD.
+- Real-device Internal matrix: pending. Required first checks are `primary:AcodeProjects/situation-monitor` Web discovery and `primary:AcodeProjects/OCI` network observation.

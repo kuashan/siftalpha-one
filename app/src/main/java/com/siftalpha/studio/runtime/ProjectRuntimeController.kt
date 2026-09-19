@@ -11,6 +11,7 @@ import com.siftalpha.studio.siftalphax.EmbeddedPythonStatePolicy
 import com.siftalpha.studio.siftalphax.InternalAlpineDependencySource
 import com.siftalpha.studio.siftalphax.InternalAlpineEnvironmentManager
 import com.siftalpha.studio.siftalphax.InternalAlpineSession
+import com.siftalpha.studio.siftalphax.InternalAlpineWebObservation
 import com.siftalpha.studio.siftalphax.InternalPythonBackend
 import java.io.File
 
@@ -158,6 +159,23 @@ class ProjectRuntimeController(
             ?: candidates.maxByOrNull { it.startedAtEpochMs ?: Long.MIN_VALUE }
         selected?.let(::cleanupEmbeddedStaging)
         return selected
+    }
+
+    fun internalAlpineWebObservationFor(
+        snapshot: EmbeddedPythonSnapshot,
+    ): InternalAlpineWebObservation? {
+        if (
+            snapshot.engine != InternalPythonBackend.ALPINE ||
+            snapshot.sessionId.isBlank() ||
+            snapshot.generation <= 0L
+        ) {
+            return null
+        }
+        return internalAlpineSession?.webObservation(
+            projectIdentity = snapshot.projectIdentity,
+            expectedSessionId = snapshot.sessionId,
+            expectedGeneration = snapshot.generation,
+        )
     }
 
     /**

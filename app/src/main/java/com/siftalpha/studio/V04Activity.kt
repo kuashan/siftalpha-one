@@ -82,8 +82,10 @@ import com.siftalpha.studio.siftalphax.EmbeddedPythonEnvironmentManager
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
 import com.siftalpha.studio.siftalphax.InternalAlpineEnvironmentManager
 import com.siftalpha.studio.siftalphax.InternalAlpineSession
+import com.siftalpha.studio.siftalphax.InternalAlpineWebObservation
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSnapshot
 import com.siftalpha.studio.siftalphax.EmbeddedPythonState
+import com.siftalpha.studio.siftalphax.InternalPythonBackend
 import com.siftalpha.studio.runtime.TermuxResultBus
 import java.util.concurrent.CancellationException
 import java.util.concurrent.Executors
@@ -2222,6 +2224,7 @@ open class V04Activity : StudioActivity() {
             action = RuntimeOperationAction.START,
             provider = RuntimeOperationProvider.INTERNAL,
         ) ?: return
+        invalidateInternalWebDiscovery(stateKey)
         embeddedStartInFlight += stateKey
         richResults.remove(stateKey)
         typedStates[stateKey] = RuntimeState.STARTING
@@ -2388,6 +2391,7 @@ open class V04Activity : StudioActivity() {
             refreshEmbeddedProject(project)
             return
         }
+        invalidateInternalWebDiscovery(project.summary.documentId)
         states[project.summary.documentId] = getString(R.string.runtime_action_stopping)
         projectOutputs.write(
             project.folderName,
@@ -2507,8 +2511,21 @@ open class V04Activity : StudioActivity() {
         manualAction: EmbeddedPythonObservationPolicy.ManualAction? = null,
     ): Boolean {
         val stateKey = project.summary.documentId
+        val internalWebObservation = if (snapshot.engine == InternalPythonBackend.ALPINE) {
+            runtime.internalAlpineWebObservationFor(snapshot)
+        } else {
+            null
+        }
+        val internalWebChanged = reconcileInternalWebDiscovery(
+            projectKey = stateKey,
+            snapshot = snapshot,
+            observation = internalWebObservation,
+        )
         val previous = embeddedLastSnapshots[stateKey]
-        if (!EmbeddedPythonObservationPolicy.shouldPresent(previous, snapshot, manualAction)) {
+        if (
+            !EmbeddedPythonObservationPolicy.shouldPresent(previous, snapshot, manualAction) &&
+            !internalWebChanged
+        ) {
             return false
         }
         embeddedLastSnapshots[stateKey] = snapshot
@@ -2555,14 +2572,67 @@ open class V04Activity : StudioActivity() {
             failureReasons.remove(stateKey)
         }
         if (::projectOutputs.isInitialized) {
+            val internalWebDiagnostics = internalWebObservation
+                ?.diagnosticLines()
+                ?.joinToString("\n")
             projectOutputs.write(
                 project.folderName,
-                EmbeddedPythonObservationPolicy.outputText(snapshot, manualAction),
+                buildString {
+                    append(EmbeddedPythonObservationPolicy.outputText(snapshot, manualAction))
+                    if (!internalWebDiagnostics.isNullOrBlank()) {
+                        append("\n\n")
+                        append(internalWebDiagnostics)
+                    }
+                },
                 expand = true,
                 forceFollowTail = isEmbeddedActive(snapshot),
             )
         }
         return true
+    }
+
+    private fun reconcileInternalWebDiscovery(
+        projectKey: String,
+        snapshot: EmbeddedPythonSnapshot,
+        observation: InternalAlpineWebObservation?,
+    ): Boolean {
+        if (!::webStateStore.isInitialized) return false
+        val current = webStateStore.snapshot(projectKey)
+        if (snapshot.state in setOf(
+                EmbeddedPythonState.SUCCEEDED,
+                EmbeddedPythonState.FAILED,
+                EmbeddedPythonState.STOPPED,
+            )
+        ) {
+            if (::webAvailability.isInitialized) webAvailability.invalidate(projectKey)
+            if (current.candidateUrl == null) return false
+            webStateStore.clear(projectKey)
+            return true
+        }
+
+        val port = observation?.ports?.firstOrNull() ?: return false
+        val candidate = "http://127.0.0.1:$port"
+        if (current.source != RuntimeWebCandidateSource.PID_SOCKET && current.candidateUrl != null) {
+            // An explicit or runtime-log candidate from this same execution is already a
+            // stronger observation. Do not oscillate its source back to procfs on every poll.
+            return false
+        }
+        if (current.candidateUrl == candidate) {
+            return false
+        }
+        webStateStore.rememberCandidateUrl(
+            projectKey = projectKey,
+            url = candidate,
+            framework = current.framework,
+            source = RuntimeWebCandidateSource.PID_SOCKET,
+        )
+        if (::webAvailability.isInitialized) webAvailability.invalidate(projectKey)
+        return true
+    }
+
+    private fun invalidateInternalWebDiscovery(projectKey: String) {
+        if (::webStateStore.isInitialized) webStateStore.clear(projectKey)
+        if (::webAvailability.isInitialized) webAvailability.invalidate(projectKey)
     }
 
     private fun scheduleEmbeddedPolling(project: V04ProjectGateway.RuntimeProject) {

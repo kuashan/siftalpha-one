@@ -874,3 +874,13 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 
 保持构建环境一致、避免本地 SDK / JDK / Gradle 差异导致不可复现结果，并确保源码提交、CI、APK 与真机测试能够通过同一 GitHub HEAD 精确追溯。
 
+## 2026-09-19 · alpha43-r18 Internal Runtime Reliability Repair
+
+- Starting source baseline: `8d5e0d74c64a0410e1a2deb9f5f0b78107b6c042`, version `0.8.0-alpha43-r17` / `143`.
+- Added only the Internal Alpine Web Discovery bridge: the current Alpine host PID and its bounded descendant PID tree are used to collect project-owned socket inodes, which are then matched against LISTEN entries in `/proc/net/tcp` and `/proc/net/tcp6` (with process-scoped proc paths as a restricted fallback).
+- Reused the existing `RuntimeWebCandidate`, `RuntimeWebStateStore`, `RuntimeWebAvailabilityTracker` and endpoint probe path. No second URL parser or global port/PID scan was added.
+- Internal listener observations are fenced by session ID and generation; Internal discovered candidates and probe results are invalidated at START/STOP/terminal transitions so an older execution cannot leak into a new one.
+- Internal Alpine DNS/network code was audited. DNS is refreshed from Android active-network LinkProperties on prepare, and current OCI failures do not prove an SiftAlpha transport defect; no network workaround or OCI-specific change was made.
+- External Runtime r17/direct execution, Termux transport, Worker code and project sources remain unchanged.
+- JVM coverage added for explicit/log discovery compatibility, empty-stdout project PID/socket discovery, sibling-PID isolation, no-listener behavior and stale session/generation fencing.
+- Source/CI validation and real-device Internal acceptance are pending; CI PASS must not be recorded as REAL_DEVICE_PASS.

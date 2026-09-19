@@ -492,6 +492,31 @@ class InternalAlpineSession(context: Context) {
     fun snapshot(projectIdentity: String): EmbeddedPythonSnapshot? =
         records[projectIdentity]?.let(::snapshotOf)
 
+    /**
+     * Returns listener facts only for the still-active execution identified by the snapshot.
+     * A delayed observation from an older session/generation is rejected before procfs access.
+     */
+    fun webObservation(
+        projectIdentity: String,
+        expectedSessionId: String,
+        expectedGeneration: Long,
+    ): InternalAlpineWebObservation? {
+        val record = records[projectIdentity] ?: return null
+        if (!InternalAlpineWebDiscovery.belongsToExecution(
+                expectedSessionId = expectedSessionId,
+                expectedGeneration = expectedGeneration,
+                currentSessionId = record.sessionId,
+                currentGeneration = record.generation,
+            )
+        ) {
+            return null
+        }
+        if (!EmbeddedPythonStatePolicy.canStop(record.state)) return null
+        val managed = record.process ?: return InternalAlpineWebObservation.empty()
+        val hostPid = managed.hostPid() ?: return InternalAlpineWebObservation.empty()
+        return InternalAlpineWebDiscovery.observe(File("/proc"), hostPid)
+    }
+
     fun start(
         projectIdentity: String,
         executionRoot: File,
