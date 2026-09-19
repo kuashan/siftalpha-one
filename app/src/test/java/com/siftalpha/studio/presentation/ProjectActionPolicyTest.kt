@@ -322,6 +322,28 @@ class ProjectActionPolicyTest {
     }
 
     @Test
+    fun embeddedRStatusAndLogsDoNotDependOnExternalHostOrActiveProcess() {
+        val policy = ProjectActionPolicy.resolve(
+            snapshot(
+                runtime = ProjectUiSnapshot.Runtime(
+                    selection = ProjectUiSnapshot.Runtime.Selection(
+                        status = ProjectUiSnapshot.Runtime.SelectionStatus.RESOLVED,
+                        primary = RuntimeKind.PYTHON,
+                    ),
+                    supported = false,
+                ),
+                lifecycle = RuntimeState.STOPPED_BY_USER,
+                environment = ProjectUiSnapshot.Environment(ProjectUiSnapshot.Readiness.UNKNOWN),
+            ),
+            runtimeSelection = ProjectRuntimeSelection.EMBEDDED_R,
+        )
+
+        assertTrue(policy.isEnabled(ProjectActionPolicy.Action.STATUS))
+        assertTrue(policy.isEnabled(ProjectActionPolicy.Action.LOGS))
+        assertEquals(ProjectActionPolicy.Action.STATUS, policy.primaryAction)
+    }
+
+    @Test
     fun embeddedRPreparedEnvironmentCanStartWithoutExternalHost() {
         val policy = ProjectActionPolicy.resolve(
             snapshot(

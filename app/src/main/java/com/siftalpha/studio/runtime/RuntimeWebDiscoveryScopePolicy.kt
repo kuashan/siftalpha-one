@@ -28,25 +28,35 @@ object RuntimeWebDiscoveryScopePolicy {
         webCapabilityEnabled: Boolean,
     ): RuntimeWebCandidate? {
         val socketEvidence = "SIFTALPHA_WEB_AUTODISCOVERY=PASS" in output
-        if (!webCapabilityEnabled && !socketEvidence) return null
+        val explicitOnly = output.lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("SIFTALPHA_WEB_URL=") }
+            .joinToString("\n")
+        val explicitUrl = RuntimeWebUrl.extractLocalHttpUrl(explicitOnly)
+
+        if (socketEvidence) {
+            val url = RuntimeWebUrl.extractLocalHttpUrl(output) ?: return null
+            return RuntimeWebCandidate(url, RuntimeWebCandidateSource.PID_SOCKET)
+        }
+        if (explicitUrl != null) {
+            return RuntimeWebCandidate(explicitUrl, RuntimeWebCandidateSource.EXPLICIT)
+        }
+        if (!webCapabilityEnabled) return null
         val url = RuntimeWebUrl.extractLocalHttpUrl(output) ?: return null
-        return RuntimeWebCandidate(
-            url = url,
-            source = if (socketEvidence) {
-                RuntimeWebCandidateSource.PID_SOCKET
-            } else {
-                RuntimeWebCandidateSource.RUNTIME_LOG
-            },
-        )
+        return RuntimeWebCandidate(url, RuntimeWebCandidateSource.RUNTIME_LOG)
     }
 
     fun shouldClearPersistedCandidate(
         webCapabilityEnabled: Boolean,
         source: RuntimeWebCandidateSource,
-    ): Boolean = !webCapabilityEnabled && source != RuntimeWebCandidateSource.PID_SOCKET
+    ): Boolean = !webCapabilityEnabled &&
+        source != RuntimeWebCandidateSource.PID_SOCKET &&
+        source != RuntimeWebCandidateSource.EXPLICIT
 
     fun canUseCandidate(
         webCapabilityEnabled: Boolean,
         source: RuntimeWebCandidateSource,
-    ): Boolean = webCapabilityEnabled || source == RuntimeWebCandidateSource.PID_SOCKET
+    ): Boolean = webCapabilityEnabled ||
+        source == RuntimeWebCandidateSource.PID_SOCKET ||
+        source == RuntimeWebCandidateSource.EXPLICIT
 }

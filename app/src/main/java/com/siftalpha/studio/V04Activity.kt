@@ -27,6 +27,7 @@ import com.siftalpha.studio.project.WebProjectInspector
 import com.siftalpha.studio.presentation.ProjectActionPolicy
 import com.siftalpha.studio.presentation.ProjectUiSnapshot
 import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
+import com.siftalpha.studio.runtime.EmbeddedPythonObservationPolicy
 import com.siftalpha.studio.runtime.ProjectActivityRegistry
 import com.siftalpha.studio.runtime.ProjectRuntimeController
 import com.siftalpha.studio.runtime.ProjectRuntimeExecutionPlanner
@@ -952,7 +953,7 @@ open class V04Activity : StudioActivity() {
                 ProjectActionPolicy.Action.STATUS -> {
                     box.addView(button(getString(R.string.runtime_button_status)) {
                         if (runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R) {
-                            refreshEmbeddedProject(project)
+                            refreshEmbeddedProject(project, EmbeddedPythonObservationPolicy.ManualAction.STATUS)
                         } else {
                             dispatch(
                                 project,
@@ -1001,7 +1002,7 @@ open class V04Activity : StudioActivity() {
         row2.addView(stopButton, weight())
         val statusButton = smallButton(getString(R.string.runtime_button_status)) {
                 if (runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R) {
-                    refreshEmbeddedProject(project)
+                    refreshEmbeddedProject(project, EmbeddedPythonObservationPolicy.ManualAction.STATUS)
                 } else {
                     dispatch(
                         project,
@@ -1013,7 +1014,7 @@ open class V04Activity : StudioActivity() {
         row2.addView(statusButton, weight().apply { marginStart = dp(5) })
         val logsButton = smallButton(getString(R.string.runtime_button_refresh_logs)) {
                 if (runtimeSelection == ProjectRuntimeSelection.EMBEDDED_R) {
-                    refreshEmbeddedProject(project)
+                    refreshEmbeddedProject(project, EmbeddedPythonObservationPolicy.ManualAction.LOGS)
                 } else {
                     dispatch(
                         project,
@@ -1935,7 +1936,10 @@ open class V04Activity : StudioActivity() {
         scheduleEmbeddedPolling(project)
     }
 
-    private fun refreshEmbeddedProject(project: V04ProjectGateway.RuntimeProject) {
+    private fun refreshEmbeddedProject(
+        project: V04ProjectGateway.RuntimeProject,
+        manualAction: EmbeddedPythonObservationPolicy.ManualAction? = null,
+    ) {
         val stateKey = project.summary.documentId
         val snapshot = runCatching {
             runtime.embeddedPythonSnapshotFor(stateKey)
@@ -1944,15 +1948,27 @@ open class V04Activity : StudioActivity() {
             typedStates[stateKey] = RuntimeState.UNKNOWN
             states[stateKey] = getString(R.string.runtime_state_not_running)
             failureReasons.remove(stateKey)
+            val diagnostics = mutableListOf(
+                "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                "SIFTALPHA_X_STATE=IDLE",
+                "SIFTALPHA_X_RUNTIME_PHASE=IDLE",
+                "SIFTALPHA_X_PROJECT_STATUS=NOT_STARTED",
+            )
+            when (manualAction) {
+                EmbeddedPythonObservationPolicy.ManualAction.STATUS -> {
+                    diagnostics += "SIFTALPHA_X_STATUS_CHECK=PASS"
+                    diagnostics += "SIFTALPHA_X_STATUS_SOURCE=INTERNAL_SNAPSHOT"
+                }
+                EmbeddedPythonObservationPolicy.ManualAction.LOGS -> {
+                    diagnostics += "SIFTALPHA_X_LOG_REFRESH=PASS"
+                    diagnostics += "SIFTALPHA_X_LOG_SOURCE=INTERNAL_SNAPSHOT"
+                }
+                null -> Unit
+            }
             projectOutputs.write(
                 project.folderName,
-                listOf(
-                    "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
-                    "SIFTALPHA_X_PROJECT_ID=" + stateKey,
-                    "SIFTALPHA_X_STATE=IDLE",
-                    "SIFTALPHA_X_RUNTIME_PHASE=IDLE",
-                    "SIFTALPHA_X_PROJECT_STATUS=NOT_STARTED",
-                ).joinToString("\n"),
+                diagnostics.joinToString("\n"),
                 expand = true,
             )
             refresh()
@@ -1964,7 +1980,7 @@ open class V04Activity : StudioActivity() {
                 RuntimeControlRequest.EMBEDDED_R,
             )
         }
-        val changed = syncEmbeddedSnapshot(project, snapshot)
+        val changed = syncEmbeddedSnapshot(project, snapshot, manualAction)
         if (changed) refresh()
         if (isEmbeddedActive(snapshot)) scheduleEmbeddedPolling(project)
     }
@@ -1972,12 +1988,39 @@ open class V04Activity : StudioActivity() {
     private fun syncEmbeddedSnapshot(
         project: V04ProjectGateway.RuntimeProject,
         snapshot: EmbeddedPythonSnapshot,
+        manualAction: EmbeddedPythonObservationPolicy.ManualAction? = null,
     ): Boolean {
         val stateKey = project.summary.documentId
         val previous = embeddedLastSnapshots[stateKey]
-        if (previous == snapshot) return false
+        if (!EmbeddedPythonObservationPolicy.shouldPresent(previous, snapshot, manualAction)) {
+            return false
+        }
         embeddedLastSnapshots[stateKey] = snapshot
         updateEmbeddedRichResult(project, snapshot)
+
+        if (::webInspector.isInitialized && ::webStateStore.isInitialized) {
+            val safeStdout = if (::secretStore.isInitialized) {
+                secretStore.redactRuntimeText(project.folderName, snapshot.stdout)
+            } else {
+                snapshot.stdout
+            }
+            val webCapabilityEnabled = runCatching {
+                webInspector.inspect(stateKey).enabled
+            }.getOrDefault(false)
+            RuntimeWebDiscoveryScopePolicy.candidateFromOutput(
+                output = safeStdout,
+                webCapabilityEnabled = webCapabilityEnabled,
+            )?.let { candidate ->
+                val existingWeb = webStateStore.snapshot(stateKey)
+                webStateStore.rememberCandidateUrl(
+                    projectKey = stateKey,
+                    url = candidate.url,
+                    framework = existingWeb.framework,
+                    source = candidate.source,
+                )
+            }
+        }
+
         val mappedState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot)
         typedStates[stateKey] = mappedState
         states[stateKey] = mappedState.uiLabel(this)
@@ -1989,7 +2032,7 @@ open class V04Activity : StudioActivity() {
         if (::projectOutputs.isInitialized) {
             projectOutputs.write(
                 project.folderName,
-                EmbeddedPythonRuntimeStateMapping.outputText(snapshot),
+                EmbeddedPythonObservationPolicy.outputText(snapshot, manualAction),
                 expand = true,
                 forceFollowTail = isEmbeddedActive(snapshot),
             )

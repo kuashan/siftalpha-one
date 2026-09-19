@@ -44,6 +44,36 @@ class EmbeddedPythonRuntimeStateMappingTest {
     }
 
     @Test
+    fun manualStatusRefreshIsNotDroppedWhenSnapshotIsStable() {
+        val snapshot = EmbeddedPythonSnapshot(
+            projectIdentity = "doc",
+            state = EmbeddedPythonState.RUNNING,
+            stdout = "steady",
+        )
+
+        assertFalse(
+            EmbeddedPythonObservationPolicy.shouldPresent(
+                previous = snapshot,
+                current = snapshot,
+                manualAction = null,
+            ),
+        )
+        assertTrue(
+            EmbeddedPythonObservationPolicy.shouldPresent(
+                previous = snapshot,
+                current = snapshot,
+                manualAction = EmbeddedPythonObservationPolicy.ManualAction.STATUS,
+            ),
+        )
+        val output = EmbeddedPythonObservationPolicy.outputText(
+            snapshot,
+            EmbeddedPythonObservationPolicy.ManualAction.STATUS,
+        )
+        assertTrue(output.contains("SIFTALPHA_X_STATUS_CHECK=PASS"))
+        assertTrue(output.contains("SIFTALPHA_X_STATUS_SOURCE=INTERNAL_SNAPSHOT"))
+    }
+
+    @Test
     fun activeEmbeddedStateCannotStartAnotherSession() {
         assertFalse(com.siftalpha.studio.siftalphax.EmbeddedPythonStatePolicy.canStart(EmbeddedPythonState.RUNNING))
         assertTrue(com.siftalpha.studio.siftalphax.EmbeddedPythonStatePolicy.canStart(EmbeddedPythonState.STOPPED))

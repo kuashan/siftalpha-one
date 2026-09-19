@@ -31,6 +31,29 @@ class RuntimeWebDiscoveryScopePolicyTest {
     }
 
     @Test
+    fun explicitSiftAlphaWebUrlIsStrongEvidenceWithoutStaticWebProfile() {
+        val candidate = RuntimeWebDiscoveryScopePolicy.candidateFromOutput(
+            output = "SIFTALPHA_WEB_URL=http://127.0.0.1:8080/",
+            webCapabilityEnabled = false,
+        )
+
+        assertEquals("http://127.0.0.1:8080/", candidate?.url)
+        assertEquals(RuntimeWebCandidateSource.EXPLICIT, candidate?.source)
+        assertFalse(
+            RuntimeWebDiscoveryScopePolicy.shouldClearPersistedCandidate(
+                webCapabilityEnabled = false,
+                source = RuntimeWebCandidateSource.EXPLICIT,
+            ),
+        )
+        assertTrue(
+            RuntimeWebDiscoveryScopePolicy.canUseCandidate(
+                webCapabilityEnabled = false,
+                source = RuntimeWebCandidateSource.EXPLICIT,
+            ),
+        )
+    }
+
+    @Test
     fun webProjectStillUsesRuntimeLogFallback() {
         val candidate = RuntimeWebDiscoveryScopePolicy.candidateFromOutput(
             output = "Server running on http://0.0.0.0:8000",

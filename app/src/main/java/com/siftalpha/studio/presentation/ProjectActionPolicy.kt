@@ -187,7 +187,9 @@ object ProjectActionPolicy {
                 DisableReason.RUNTIME_SELECTION_REQUIRED
             else -> null
         }
-        val embeddedObservationAvailable = embeddedRSelected && snapshot.processMayBeActive
+        // Internal status/log observation reads the app-owned session snapshot and never requires
+        // the External Provider host. It remains available before START as well as while active.
+        val embeddedObservationAvailable = embeddedRSelected
         actions[Action.STATUS] = if (snapshot.runtime.supported || embeddedObservationAvailable) {
             enabled()
         } else {

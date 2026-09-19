@@ -21,3 +21,35 @@ object EmbeddedPythonRuntimeStateMapping {
     fun outputText(snapshot: EmbeddedPythonSnapshot): String =
         EmbeddedPythonDiagnosticText.copyAll(snapshot)
 }
+
+object EmbeddedPythonObservationPolicy {
+    enum class ManualAction {
+        STATUS,
+        LOGS,
+    }
+
+    fun shouldPresent(
+        previous: EmbeddedPythonSnapshot?,
+        current: EmbeddedPythonSnapshot,
+        manualAction: ManualAction?,
+    ): Boolean = manualAction != null || previous != current
+
+    fun outputText(
+        snapshot: EmbeddedPythonSnapshot,
+        manualAction: ManualAction? = null,
+    ): String = buildString {
+        append(EmbeddedPythonRuntimeStateMapping.outputText(snapshot))
+        when (manualAction) {
+            ManualAction.STATUS -> {
+                append("\n\nSIFTALPHA_X_STATUS_CHECK=PASS")
+                append("\nSIFTALPHA_X_STATUS_SOURCE=INTERNAL_SNAPSHOT")
+            }
+            ManualAction.LOGS -> {
+                append("\n\nSIFTALPHA_X_LOG_REFRESH=PASS")
+                append("\nSIFTALPHA_X_LOG_SOURCE=INTERNAL_SNAPSHOT")
+            }
+            null -> Unit
+        }
+    }
+}
+
