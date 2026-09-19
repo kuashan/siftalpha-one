@@ -858,3 +858,19 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Kept only private PID/legacy-PGID conflict checks, PID publication, cleanup traps and diagnostic operation/owner markers. No new PGID is recorded without a proven dedicated process group.
 - External business commands, STOP routing, Internal Runtime, Internal Alpine networking, Worker code and Termux transport remain unchanged.
 - Source/CI validation is pending; External real-device acceptance has not been executed.
+
+## 2026-09-19 · Cloud-Only Development and Build Policy
+
+### 固定开发执行方式
+
+- SiftAlpha Android 的 Codex（云端代码代理）使用云端执行方式，不依赖用户本地 Android SDK、JDK、Gradle 或本地编译环境。
+- 代码修改、源码审查和提交均以 GitHub（代码托管平台）远端仓库的真实分支 / HEAD 为准；开始任务前必须重新读取远端状态，不能把本地工作区或旧对话中的状态当作唯一事实来源。
+- Android 单元测试、Gradle 构建、APK 组装、签名、Probe（探针）和其他 CI 验证统一通过 GitHub Actions（GitHub 云端持续集成）执行。
+- 可安装测试 APK 必须来自对应最终 HEAD 的 GitHub Actions 云端构建产物；不得用本地 Android SDK / Gradle 构建结果替代正式验证证据。
+- 用户真机验收仍是最终 Runtime（运行时）行为证据；CI PASS（云端持续集成通过）不能替代 REAL_DEVICE_PASS（真实设备通过）。
+- 后续开发默认保持 cloud-only（仅云端）流程，除非用户明确改变该约束。
+
+### 目的
+
+保持构建环境一致、避免本地 SDK / JDK / Gradle 差异导致不可复现结果，并确保源码提交、CI、APK 与真机测试能够通过同一 GitHub HEAD 精确追溯。
+
