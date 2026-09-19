@@ -320,7 +320,7 @@ open class V04Activity : StudioActivity() {
             embeddedPythonProjectStager = EmbeddedPythonProjectStager(this),
             embeddedPythonEnvironmentManager = EmbeddedPythonEnvironmentManager(this),
             internalAlpineEnvironmentManager = InternalAlpineEnvironmentManager(this),
-            internalAlpineSession = InternalAlpineSession(this),
+            internalAlpineSession = InternalAlpineSession.shared(this),
         )
         secretStore = ProjectSecretStore(this)
         lifecycleStore = RuntimeLifecycleStore(this)

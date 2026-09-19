@@ -462,7 +462,7 @@ class InternalAlpineEnvironmentManager(context: Context) {
     }
 }
 
-class InternalAlpineSession(context: Context) {
+class InternalAlpineSession private constructor(context: Context) {
     private val appContext = context.applicationContext
     private val nextGeneration = AtomicLong(0L)
     private val records = ConcurrentHashMap<String, Record>()
@@ -604,4 +604,15 @@ class InternalAlpineSession(context: Context) {
             stdout = InternalAlpineEnvironmentManager.readTail(record.stdout, 512 * 1024),
             stderr = InternalAlpineEnvironmentManager.readTail(record.stderr, 512 * 1024),
         )
+
+    companion object {
+        @Volatile
+        private var sharedInstance: InternalAlpineSession? = null
+
+        /** Keep Internal Alpine session records and generations alive for the app process. */
+        fun shared(context: Context): InternalAlpineSession =
+            sharedInstance ?: synchronized(this) {
+                sharedInstance ?: InternalAlpineSession(context).also { sharedInstance = it }
+            }
+    }
 }

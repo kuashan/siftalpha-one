@@ -63,11 +63,11 @@ android {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        // alpha43-r18 adds project-scoped Internal Alpine listener discovery; External remains frozen.
+        // alpha43-r19 keeps Internal Alpine session state process-scoped; External remains frozen.
         // Listener facts remain observation-only and use the existing Web probe chain.
         // Final source validation is cloud-only; real-device acceptance remains separate.
-        versionCode = 144
-        versionName = "0.8.0-alpha43-r18"
+        versionCode = 145
+        versionName = "0.8.0-alpha43-r19"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

@@ -884,3 +884,12 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - External Runtime r17/direct execution, Termux transport, Worker code and project sources remain unchanged.
 - JVM coverage added for explicit/log discovery compatibility, empty-stdout project PID/socket discovery, sibling-PID isolation, no-listener behavior and stale session/generation fencing.
 - Source/CI validation and real-device Internal acceptance are pending; CI PASS must not be recorded as REAL_DEVICE_PASS.
+
+## 2026-09-19 · alpha43-r19 Internal Alpine Session Continuity Repair
+
+- Starting source baseline: `49e05ffbe8b202ff226080474c69de05c4a2b905`, version `0.8.0-alpha43-r18` / `144`.
+- Changed only the Internal Alpine session ownership boundary: `InternalAlpineSession` now exposes a process-scoped `shared(context)` instance backed by `context.applicationContext`.
+- `V04Activity` now injects that shared session, so Activity recreation and re-entry retain active project records, session identity and generation continuity within the app process.
+- The constructor is private to prevent a second Activity-local session from being created accidentally. External Runtime, network configuration, Worker code and r18 Web Discovery remain unchanged.
+- Added JVM coverage proving separate Context instances resolve to the same process-scoped session; raised the installable version to `0.8.0-alpha43-r19` / `145`.
+- W0 Cloud Build, Internal Alpine Probe, APK evidence and real-device Internal acceptance must be run against the final r19 HEAD; CI PASS must not be recorded as REAL_DEVICE_PASS.

@@ -1,15 +1,30 @@
 package com.siftalpha.studio.siftalphax
 
+import android.content.Context
+import android.content.ContextWrapper
+
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InternalAlpineRuntimeTest {
+    @Test
+    fun sharedSessionIsStableWithinOneAppProcess() {
+        val firstContext = TestApplicationContext()
+        val secondContext = TestApplicationContext()
+
+        assertSame(
+            InternalAlpineSession.shared(firstContext),
+            InternalAlpineSession.shared(secondContext),
+        )
+    }
+
     @Test
     fun requirementsTakePrecedenceAndFingerprintIsStable() {
         val first = InternalAlpineDependencySource.fromProjectFiles(
@@ -254,5 +269,9 @@ class InternalAlpineRuntimeTest {
         } catch (_: IllegalArgumentException) {
         } catch (_: IllegalStateException) {
         }
+    }
+
+    private class TestApplicationContext : ContextWrapper(null) {
+        override fun getApplicationContext(): Context = this
     }
 }
