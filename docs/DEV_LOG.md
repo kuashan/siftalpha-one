@@ -851,3 +851,10 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - No dedicated PGID is recorded when `setsid` semantics cannot be proven safe; project STOP continues to use the existing descendant-tree ownership path without risking a shared process group.
 - External business commands, STOP routing, Internal Runtime, provider-aware deadlines, result fencing and Pure Python supplemental-Node detection remain unchanged.
 - Source/CI validation is pending; External real-device acceptance has not been executed.
+
+## 2026-09-19 · alpha43-r17 External Direct Execution + Lightweight Ownership Restoration
+
+- Removed the second execution shell from the External project activity contract. The ownership prefix no longer injects host preamble/helpers or quotes the payload for another `bash -lc`; it is attached directly to the original Termux RUN_COMMAND shell script.
+- Kept only private PID/legacy-PGID conflict checks, PID publication, cleanup traps and diagnostic operation/owner markers. No new PGID is recorded without a proven dedicated process group.
+- External business commands, STOP routing, Internal Runtime, Internal Alpine networking, Worker code and Termux transport remain unchanged.
+- Source/CI validation is pending; External real-device acceptance has not been executed.

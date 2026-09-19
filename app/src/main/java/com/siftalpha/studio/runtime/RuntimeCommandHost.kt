@@ -71,41 +71,46 @@ internal object TermuxProjectActivityContract {
     fun wrap(
         runtimeId: String,
         operation: String,
-        quotedShellScript: String,
-        hostPreamble: String,
-        hostProcessHelpers: String,
+        shellScript: String,
     ): String {
         require(runtimeId.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid runtime id" }
         require(operation.matches(Regex("[A-Za-z0-9._-]+"))) { "invalid operation id" }
         return """
-            ${hostPreamble}
-            ${hostProcessHelpers}
-            activity_pid_file="${'$'}runtime_dir/$runtimeId.activity.$operation.pid"
-            activity_pgid_file="${'$'}runtime_dir/$runtimeId.activity.$operation.pgid"
-            old_pid="${'$'}(cat "${'$'}activity_pid_file" 2>/dev/null || true)"
-            old_pgid="${'$'}(cat "${'$'}activity_pgid_file" 2>/dev/null || true)"
-            if siftalpha_pid_alive "${'$'}old_pid" || { [ -n "${'$'}old_pgid" ] && siftalpha_group_alive "${'$'}old_pgid"; }; then
+            _siftalpha_activity_runtime_dir="${'$'}{HOME}/.siftalpha/runtime"
+            mkdir -p "${'$'}_siftalpha_activity_runtime_dir"
+            _siftalpha_activity_pid_file="${'$'}_siftalpha_activity_runtime_dir/$runtimeId.activity.$operation.pid"
+            _siftalpha_activity_pgid_file="${'$'}_siftalpha_activity_runtime_dir/$runtimeId.activity.$operation.pgid"
+            _siftalpha_activity_pid_alive() {
+              [ -n "${'$'}1" ] && kill -0 "${'$'}1" 2>/dev/null
+            }
+            _siftalpha_activity_group_alive() {
+              [ -n "${'$'}1" ] && kill -0 -- "-${'$'}1" 2>/dev/null
+            }
+            _siftalpha_activity_old_pid="${'$'}(cat "${'$'}_siftalpha_activity_pid_file" 2>/dev/null || true)"
+            _siftalpha_activity_old_pgid="${'$'}(cat "${'$'}_siftalpha_activity_pgid_file" 2>/dev/null || true)"
+            if _siftalpha_activity_pid_alive "${'$'}_siftalpha_activity_old_pid" || { [ -n "${'$'}_siftalpha_activity_old_pgid" ] && _siftalpha_activity_group_alive "${'$'}_siftalpha_activity_old_pgid"; }; then
               echo 'SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE'
               exit 80
             fi
-            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
-            # Keep this RUN_COMMAND shell as the project owner. The payload stays in the
-            # foreground so Termux observes its real completion and exit code. We deliberately
-            # do not publish a PGID: without a proven dedicated session, recording the shared
-            # shell process group could make project STOP terminate unrelated work.
-            activity_pid=${'$'}${'$'}
-            activity_cleanup() {
-              rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
+            rm -f -- "${'$'}_siftalpha_activity_pid_file" "${'$'}_siftalpha_activity_pgid_file"
+            _siftalpha_activity_pid=${'$'}${'$'}
+            _siftalpha_activity_cleanup() {
+              rm -f -- "${'$'}_siftalpha_activity_pid_file" "${'$'}_siftalpha_activity_pgid_file"
             }
-            trap activity_cleanup EXIT
-            trap 'activity_cleanup; exit 130' INT
-            trap 'activity_cleanup; exit 143' TERM
-            trap 'activity_cleanup; exit 129' HUP
-            printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pid_file"
-            set +e
-            bash -lc ${quotedShellScript}
-            activity_code=${'$'}?
-            exit "${'$'}activity_code"
+            _siftalpha_activity_on_exit() {
+              _siftalpha_activity_exit_code=${'$'}?
+              _siftalpha_activity_cleanup
+              trap - EXIT
+              exit "${'$'}_siftalpha_activity_exit_code"
+            }
+            trap _siftalpha_activity_on_exit EXIT
+            trap '_siftalpha_activity_cleanup; exit 130' INT
+            trap '_siftalpha_activity_cleanup; exit 143' TERM
+            trap '_siftalpha_activity_cleanup; exit 129' HUP
+            printf '%s\n' "${'$'}_siftalpha_activity_pid" >"${'$'}_siftalpha_activity_pid_file"
+            printf 'SIFTALPHA_EXTERNAL_ACTIVITY_OPERATION=%s\n' '$operation'
+            printf 'SIFTALPHA_EXTERNAL_ACTIVITY_OWNER_PID=%s\n' "${'$'}_siftalpha_activity_pid"
+            ${shellScript}
         """.trimIndent()
     }
 }
@@ -186,9 +191,7 @@ class TermuxProotRuntimeHost(
     ): String = TermuxProjectActivityContract.wrap(
         runtimeId = runtimeId,
         operation = operation,
-        quotedShellScript = sh(shellScript),
-        hostPreamble = hostPreamble(),
-        hostProcessHelpers = hostProcessHelpers(),
+        shellScript = shellScript,
     )
 
     override fun stopProjectActivities(runtimeId: String): String {

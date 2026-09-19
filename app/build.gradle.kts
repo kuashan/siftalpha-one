@@ -63,9 +63,9 @@ android {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        // alpha43-r16 final-source Probe coverage for foreground External project activity semantics.
-        versionCode = 142
-        versionName = "0.8.0-alpha43-r16"
+        // alpha43-r17 restores direct External execution with lightweight ownership metadata.
+        versionCode = 143
+        versionName = "0.8.0-alpha43-r17"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
