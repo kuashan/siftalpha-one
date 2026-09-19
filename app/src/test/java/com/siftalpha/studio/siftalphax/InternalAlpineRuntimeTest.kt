@@ -48,6 +48,48 @@ class InternalAlpineRuntimeTest {
     }
 
     @Test
+    fun tarExtractorCopiesHardLinksAndSkipsMetadataRecords() {
+        val root = Files.createTempDirectory("siftalpha-alpine-hardlink").toFile()
+        try {
+            val tar = tarOf(
+                entry("bin/", type = '5'),
+                entry("bin/base", type = '0', mode = 0b111_101_101, payload = "base".toByteArray()),
+                entry("metadata", type = 'x', payload = "25 comment=safe-metadata\n".toByteArray()),
+                entry("bin/copy", type = '1', mode = 0b111_101_101, linkName = "bin/base"),
+                entry("after", payload = "ok".toByteArray()),
+            )
+            InternalAlpineFiles.extractTar(ByteArrayInputStream(tar), root)
+
+            assertEquals("base", File(root, "bin/copy").readText())
+            assertTrue(File(root, "bin/copy").canExecute())
+            assertFalse(Files.isSymbolicLink(File(root, "bin/copy").toPath()))
+            assertEquals("ok", File(root, "after").readText())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun tarExtractorRejectsHardLinkTraversal() {
+        val root = Files.createTempDirectory("siftalpha-alpine-hardlink-traversal").toFile()
+        try {
+            assertFails {
+                InternalAlpineFiles.extractTar(
+                    ByteArrayInputStream(
+                        tarOf(
+                            entry("bin/", type = '5'),
+                            entry("bin/bad", type = '1', linkName = "../outside"),
+                        ),
+                    ),
+                    root,
+                )
+            }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun tarExtractorRejectsTraversalAndSymlinkParents() {
         val traversalRoot = Files.createTempDirectory("siftalpha-alpine-traversal").toFile()
         try {

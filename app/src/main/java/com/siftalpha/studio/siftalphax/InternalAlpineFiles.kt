@@ -174,6 +174,24 @@ object InternalAlpineFiles {
                     Files.createSymbolicLink(target, Paths.get(linkName))
                     skipEntryData(input, size)
                 }
+                '1' -> {
+                    check(linkName.isNotBlank()) { "Empty rootfs hard-link target: $safeName" }
+                    val safeLinkName = normalizeArchivePath(linkName)
+                    check(safeLinkName.isNotBlank()) { "Invalid rootfs hard-link target: $linkName" }
+                    val linkTarget = root.resolve(safeLinkName).normalize()
+                    check(linkTarget.startsWith(root) && linkTarget != root) {
+                        "Rootfs hard-link target escaped root: $linkName"
+                    }
+                    check(Files.isRegularFile(linkTarget, LinkOption.NOFOLLOW_LINKS)) {
+                        "Rootfs hard-link target is unavailable or unsafe: $linkName"
+                    }
+                    check(!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+                        "Duplicate rootfs hard-link path: $safeName"
+                    }
+                    Files.copy(linkTarget, target)
+                    if (mode and 0b001_001_001 != 0) target.toFile().setExecutable(true, false)
+                    skipEntryData(input, size)
+                }
                 '0', '\u0000' -> {
                     check(!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
                         "Duplicate rootfs file path: $safeName"
@@ -182,6 +200,11 @@ object InternalAlpineFiles {
                     Files.newOutputStream(target).use { output -> copyExact(input, output, size) }
                     skipPadding(input, size)
                     if (mode and 0b001_001_001 != 0) target.toFile().setExecutable(true, false)
+                }
+                'x', 'g', 'L', 'K', '3', '4', '6' -> {
+                    // Alpine minirootfs is a ustar archive in normal releases. Keep extraction
+                    // resilient to metadata/special entries without materializing host devices.
+                    skipEntryData(input, size)
                 }
                 else -> error("Unsupported rootfs tar entry type '$type' for $safeName")
             }
