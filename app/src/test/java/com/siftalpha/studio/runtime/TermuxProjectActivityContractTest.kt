@@ -33,8 +33,8 @@ class TermuxProjectActivityContractTest {
         assertTrue("wait must happen only after ownership files are durable", wait > pgidWrite)
         assertTrue(script.contains("project-a.activity.status.pid"))
         assertTrue(script.contains("project-a.activity.status.pgid"))
-        assertTrue("watchdog must not wait from a sibling subshell", !script.contains("activity_waiter"))
-        assertTrue("parent must observe the owned process before waiting", script.contains("/proc/\$activity_pid/stat"))
+        assertTrue("wrapper must not use a sibling waiter", !script.contains("activity_waiter"))
+        assertTrue("natural wait must not poll /proc", !script.contains("/proc/\$activity_pid/stat"))
     }
 
     @Test
