@@ -11,7 +11,7 @@ import java.nio.file.Files
  * inode was first observed through the current Alpine host PID or one of its descendants. This is
  * deliberately different from scanning Android's listeners or probing every port.
  */
-internal data class InternalAlpineWebObservation(
+data class InternalAlpineWebObservation(
     val projectPidCount: Int,
     val socketInodeCount: Int,
     val ports: List<Int>,
