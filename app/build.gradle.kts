@@ -97,6 +97,10 @@ android {
         }
     }
 
+    androidResources {
+        noCompress += "gz"
+    }
+
     packaging {
         jniLibs {
             useLegacyPackaging = true

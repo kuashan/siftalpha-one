@@ -8,6 +8,7 @@ on:
       - .github/workflows/internal-alpine-probe.yml
       - tools/probe_internal_alpine_android.sh
       - tools/prepare_internal_alpine_android.sh
+      - app/build.gradle.kts
   workflow_dispatch:
 
 permissions:
