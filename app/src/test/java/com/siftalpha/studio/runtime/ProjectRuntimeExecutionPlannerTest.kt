@@ -27,6 +27,39 @@ class ProjectRuntimeExecutionPlannerTest {
     }
 
     @Test
+    fun purePythonProjectDoesNotRequireSupplementalNodeLifecycle() {
+        val result = ProjectRuntimeExecutionPlanner.select(
+            listOf(
+                "requirements.txt",
+                "main.py",
+                "siftalpha_oci_a1_catcher.py",
+            ),
+        ) as ProjectRuntimeExecutionPlanner.Selection.Resolved
+
+        assertEquals(RuntimeKind.PYTHON, result.primary)
+        assertTrue(result.supplemental.isEmpty())
+        assertTrue(!RuntimeSupplementalCompositionPolicy.requiresNode(result))
+    }
+
+    @Test
+    fun pythonWithNestedViteRequiresSupplementalNodeLifecycle() {
+        val result = ProjectRuntimeExecutionPlanner.select(
+            listOf(
+                "requirements.txt",
+                "main.py",
+                "web/package.json",
+                "web/package-lock.json",
+                "web/vite.config.ts",
+                "web/src/main.tsx",
+            ),
+        ) as ProjectRuntimeExecutionPlanner.Selection.Resolved
+
+        assertEquals(RuntimeKind.PYTHON, result.primary)
+        assertTrue(RuntimeKind.NODE_JS in result.supplemental)
+        assertTrue(RuntimeSupplementalCompositionPolicy.requiresNode(result))
+    }
+
+    @Test
     fun nodeRootIsPrimaryForPureNodeProject() {
         val result = ProjectRuntimeExecutionPlanner.select(
             listOf("package.json", "package-lock.json", "src/server.js"),

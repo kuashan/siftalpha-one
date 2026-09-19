@@ -546,13 +546,17 @@ class ProjectRuntimeController(
                     project = context.spec,
                     host = host,
                 )
-                val node = supplementalNodeAdapter.prepareDetectedWebComponents(context.spec)
-                RuntimeEnvironmentComposer.prepare(
-                    host = host,
-                    projectName = context.spec.name,
-                    primary = python,
-                    node = node,
-                )
+                if (RuntimeSupplementalCompositionPolicy.requiresNode(resolved)) {
+                    val node = supplementalNodeAdapter.prepareDetectedWebComponents(context.spec)
+                    RuntimeEnvironmentComposer.prepare(
+                        host = host,
+                        projectName = context.spec.name,
+                        primary = python,
+                        node = node,
+                    )
+                } else {
+                    python
+                }
             }
             RuntimeKind.NODE_JS -> nodeExecutableAdapter.prepare(context.spec)
             else -> executableUnavailable(project, resolved.primary)
@@ -594,12 +598,16 @@ class ProjectRuntimeController(
                     project = effectiveSpec,
                     host = host,
                 )
-                RuntimeEnvironmentComposer.start(
-                    host = host,
-                    projectName = effectiveSpec.name,
-                    primary = python,
-                    nodeStatus = supplementalNodeAdapter.statusDetectedWebComponents(effectiveSpec),
-                )
+                if (RuntimeSupplementalCompositionPolicy.requiresNode(resolved)) {
+                    RuntimeEnvironmentComposer.start(
+                        host = host,
+                        projectName = effectiveSpec.name,
+                        primary = python,
+                        nodeStatus = supplementalNodeAdapter.statusDetectedWebComponents(effectiveSpec),
+                    )
+                } else {
+                    python
+                }
             }
             RuntimeKind.NODE_JS -> nodeExecutableAdapter.start(context.spec)
             else -> executableUnavailable(project, resolved.primary)
@@ -623,12 +631,19 @@ class ProjectRuntimeController(
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
             ?: return unresolvedStatus(context)
         return when (resolved.primary) {
-            RuntimeKind.PYTHON -> RuntimeEnvironmentComposer.status(
-                host = host,
-                projectName = context.spec.name,
-                primary = pythonAdapter.status(context.spec),
-                node = supplementalNodeAdapter.statusDetectedWebComponents(context.spec),
-            )
+            RuntimeKind.PYTHON -> {
+                val python = pythonAdapter.status(context.spec)
+                if (RuntimeSupplementalCompositionPolicy.requiresNode(resolved)) {
+                    RuntimeEnvironmentComposer.status(
+                        host = host,
+                        projectName = context.spec.name,
+                        primary = python,
+                        node = supplementalNodeAdapter.statusDetectedWebComponents(context.spec),
+                    )
+                } else {
+                    python
+                }
+            }
             RuntimeKind.NODE_JS -> nodeExecutableAdapter.status(context.spec)
             else -> executableUnavailable(project, resolved.primary)
         }
@@ -656,12 +671,19 @@ class ProjectRuntimeController(
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
             ?: return cleanUnresolved(project)
         return when (resolved.primary) {
-            RuntimeKind.PYTHON -> RuntimeEnvironmentComposer.clean(
-                host = host,
-                projectName = context.spec.name,
-                primary = pythonAdapter.clean(context.spec),
-                node = supplementalNodeAdapter.cleanDetectedWebComponents(context.spec),
-            )
+            RuntimeKind.PYTHON -> {
+                val python = pythonAdapter.clean(context.spec)
+                if (RuntimeSupplementalCompositionPolicy.requiresNode(resolved)) {
+                    RuntimeEnvironmentComposer.clean(
+                        host = host,
+                        projectName = context.spec.name,
+                        primary = python,
+                        node = supplementalNodeAdapter.cleanDetectedWebComponents(context.spec),
+                    )
+                } else {
+                    python
+                }
+            }
             RuntimeKind.NODE_JS -> nodeExecutableAdapter.clean(context.spec)
             else -> executableUnavailable(project, resolved.primary)
         }

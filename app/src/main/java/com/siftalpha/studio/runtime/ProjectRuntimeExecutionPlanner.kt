@@ -7,6 +7,12 @@ package com.siftalpha.studio.runtime
  * a Python project with a nested Node/Vite frontend must stay Python-primary even when the nested
  * frontend contributes several Node evidence files. Explicit recognized metadata remains authoritative.
  */
+object RuntimeSupplementalCompositionPolicy {
+    fun requiresNode(
+        selection: ProjectRuntimeExecutionPlanner.Selection.Resolved,
+    ): Boolean = RuntimeKind.NODE_JS in selection.supplemental
+}
+
 object ProjectRuntimeExecutionPlanner {
 
     enum class SelectionSource {
