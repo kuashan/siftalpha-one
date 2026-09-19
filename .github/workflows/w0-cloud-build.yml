@@ -150,7 +150,7 @@ jobs:
           unzip -l "$apk" | tee w0-evidence/apk-contents.txt
           grep -q 'lib/arm64-v8a/libproot.so' w0-evidence/apk-contents.txt
           grep -q 'lib/arm64-v8a/libproot-loader.so' w0-evidence/apk-contents.txt
-          grep -q 'assets/siftalphax/alpine/alpine-minirootfs.tar.gz' w0-evidence/apk-contents.txt
+          grep -q 'assets/siftalphax/alpine/alpine-minirootfs.tgzblob' w0-evidence/apk-contents.txt
           sha256sum "$apk" | tee w0-evidence/apk-sha256.txt
           "$build_tools/apksigner" verify --verbose --print-certs "$apk" | tee w0-evidence/apk-certificates.txt
           "$build_tools/aapt2" dump badging "$apk" | tee w0-evidence/apk-badging.txt

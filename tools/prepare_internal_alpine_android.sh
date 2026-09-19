@@ -31,7 +31,7 @@ READELF="$TOOLCHAIN/llvm-readelf"
 JNI_DIR="$OUTPUT_DIR/jniLibs/arm64-v8a"
 ASSET_DIR="$OUTPUT_DIR/assets/siftalphax/alpine"
 STATUS_FILE="$OUTPUT_DIR/prepare-status.txt"
-ROOTFS_ASSET="$ASSET_DIR/alpine-minirootfs.tar.gz"
+ROOTFS_ASSET="$ASSET_DIR/alpine-minirootfs.tgzblob"
 PROOT_OUT="$JNI_DIR/libproot.so"
 LOADER_OUT="$JNI_DIR/libproot-loader.so"
 

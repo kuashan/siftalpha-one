@@ -15,7 +15,7 @@ trap 'rm -rf "$WORK"' EXIT
 
 PROOT="$WORK/runtime/jniLibs/arm64-v8a/libproot.so"
 LOADER="$WORK/runtime/jniLibs/arm64-v8a/libproot-loader.so"
-ROOTFS="$WORK/runtime/assets/siftalphax/alpine/alpine-minirootfs.tar.gz"
+ROOTFS="$WORK/runtime/assets/siftalphax/alpine/alpine-minirootfs.tgzblob"
 PROVENANCE="$WORK/runtime/assets/siftalphax/alpine/PROVENANCE.txt"
 STATUS="$WORK/runtime/prepare-status.txt"
 
@@ -37,10 +37,10 @@ rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 cp "$PROOT" "$OUTPUT_DIR/libproot.so"
 cp "$LOADER" "$OUTPUT_DIR/libproot-loader.so"
-cp "$ROOTFS" "$OUTPUT_DIR/alpine-minirootfs.tar.gz"
+cp "$ROOTFS" "$OUTPUT_DIR/alpine-minirootfs.tgzblob"
 cp "$PROVENANCE" "$OUTPUT_DIR/provenance.txt"
 cp "$STATUS" "$OUTPUT_DIR/prepare-status.txt"
 
-sha256sum   "$OUTPUT_DIR/libproot.so"   "$OUTPUT_DIR/libproot-loader.so"   "$OUTPUT_DIR/alpine-minirootfs.tar.gz"   | tee "$OUTPUT_DIR/artifact-sha256.txt"
+sha256sum   "$OUTPUT_DIR/libproot.so"   "$OUTPUT_DIR/libproot-loader.so"   "$OUTPUT_DIR/alpine-minirootfs.tgzblob"   | tee "$OUTPUT_DIR/artifact-sha256.txt"
 
 echo "SIFTALPHA_INTERNAL_ALPINE_PROBE=PASS"

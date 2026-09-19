@@ -76,7 +76,7 @@ class InternalAlpineCommand(
 }
 
 object InternalAlpineFiles {
-    private const val ASSET_ROOTFS = "siftalphax/alpine/alpine-minirootfs.tar.gz"
+    private const val ASSET_ROOTFS = "siftalphax/alpine/alpine-minirootfs.tgzblob"
     private const val ASSET_PROVENANCE = "siftalphax/alpine/PROVENANCE.txt"
     private const val EXPECTED_ALPINE_VERSION = "3.21.8"
     private const val EXPECTED_ROOTFS_SHA256 =

@@ -98,7 +98,7 @@ android {
     }
 
     androidResources {
-        noCompress += "gz"
+        noCompress += "tgzblob"
     }
 
     packaging {
