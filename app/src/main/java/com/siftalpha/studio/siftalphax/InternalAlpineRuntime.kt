@@ -559,7 +559,8 @@ class InternalAlpineSession private constructor(context: Context) {
             append("printf 'SIFTALPHA_X_BACKGROUND_PROTECTION=FOREGROUND_SERVICE+PARTIAL_WAKE_LOCK\\n'; ")
             append(portPrelude)
             if (safeLaunchCommand != null) {
-                append("exec /bin/sh -lc '")
+                append("printf 'SIFTALPHA_X_START_SHELL=NON_LOGIN\\n'; ")
+                append("exec /bin/sh -c '")
                 append(safeLaunchCommand)
                 append("'")
             } else {

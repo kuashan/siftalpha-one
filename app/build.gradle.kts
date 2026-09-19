@@ -63,10 +63,10 @@ android {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        // alpha43-r25 adds deployment start contracts, four-stage Web readiness and Internal
-        // foreground-service + partial-wake-lock protection. Worker remains frozen.
-        versionCode = 151
-        versionName = "0.8.0-alpha43-r25"
+        // alpha43-r26 fixes deployment-shell venv inheritance and treats any valid HTTP response
+        // as Web readiness while preserving the r25 four-stage model and background protection.
+        versionCode = 152
+        versionName = "0.8.0-alpha43-r26"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

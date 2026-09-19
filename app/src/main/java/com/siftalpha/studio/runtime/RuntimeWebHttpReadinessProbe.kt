@@ -36,7 +36,10 @@ object RuntimeWebHttpReadinessProbe {
             connection.setRequestProperty("Connection", "close")
             connection.setRequestProperty("User-Agent", "SiftAlpha-Web-Readiness/1")
             val code = connection.responseCode
-            code in 200..499
+            // Any syntactically valid HTTP response means a Browser target exists. Application
+            // health is a separate concern: 5xx still proves that the local Web server is ready
+            // enough to open and show its own error page.
+            code in 100..599
         } catch (_: Throwable) {
             false
         } finally {

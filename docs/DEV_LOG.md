@@ -980,3 +980,14 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Added `android.permission.WAKE_LOCK`. No OCI-specific or situation-monitor-specific source patch was added.
 - Internal Browser is intentionally not part of r25.
 - Cloud CI, signed APK and real-device acceptance are pending for the final r25 HEAD.
+
+
+## 2026-09-20 · alpha43-r26 r25 real-device regression repair
+
+- Real-device evidence from r25 showed situation-monitor correctly selecting `RENDER_YAML` and assigning port 5001, then exiting 127 with `/bin/sh: gunicorn: not found`.
+- Root cause: the r25 deployment-command path exported the project venv into `PATH` and then invoked `/bin/sh -lc`; login-shell initialization may replace the inherited PATH. r26 uses non-login `/bin/sh -c` and emits `SIFTALPHA_X_START_SHELL=NON_LOGIN`.
+- r25 also replaced TCP-only Web availability with HTTP readiness. The first implementation accepted only 2xx-4xx. r26 treats any valid HTTP status 100-599 as Web-ready because a 5xx response still proves a Browser target exists; application health remains visible inside the Web app.
+- Internal Alpine PID/socket ownership discovery itself is unchanged from r24/r25.
+- Worker remains frozen. Foreground Service + PARTIAL_WAKE_LOCK and the SEARCHING -> LISTENER_FOUND -> STARTING_WEB -> AVAILABLE model remain unchanged.
+- versionCode 152 / versionName 0.8.0-alpha43-r26.
+- Cloud CI and real-device revalidation pending.

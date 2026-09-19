@@ -501,3 +501,8 @@ Production external runtime 仍主要依赖 Termux + PRoot + Ubuntu + Python 作
 - Web readiness is staged: SEARCHING (no owned listener), LISTENER_FOUND (owned socket), STARTING_WEB (owned listener but HTTP not yet ready), AVAILABLE (HTTP ready).
 - Internal Runtime background protection is now session-lease Foreground Service + PARTIAL_WAKE_LOCK. This protects Runtime execution; it does not promise that a third-party browser tab's JavaScript timers run unthrottled in the background.
 - Internal Browser remains a separate presentation decision and is not required for r25 background Runtime protection.
+
+
+## alpha43-r26 targeted correction
+
+r26 is a minimal correction to the r25 start/readiness integration. Deployment commands keep the project venv environment by using a non-login shell. HTTP readiness means that a local candidate speaks HTTP, not that the application returned a success status; therefore any valid HTTP 100-599 response is Browser-ready. PID/socket ownership discovery, Worker freeze, STOP scope and Foreground Service + PARTIAL_WAKE_LOCK architecture are unchanged.

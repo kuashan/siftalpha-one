@@ -498,3 +498,11 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Real device: situation-monitor Internal Alpine should log RENDER_YAML as start source, an assigned port for $PORT, progress through the four Web states, and reach AVAILABLE if Gunicorn becomes ready.
 - Real device: OCI Internal Runtime should continue server-side/background work after SiftAlpha goes to background; verify the foreground notification remains and compare activity before/after returning.
 - Internal Browser remains out of scope.
+
+
+### alpha43-r26 targeted regression tests
+
+- situation-monitor: Render start source must remain RENDER_YAML; assigned PORT must be present; deployment command must run through NON_LOGIN shell and resolve `gunicorn` from the project venv.
+- HTTP readiness: 200, 404, 503 and other valid 100-599 responses mean AVAILABLE once the current candidate is verified; a raw TCP listener with no HTTP response must not become AVAILABLE.
+- OCI: verify the previously working Internal Web returns. If it still stays SEARCHING with `INTERNAL_WEB_DISCOVERY=NO_CANDIDATE`, capture the new run diagnostics before changing PID/socket discovery because that implementation did not change in r26.
+- Background protection regression: active Internal Runtime retains Foreground Service + PARTIAL_WAKE_LOCK; STOP releases only the current project/session lease.

@@ -33,6 +33,40 @@ class RuntimeWebHttpReadinessProbeTest {
     }
 
     @Test
+    fun serverErrorStillProvesHttpReadiness() {
+        ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { server ->
+            val executor = Executors.newSingleThreadExecutor()
+            try {
+                executor.submit {
+                    server.accept().use { socket ->
+                        val input = socket.getInputStream().bufferedReader()
+                        while (true) {
+                            val line = input.readLine() ?: break
+                            if (line.isEmpty()) break
+                        }
+                        socket.getOutputStream().use { output ->
+                            output.write(
+                                "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                                    .toByteArray(),
+                            )
+                            output.flush()
+                        }
+                    }
+                }
+                assertTrue(
+                    RuntimeWebHttpReadinessProbe.isReady(
+                        "http://127.0.0.1:${server.localPort}",
+                        connectTimeoutMs = 500,
+                        readTimeoutMs = 500,
+                    ),
+                )
+            } finally {
+                executor.shutdownNow()
+            }
+        }
+    }
+
+    @Test
     fun realHttpResponseIsReady() {
         ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { server ->
             val executor = Executors.newSingleThreadExecutor()
