@@ -843,3 +843,11 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Runtime operation deadlines are provider-aware: Internal retains its existing Android deadline path, while External operation records remain backend-result-owned and are reconciled through the real Termux result / recovery path.
 - Retained the r14 lifecycle states, operation store, generation and late-result fencing, project-scoped activity registry, PID/PGID ownership, and Pure Python supplemental-Node detection behavior.
 - Unit/build CI and Internal Alpine Probe are required for this source change; External real-device acceptance has not yet been executed.
+
+## 2026-09-19 · alpha43-r16 External Project Activity Foreground Execution Restoration
+
+- Regression analysis confirmed that the remaining r15 difference from the old working External path was the generic project activity wrapper: it backgrounded the real payload and waited on `$!`.
+- Restored a foreground PID-only owner shell. It publishes the owner PID before the payload, keeps the real External command synchronous, propagates its exit code and output, and cleans ownership files through EXIT/INT/TERM/HUP traps.
+- No dedicated PGID is recorded when `setsid` semantics cannot be proven safe; project STOP continues to use the existing descendant-tree ownership path without risking a shared process group.
+- External business commands, STOP routing, Internal Runtime, provider-aware deadlines, result fencing and Pure Python supplemental-Node detection remain unchanged.
+- Source/CI validation is pending; External real-device acceptance has not been executed.

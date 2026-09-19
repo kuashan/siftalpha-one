@@ -89,20 +89,22 @@ internal object TermuxProjectActivityContract {
               exit 80
             fi
             rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
+            # Keep this RUN_COMMAND shell as the project owner. The payload stays in the
+            # foreground so Termux observes its real completion and exit code. We deliberately
+            # do not publish a PGID: without a proven dedicated session, recording the shared
+            # shell process group could make project STOP terminate unrelated work.
+            activity_pid=${'$'}${'$'}
+            activity_cleanup() {
+              rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
+            }
+            trap activity_cleanup EXIT
+            trap 'activity_cleanup; exit 130' INT
+            trap 'activity_cleanup; exit 143' TERM
+            trap 'activity_cleanup; exit 129' HUP
+            printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pid_file"
             set +e
-            if command -v setsid >/dev/null 2>&1; then
-              setsid bash -lc ${quotedShellScript} &
-              activity_pid=${'$'}!
-              printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pid_file"
-              printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pgid_file"
-            else
-              bash -lc ${quotedShellScript} &
-              activity_pid=${'$'}!
-              printf '%s\n' "${'$'}activity_pid" >"${'$'}activity_pid_file"
-            fi
-            wait "${'$'}activity_pid"
+            bash -lc ${quotedShellScript}
             activity_code=${'$'}?
-            rm -f -- "${'$'}activity_pid_file" "${'$'}activity_pgid_file"
             exit "${'$'}activity_code"
         """.trimIndent()
     }
