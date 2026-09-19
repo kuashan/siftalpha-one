@@ -231,6 +231,21 @@ class ProjectRuntimeController(
         ) != null
     }
 
+    fun cleanEmbeddedPythonEnvironment(
+        project: V04ProjectGateway.RuntimeProject,
+    ) {
+        val projectId = project.summary.documentId
+        val active = embeddedPythonSnapshotFor(projectId)
+        check(active == null || !EmbeddedPythonStatePolicy.canStop(active.state)) {
+            "EMBEDDED_R_RUNTIME_ACTIVE"
+        }
+        check(embeddedPythonEnvironmentManager != null || internalAlpineEnvironmentManager != null) {
+            "EMBEDDED_R_ENVIRONMENT_MANAGER_UNAVAILABLE"
+        }
+        embeddedPythonEnvironmentManager?.cleanProjectEnvironment(projectId)
+        internalAlpineEnvironmentManager?.cleanProjectEnvironment(projectId)
+    }
+
     fun prepareEmbeddedPythonEnvironment(
         project: V04ProjectGateway.RuntimeProject,
     ): InternalEnvironmentPreparationResult {

@@ -231,6 +231,17 @@ class InternalAlpineEnvironmentManager(context: Context) {
         }
     }
 
+    @Synchronized
+    fun cleanProjectEnvironment(projectIdentity: String) {
+        require(projectIdentity.isNotBlank())
+        InternalAlpineProcessControl.throwIfCancelled()
+        val root = InternalAlpineFiles.projectEnvironmentRoot(appContext, projectIdentity)
+        if (root.exists()) {
+            check(root.deleteRecursively()) { "Unable to clean Internal Alpine project environment" }
+        }
+        InternalAlpineProcessControl.throwIfCancelled()
+    }
+
     fun loadBinding(
         projectIdentity: String,
         source: InternalAlpineDependencySource,

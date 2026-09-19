@@ -245,14 +245,19 @@ open class V04Activity : StudioActivity() {
             if (::prepareLiveProgress.isInitialized && prepareLiveProgress.consumeIfProbe(result)) {
                 return@runOnUiThread
             }
+            // STOP removes cancelled project operations from the visible Pending table immediately.
+            // A late external callback still has to be consumed, but must never re-open or mutate UI state.
+            if (cancelledExternalExecutions.remove(result.executionId)) {
+                pending.remove(result.executionId)
+                TermuxResultBus.consume(result.executionId)
+                externalActivityTokens.remove(result.executionId)?.let(projectActivities::finish)
+                return@runOnUiThread
+            }
             // A very fast Termux command can publish before the UI has registered its Pending item.
             // Never consume such an unmatched result: registerPending() will immediately reconcile it.
             val item = pending.remove(result.executionId) ?: return@runOnUiThread
             TermuxResultBus.consume(result.executionId)
             externalActivityTokens.remove(result.executionId)?.let(projectActivities::finish)
-            if (cancelledExternalExecutions.remove(result.executionId)) {
-                return@runOnUiThread
-            }
             if (item.automaticObservation && !isCurrentAutomaticObservation(item)) {
                 // A STOP, CLEAN, new START, or a newer observation generation superseded this
                 // delayed result. Consume it, but never let it mutate the new project state.
@@ -662,7 +667,10 @@ open class V04Activity : StudioActivity() {
                 ObservationPresentationPolicy.isUserVisiblePending(item.automaticObservation)
         }
         val deferredManualAction = deferredManualActions[stateKey]
-        val visiblePendingAction = pendingItem?.action ?: deferredManualAction?.action
+        val internalCleanPending = ProjectRuntimeController.Action.CLEAN.takeIf {
+            ProjectActivityRegistry.Kind.CLEAN in projectActivities.activeKinds(stateKey)
+        }
+        val visiblePendingAction = pendingItem?.action ?: deferredManualAction?.action ?: internalCleanPending
         val pendingExecutionId = pendingItem?.let { visibleItem ->
             pending.entries.firstOrNull { it.value === visibleItem }?.key
         }
@@ -1193,8 +1201,15 @@ open class V04Activity : StudioActivity() {
         if (!failureReasons.containsKey(stateKey)) {
             cached.failureReason?.let { failureReasons[stateKey] = it }
         }
-        if (!activityStarted && cached.runtimeState in ACTIVE_RUNTIME_STATES) {
+        val selection = projectRuntimeSelectionStore.read(stateKey)
+        if (
+            !activityStarted &&
+            selection == ProjectRuntimeSelection.TERMUX &&
+            cached.runtimeState in ACTIVE_RUNTIME_STATES
+        ) {
             recoveryProjects += stateKey
+        } else if (selection == ProjectRuntimeSelection.EMBEDDED_R) {
+            recoveryProjects.remove(stateKey)
         }
     }
 
@@ -1217,9 +1232,16 @@ open class V04Activity : StudioActivity() {
             restoreStoredState(key)
             val cached = lifecycleStore.read(key)
             if (projectRuntimeSelectionStore.read(key) != ProjectRuntimeSelection.TERMUX) {
-                // Embedded R owns its own snapshot/polling path; never issue Termux recovery probes
-                // for a project explicitly owned by Embedded R.
+                // Internal owns its own environment/session state. Reconcile it directly and never
+                // enter the External/Termux RECOVERING state machine.
                 recoveryProjects.remove(key)
+                runCatching { runtime.embeddedPythonEnvironmentReady(project) }
+                    .getOrNull()
+                    ?.let { ready ->
+                        setEnvironmentReady(key, ProjectRuntimeSelection.EMBEDDED_R, ready)
+                    }
+                refreshEmbeddedProject(project)
+                persistRuntimeState(key, ProjectRuntimeSelection.EMBEDDED_R)
                 return@forEach
             }
             if (cached.runtimeState in ACTIVE_RUNTIME_STATES) {
@@ -1438,13 +1460,18 @@ open class V04Activity : StudioActivity() {
     }
 
     private fun confirmClean(project: V04ProjectGateway.RuntimeProject) {
-        if (!ensureRuntime()) return
+        val selection = selectedRuntimeSelection(project)
+        if (selection == ProjectRuntimeSelection.TERMUX && !ensureRuntime()) return
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.runtime_clean_title, project.summary.name))
             .setMessage(getString(R.string.runtime_clean_message))
             .setNegativeButton(getString(R.string.common_cancel), null)
             .setPositiveButton(getString(R.string.runtime_clean_confirm)) { _, _ ->
-                dispatch(project, ProjectRuntimeController.Action.CLEAN)
+                if (selection == ProjectRuntimeSelection.EMBEDDED_R) {
+                    cleanEmbeddedProject(project)
+                } else {
+                    dispatch(project, ProjectRuntimeController.Action.CLEAN)
+                }
             }
             .show()
     }
@@ -1754,6 +1781,96 @@ open class V04Activity : StudioActivity() {
         }
     }
 
+    private fun cleanEmbeddedProject(project: V04ProjectGateway.RuntimeProject) {
+        val stateKey = project.summary.documentId
+        if (projectActivities.hasActive(stateKey)) return
+        val activeSnapshot = runCatching { runtime.embeddedPythonSnapshotFor(stateKey) }.getOrNull()
+        if (activeSnapshot != null && isEmbeddedActive(activeSnapshot)) {
+            toast(getString(R.string.runtime_embedded_r_active))
+            return
+        }
+
+        states[stateKey] = getString(R.string.runtime_action_cleaning)
+        failureReasons.remove(stateKey)
+        projectOutputs.write(
+            project.folderName,
+            listOf(
+                "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                "SIFTALPHA_X_ENVIRONMENT_STAGE=CLEANING",
+            ).joinToString("\n"),
+            expand = true,
+        )
+        refresh()
+
+        val token = projectActivities.begin(
+            stateKey,
+            ProjectActivityRegistry.Kind.CLEAN,
+        )
+        val future = embeddedStartExecutor.submit {
+            val result = runCatching {
+                runtime.cleanEmbeddedPythonEnvironment(project)
+            }
+            runOnUiThread {
+                if (!projectActivities.finish(token)) return@runOnUiThread
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                recoveryProjects.remove(stateKey)
+                embeddedStartInFlight.remove(stateKey)
+                val success = result.isSuccess
+                val readyAfterClean = runCatching {
+                    runtime.embeddedPythonEnvironmentReady(project)
+                }.getOrDefault(false)
+                setEnvironmentReady(
+                    stateKey,
+                    ProjectRuntimeSelection.EMBEDDED_R,
+                    readyAfterClean,
+                )
+                if (success && !readyAfterClean) {
+                    typedStates[stateKey] = RuntimeState.UNKNOWN
+                    states[stateKey] = getString(R.string.runtime_state_env_not_ready)
+                    failureReasons.remove(stateKey)
+                    richResults.remove(stateKey)
+                    embeddedLastSnapshots.remove(stateKey)
+                    if (::webStateStore.isInitialized) webStateStore.clear(stateKey)
+                    if (::webAvailability.isInitialized) webAvailability.invalidate(stateKey)
+                    configurationUi.clearRuntimeDiscovery(project.folderName)
+                    projectOutputs.write(
+                        project.folderName,
+                        listOf(
+                            "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                            "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                            "SIFTALPHA_X_ENVIRONMENT_STAGE=CLEANED",
+                            "SIFTALPHA_X_ENVIRONMENT_READY=false",
+                        ).joinToString("\n"),
+                        expand = true,
+                    )
+                } else {
+                    typedStates[stateKey] = RuntimeState.ENVIRONMENT_ERROR
+                    states[stateKey] = getString(R.string.runtime_clean_failed)
+                    val message = result.exceptionOrNull()?.message
+                        ?: "INTERNAL_ENVIRONMENT_STILL_READY_AFTER_CLEAN"
+                    failureReasons[stateKey] = message
+                    projectOutputs.write(
+                        project.folderName,
+                        listOf(
+                            "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                            "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                            "SIFTALPHA_X_ENVIRONMENT_STAGE=CLEAN_FAILED",
+                            message,
+                        ).joinToString("\n"),
+                        expand = true,
+                    )
+                    errorDialog(getString(R.string.runtime_clean_failed), message)
+                }
+                persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
+                refresh()
+            }
+        }
+        if (!projectActivities.attachCancel(token) { future.cancel(true) }) {
+            future.cancel(true)
+        }
+    }
+
     private fun startEmbeddedProject(
         project: V04ProjectGateway.RuntimeProject,
         requiredConfiguration: Boolean = false,
@@ -1858,6 +1975,7 @@ open class V04Activity : StudioActivity() {
         }
         projectPending.forEach { (executionId, _) ->
             cancelledExternalExecutions += executionId
+            pending.remove(executionId)
         }
 
         if (::prepareLiveProgress.isInitialized) {
@@ -1868,6 +1986,9 @@ open class V04Activity : StudioActivity() {
         recoveryProjects.remove(stateKey)
 
         val cancelledInternal = projectActivities.cancelProject(stateKey)
+        projectPending.forEach { (executionId, _) ->
+            externalActivityTokens.remove(executionId)
+        }
         if (cancelledInternal > 0) {
             embeddedStartInFlight.remove(stateKey)
         }
@@ -1882,19 +2003,29 @@ open class V04Activity : StudioActivity() {
             return
         }
 
-        if (
-            cancelledInternal > 0 &&
-            selectedRuntimeSelection(project) == ProjectRuntimeSelection.EMBEDDED_R
-        ) {
-            typedStates[stateKey] = RuntimeState.STOPPED_BY_USER
-            states[stateKey] = getString(R.string.runtime_state_stopped_by_user)
+        if (selectedRuntimeSelection(project) == ProjectRuntimeSelection.EMBEDDED_R) {
+            val ready = runCatching {
+                runtime.embeddedPythonEnvironmentReady(project)
+            }.getOrDefault(false)
+            setEnvironmentReady(stateKey, ProjectRuntimeSelection.EMBEDDED_R, ready)
+            val terminalState = embeddedSnapshot
+                ?.let(EmbeddedPythonRuntimeStateMapping::toRuntimeState)
+                ?.takeIf { it !in ACTIVE_RUNTIME_STATES }
+                ?: RuntimeState.STOPPED_BY_USER
+            typedStates[stateKey] = terminalState
+            states[stateKey] = terminalState.uiLabel(this)
             failureReasons.remove(stateKey)
             projectOutputs.write(
                 project.folderName,
                 listOf(
                     "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
                     "SIFTALPHA_X_PROJECT_ID=" + stateKey,
-                    "SIFTALPHA_X_STOP_REQUEST=LOCAL_ACTIVITY_CANCELLED",
+                    "SIFTALPHA_X_STOP_REQUEST=" + if (cancelledInternal > 0) {
+                        "LOCAL_ACTIVITY_CANCELLED"
+                    } else {
+                        "NO_ACTIVE_INTERNAL_ACTIVITY"
+                    },
+                    "SIFTALPHA_X_ENVIRONMENT_READY=" + ready,
                 ).joinToString("\n"),
                 expand = true,
             )
@@ -1941,6 +2072,20 @@ open class V04Activity : StudioActivity() {
         manualAction: EmbeddedPythonObservationPolicy.ManualAction? = null,
     ) {
         val stateKey = project.summary.documentId
+        val checkedEnvironmentReady = if (
+            manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS
+        ) {
+            runCatching { runtime.embeddedPythonEnvironmentReady(project) }.getOrNull()
+        } else {
+            null
+        }
+        if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
+            setEnvironmentReady(
+                stateKey,
+                ProjectRuntimeSelection.EMBEDDED_R,
+                checkedEnvironmentReady,
+            )
+        }
         val snapshot = runCatching {
             runtime.embeddedPythonSnapshotFor(stateKey)
         }.getOrNull()
@@ -1955,6 +2100,11 @@ open class V04Activity : StudioActivity() {
                 "SIFTALPHA_X_RUNTIME_PHASE=IDLE",
                 "SIFTALPHA_X_PROJECT_STATUS=NOT_STARTED",
             )
+            if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
+                diagnostics += "SIFTALPHA_X_ENVIRONMENT_READY=" + (
+                    checkedEnvironmentReady?.toString() ?: "UNKNOWN"
+                )
+            }
             when (manualAction) {
                 EmbeddedPythonObservationPolicy.ManualAction.STATUS -> {
                     diagnostics += "SIFTALPHA_X_STATUS_CHECK=PASS"
@@ -1971,6 +2121,9 @@ open class V04Activity : StudioActivity() {
                 diagnostics.joinToString("\n"),
                 expand = true,
             )
+            if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
+                persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
+            }
             refresh()
             return
         }
@@ -1981,6 +2134,9 @@ open class V04Activity : StudioActivity() {
             )
         }
         val changed = syncEmbeddedSnapshot(project, snapshot, manualAction)
+        if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
+            persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
+        }
         if (changed) refresh()
         if (isEmbeddedActive(snapshot)) scheduleEmbeddedPolling(project)
     }

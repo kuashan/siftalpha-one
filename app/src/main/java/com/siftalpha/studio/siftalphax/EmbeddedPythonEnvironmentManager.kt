@@ -72,6 +72,15 @@ class EmbeddedPythonEnvironmentManager(context: Context) {
         )
     }
 
+    @Synchronized
+    fun cleanProjectEnvironment(projectIdentity: String) {
+        require(projectIdentity.isNotBlank()) { "projectIdentity must not be blank" }
+        val root = EmbeddedPythonFiles.projectEnvironmentRoot(appContext, projectIdentity)
+        if (root.exists()) {
+            check(root.deleteRecursively()) { "Unable to clean Embedded Python project environment" }
+        }
+    }
+
     fun loadBinding(
         projectIdentity: String,
         dependencyInput: EmbeddedPythonDependencyInputV1,
