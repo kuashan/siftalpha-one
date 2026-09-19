@@ -183,14 +183,15 @@ object InternalAlpineFiles {
         val pidRoot = File(context.cacheDir, "siftalpha-proot-pids")
         check(pidRoot.mkdirs() || pidRoot.isDirectory) { "Unable to create Internal Alpine PID root" }
         val pidFile = File(pidRoot, UUID.randomUUID().toString() + ".pid")
-        val wrapper = """
-            set -eu
-            pid_file="$1"
-            shift
-            umask 077
-            printf '%s\\n' "${'
-            exec "$@"
-        """.trimIndent()
+        val dollar = 36.toChar()
+        val wrapper = listOf(
+            "set -eu",
+            "pid_file=\"" + dollar + "1\"",
+            "shift",
+            "umask 077",
+            "printf '%s\\n' \"" + dollar + dollar + "\" >\"" + dollar + "pid_file\"",
+            "exec \"" + dollar + "@\"",
+        ).joinToString("\n")
         val wrapped = mutableListOf(
             "/system/bin/sh",
             "-c",
