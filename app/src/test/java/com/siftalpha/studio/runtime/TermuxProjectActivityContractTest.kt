@@ -73,7 +73,7 @@ class TermuxProjectActivityContractTest {
         val root = Files.createTempDirectory("siftalpha-activity-stale").toFile()
         try {
             val stalePidFile = root.toPath().resolve("project-a.activity.clean.pid")
-            Files.writeString(stalePidFile, "99999999\n")
+            Files.write(stalePidFile, "99999999\n".toByteArray(StandardCharsets.UTF_8))
             val staleScript = TermuxProjectActivityContract.wrap(
                 runtimeId = "project-a",
                 operation = "clean",
@@ -84,7 +84,10 @@ class TermuxProjectActivityContractTest {
             val staleProcess = ProcessBuilder("bash", "-lc", staleScript).start()
             assertEquals(0, staleProcess.waitFor())
 
-            Files.writeString(stalePidFile, ProcessHandle.current().pid().toString())
+            Files.write(
+                stalePidFile,
+                ProcessHandle.current().pid().toString().toByteArray(StandardCharsets.UTF_8),
+            )
             val liveScript = TermuxProjectActivityContract.wrap(
                 runtimeId = "project-a",
                 operation = "clean",
