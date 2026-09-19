@@ -64,6 +64,7 @@ android {
         minSdk = 26
         targetSdk = 36
         // alpha43-r17 restores direct External execution with lightweight ownership metadata.
+        // Final source validation is cloud-only; real-device acceptance remains separate.
         versionCode = 143
         versionName = "0.8.0-alpha43-r17"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
