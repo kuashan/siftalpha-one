@@ -2865,8 +2865,7 @@ open class V04Activity : StudioActivity() {
                 ProjectRuntimeController.Action.START -> getString(R.string.runtime_action_starting)
                 ProjectRuntimeController.Action.STOP -> getString(R.string.runtime_action_stopping)
                 ProjectRuntimeController.Action.STATUS -> getString(R.string.runtime_action_checking)
-                ProjectRuntimeController.Action.LOGS ->
-                    states[stateKey] ?: getString(R.string.runtime_state_not_checked)
+                ProjectRuntimeController.Action.LOGS -> getString(R.string.runtime_action_checking)
                 ProjectRuntimeController.Action.CLEAN -> getString(R.string.runtime_action_cleaning)
                 ProjectRuntimeController.Action.CLONE_GITHUB -> getString(R.string.runtime_action_importing)
             }
