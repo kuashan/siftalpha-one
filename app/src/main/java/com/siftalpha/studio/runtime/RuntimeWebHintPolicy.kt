@@ -32,7 +32,9 @@ object RuntimeWebHintPolicy {
     fun ports(
         detectedPort: Int?,
         framework: String?,
+        learnedPort: Int? = null,
     ): List<Int> = buildList {
+        learnedPort?.takeIf { it in 1..65535 }?.let(::add)
         detectedPort?.takeIf { it in 1..65535 }?.let(::add)
         framework
             ?.trim()
@@ -42,5 +44,5 @@ object RuntimeWebHintPolicy {
         addAll(commonPorts)
     }.distinct().take(MAX_HINT_PORTS)
 
-    internal const val MAX_HINT_PORTS = 9
+    internal const val MAX_HINT_PORTS = 10
 }

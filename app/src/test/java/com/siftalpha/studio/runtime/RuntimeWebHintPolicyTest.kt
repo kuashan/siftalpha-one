@@ -7,20 +7,22 @@ import org.junit.Test
 class RuntimeWebHintPolicyTest {
 
     @Test
-    fun detectedProjectPortWinsBeforeFrameworkAndCommonFallbacks() {
+    fun learnedPortWinsBeforeDetectedFrameworkAndCommonFallbacks() {
         val ports = RuntimeWebHintPolicy.ports(
             detectedPort = 9234,
             framework = "fastapi",
+            learnedPort = 9127,
         )
 
-        assertEquals(9234, ports.first())
-        assertEquals(8000, ports[1])
+        assertEquals(9127, ports.first())
+        assertEquals(9234, ports[1])
+        assertEquals(8000, ports[2])
         assertTrue(5173 in ports)
         assertEquals(ports.distinct(), ports)
     }
 
     @Test
-    fun frameworkDefaultWinsWhenNoExplicitOrSourcePortExists() {
+    fun frameworkDefaultWinsWhenNoLearnedOrExplicitPortExists() {
         val ports = RuntimeWebHintPolicy.ports(
             detectedPort = null,
             framework = "flask",
@@ -38,6 +40,6 @@ class RuntimeWebHintPolicyTest {
         )
 
         assertEquals(5173, ports.first())
-        assertEquals(RuntimeWebHintPolicy.MAX_HINT_PORTS, ports.size)
+        assertTrue(ports.size <= RuntimeWebHintPolicy.MAX_HINT_PORTS)
     }
 }

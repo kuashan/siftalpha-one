@@ -73,6 +73,8 @@ import com.siftalpha.studio.runtime.RuntimeWebCandidateSource
 import com.siftalpha.studio.runtime.RuntimeWebDetectionCadence
 import com.siftalpha.studio.runtime.RuntimeWebDiscoveryScopePolicy
 import com.siftalpha.studio.runtime.RuntimeWebHintPolicy
+import com.siftalpha.studio.runtime.RuntimeWebLearnedEndpointPolicy
+import com.siftalpha.studio.runtime.RuntimeWebLearnedEndpointStore
 import com.siftalpha.studio.runtime.RuntimeWebStateStore
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
 import com.siftalpha.studio.runtime.RuntimeWebUrl
@@ -125,6 +127,13 @@ open class V04Activity : StudioActivity() {
         val observation: InternalAlpineWebObservation,
     )
 
+    private data class InternalWebDiscoveryRetryRecord(
+        val sessionId: String,
+        val generation: Long,
+        val missCount: Int,
+        val nextEligibleAtEpochMs: Long,
+    )
+
     private data class DeferredManualAction(
         val project: V04ProjectGateway.RuntimeProject,
         val action: ProjectRuntimeController.Action,
@@ -165,6 +174,7 @@ open class V04Activity : StudioActivity() {
     private lateinit var configurationUi: ProjectConfigurationUiController
     private lateinit var webInspector: WebProjectInspector
     private lateinit var webStateStore: RuntimeWebStateStore
+    private lateinit var webLearnedEndpointStore: RuntimeWebLearnedEndpointStore
     private lateinit var webAvailability: RuntimeWebAvailabilityTracker
     private lateinit var projectOutputs: ProjectOutputPanelController
     private lateinit var prepareLiveProgress: PrepareLiveProgressController
@@ -190,6 +200,7 @@ open class V04Activity : StudioActivity() {
     private val internalWebObservationExecutor = Executors.newSingleThreadExecutor()
     private val internalWebObservationInFlight = mutableSetOf<String>()
     private val internalWebObservationCache = mutableMapOf<String, InternalWebObservationRecord>()
+    private val internalWebDiscoveryRetries = mutableMapOf<String, InternalWebDiscoveryRetryRecord>()
     private val embeddedStartInFlight = mutableSetOf<String>()
     private val operationTracker = RuntimeOperationTracker()
     private val operationDeadlineRunnables = mutableMapOf<String, Runnable>()
@@ -342,6 +353,7 @@ open class V04Activity : StudioActivity() {
         configurationInspector = ProjectConfigurationInspector(this)
         webInspector = WebProjectInspector(this)
         webStateStore = RuntimeWebStateStore(this)
+        webLearnedEndpointStore = RuntimeWebLearnedEndpointStore(this)
         webAvailability = RuntimeWebAvailabilityTracker {
             if (!isFinishing && !isDestroyed && ::projectList.isInitialized) {
                 refresh()
@@ -667,9 +679,20 @@ open class V04Activity : StudioActivity() {
         val embeddedActive = embeddedSnapshot?.let(::isEmbeddedActive) == true
         val webSnapshot = webStateStore.snapshot(stateKey)
         val configuredWebUrl = webProfile.configuredLocalUrl()
-        // Project configuration and framework defaults are hints, not ownership proof. Only a
-        // Runtime-published project-owned candidate is eligible for endpoint verification.
+        // Project configuration, learned endpoints and framework defaults are hints only. Android
+        // endpoint verification starts only after Runtime ownership discovery publishes a candidate.
         val candidateWebUrls = listOfNotNull(webSnapshot.candidateUrl).distinct()
+        val persistedVerifiedWebUrl = webSnapshot.verifiedUrl?.takeIf { it in candidateWebUrls }
+        if (
+            persistedVerifiedWebUrl != null &&
+            ::webAvailability.isInitialized
+        ) {
+            webAvailability.restoreVerifiedIdentity(
+                projectKey = stateKey,
+                url = persistedVerifiedWebUrl,
+                checkedAtEpochMs = webSnapshot.verifiedAtEpochMs,
+            )
+        }
         val endpointReachable = if (
             candidateWebUrls.isEmpty() &&
             typedState == RuntimeState.RUNNING &&
@@ -688,17 +711,23 @@ open class V04Activity : StudioActivity() {
         }
         if (
             endpointReachable == true &&
-            reachableWebUrl != null &&
-            webSnapshot.verifiedUrl != reachableWebUrl
+            reachableWebUrl != null
         ) {
-            webStateStore.rememberVerifiedUrl(stateKey, reachableWebUrl)
+            if (webSnapshot.verifiedUrl != reachableWebUrl) {
+                webStateStore.rememberVerifiedUrl(stateKey, reachableWebUrl)
+            }
+            if (
+                ::webLearnedEndpointStore.isInitialized &&
+                RuntimeWebLearnedEndpointPolicy.canLearn(webSnapshot.source, reachableWebUrl)
+            ) {
+                webLearnedEndpointStore.rememberOwnedVerified(stateKey, reachableWebUrl)
+            }
         }
         val lastKnownWebUrl = if (::webAvailability.isInitialized) {
             webAvailability.lastKnownReachableUrl(stateKey, candidateWebUrls)
         } else {
             null
         }
-        val persistedVerifiedWebUrl = webSnapshot.verifiedUrl?.takeIf { it in candidateWebUrls }
         val verifiedWebUrl = reachableWebUrl ?: lastKnownWebUrl ?: persistedVerifiedWebUrl
         val reachableWebFramework = when (reachableWebUrl ?: verifiedWebUrl) {
             webSnapshot.candidateUrl -> webSnapshot.framework ?: webProfile.framework
@@ -1788,9 +1817,11 @@ open class V04Activity : StudioActivity() {
             webInspector.inspect(project.summary.documentId)
         }.getOrNull()
         profile?.let { webProfileCache[project.summary.documentId] = it }
+        val learnedPort = webLearnedEndpointStore.read(project.summary.documentId)?.port
         val webHintPorts = RuntimeWebHintPolicy.ports(
             detectedPort = profile?.port,
             framework = profile?.framework,
+            learnedPort = learnedPort,
         )
         dispatch(
             project = project,
@@ -2566,6 +2597,11 @@ open class V04Activity : StudioActivity() {
             snapshot = snapshot,
             observation = internalWebObservation,
         )
+        // Schedule discovery before the presentation early-return so an initial empty observation
+        // cannot permanently strand an unchanged RUNNING snapshot in DETECTING.
+        if (snapshot.engine == InternalPythonBackend.ALPINE && isEmbeddedActive(snapshot)) {
+            scheduleInternalWebObservation(project, snapshot)
+        }
         val previous = embeddedLastSnapshots[stateKey]
         if (
             !EmbeddedPythonObservationPolicy.shouldPresent(previous, snapshot, manualAction) &&
@@ -2595,9 +2631,6 @@ open class V04Activity : StudioActivity() {
                     source = candidate.source,
                 )
             }
-        }
-        if (snapshot.engine == InternalPythonBackend.ALPINE && isEmbeddedActive(snapshot)) {
-            scheduleInternalWebObservation(project, snapshot)
         }
 
         val mappedState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot)
@@ -2645,7 +2678,21 @@ open class V04Activity : StudioActivity() {
         if (snapshot.engine != InternalPythonBackend.ALPINE || !isEmbeddedActive(snapshot)) return
         if (!::webStateStore.isInitialized) return
         val stateKey = project.summary.documentId
-        if (webStateStore.snapshot(stateKey).candidateUrl != null) return
+        if (webStateStore.snapshot(stateKey).candidateUrl != null) {
+            internalWebDiscoveryRetries.remove(stateKey)
+            return
+        }
+        val currentRetry = internalWebDiscoveryRetries[stateKey]
+            ?.takeIf {
+                it.sessionId == snapshot.sessionId &&
+                    it.generation == snapshot.generation
+            }
+        if (currentRetry != null && System.currentTimeMillis() < currentRetry.nextEligibleAtEpochMs) {
+            return
+        }
+        if (currentRetry == null) {
+            internalWebDiscoveryRetries.remove(stateKey)
+        }
         if (!internalWebObservationInFlight.add(stateKey)) return
 
         val expectedSessionId = snapshot.sessionId
@@ -2655,9 +2702,11 @@ open class V04Activity : StudioActivity() {
             val resolvedProfile = cachedProfile ?: runCatching {
                 webInspector.inspect(stateKey)
             }.getOrNull()
+            val learnedPort = webLearnedEndpointStore.read(stateKey)?.port
             val hintPorts = RuntimeWebHintPolicy.ports(
                 detectedPort = resolvedProfile?.port,
                 framework = resolvedProfile?.framework,
+                learnedPort = learnedPort,
             )
             val observation = runCatching {
                 runtime.internalAlpineWebObservationFor(snapshot, hintPorts)
@@ -2683,6 +2732,23 @@ open class V04Activity : StudioActivity() {
                     generation = expectedGeneration,
                     observation = observation,
                 )
+                if (observation.ports.isEmpty()) {
+                    val previousRetry = internalWebDiscoveryRetries[stateKey]
+                        ?.takeIf {
+                            it.sessionId == expectedSessionId &&
+                                it.generation == expectedGeneration
+                        }
+                    val missCount = (previousRetry?.missCount ?: 0) + 1
+                    internalWebDiscoveryRetries[stateKey] = InternalWebDiscoveryRetryRecord(
+                        sessionId = expectedSessionId,
+                        generation = expectedGeneration,
+                        missCount = missCount,
+                        nextEligibleAtEpochMs = System.currentTimeMillis() +
+                            RuntimeWebDetectionCadence.internalDiscoveryRetryDelay(missCount),
+                    )
+                } else {
+                    internalWebDiscoveryRetries.remove(stateKey)
+                }
                 if (
                     reconcileInternalWebDiscovery(
                         projectKey = stateKey,
@@ -2711,6 +2777,7 @@ open class V04Activity : StudioActivity() {
         ) {
             internalWebObservationCache.remove(projectKey)
             internalWebObservationInFlight.remove(projectKey)
+            internalWebDiscoveryRetries.remove(projectKey)
             if (::webAvailability.isInitialized) webAvailability.invalidate(projectKey)
             if (current.candidateUrl == null) return false
             webStateStore.clear(projectKey)
@@ -2740,6 +2807,7 @@ open class V04Activity : StudioActivity() {
     private fun invalidateInternalWebDiscovery(projectKey: String) {
         internalWebObservationCache.remove(projectKey)
         internalWebObservationInFlight.remove(projectKey)
+        internalWebDiscoveryRetries.remove(projectKey)
         if (::webStateStore.isInitialized) webStateStore.clear(projectKey)
         if (::webAvailability.isInitialized) webAvailability.invalidate(projectKey)
     }
@@ -2766,6 +2834,7 @@ open class V04Activity : StudioActivity() {
         embeddedLastSnapshots.remove(projectDocumentId)
         internalWebObservationCache.remove(projectDocumentId)
         internalWebObservationInFlight.remove(projectDocumentId)
+        internalWebDiscoveryRetries.remove(projectDocumentId)
         if (embeddedPollProject?.summary?.documentId == projectDocumentId) {
             embeddedPollProject = null
             refreshHandler.removeCallbacks(embeddedPollRunnable)
@@ -3379,7 +3448,11 @@ open class V04Activity : StudioActivity() {
             val profile = webProfileCache[stateKey] ?: runCatching {
                 webInspector.inspect(stateKey)
             }.getOrNull()?.also { webProfileCache[stateKey] = it }
-            RuntimeWebHintPolicy.ports(profile?.port, profile?.framework)
+            RuntimeWebHintPolicy.ports(
+                detectedPort = profile?.port,
+                framework = profile?.framework,
+                learnedPort = webLearnedEndpointStore.read(stateKey)?.port,
+            )
         }
         externalObservationRunnables[stateKey]?.let(refreshHandler::removeCallbacks)
         val generation = (externalObservationGenerations[stateKey] ?: 0L) + 1L

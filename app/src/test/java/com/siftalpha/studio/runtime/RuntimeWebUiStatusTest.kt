@@ -44,7 +44,20 @@ class RuntimeWebUiStatusTest {
             verifiedWebIdentity = true,
         )
         assertEquals(true, web.expected)
-        assertEquals(RuntimeWebUiStatus.DETECTING, web.status)
+        assertEquals(RuntimeWebUiStatus.AVAILABLE, web.status)
+    }
+
+    @Test
+    fun confirmedFailureStillDowngradesVerifiedIdentity() {
+        val web = com.siftalpha.studio.presentation.ProjectUiSnapshot.Web.resolve(
+            profileEnabled = true,
+            hasCandidateRuntimeUrl = true,
+            hasConfiguredLocalUrl = false,
+            runtimeState = RuntimeState.RUNNING,
+            endpointReachable = false,
+            verifiedWebIdentity = true,
+        )
+        assertEquals(RuntimeWebUiStatus.UNAVAILABLE, web.status)
     }
 
     @Test

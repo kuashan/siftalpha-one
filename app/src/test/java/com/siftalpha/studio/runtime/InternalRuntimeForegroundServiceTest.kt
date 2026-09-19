@@ -23,4 +23,14 @@ class InternalRuntimeForegroundServiceTest {
         assertTrue(leases.release("session-b"))
         assertTrue(leases.isEmpty())
     }
+
+    @Test
+    fun failedLeaseCanBeRolledBackAndReacquired() {
+        val leases = InternalRuntimeProjectSet()
+
+        assertTrue(leases.acquire("cpython-session"))
+        assertTrue(leases.release("cpython-session"))
+        assertTrue(leases.acquire("cpython-session"))
+        assertEquals(1, leases.size())
+    }
 }

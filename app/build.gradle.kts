@@ -63,11 +63,11 @@ android {
         applicationId = "com.siftalpha.studio"
         minSdk = 26
         targetSdk = 36
-        // alpha43-r23 adds ownership-verified Web hints before full listener discovery.
-        // Hints never become Web evidence without current-project PID/socket ownership proof.
+        // alpha43-r24 closes Web continuity gaps: bounded Internal discovery retries, stable
+        // foreground Web presentation, CPython foreground-runtime leases, and learned endpoints.
         // Rich Result, External execution semantics and Worker freeze remain unchanged.
-        versionCode = 149
-        versionName = "0.8.0-alpha43-r23"
+        versionCode = 150
+        versionName = "0.8.0-alpha43-r24"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

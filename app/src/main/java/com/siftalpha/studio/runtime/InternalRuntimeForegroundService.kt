@@ -105,15 +105,22 @@ class InternalRuntimeForegroundService : Service() {
         fun acquire(context: Context, sessionLeaseId: String) {
             require(sessionLeaseId.isNotBlank())
             if (!projects.acquire(sessionLeaseId)) return
-            val service = runningService
-            if (service != null) {
-                service.refreshNotification()
-                return
+            try {
+                val service = runningService
+                if (service != null) {
+                    service.refreshNotification()
+                    return
+                }
+                val appContext = context.applicationContext
+                appContext.startForegroundService(
+                    Intent(appContext, InternalRuntimeForegroundService::class.java),
+                )
+            } catch (error: Throwable) {
+                // A failed service start must not leave a phantom lease that prevents the next
+                // legitimate Internal Runtime session from starting foreground protection.
+                projects.release(sessionLeaseId)
+                throw error
             }
-            val appContext = context.applicationContext
-            appContext.startForegroundService(
-                Intent(appContext, InternalRuntimeForegroundService::class.java),
-            )
         }
 
         fun release(context: Context, sessionLeaseId: String) {

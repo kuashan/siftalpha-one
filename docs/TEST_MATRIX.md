@@ -458,3 +458,24 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Real-device Internal: verify `situation-monitor` reaches Web AVAILABLE faster and still survives external-browser backgrounding.
 - Real-device isolation: while another project owns a common port, start a different project and confirm SiftAlpha never opens the other project's page.
 - Real-device Rich Result: run a Rich Result project with no verified Web endpoint and confirm unified Open still opens Rich Result.
+
+
+### alpha43-r24 Web Runtime Continuity
+
+- Internal Alpine empty discovery must retry at 150/300/600/1000 ms, then 2 seconds, even when the Embedded snapshot itself is unchanged.
+- Internal retry state must be fenced by session ID/generation and cannot publish an older execution's result.
+- Once a current-run candidate exists, heavy Internal discovery retries must stop.
+- A verified Web endpoint must remain AVAILABLE when the Activity returns to foreground while a fresh probe runs silently.
+- One fresh failure after a previously verified endpoint must not downgrade presentation; two consecutive fresh failures may downgrade it.
+- Activity recreation may restore current-execution verified identity from `RuntimeWebStateStore`, but that restored identity still triggers a fresh probe.
+- Cross-run learned endpoint memory must accept only PID_SOCKET + Android-verified loopback endpoints with an explicit valid port.
+- Runtime-log, configured-only, credential-bearing, external-host and no-port URLs must never become learned endpoints.
+- Learned endpoint port must outrank project/framework/common hints but must still pass current-run ownership verification before becoming a candidate.
+- New START clears current execution Web candidate/verification but must not clear learned endpoint memory.
+- Embedded CPython must acquire an Internal Runtime foreground lease after native START acceptance and release only for its terminal/replaced session; blank IDLE snapshots must not prematurely release it.
+- Internal Alpine and CPython leases must remain independent; project-scoped STOP must not drop a sibling session lease.
+- Foreground-service start failure must roll back the attempted lease.
+- Rich Result production behavior remains unchanged and remains usable when Web is not currently verified.
+- Real-device situation-monitor: verify no permanent DETECTING after an early empty discovery, verify fast availability, external-browser background survival, and stable AVAILABLE when returning to SiftAlpha.
+- Real-device OCI: test both reported Internal engines; background SiftAlpha + browser, use another app, then return and verify Runtime survival and silent Web revalidation.
+- Real-device learned endpoint: after one ownership-verified successful Web run, STOP/START and confirm the previous port is tried first but a changed project port is rediscovered and replaces it safely.

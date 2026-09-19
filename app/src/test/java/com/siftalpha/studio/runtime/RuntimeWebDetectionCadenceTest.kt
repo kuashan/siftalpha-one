@@ -20,9 +20,20 @@ class RuntimeWebDetectionCadenceTest {
     }
 
     @Test
-    fun verifiedEndpointAlwaysUsesSteadyStateHealthCadence() {
-        assertEquals(2_000L, RuntimeWebDetectionCadence.endpointRecheckDelay(true, 1))
-        assertFalse(RuntimeWebDetectionCadence.initialVerificationPending(true, 1))
+    fun verifiedEndpointNeedsRepeatedFreshFailuresBeforeDowngrade() {
+        assertTrue(RuntimeWebDetectionCadence.verifiedFailurePending(true, 1))
+        assertFalse(RuntimeWebDetectionCadence.verifiedFailurePending(true, 2))
+        assertEquals(500L, RuntimeWebDetectionCadence.endpointRecheckDelay(true, 1))
+        assertEquals(2_000L, RuntimeWebDetectionCadence.endpointRecheckDelay(true, 2))
+    }
+
+    @Test
+    fun internalDiscoveryMissesUseBoundedFastBurstThenNormalCadence() {
+        assertEquals(150L, RuntimeWebDetectionCadence.internalDiscoveryRetryDelay(1))
+        assertEquals(300L, RuntimeWebDetectionCadence.internalDiscoveryRetryDelay(2))
+        assertEquals(600L, RuntimeWebDetectionCadence.internalDiscoveryRetryDelay(3))
+        assertEquals(1_000L, RuntimeWebDetectionCadence.internalDiscoveryRetryDelay(4))
+        assertEquals(2_000L, RuntimeWebDetectionCadence.internalDiscoveryRetryDelay(5))
     }
 
     @Test

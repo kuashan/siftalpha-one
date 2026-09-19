@@ -2,17 +2,38 @@ package com.siftalpha.studio.siftalphax
 
 import android.content.Context
 import android.util.Log
+import com.siftalpha.studio.runtime.InternalRuntimeForegroundService
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Process-scoped manager for the PoC. It allows one active interpreter session at a time and
  * retains the last terminal result while the app process remains alive.
  */
+
+internal object EmbeddedPythonForegroundLeasePolicy {
+    fun shouldRelease(
+        current: EmbeddedPythonSnapshot,
+        sessionId: String,
+        generation: Long,
+    ): Boolean {
+        val replacedByNewSession =
+            current.sessionId.isNotBlank() &&
+                (current.sessionId != sessionId || current.generation != generation)
+        val thisSessionTerminal =
+            current.sessionId == sessionId &&
+                current.generation == generation &&
+                EmbeddedPythonStatePolicy.isTerminal(current.state)
+        return replacedByNewSession || thisSessionTerminal
+    }
+}
+
 class EmbeddedPythonSession private constructor(context: Context) {
     private val appContext = context.applicationContext
     private val nextGeneration = AtomicLong(0L)
+    private val foregroundLeaseMonitor = Executors.newSingleThreadExecutor()
     private var boundEnvironmentKey: String? = null
 
     @Synchronized
@@ -109,6 +130,15 @@ class EmbeddedPythonSession private constructor(context: Context) {
         ) {
             "Embedded CPython did not accept the session"
         }
+
+        try {
+            InternalRuntimeForegroundService.acquire(appContext, spec.sessionId)
+        } catch (error: Throwable) {
+            runCatching { EmbeddedPythonBridge.nativeRequestStop() }
+            throw IllegalStateException("INTERNAL_RUNTIME_FOREGROUND_SERVICE_FAILED", error)
+        }
+        monitorForegroundLease(spec.sessionId, spec.generation)
+
         if (requestedEnvironmentKey != null && boundEnvironmentKey == null) {
             boundEnvironmentKey = requestedEnvironmentKey
         }
@@ -124,11 +154,38 @@ class EmbeddedPythonSession private constructor(context: Context) {
         return snapshot()
     }
 
+    private fun monitorForegroundLease(sessionId: String, generation: Long) {
+        foregroundLeaseMonitor.execute {
+            try {
+                while (!Thread.currentThread().isInterrupted) {
+                    val current = runCatching { snapshot() }.getOrNull()
+                    if (
+                        current != null &&
+                        EmbeddedPythonForegroundLeasePolicy.shouldRelease(
+                            current = current,
+                            sessionId = sessionId,
+                            generation = generation,
+                        )
+                    ) {
+                        break
+                    }
+                    Thread.sleep(FOREGROUND_LEASE_POLL_MS)
+                }
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            } finally {
+                InternalRuntimeForegroundService.release(appContext, sessionId)
+            }
+        }
+    }
+
     @Synchronized
     fun requestStop(): Boolean = EmbeddedPythonBridge.nativeRequestStop()
 
     companion object {
         private const val TAG = "SiftAlphaX"
+        private const val FOREGROUND_LEASE_POLL_MS = 250L
+
         @Volatile
         private var sharedInstance: EmbeddedPythonSession? = null
 

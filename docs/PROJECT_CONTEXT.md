@@ -479,3 +479,15 @@ Production external runtime 仍主要依赖 Termux + PRoot + Ubuntu + Python 作
 - External ownership proof remains managed PID/PGID and Runtime Identity/PRoot guest PID scope.
 - Android loopback reachability is the second gate after ownership; only verified Runtime candidates can establish Web presentation identity.
 - Rich Result remains an independent presentation capability. Hint discovery must not alter Rich Result parsing, lifecycle or viewer semantics.
+
+
+## alpha43-r24 Web Runtime Continuity architecture (2026-09-19)
+
+- Current Execution Web State and Project Learned Endpoint are separate stores with different lifetimes.
+- Current execution candidate/verified state is cleared at execution boundaries and remains protected by session/generation and Runtime ownership evidence.
+- Project Learned Endpoint is cross-run acceleration only. It stores the last PID/socket-owned + Android-verified loopback endpoint and is never sufficient to establish current Web availability by itself.
+- Hint priority: learned endpoint > project-detected/configured port > framework default > bounded common ports > complete existing listener discovery.
+- Internal Alpine discovery has a bounded startup miss burst followed by low-frequency discovery so a listener that binds after the first observation cannot strand the UI in DETECTING.
+- Foreground Activity lifecycle no longer invalidates user-visible Web identity. Fresh reachability is revalidated silently and repeated failures are required before downgrade.
+- Internal Runtime foreground-service leases now cover both Internal Alpine and Embedded CPython sessions. The service remains a process-liveness lease, not a Worker/executor/supervisor.
+- Rich Result remains independent; it has no network port and is not persisted as a new run's result.

@@ -244,15 +244,26 @@ data class ProjectUiSnapshot(
                 // A discovered URL is only a candidate until Android verifies the endpoint.
                 val expected =
                     profileEnabled || hasConfiguredLocalUrl || verifiedWebIdentity || endpointReachable == true
-                return Web(
-                    expected = expected,
-                    status = RuntimeWebUiStatus.resolve(
+                val status = if (
+                    runtimeState == RuntimeState.RUNNING &&
+                    verifiedWebIdentity &&
+                    endpointReachable == null
+                ) {
+                    // Keep a previously verified Web presentation stable while the fresh
+                    // foreground-lifecycle probe runs silently.
+                    RuntimeWebUiStatus.AVAILABLE
+                } else {
+                    RuntimeWebUiStatus.resolve(
                         profileEnabled = profileEnabled,
                         hasCandidateRuntimeUrl = hasCandidateRuntimeUrl,
                         hasConfiguredLocalUrl = hasConfiguredLocalUrl,
                         runtimeState = runtimeState,
                         endpointReachable = endpointReachable,
-                    ),
+                    )
+                }
+                return Web(
+                    expected = expected,
+                    status = status,
                     endpointReachable = endpointReachable,
                     reachableUrl = reachableUrl,
                     framework = framework,

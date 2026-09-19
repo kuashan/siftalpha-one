@@ -946,3 +946,20 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Rich Result production code remains unchanged. Regression coverage confirms automatic hint LOGS still participate in Rich Result inspection, Web hints cannot invent candidate ports, and an unrelated project's hinted listener cannot pass Internal ownership verification.
 - No global PID scan, no 1..65535 port scan, no Worker, no OCI/situation-monitor source patch, and no External START/STOP ownership rewrite were introduced.
 - W0 Cloud Build, Internal Alpine Probe, signed APK evidence and real-device acceptance are pending for the final r23 HEAD.
+
+
+## 2026-09-19 · alpha43-r24 Web Runtime Continuity
+
+- Starting source baseline: `260731c9ccee58b6097269f9c95c9a6d7c7a2ab1`, version `0.8.0-alpha43-r23` / `149`.
+- Fixed the r23 Internal Alpine discovery starvation: an initial empty PID/socket observation no longer depends on a changing Runtime snapshot to be retried. Discovery is scheduled before the presentation early-return and uses a bounded 150/300/600/1000 ms miss burst before returning to a 2-second low-frequency cadence.
+- Internal discovery retry state is fenced by project + session ID + generation and cleared on candidate discovery, terminal state, STOP/CLEAN invalidation and External ownership changes.
+- Foreground lifecycle continuity now restores the current execution's app-private verified Web identity into the endpoint tracker as stale evidence. The card stays AVAILABLE while a silent fresh probe runs after Activity recreation/resume.
+- A previously verified endpoint requires two consecutive fresh failures before downgrade. The first miss is confirmation-only and receives a 500 ms recheck.
+- Added project-scoped `RuntimeWebLearnedEndpointStore`. Only PID/socket-owned candidates that also pass Android endpoint verification can become cross-run learned endpoints. Runtime-log and merely configured URLs are explicitly excluded.
+- Learned endpoint ports are the highest-priority hint on a later START, ahead of detected/configured project ports, framework defaults and the bounded common-port list. They remain hints only and must cross current-run ownership discovery again.
+- Current execution Web state is still cleared on START/STOP/CLEAN as before; learned endpoint memory is separate and intentionally survives a new START.
+- Embedded CPython now acquires the same `InternalRuntimeForegroundService` session lease used by Internal Alpine. A lightweight monitor releases the exact CPython lease only when that session reaches SUCCEEDED/FAILED/STOPPED or is replaced by a newer session. The service remains a liveness lease only and does not execute, supervise or own Runtime PIDs.
+- Foreground-service acquisition now rolls back its in-memory lease if Android rejects service startup, preventing a phantom lease.
+- Rich Result parser/lifecycle/viewer production code remains unchanged.
+- No Worker, no global PID scan, no 1..65535 port scan, no OCI/situation-monitor project patch and no External START/STOP rewrite were introduced.
+- W0 Cloud Build, Internal Alpine Probe, signed APK evidence and real-device acceptance are pending for the final r24 HEAD.

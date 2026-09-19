@@ -6,9 +6,9 @@ import android.os.Looper
 /**
  * Activity-lifetime cache and scheduler for loopback Web listener checks.
  *
- * New candidates get a short bounded retry burst so a listener that is still finishing startup
- * can become AVAILABLE quickly. Once a listener has been verified, health checks return to the
- * normal low-frequency cadence.
+ * New candidates get a short bounded retry burst. A previously verified endpoint remains
+ * provisionally AVAILABLE across Activity lifecycle changes while a fresh foreground probe runs;
+ * only repeated fresh failures downgrade it.
  */
 class RuntimeWebAvailabilityTracker(
     private val probe: (String) -> Boolean = { RuntimeWebEndpointProbe.isListening(it) },
@@ -42,9 +42,31 @@ class RuntimeWebAvailabilityTracker(
         lifecycleGeneration += 1
         handler.removeCallbacksAndMessages(null)
         scheduledVersions.clear()
-        // Retain the last verified fact as presentation identity only. A fresh foreground
-        // lifecycle probe is still required before the endpoint is reported AVAILABLE.
+        // Keep verified identity. The next foreground lifecycle still schedules a fresh probe.
         inFlight.clear()
+    }
+
+    /**
+     * Restores app-private verified identity after Activity recreation without treating it as a
+     * fresh reachability result. The stale lifecycle marker forces an immediate background probe.
+     */
+    fun restoreVerifiedIdentity(
+        projectKey: String,
+        url: String,
+        checkedAtEpochMs: Long,
+    ) {
+        if (url.isBlank()) return
+        val key = key(projectKey, url)
+        val generation = generation(projectKey)
+        if (results[key]?.generation == generation) return
+        results[key] = ProbeResult(
+            reachable = true,
+            checkedAtEpochMs = checkedAtEpochMs,
+            generation = generation,
+            lifecycleGeneration = lifecycleGeneration - 1,
+            consecutiveFailures = 0,
+            everReachable = true,
+        )
     }
 
     fun invalidate(projectKey: String) {
@@ -70,10 +92,6 @@ class RuntimeWebAvailabilityTracker(
         }
     }
 
-    /**
-     * Returns the last verified reachable URL for stable presentation identity. Project
-     * invalidation still fences old executions, while lifecycle changes only make it stale.
-     */
     fun lastKnownReachableUrl(
         projectKey: String,
         candidateUrls: List<String>,
@@ -81,7 +99,11 @@ class RuntimeWebAvailabilityTracker(
         val projectGeneration = generation(projectKey)
         return candidateUrls.distinct().firstOrNull { url ->
             results[key(projectKey, url)]?.let { result ->
-                result.generation == projectGeneration && result.reachable
+                result.generation == projectGeneration &&
+                    (result.reachable || RuntimeWebDetectionCadence.verifiedFailurePending(
+                        everReachable = result.everReachable,
+                        consecutiveFailures = result.consecutiveFailures,
+                    ))
             } == true
         }
     }
@@ -89,8 +111,9 @@ class RuntimeWebAvailabilityTracker(
     /**
      * Returns the latest tri-state endpoint fact while scheduling any missing probe.
      *
-     * A new candidate remains DETECTING through the bounded startup retry burst instead of briefly
-     * showing UNAVAILABLE after one early connection miss.
+     * A stale verified fact remains provisionally true across Activity lifecycle changes. One fresh
+     * miss also keeps it true while a fast confirmation probe is scheduled; the configured repeated
+     * failure threshold is required before false is returned.
      */
     fun endpointReachable(
         projectKey: String,
@@ -101,24 +124,46 @@ class RuntimeWebAvailabilityTracker(
         if (candidateUrls.isEmpty()) return false
         val now = clock()
         val urls = candidateUrls.distinct()
+        val projectGeneration = generation(projectKey)
         urls.forEach { url -> ensureProbe(projectKey, url, now) }
+
         val current = urls.mapNotNull { url ->
             results[key(projectKey, url)]?.takeIf {
-                it.generation == generation(projectKey) &&
+                it.generation == projectGeneration &&
                     it.lifecycleGeneration == lifecycleGeneration
             }
         }
-        return when {
-            current.any { it.reachable } -> true
-            current.size != urls.size -> null
-            current.any {
+        if (current.any { it.reachable }) return true
+
+        val staleVerifiedExists = urls.any { url ->
+            results[key(projectKey, url)]?.let { result ->
+                result.generation == projectGeneration &&
+                    result.lifecycleGeneration != lifecycleGeneration &&
+                    result.everReachable
+            } == true
+        }
+        if (current.size != urls.size) {
+            return if (staleVerifiedExists) true else null
+        }
+        if (current.any {
+                RuntimeWebDetectionCadence.verifiedFailurePending(
+                    everReachable = it.everReachable,
+                    consecutiveFailures = it.consecutiveFailures,
+                )
+            }
+        ) {
+            return true
+        }
+        if (current.any {
                 RuntimeWebDetectionCadence.initialVerificationPending(
                     everReachable = it.everReachable,
                     consecutiveFailures = it.consecutiveFailures,
                 )
-            } -> null
-            else -> false
+            }
+        ) {
+            return null
         }
+        return false
     }
 
     fun verifyNow(projectKey: String, url: String, callback: (Boolean) -> Unit) {
@@ -235,17 +280,31 @@ class RuntimeWebAvailabilityTracker(
     }
 
     private fun notifyIfPresentationChanged(previous: ProbeResult?, current: ProbeResult) {
-        val previousPending = previous?.let {
+        val previousInitialPending = previous?.let {
             RuntimeWebDetectionCadence.initialVerificationPending(
                 everReachable = it.everReachable,
                 consecutiveFailures = it.consecutiveFailures,
             )
         } ?: true
-        val currentPending = RuntimeWebDetectionCadence.initialVerificationPending(
+        val currentInitialPending = RuntimeWebDetectionCadence.initialVerificationPending(
             everReachable = current.everReachable,
             consecutiveFailures = current.consecutiveFailures,
         )
-        if (previous?.reachable != current.reachable || previousPending != currentPending) {
+        val previousVerifiedPending = previous?.let {
+            RuntimeWebDetectionCadence.verifiedFailurePending(
+                everReachable = it.everReachable,
+                consecutiveFailures = it.consecutiveFailures,
+            )
+        } ?: false
+        val currentVerifiedPending = RuntimeWebDetectionCadence.verifiedFailurePending(
+            everReachable = current.everReachable,
+            consecutiveFailures = current.consecutiveFailures,
+        )
+        if (
+            previous?.reachable != current.reachable ||
+            previousInitialPending != currentInitialPending ||
+            previousVerifiedPending != currentVerifiedPending
+        ) {
             onChanged()
         }
     }
