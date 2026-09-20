@@ -1451,3 +1451,21 @@ Implementation:
 - Existing `RuntimeWebLearnedEndpointStore` remains intact. Learned endpoint/port data is still only a hint and current-session Endpoint Probe remains mandatory.
 - R47 storage consolidation remains abandoned. R46.1 is the source baseline for this work.
 - versionCode intentionally advances from 176 to 178. Historical abandoned R47 used 177, so 177 is not reused.
+
+
+## 2026-09-20 — alpha43-r46.3 External Python stable-prefix venv repair
+
+Real-device evidence from the newly recognized easy_tdx Web launch exposed a generic External Python environment bug: PREPARE created a complete venv under a temporary `.prepare-<pid>` prefix and then renamed that venv to the final project path. Python virtual environments are not relocatable; pip-generated console scripts may embed the temporary absolute interpreter path in their shebang. The Web recognizer correctly selected the project console script, but execution failed with exit 127 because the shebang still pointed at the removed temporary prefix.
+
+Generic repair:
+- Removed the completed-venv rename pattern. No finished Python venv is moved from a temporary prefix to its final prefix.
+- A previous final venv is renamed to a project-scoped backup before replacement.
+- The new venv is created directly at the stable final path, so pip, entry-point scripts, activation files, and environment metadata are generated with the final prefix from the start.
+- The previous READY marker is backed up together with the previous venv.
+- PREPARE keeps an EXIT rollback trap armed until the replacement venv has passed Python version/prefix validation and the new READY marker has been written.
+- Any failure removes the partial replacement and restores the previous venv + READY marker. A failed rollback clears READY and emits `ENVIRONMENT_ROLLBACK_FAILED`.
+- Added an explicit `sys.executable` final-prefix validation and `PYTHON_ENVIRONMENT_PREFIX_MISMATCH` diagnostic.
+- This is a Runtime-level fix for all External Python projects using console scripts; there is no easy_tdx-specific command rewrite or source patch.
+- Web Recognition remains unchanged from R46.2 and continues to require current-run Endpoint Probe before a learned launch becomes VERIFIED.
+
+Version: `0.8.0-alpha43-r46.3`, versionCode `179`.
