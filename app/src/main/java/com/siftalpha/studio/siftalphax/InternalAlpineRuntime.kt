@@ -470,30 +470,94 @@ class InternalAlpineEnvironmentManager(context: Context) {
         InternalAlpineProcessControl.throwIfCancelled()
     }
 
+    @Synchronized
     fun loadBinding(
         projectIdentity: String,
         source: InternalAlpineDependencySource,
     ): LoadBinding? {
-        val runtime = readPythonRuntimeIdentity(
-            InternalAlpineFiles.rootfsDirectory(appContext),
-        ) ?: return null
-        if (!pythonRequirementMatches(source.projectRequiresPython, runtime.fullVersion)) return null
-
         val root = InternalAlpineFiles.projectEnvironmentRoot(appContext, projectIdentity)
         val marker = File(root, READY_MARKER)
         if (!marker.isFile) return null
-        val values = marker.readLines().mapNotNull {
-            val index = it.indexOf('=')
-            if (index <= 0) null else it.substring(0, index) to it.substring(index + 1)
-        }.toMap()
+        val values = readMarker(marker)
         if (values["BACKEND"] != "ALPINE") return null
-        if (values["SOURCE_FINGERPRINT"] != source.sourceFingerprint) return null
-        if (values["PYTHON_VERSION"] != runtime.fullVersion) return null
-        if (values["RUNTIME_IDENTITY"] != runtime.identity) return null
         val key = values["ENVIRONMENT_KEY"]?.takeIf { it.isNotBlank() } ?: return null
         val python = File(root, "venv/bin/python")
         if (!Files.exists(python.toPath(), LinkOption.NOFOLLOW_LINKS)) return null
+
+        val runtimeRoot = InternalAlpineFiles.rootfsDirectory(appContext)
+        val runtime = readPythonRuntimeIdentity(runtimeRoot)
+        if (runtime != null) {
+            if (!pythonRequirementMatches(source.projectRequiresPython, runtime.fullVersion)) return null
+            if (values["SOURCE_FINGERPRINT"] != source.sourceFingerprint) return null
+            if (values["PYTHON_VERSION"] != runtime.fullVersion) return null
+            if (values["RUNTIME_IDENTITY"] != runtime.identity) return null
+            return LoadBinding(root, key)
+        }
+
+        return migrateLegacyBinding(
+            root = root,
+            marker = marker,
+            values = values,
+            key = key,
+            source = source,
+            runtimeRoot = runtimeRoot,
+        )
+    }
+
+    private fun migrateLegacyBinding(
+        root: File,
+        marker: File,
+        values: Map<String, String>,
+        key: String,
+        source: InternalAlpineDependencySource,
+        runtimeRoot: File,
+    ): LoadBinding? {
+        if (values.containsKey("PYTHON_VERSION") || values.containsKey("RUNTIME_IDENTITY")) return null
+        if (values["SOURCE_FINGERPRINT"] != source.legacySourceFingerprint) return null
+        if (!InternalAlpineFiles.rootfsMatchesCurrentAssets(appContext)) return null
+
+        val runtimeMarker = File(runtimeRoot, PYTHON_READY_MARKER)
+        val runtimeValues = readMarker(runtimeMarker)
+        if (runtimeValues["READY"] != "1") return null
+        if (
+            runtimeValues.containsKey("PYTHON_VERSION") ||
+            runtimeValues.containsKey("RUNTIME_IDENTITY")
+        ) return null
+
+        val pythonVersion = readLegacyVenvPythonVersion(root) ?: return null
+        if (!pythonRequirementMatches(source.projectRequiresPython, pythonVersion)) return null
+        val runtimeIdentity = InternalAlpineFiles.pythonRuntimeIdentity(pythonVersion)
+
+        runtimeMarker.writeText(
+            "READY=1\nPYTHON_VERSION=" + pythonVersion +
+                "\nRUNTIME_IDENTITY=" + runtimeIdentity + "\n",
+        )
+        marker.writeText(
+            "BACKEND=ALPINE\nSOURCE_FINGERPRINT=" + source.sourceFingerprint +
+                "\nPYTHON_VERSION=" + pythonVersion +
+                "\nRUNTIME_IDENTITY=" + runtimeIdentity +
+                "\nENVIRONMENT_KEY=" + key + "\n",
+        )
         return LoadBinding(root, key)
+    }
+
+    private fun readLegacyVenvPythonVersion(root: File): String? {
+        val config = File(root, "venv/pyvenv.cfg")
+        if (!config.isFile) return null
+        val text = runCatching { config.readText() }.getOrNull() ?: return null
+        return Regex(
+            """(?m)^(?:version_info|version)\s*=\s*([0-9]+\.[0-9]+\.[0-9]+)""",
+        ).find(text)?.groupValues?.getOrNull(1)
+    }
+
+    private fun readMarker(file: File): Map<String, String> {
+        if (!file.isFile) return emptyMap()
+        return runCatching {
+            file.readLines().mapNotNull {
+                val index = it.indexOf('=')
+                if (index <= 0) null else it.substring(0, index) to it.substring(index + 1)
+            }.toMap()
+        }.getOrDefault(emptyMap())
     }
 
     private fun ensurePythonRuntime(
