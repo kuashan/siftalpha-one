@@ -488,10 +488,23 @@ class InternalAlpineEnvironmentManager(context: Context) {
         val runtime = readPythonRuntimeIdentity(runtimeRoot)
         if (runtime != null) {
             if (!pythonRequirementMatches(source.projectRequiresPython, runtime.fullVersion)) return null
-            if (values["SOURCE_FINGERPRINT"] != source.sourceFingerprint) return null
-            if (values["PYTHON_VERSION"] != runtime.fullVersion) return null
-            if (values["RUNTIME_IDENTITY"] != runtime.identity) return null
-            return LoadBinding(root, key)
+            if (
+                values["SOURCE_FINGERPRINT"] == source.sourceFingerprint &&
+                values["PYTHON_VERSION"] == runtime.fullVersion &&
+                values["RUNTIME_IDENTITY"] == runtime.identity
+            ) {
+                return LoadBinding(root, key)
+            }
+            if (
+                !values.containsKey("PYTHON_VERSION") &&
+                !values.containsKey("RUNTIME_IDENTITY") &&
+                values["SOURCE_FINGERPRINT"] == source.legacySourceFingerprint &&
+                InternalAlpineFiles.rootfsMatchesCurrentAssets(appContext)
+            ) {
+                writeProjectBindingMarker(marker, source.sourceFingerprint, runtime, key)
+                return LoadBinding(root, key)
+            }
+            return null
         }
 
         return migrateLegacyBinding(
@@ -532,13 +545,27 @@ class InternalAlpineEnvironmentManager(context: Context) {
             "READY=1\nPYTHON_VERSION=" + pythonVersion +
                 "\nRUNTIME_IDENTITY=" + runtimeIdentity + "\n",
         )
-        marker.writeText(
-            "BACKEND=ALPINE\nSOURCE_FINGERPRINT=" + source.sourceFingerprint +
-                "\nPYTHON_VERSION=" + pythonVersion +
-                "\nRUNTIME_IDENTITY=" + runtimeIdentity +
-                "\nENVIRONMENT_KEY=" + key + "\n",
+        writeProjectBindingMarker(
+            marker = marker,
+            sourceFingerprint = source.sourceFingerprint,
+            runtime = PythonRuntimeIdentity(pythonVersion, runtimeIdentity),
+            key = key,
         )
         return LoadBinding(root, key)
+    }
+
+    private fun writeProjectBindingMarker(
+        marker: File,
+        sourceFingerprint: String,
+        runtime: PythonRuntimeIdentity,
+        key: String,
+    ) {
+        marker.writeText(
+            "BACKEND=ALPINE\nSOURCE_FINGERPRINT=" + sourceFingerprint +
+                "\nPYTHON_VERSION=" + runtime.fullVersion +
+                "\nRUNTIME_IDENTITY=" + runtime.identity +
+                "\nENVIRONMENT_KEY=" + key + "\n",
+        )
     }
 
     private fun readLegacyVenvPythonVersion(root: File): String? {
