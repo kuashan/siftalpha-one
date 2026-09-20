@@ -727,3 +727,21 @@ Current r46 version: `0.8.0-alpha43-r46`, versionCode `175`.
 Implementation head verified by W0 #287: `6d33168b3cc2a13052d1ebd0715da4c98453e407`.
 Cloud verification: PASS. Real-device acceptance: pending.
 
+## r46.1 upgrade-migration rule
+
+Environment schema evolution must not be confused with Runtime incompatibility.
+
+When SiftAlpha is upgraded, a project environment created by an older SiftAlpha version may continue to be used without rebuilding when SiftAlpha can prove that:
+- the project/dependency evidence still matches;
+- the Runtime actually used by that environment is still compatible;
+- provider-specific base Runtime evidence (for example the pinned Internal Alpine RootFS) is unchanged; and
+- the project's declared Python compatibility requirement, when present, is satisfied.
+
+If those facts can be proven, SiftAlpha upgrades only the environment metadata/ready marker and keeps the installed dependencies. If they cannot be proven, the environment remains NOT_READY and the user must Prepare.
+
+This migration rule is a long-term environment-contract rule, not a one-off r45b2 -> r46 exception. Future environment schema revisions must use the same prove-compatible-then-migrate principle.
+
+Current migration release: `0.8.0-alpha43-r46.1`, versionCode `176`.
+Code verification: W0 #302 PASS at `28a1bde86d9b144646b9608c3cd69d9eb08c90db`.
+Real-device acceptance remains pending.
+

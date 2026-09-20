@@ -1054,3 +1054,21 @@ The earlier persistence model already allowed repeated runs to reuse a prepared 
 - Runtime version selection is constrained by actually available Runtime implementations. r46 does not treat a newer Python as automatically compatible with a project requesting an older major/minor version, and it does not claim Python 2 support when no Python 2 Runtime is packaged.
 - Future Python Runtime providers can participate in the same compatibility-selection contract without changing the project-environment semantics.
 
+## r46.1 legacy marker migration closure
+
+r46 correctly strengthened environment compatibility checks but initially treated missing new metadata as equivalent to an incompatible Runtime. Real-device overwrite testing exposed that this invalidated every pre-r46 prepared environment.
+
+r46.1 separates these cases:
+
+- Missing new metadata + provable legacy compatibility -> migrate metadata in place and reuse.
+- Dependency evidence changed -> require Prepare.
+- Runtime/version/base RootFS changed or cannot be proven -> require Prepare.
+- Project requires-python is incompatible with the proven legacy Python version -> require Prepare.
+
+Provider evidence:
+- Embedded CPython v2 manifests are accepted only for the known CPython 3.14.7 Android arm64-v8a Runtime identity and matching project/source fingerprints.
+- Internal Alpine requires current RootFS asset identity, matching pre-r46 dependency fingerprint, valid legacy pyvenv.cfg version evidence and Python requirement compatibility.
+- External Python requires matching dependency hash plus pyvenv.cfg creation-version equality with the current venv interpreter, then validates any declared Python specifier before upgrading the ready marker.
+
+This preserves r46 Runtime safety while preventing App-only upgrades from causing unnecessary dependency rebuilds.
+

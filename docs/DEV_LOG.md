@@ -1417,3 +1417,18 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Internal Alpine Probe #56 / run `35509662187`: SUCCESS on the same r46 implementation line before the final fingerprint-parentheses cleanup; that cleanup changes only Kotlin fingerprint construction and is covered by W0 #287.
 - Real-device acceptance remains pending.
 
+## r46.1 Legacy Environment Migration
+
+- Trigger: real-device overwrite from r45b2 to r46 showed previously prepared projects as requiring Prepare again even though their actual Runtime and dependencies had not changed.
+- Root cause: r46 introduced stronger Runtime Identity / Python version markers but had no migration path for the older environment marker schemas. Schema absence was therefore treated as incompatibility.
+- Corrected principle: an App upgrade is not itself a Runtime upgrade. Compatible legacy environments are migrated in place; only actual dependency/Runtime incompatibility requires re-prepare.
+- Embedded CPython: legacy v2 environment manifests migrate to v3 only when project identity, source fingerprint and the known packaged CPython 3.14.7 Runtime identity are compatible.
+- Internal Alpine: migration requires the pinned RootFS marker to still match current assets, the pre-r46 dependency fingerprint to match, the project venv to expose a valid creation Python version, and any declared requires-python constraint to accept that version. Both old-runtime-marker and already-upgraded-runtime-marker / old-project-marker mixed states are supported.
+- External Python: legacy ready markers migrate only when dependency source/hash match, pyvenv.cfg proves the venv creation version equals the currently executing venv Python, and any requires-python declaration is satisfied.
+- Migration never modifies project source code and never touches another project's environment.
+- Version: `0.8.0-alpha43-r46.1`, versionCode `176`.
+- Code verification head: `28a1bde86d9b144646b9608c3cd69d9eb08c90db`.
+- W0 Cloud Build #302 / run `35512275065`: SUCCESS.
+- Internal Alpine Probe #57 / run `35512163859`: SUCCESS.
+- Real-device migration acceptance: pending.
+

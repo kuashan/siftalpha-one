@@ -935,3 +935,17 @@ Real-device gate:
 | Internal Alpine assets | Existing reproducible rootfs/proot asset pipeline remains valid | Internal Alpine Probe #56 PASS |
 | Real-device upgrade/re-prepare | Existing r45b2 install upgrades to v175; old environment invalidation and re-prepare behave correctly | PENDING DEVICE ACCEPTANCE |
 
+## r46.1 legacy environment migration
+
+| Check | Expected | Status |
+| --- | --- | --- |
+| Embedded CPython v2 -> v3 marker migration | Reuse compatible site-packages without reinstall; write v3 Runtime Identity marker | Unit regression + W0 #302 PASS |
+| Embedded CPython incompatible Runtime | Do not migrate legacy environment when current Runtime identity is not the known v2-compatible Runtime | Existing runtime mismatch coverage + W0 #302 PASS |
+| Internal Alpine pre-r46 fingerprint | Preserve the exact pre-r46 fingerprint calculation for migration comparison | Unit regression + W0 #302 PASS |
+| Internal Alpine venv version evidence | Parse virtualenv and builtin venv pyvenv.cfg version formats before migration | Unit regression + W0 #302 PASS |
+| Internal Alpine RootFS compatibility | Legacy migration requires current pinned RootFS identity/assets | Source gate + Internal Alpine Probe #57 PASS |
+| Internal Alpine mixed marker state | Old project marker can migrate even if another project already upgraded the shared Runtime marker | Source path + W0 #302 PASS |
+| External Python legacy ready marker | Migrate only when dependency hash, venv creation/current Python version, and requires-python are compatible | Generated-shell regression + W0 #302 PASS |
+| Existing incompatible/changed project | Keep NOT_READY and require Prepare | Preserved r46 checks + W0 #302 PASS |
+| Overwrite install from r46 to r46.1 | Previously prepared compatible projects remain usable without unnecessary re-prepare | PENDING REAL DEVICE |
+
