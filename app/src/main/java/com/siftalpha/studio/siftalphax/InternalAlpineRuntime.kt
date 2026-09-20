@@ -572,9 +572,7 @@ class InternalAlpineEnvironmentManager(context: Context) {
         val config = File(root, "venv/pyvenv.cfg")
         if (!config.isFile) return null
         val text = runCatching { config.readText() }.getOrNull() ?: return null
-        return Regex(
-            """(?m)^(?:version_info|version)\s*=\s*([0-9]+\.[0-9]+\.[0-9]+)""",
-        ).find(text)?.groupValues?.getOrNull(1)
+        return legacyVenvPythonVersion(text)
     }
 
     private fun readMarker(file: File): Map<String, String> {
@@ -841,6 +839,11 @@ class InternalAlpineEnvironmentManager(context: Context) {
         private const val NODE_READY_MARKER = ".siftalpha-node-runtime-ready"
         private const val PROGRESS_INTERVAL_MS = 750L
         private const val PROGRESS_TAIL_CHARS = 16_000
+
+        internal fun legacyVenvPythonVersion(configText: String): String? =
+            Regex(
+                """(?m)^(?:version_info|version)\s*=\s*([0-9]+\.[0-9]+\.[0-9]+)""",
+            ).find(configText)?.groupValues?.getOrNull(1)
 
         internal fun readTail(file: File, maxChars: Int): String {
             if (!file.isFile) return ""
