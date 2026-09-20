@@ -537,3 +537,13 @@ A direct r24-to-r33 audit showed that the core Internal Alpine Web discovery mac
 
 r34 adds a stream-neutral fallback without weakening Web truth. Both Runtime streams may contribute candidate evidence, but ordinary log URLs remain allowed only for projects already classified as Web-capable, and every candidate still crosses the existing Android loopback Endpoint Probe before browser availability is presented. The r24 Web state model, r31 foreground ownership, r32 UI stability and r33 background telemetry stay intact.
 
+## Current Known Good Functional Baseline: alpha43-r34
+
+As of 2026-09-20, the project-level Known Good Functional Baseline is `0.8.0-alpha43-r34` / versionCode `160`, commit `466e33d5bb0f18bcc1bfa537f5d7ebe5aef93f1c`, tree `6ec24ca0a5a9cca585946306da61fc36741e2aa4`.
+
+A dedicated frozen reference branch, `baseline/alpha43-r34-known-good`, points directly at that accepted source commit. It is not a development branch and must not move. r24 remains the historical Web-behavior reference, while r34 is now the current product-level baseline for future regression comparison.
+
+The accepted r34 line includes the r31 Internal Runtime foreground ownership model, r32 Runtime Center responsiveness/stable log presentation, r33 background-continuity telemetry, and r34 stdout+stderr late Web candidate fallback while preserving the existing Endpoint Probe truth gate. Same-device localhost background continuity has been demonstrated when SiftAlpha is granted unrestricted battery/background execution by the device.
+
+The baseline is replaced only by a later version that completes cloud verification and receives explicit real-device acceptance.
+

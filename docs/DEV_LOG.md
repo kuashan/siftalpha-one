@@ -1058,3 +1058,15 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - versionCode 160 / versionName 0.8.0-alpha43-r34.
 - Cloud CI + signed APK are required before real-device acceptance. Situation-monitor must transition from DETECTING to AVAILABLE only after its late Flask listener is actually reachable.
 
+## 2026-09-20 · alpha43-r34 baseline freeze
+
+- User real-device assessment: r34 is almost completely usable and is now the current Known Good Functional Baseline.
+- Frozen source identity: commit `466e33d5bb0f18bcc1bfa537f5d7ebe5aef93f1c`, tree `6ec24ca0a5a9cca585946306da61fc36741e2aa4`, versionCode `160`, versionName `0.8.0-alpha43-r34`.
+- Frozen baseline branch: `baseline/alpha43-r34-known-good`, pointing directly at the accepted r34 source commit.
+- Accepted APK SHA-256: `2d91657c07dc7cf75af2545f45587f96d15897ebb3fa5846fdb72cac417d8d0e`.
+- Stable test certificate SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`.
+- Cloud evidence: W0 Run #240 PASS, Internal Alpine Probe Run #41 PASS, unit tests + assembleDebug PASS.
+- r24 remains the historical Web reference; r34 supersedes it as the current product-level known-good baseline.
+- This freeze is documentation-only. No application source, applicationId, Runtime behavior, Web behavior, STOP behavior or version number is changed by the freeze commit.
+- Future regressions must compare against the exact r34 commit above. The baseline branch must not be advanced or rewritten.
+
