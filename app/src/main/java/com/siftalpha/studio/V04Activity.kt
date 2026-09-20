@@ -2752,6 +2752,15 @@ open class V04Activity : StudioActivity() {
         }
 
         embeddedObservationExecutor.execute {
+            val checkedEnvironmentResolution = if (
+                manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS
+            ) {
+                runCatching {
+                    runtime.detectEnvironment(project, resolveCompatibility = true)
+                }.getOrNull()
+            } else {
+                null
+            }
             val checkedEnvironmentReady = if (
                 manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS
             ) {
@@ -2787,6 +2796,9 @@ open class V04Activity : StudioActivity() {
                         "SIFTALPHA_X_PROJECT_STATUS=NOT_STARTED",
                     )
                     if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
+                        checkedEnvironmentResolution?.let { resolution ->
+                            diagnostics += resolution.diagnosticLines()
+                        }
                         diagnostics += "SIFTALPHA_X_ENVIRONMENT_READY=" + (
                             checkedEnvironmentReady?.toString() ?: "UNKNOWN"
                         )
