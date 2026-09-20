@@ -15,7 +15,6 @@ import com.siftalpha.studio.siftalphax.InternalAlpineSession
 import com.siftalpha.studio.siftalphax.InternalAlpineWebObservation
 import com.siftalpha.studio.siftalphax.InternalPythonBackend
 import java.io.File
-import org.tomlj.Toml
 
 internal object ExternalProjectActivityContract {
     fun operationFor(action: ProjectRuntimeController.Action): String? = when (action) {
@@ -115,6 +114,12 @@ class ProjectRuntimeController(
     private data class ExecutionContext(
         val spec: RuntimeProjectSpec,
         val selection: ProjectRuntimeExecutionPlanner.Selection,
+        val environmentPlan: ProjectEnvironmentPlan,
+    )
+
+    private data class EnvironmentPlanningContext(
+        val facts: V04ProjectGateway.RuntimeFacts,
+        val plan: ProjectEnvironmentPlan,
     )
 
     private val host: RuntimeCommandHost = TermuxProotRuntimeHost(gateway)
@@ -125,21 +130,69 @@ class ProjectRuntimeController(
 
     fun runtimeSupported(): Boolean = host.runtimeSupported()
 
-    private fun requiresInternalNodeVite(projectDocumentId: String): Boolean {
-        val facts = gateway.runtimeFacts(projectDocumentId)
-        val selection = ProjectRuntimeExecutionPlanner.select(
-            relativePaths = facts.relativePaths,
-            declaredType = facts.declaredType,
-        ) as? ProjectRuntimeExecutionPlanner.Selection.Resolved ?: return false
-        return selection.primary == RuntimeKind.PYTHON &&
-            RuntimeSupplementalCompositionPolicy.requiresNode(selection)
+    /**
+     * Read-only Environment Detection -> Environment Plan entrypoint.
+     *
+     * This is the single action-time source for Runtime selection, dependency-source precedence,
+     * static packaging inputs, build needs and backend candidates. PREPARE consumes this contract
+     * rather than recomputing those facts independently.
+     */
+    fun environmentPlan(project: V04ProjectGateway.RuntimeProject): ProjectEnvironmentPlan =
+        environmentPlanningContext(project).plan
+
+    private fun environmentPlanningContext(
+        project: V04ProjectGateway.RuntimeProject,
+    ): EnvironmentPlanningContext {
+        val projectId = project.summary.documentId
+        val facts = gateway.runtimeFacts(projectId)
+        val requirements = gateway.readProjectRootText(projectId, "requirements.txt")
+        val pyproject = gateway.readProjectRootText(projectId, "pyproject.toml")
+        val detection = ProjectEnvironmentDetector.detect(
+            ProjectEnvironmentDetectionInput(
+                relativePaths = facts.relativePaths,
+                declaredType = facts.declaredType,
+                declaredEntry = facts.declaredEntry,
+                declaredRun = facts.declaredRun,
+                requirementsText = requirements,
+                pyprojectText = pyproject,
+            ),
+        )
+        val plan = ProjectEnvironmentPlanner.plan(
+            detection = detection,
+            capabilities = ProjectEnvironmentCapabilities(
+                embeddedCpythonAvailable =
+                    embeddedPythonSession != null &&
+                        embeddedPythonEnvironmentManager != null &&
+                        embeddedPythonProjectStager != null,
+                internalAlpineAvailable =
+                    internalAlpineSession != null &&
+                        internalAlpineEnvironmentManager != null &&
+                        embeddedPythonProjectStager != null,
+                externalProviderAvailable = host.runtimeSupported(),
+            ),
+        )
+        return EnvironmentPlanningContext(facts = facts, plan = plan)
     }
+
+    private fun requiresInternalNodeVite(plan: ProjectEnvironmentPlan): Boolean =
+        plan.detection.primaryRuntime == RuntimeKind.PYTHON &&
+            plan.detection.viteComponentCount > 0 &&
+            RuntimeKind.NODE_JS in plan.detection.supplementalRuntimes &&
+            EnvironmentBuildStep.NODE_BUILD in plan.buildSteps
+
+    private fun blockedEnvironmentPlanMessage(plan: ProjectEnvironmentPlan): String =
+        buildList {
+            add("ENVIRONMENT_PLAN_BLOCKED")
+            addAll(plan.diagnosticLines())
+        }.joinToString("\n")
 
     fun embeddedPythonCanStart(project: V04ProjectGateway.RuntimeProject): Boolean {
         val projectId = project.summary.documentId
-        val requiresNodeVite = requiresInternalNodeVite(projectId)
+        val plan = runCatching { environmentPlan(project) }.getOrNull() ?: return false
+        if (!plan.readyToPrepare) return false
+        val requiresNodeVite = requiresInternalNodeVite(plan)
         val files = internalDependencyFiles(projectId, requiresNodeVite)
-        if (!requiresNodeVite) {
+        if (plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON) && !requiresNodeVite) {
             val cpythonBinding = runCatching {
                 val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
                     files.requirementsText,
@@ -153,6 +206,7 @@ class ProjectRuntimeController(
                     .getOrDefault(false)
             }
         }
+        if (!plan.supports(EnvironmentBackend.INTERNAL_ALPINE)) return false
         val alpineBinding = internalAlpineEnvironmentManager?.loadBinding(projectId, files.alpineSource)
         return alpineBinding != null && internalAlpineSession?.canStart(projectId) == true
     }
@@ -227,11 +281,10 @@ class ProjectRuntimeController(
             )
         }
 
-        val facts = gateway.runtimeFacts(project.summary.documentId)
-        val selection = ProjectRuntimeExecutionPlanner.select(
-            relativePaths = facts.relativePaths,
-            declaredType = facts.declaredType,
-        )
+        val planning = environmentPlanningContext(project)
+        val facts = planning.facts
+        val plan = planning.plan
+        val selection = plan.detection.selection
         val capabilityFacts = EmbeddedPythonCapabilityFacts(
             selection = selection,
             relativePaths = facts.relativePaths,
@@ -240,13 +293,12 @@ class ProjectRuntimeController(
             hasExternalDependencyRequirement = facts.hasExternalDependencyRequirement,
             hasProtectedConfigurationRequirement = requiredConfiguration,
             embeddedRuntimeAvailable = embeddedPythonProjectStager != null && if (
-                (selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved)
-                    ?.let(RuntimeSupplementalCompositionPolicy::requiresNode) == true
+                requiresInternalNodeVite(plan)
             ) {
-                internalAlpineSession != null && internalAlpineEnvironmentManager != null
+                plan.supports(EnvironmentBackend.INTERNAL_ALPINE)
             } else {
-                (embeddedPythonSession != null && embeddedPythonEnvironmentManager != null) ||
-                    (internalAlpineSession != null && internalAlpineEnvironmentManager != null)
+                plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON) ||
+                    plan.supports(EnvironmentBackend.INTERNAL_ALPINE)
             },
         )
         return if (action == Action.PREPARE) {
@@ -266,9 +318,11 @@ class ProjectRuntimeController(
         project: V04ProjectGateway.RuntimeProject,
     ): Boolean {
         val projectId = project.summary.documentId
-        val requiresNodeVite = requiresInternalNodeVite(projectId)
+        val plan = runCatching { environmentPlan(project) }.getOrNull() ?: return false
+        if (!plan.readyToPrepare) return false
+        val requiresNodeVite = requiresInternalNodeVite(plan)
         val files = internalDependencyFiles(projectId, requiresNodeVite)
-        if (!requiresNodeVite) {
+        if (plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON) && !requiresNodeVite) {
             val cpythonReady = runCatching {
                 val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
                     files.requirementsText,
@@ -281,6 +335,7 @@ class ProjectRuntimeController(
             }.getOrDefault(false)
             if (cpythonReady) return true
         }
+        if (!plan.supports(EnvironmentBackend.INTERNAL_ALPINE)) return false
         return internalAlpineEnvironmentManager?.loadBinding(
             projectIdentity = projectId,
             source = files.alpineSource,
