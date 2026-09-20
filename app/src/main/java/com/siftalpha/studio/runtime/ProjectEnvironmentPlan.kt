@@ -63,6 +63,7 @@ data class ProjectEnvironmentDetection(
     val dependencySource: EnvironmentDependencySource,
     val directDependencyCount: Int,
     val pythonRequiresVersion: String?,
+    val pythonOptionalDependencyGroups: List<String>,
     val viteComponentCount: Int,
     val declaredEntry: String?,
     val declaredRun: String?,
@@ -81,6 +82,7 @@ data class ProjectEnvironmentPlan(
     val backendCandidates: List<EnvironmentBackend>,
     val preferredBackend: EnvironmentBackend?,
     val buildSteps: List<EnvironmentBuildStep>,
+    val pythonInstallExtras: List<String>,
 ) {
     val readyToPrepare: Boolean
         get() = detection.blockingIssues.isEmpty() && preferredBackend != null
@@ -100,6 +102,11 @@ data class ProjectEnvironmentPlan(
         add("SIFTALPHA_ENV_DEPENDENCY_SOURCE=" + detection.dependencySource.wireValue)
         add("SIFTALPHA_ENV_DIRECT_DEPENDENCIES=" + detection.directDependencyCount)
         add("SIFTALPHA_ENV_PYTHON_REQUIRES=" + detection.pythonRequiresVersion.orEmpty())
+        add(
+            "SIFTALPHA_ENV_PYTHON_OPTIONAL_GROUPS=" +
+                detection.pythonOptionalDependencyGroups.joinToString(","),
+        )
+        add("SIFTALPHA_ENV_PYTHON_INSTALL_EXTRAS=" + pythonInstallExtras.joinToString(","))
         add("SIFTALPHA_ENV_VITE_COMPONENTS=" + detection.viteComponentCount)
         add(
             "SIFTALPHA_ENV_BACKEND_CANDIDATES=" +
@@ -306,6 +313,9 @@ object ProjectEnvironmentDetector {
             )
         }
 
+        val pythonOptionalDependencyGroups =
+            optionalDependencyGroups(projectTable, issues)
+
         val directDependencyCount = when (dependencySource) {
             EnvironmentDependencySource.REQUIREMENTS_TXT ->
                 activeRequirements.count { !it.startsWith("-") }
@@ -385,6 +395,7 @@ object ProjectEnvironmentDetector {
             dependencySource = dependencySource,
             directDependencyCount = directDependencyCount,
             pythonRequiresVersion = requiresPython,
+            pythonOptionalDependencyGroups = pythonOptionalDependencyGroups,
             viteComponentCount = viteComponents.size,
             declaredEntry = input.declaredEntry,
             declaredRun = input.declaredRun,
@@ -428,6 +439,22 @@ object ProjectEnvironmentDetector {
                 ?.takeIf { it.isNotBlank() }
                 ?.let { add(StaticReference("project.license.file", it)) }
         }
+    }
+
+    private fun optionalDependencyGroups(
+        project: TomlTable?,
+        issues: MutableList<EnvironmentDetectionIssue>,
+    ): List<String> {
+        val optional = project?.get("optional-dependencies") ?: return emptyList()
+        if (optional !is TomlTable) {
+            issues += EnvironmentDetectionIssue(
+                EnvironmentIssueKind.PYPROJECT_INVALID,
+                "project.optional-dependencies must be a table",
+                blocking = true,
+            )
+            return emptyList()
+        }
+        return optional.keySet().sorted()
     }
 
     private fun directPyprojectDependencyCount(
@@ -582,8 +609,9 @@ object ProjectEnvironmentPlanner {
 
         val effectiveDetection = detection.copy(issues = issues)
         val steps = buildSteps(effectiveDetection)
+        val pythonInstallExtras = buildPythonInstallExtras(effectiveDetection)
         val preferred = candidates.firstOrNull()
-        val planId = planId(effectiveDetection, candidates, steps)
+        val planId = planId(effectiveDetection, candidates, steps, pythonInstallExtras)
         return ProjectEnvironmentPlan(
             schemaVersion = ProjectEnvironmentPlan.CURRENT_SCHEMA_VERSION,
             planId = planId,
@@ -591,7 +619,20 @@ object ProjectEnvironmentPlanner {
             backendCandidates = candidates,
             preferredBackend = preferred,
             buildSteps = steps,
+            pythonInstallExtras = pythonInstallExtras,
         )
+    }
+
+    private fun buildPythonInstallExtras(
+        detection: ProjectEnvironmentDetection,
+    ): List<String> = buildList {
+        if (
+            detection.primaryRuntime == RuntimeKind.PYTHON &&
+            detection.viteComponentCount > 0 &&
+            "web" in detection.pythonOptionalDependencyGroups
+        ) {
+            add("web")
+        }
     }
 
     private fun buildSteps(detection: ProjectEnvironmentDetection): List<EnvironmentBuildStep> {
@@ -628,6 +669,7 @@ object ProjectEnvironmentPlanner {
         detection: ProjectEnvironmentDetection,
         candidates: List<EnvironmentBackend>,
         steps: List<EnvironmentBuildStep>,
+        pythonInstallExtras: List<String>,
     ): String {
         val canonical = buildString {
             append("schema=").append(ProjectEnvironmentPlan.CURRENT_SCHEMA_VERSION).append('\n')
@@ -638,6 +680,10 @@ object ProjectEnvironmentPlanner {
                 .append('\n')
             append("dependency=").append(detection.dependencySource.wireValue).append('\n')
             append("python=").append(detection.pythonRequiresVersion.orEmpty()).append('\n')
+            append("python_optional_groups=")
+                .append(detection.pythonOptionalDependencyGroups.joinToString(","))
+                .append('\n')
+            append("python_install_extras=").append(pythonInstallExtras.joinToString(",")).append('\n')
             append("backends=").append(candidates.joinToString(",") { it.wireValue }).append('\n')
             append("steps=").append(steps.joinToString(",") { it.wireValue }).append('\n')
             detection.issues.forEach {
