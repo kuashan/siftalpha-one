@@ -784,3 +784,20 @@ If any step after backup fails, SiftAlpha removes the partial new venv and resto
 This fix is generic and applies to any Python project whose package installation generates console scripts or other prefix-sensitive files. It does not special-case easy_tdx and does not modify imported project source.
 
 Current development version: `0.8.0-alpha43-r46.3`, versionCode `179`.
+
+
+## 2026-09-20 — R46.3 Known-Good Baseline Closure
+
+R46.3 is promoted to the current Known-Good Functional Baseline after real-device acceptance.
+
+- Accepted version: `0.8.0-alpha43-r46.3` / versionCode `179`.
+- Accepted source commit: `302bc7e23b1fb6beedb7776075a7c426f7d0403b`.
+- Frozen reference branch: `baseline/r46.3-web-recognition`.
+- W0 Cloud Build #330: SUCCESS.
+- Real-device acceptance: PASS.
+- Real-device evidence confirms that enhanced Web recognition finds the intended project Web path quickly and that the generic External Python stable-prefix venv repair eliminates the prior console-script shebang failure.
+- This baseline contains no easy_tdx-specific source modification or launch workaround.
+- The frozen baseline branch must not be advanced by future development or documentation-only commits.
+- Future installable builds start at versionCode `180` or higher.
+
+Canonical baseline details are recorded in [BASELINES.md](BASELINES.md).

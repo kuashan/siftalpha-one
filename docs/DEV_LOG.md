@@ -1469,3 +1469,17 @@ Generic repair:
 - Web Recognition remains unchanged from R46.2 and continues to require current-run Endpoint Probe before a learned launch becomes VERIFIED.
 
 Version: `0.8.0-alpha43-r46.3`, versionCode `179`.
+
+
+## 2026-09-20 — R46.3 Baseline Closure / real-device acceptance
+
+- User real-device acceptance: PASS.
+- The accepted build quickly discovered and opened the intended project-owned Web path after the R46.2 recognition work.
+- The External Python Console Script failure exposed during that path was repaired generically at Runtime level in R46.3 by creating replacement venvs directly at their stable final prefix rather than relocating completed venvs.
+- Accepted source commit: `302bc7e23b1fb6beedb7776075a7c426f7d0403b`.
+- Accepted version: `0.8.0-alpha43-r46.3` / versionCode `179`.
+- W0 Cloud Build #330: SUCCESS.
+- Frozen baseline branch: `baseline/r46.3-web-recognition`.
+- This branch is an immutable recovery/comparison point. Ordinary development continues on `codex/siftalpha-no-worker-alpha43`.
+- Next installable development version must use versionCode `180` or higher.
+- Canonical baseline registry: `docs/BASELINES.md`.
