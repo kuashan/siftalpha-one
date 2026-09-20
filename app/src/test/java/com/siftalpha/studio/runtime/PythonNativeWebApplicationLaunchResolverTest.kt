@@ -182,4 +182,74 @@ class PythonNativeWebApplicationLaunchResolverTest {
 
         assertNull(result)
     }
+    @Test
+    fun streamlitCommonSignatureResolvesDirectLaunch() {
+        val result = PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = null,
+            pyprojectToml = null,
+            requirementsText = "streamlit>=1.40",
+            relativePaths = listOf("streamlit_app.py"),
+            pythonSources = mapOf(
+                "streamlit_app.py" to "import streamlit as st\nst.title('hello')",
+            ),
+            webProjectEnabled = true,
+        )
+
+        assertEquals("streamlit", result?.executableName)
+        assertEquals("streamlit_app.py", result?.evidencePath)
+        assertEquals(
+            listOf(
+                "run",
+                "streamlit_app.py",
+                "--server.address",
+                "127.0.0.1",
+                "--server.headless",
+                "true",
+            ),
+            result?.arguments,
+        )
+    }
+
+    @Test
+    fun djangoCommonSignatureResolvesManageRunserver() {
+        val result = PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = null,
+            pyprojectToml = null,
+            requirementsText = "Django>=5",
+            relativePaths = listOf(
+                "manage.py",
+                "demo/settings.py",
+                "demo/urls.py",
+            ),
+            pythonSources = mapOf("manage.py" to "def main(): pass"),
+            webProjectEnabled = true,
+        )
+
+        assertEquals("python", result?.executableName)
+        assertEquals(listOf("manage.py", "runserver", "127.0.0.1:8000"), result?.arguments)
+    }
+
+    @Test
+    fun fastApiCommonSignatureResolvesInstalledModuleTarget() {
+        val result = PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = null,
+            pyprojectToml = """
+                [project]
+                dependencies = ["fastapi", "uvicorn"]
+            """.trimIndent(),
+            requirementsText = null,
+            relativePaths = listOf("src/demo/server.py"),
+            pythonSources = mapOf(
+                "src/demo/server.py" to """
+                    from fastapi import FastAPI
+                    app = FastAPI()
+                """.trimIndent(),
+            ),
+            webProjectEnabled = true,
+        )
+
+        assertEquals("uvicorn", result?.executableName)
+        assertEquals(listOf("demo.server:app", "--host", "127.0.0.1"), result?.arguments)
+    }
+
 }
