@@ -1086,3 +1086,8 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - versionCode 161 / versionName 0.8.0-alpha43-r35.
 - First contract intentionally supports file-backed Python argv end-to-end. Existing External Runtime console-script support remains; Internal Runtime console-script execution is not widened by this change.
 
+### r35 pre-release native argv wiring correction
+
+- Pre-release source review caught that the first r35 native edit added the argv vector to the snapshot struct but not the live Session struct while later code referenced `session->arguments`.
+- Corrected the live Embedded CPython Session to own `std::vector<std::string> arguments`. No released APK existed from the broken commit, so versionCode remains 161 / versionName 0.8.0-alpha43-r35.
+- The frozen r34 baseline remains unchanged.

@@ -294,6 +294,7 @@ struct Session {
     std::string environmentSitePackages;
     std::string entrypoint;
     std::string workingDirectory;
+    std::vector<std::string> arguments;
     std::int64_t generation = 0;
     std::int64_t startedAtEpochMs = 0;
     std::int64_t finishedAtEpochMs = 0;
