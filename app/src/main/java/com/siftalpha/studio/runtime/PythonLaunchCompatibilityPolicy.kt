@@ -1,6 +1,7 @@
 package com.siftalpha.studio.runtime
 
 import com.siftalpha.studio.project.EmbeddedPythonEntrypointPolicy
+import com.siftalpha.studio.project.PythonCliRequirement
 
 /**
  * Preserves the accepted external-provider Python launch behavior while alpha40 introduces
@@ -21,6 +22,34 @@ internal object PythonLaunchCompatibilityPolicy {
         val summaryCandidate = EmbeddedPythonEntrypointPolicy.safeRelativePath(summaryEntry)
             ?.takeIf { it in normalizedPaths }
         return summaryCandidate ?: strictFallback
+    }
+
+    fun bindCliRequirementsToEntrypoint(
+        resolution: PythonCliLaunchResolver.Resolution,
+        fallbackEntrypoint: String?,
+        requirements: List<PythonCliRequirement>,
+    ): PythonCliLaunchResolver.Resolution {
+        if (resolution !is PythonCliLaunchResolver.Resolution.ConsoleScripts) return resolution
+        val entrypoint = fallbackEntrypoint ?: return resolution
+        val required = requirements.filter { it.required }
+        if (required.isEmpty()) return resolution
+
+        val evidencePaths = required
+            .mapNotNull { requirement ->
+                requirement.evidence?.filePath
+                    ?.replace('\\', '/')
+                    ?.trim()
+                    ?.trim('/')
+                    ?.takeIf { it.isNotBlank() }
+            }
+            .toSet()
+        if (evidencePaths.size != 1 || evidencePaths.single() != entrypoint) {
+            return resolution
+        }
+        if (required.any { it.evidence?.filePath.isNullOrBlank() }) {
+            return resolution
+        }
+        return PythonCliLaunchResolver.Resolution.PythonFile(entrypoint)
     }
 
     fun preserveLegacyRun(

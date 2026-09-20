@@ -1119,3 +1119,13 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - r34 remains the frozen Known Good Functional Baseline.
 - versionCode 162 / versionName 0.8.0-alpha43-r36.
 
+## 2026-09-20 · alpha43-r37 entry-bound CLI launch
+
+- Trigger: r36 real-device run correctly discovered two CLI values and passed two argv items, but selected the unrelated `easy-tdx` console script from `pyproject.toml` instead of the project entrypoint `run_all_strategies.py`.
+- Real-device evidence: `SIFTALPHA_LAUNCH_KIND=CONSOLE_SCRIPT`, `SIFTALPHA_LAUNCH_EXECUTABLE=easy-tdx`, `SIFTALPHA_LAUNCH_ARGUMENT_COUNT=2`, followed by `Error: No such command 'SH'.`
+- Root cause: project-level CLI requirements were applied to whichever structured Python launch resolver won. The resolver prefers pyproject console scripts before fallback Python files, so requirements discovered in `run_all_strategies.py` were incorrectly attached to `easy-tdx`.
+- Added entry-bound CLI compatibility policy: a console-script resolution is overridden by the fallback Python file only when every required CLI item has explicit file evidence and that evidence points to the same resolved fallback entrypoint.
+- Runtime-only hints or requirements from another file never change the launch target.
+- r35 argv transport and r36 Click/Typer discovery remain unchanged.
+- versionCode 163 / versionName 0.8.0-alpha43-r37.
+

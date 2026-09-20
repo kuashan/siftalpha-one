@@ -561,3 +561,7 @@ r35 established the common argv execution contract but its first discovery imple
 
 r36 broadens only CLI requirement discovery: literal Click required arguments, Typer ellipsis arguments, and Click/Typer runtime diagnostics are now recognized. Likely launcher files are prioritized within the bounded static scan, and the configuration profile cache moves to a new namespace so previously cached empty results are invalidated. The r35 argv transport/execution contract remains the execution layer.
 
+## alpha43-r37 entry-bound CLI launch
+
+r37 fixes the remaining separation between CLI requirement discovery and launch-target selection. CLI requirements now carry entrypoint evidence into action-time resolution. A pyproject console script cannot inherit positional arguments discovered from a different Python file. Only an exact evidence match to the resolved fallback entrypoint allows that Python file to supersede a generic console-script candidate.
+

@@ -626,3 +626,11 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Regression:
   - r34 Web, r31 ownership, r32 UI stability, r33 telemetry, r35 argv execution, project-scoped STOP and External Runtime behavior remain unchanged.
 
+### alpha43-r37 entry-bound CLI launch acceptance
+
+- When required CLI evidence for MARKET/CODE points to `run_all_strategies.py` and pyproject also declares `easy-tdx`, launch resolution must select `PythonFile("run_all_strategies.py")`.
+- CLI evidence from a different Python file must not override a console-script resolution.
+- Runtime-only CLI hints without a file path must not guess a new entrypoint.
+- easy_tdx-main real-device acceptance: final launch must report PYTHON_FILE / `run_all_strategies.py`, pass MARKET and CODE as argv, and must not execute `easy-tdx MARKET CODE`.
+- r34 baseline behavior, project-scoped STOP, Web discovery, Internal ownership and External Runtime semantics remain unchanged.
+

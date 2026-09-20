@@ -1898,7 +1898,10 @@ open class V04Activity : StudioActivity() {
         if (isPythonCliCandidate) {
             val cliWebProfile = checkNotNull(webProfile)
             val resolution = runCatching {
-                runtime.resolvePythonLaunch(project)
+                runtime.resolvePythonLaunch(
+                    project = project,
+                    cliRequirements = requiredCli,
+                )
             }.getOrElse {
                 errorDialog(
                     getString(R.string.runtime_cli_pyproject_invalid),

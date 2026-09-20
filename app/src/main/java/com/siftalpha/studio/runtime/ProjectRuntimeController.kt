@@ -2,6 +2,7 @@ package com.siftalpha.studio.runtime
 
 import com.siftalpha.studio.project.EmbeddedPythonProjectStager
 import com.siftalpha.studio.project.V04ProjectGateway
+import com.siftalpha.studio.project.PythonCliRequirement
 import com.siftalpha.studio.siftalphax.EmbeddedPythonDependencyInputV1
 import com.siftalpha.studio.siftalphax.EmbeddedPythonEnvironmentManager
 import com.siftalpha.studio.siftalphax.EmbeddedPythonRequirementParserV1
@@ -539,6 +540,7 @@ class ProjectRuntimeController(
      */
     fun resolvePythonLaunch(
         project: V04ProjectGateway.RuntimeProject,
+        cliRequirements: List<PythonCliRequirement> = emptyList(),
     ): PythonCliLaunchResolver.Resolution {
         val projectId = project.summary.documentId
         val facts = gateway.runtimeFacts(projectId)
@@ -565,8 +567,13 @@ class ProjectRuntimeController(
             pyprojectToml = pyprojectToml,
             fallbackEntrypoint = fallbackEntrypoint,
         )
-        return PythonLaunchCompatibilityPolicy.preserveLegacyRun(
+        val entryBoundResolution = PythonLaunchCompatibilityPolicy.bindCliRequirementsToEntrypoint(
             resolution = resolution,
+            fallbackEntrypoint = fallbackEntrypoint,
+            requirements = cliRequirements,
+        )
+        return PythonLaunchCompatibilityPolicy.preserveLegacyRun(
+            resolution = entryBoundResolution,
             legacyRun = project.summary.run,
         )
     }
