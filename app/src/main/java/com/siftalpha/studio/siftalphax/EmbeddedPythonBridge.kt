@@ -20,6 +20,7 @@ internal object EmbeddedPythonBridge {
         environmentSitePackages: String,
         entrypoint: String,
         workingDirectory: String,
+        arguments: Array<String>,
         sessionId: String,
         generation: Long,
     ): Boolean

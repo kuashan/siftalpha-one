@@ -512,6 +512,7 @@ class EmbeddedPythonNativeSmokeTest {
                 executionRoot.absolutePath,
                 entrypoint.absolutePath,
                 workingDirectory.absolutePath,
+                emptyArray(),
                 sessionId,
                 previous.generation + 1L,
             ),

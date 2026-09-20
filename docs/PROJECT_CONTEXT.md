@@ -547,3 +547,11 @@ The accepted r34 line includes the r31 Internal Runtime foreground ownership mod
 
 The baseline is replaced only by a later version that completes cloud verification and receives explicit real-device acceptance.
 
+## alpha43-r35 CLI Launch Configuration
+
+r35 extends the product configuration model with a separate Launch Configuration layer. Environment variables, secrets and config files remain environment configuration; Python CLI argv is not converted into environment variables.
+
+The first high-confidence static contract recognizes conventional literal `argparse` declarations for scalar required positionals and required valued options. Runtime output remains the fallback truth source: argparse's explicit missing-argument diagnostic can teach SiftAlpha project-scoped launch requirements after a failed first run.
+
+The existing `PythonLaunchInvocation` becomes the common argv contract for supported Python-file launches across External Runtime and Internal Runtime. Internal Alpine receives safely quoted distinct arguments, and Embedded CPython now reconstructs `sys.argv` natively for every session. r34 remains frozen as the current Known Good Functional Baseline for regression comparison.
+

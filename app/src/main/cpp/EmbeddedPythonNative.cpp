@@ -271,6 +271,7 @@ struct SessionSnapshot {
     std::string executionRoot;
     std::string entrypoint;
     std::string workingDirectory;
+    std::vector<std::string> arguments;
     std::int64_t generation = 0;
     std::int64_t startedAtEpochMs = 0;
     std::int64_t finishedAtEpochMs = 0;
@@ -499,6 +500,25 @@ std::string jstringToUtf8(JNIEnv* env, jstring value) {
     }
     std::string result(chars);
     env->ReleaseStringUTFChars(value, chars);
+    return result;
+}
+
+std::vector<std::string> jstringArrayToUtf8(JNIEnv* env, jobjectArray values) {
+    std::vector<std::string> result;
+    if (values == nullptr) {
+        return result;
+    }
+    const jsize count = env->GetArrayLength(values);
+    result.reserve(static_cast<std::size_t>(count));
+    for (jsize index = 0; index < count; ++index) {
+        auto* value = static_cast<jstring>(env->GetObjectArrayElement(values, index));
+        if (value == nullptr) {
+            result.clear();
+            return result;
+        }
+        result.push_back(jstringToUtf8(env, value));
+        env->DeleteLocalRef(value);
+    }
     return result;
 }
 
@@ -1114,7 +1134,8 @@ bool configureExecutionSys(
     PyObject* originalArgv,
     const std::string& executionRoot,
     const std::string& environmentSitePackages,
-    const std::string& entrypoint) {
+    const std::string& entrypoint,
+    const std::vector<std::string>& arguments) {
     PyObject* newPath = PySequence_List(originalPath);
     if (newPath == nullptr) {
         return false;
@@ -1153,7 +1174,8 @@ bool configureExecutionSys(
         return false;
     }
 
-    PyObject* newArgv = PyList_New(1);
+    PyObject* newArgv = PyList_New(
+        static_cast<Py_ssize_t>(1 + arguments.size()));
     if (newArgv == nullptr) {
         return false;
     }
@@ -1163,6 +1185,17 @@ bool configureExecutionSys(
         return false;
     }
     PyList_SET_ITEM(newArgv, 0, entrypointObject);
+    for (std::size_t index = 0; index < arguments.size(); ++index) {
+        PyObject* argumentObject = PyUnicode_FromString(arguments[index].c_str());
+        if (argumentObject == nullptr) {
+            Py_DECREF(newArgv);
+            return false;
+        }
+        PyList_SET_ITEM(
+            newArgv,
+            static_cast<Py_ssize_t>(index + 1),
+            argumentObject);
+    }
     success = PyObject_SetAttrString(sysModule, "argv", newArgv) == 0;
     Py_DECREF(newArgv);
     return success;
@@ -1429,7 +1462,8 @@ void runSession(const std::shared_ptr<Session>& session) {
                     originalArgv,
                     session->executionRoot,
                     session->environmentSitePackages,
-                    session->entrypoint) &&
+                    session->entrypoint,
+                    session->arguments) &&
                 initializeExecutionGlobals(globals, session->entrypoint);
             if (!executionContextReady) {
                 if (PyErr_Occurred()) {
@@ -1691,6 +1725,7 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeStart(
     jstring environmentSitePackages,
     jstring entrypoint,
     jstring workingDirectory,
+    jobjectArray arguments,
     jstring sessionId,
     jlong generation) {
     const std::string homePath = jstringToUtf8(env, home);
@@ -1700,11 +1735,18 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeStart(
         jstringToUtf8(env, environmentSitePackages);
     const std::string entrypointPath = jstringToUtf8(env, entrypoint);
     const std::string workingDirectoryPath = jstringToUtf8(env, workingDirectory);
+    const std::vector<std::string> runtimeArguments = jstringArrayToUtf8(env, arguments);
     const std::string id = jstringToUtf8(env, sessionId);
     if (homePath.empty() || projectId.empty() || rootPath.empty() ||
         entrypointPath.empty() || workingDirectoryPath.empty() ||
-        id.empty() || generation <= 0) {
+        id.empty() || generation <= 0 ||
+        runtimeArguments.size() > 64) {
         return JNI_FALSE;
+    }
+    for (const auto& argument : runtimeArguments) {
+        if (argument.size() > 4096) {
+            return JNI_FALSE;
+        }
     }
 
     std::shared_ptr<Session> session;
@@ -1735,6 +1777,7 @@ Java_com_siftalpha_studio_siftalphax_EmbeddedPythonBridge_nativeStart(
         session->environmentSitePackages = environmentSitePackagesPath;
         session->entrypoint = entrypointPath;
         session->workingDirectory = workingDirectoryPath;
+        session->arguments = runtimeArguments;
         session->generation = static_cast<std::int64_t>(generation);
         session->startedAtEpochMs = nowEpochMillis();
         session->state = SessionState::STARTING;

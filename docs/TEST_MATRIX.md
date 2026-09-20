@@ -576,3 +576,31 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Situation-monitor real-device test: start with Internal Alpine, allow the initial feed fetch to finish, and verify Web changes from DETECTING to AVAILABLE without manual log refresh or project restart.
 - If situation-monitor remains DETECTING, copy full logs and verify whether stderr contains the Flask bound URL, whether the candidate reaches RuntimeWebStateStore, and whether the Endpoint Probe completes. CI success is not REAL_DEVICE_PASS.
 
+### alpha43-r35 CLI Launch Configuration acceptance
+
+- Static argparse:
+  - `add_argument("MARKET")` and `add_argument("CODE")` are detected as required positional CLI arguments in declaration order.
+  - `add_argument("--market", required=True)` is detected as a required valued option.
+  - optional options, boolean/count actions, dynamic declarations and repeated nargs are not guessed.
+- Project Config:
+  - required CLI inputs are displayed separately from environment variables/secrets;
+  - the summary must not claim there is no required configuration when CLI requirements exist;
+  - CLI values are not injected or saved as environment variables.
+- Runtime diagnosis:
+  - argparse `the following arguments are required: MARKET, CODE` produces project-scoped CLI hints;
+  - ordinary exit-code-2 failures without this evidence are not reclassified as CLI configuration.
+- External Runtime:
+  - existing Python-file/console-script argv path remains functional;
+  - required static CLI fields are collected before START.
+- Internal Alpine:
+  - Python-file arguments are shell-quoted as distinct argv values;
+  - no eval, command concatenation with unquoted user data, global port/PID scan, Worker or STOP-scope change is introduced.
+- Embedded CPython:
+  - execution spec bounds argument count/length and rejects NUL;
+  - native execution publishes `sys.argv[0] = entrypoint` and appends each supplied argument as one Python argv item.
+- Internal terminal failure:
+  - one high-confidence configuration diagnosis is allowed per session/generation so a missing-argument failure cannot create repeated dialogs on every poll.
+- Regression:
+  - r34 Web discovery, foreground ownership, background telemetry, Runtime Center stability and project-scoped STOP semantics remain unchanged.
+- Cloud requirement: repository validators, unit tests and `assembleDebug` must pass before APK release. Real-device test must run the affected project with values for `MARKET` and `CODE`.
+

@@ -50,10 +50,19 @@
     <string name="runtime_configuration_runtime_unnamed_message">项目明确报告需要 API 密钥或凭证，但没有给出可靠的环境变量名称。Studio 不会猜测名称；请打开“配置”查看项目声明和候选凭证。</string>
 
     <string name="runtime_configuration_summary_required_complete">✓ 必需配置完成</string>
-    <string name="runtime_configuration_summary_required_none">✓ 没有必需配置</string>
+    <string name="runtime_configuration_summary_required_none">✓ 没有必需环境配置</string>
     <string name="runtime_configuration_summary_required_missing">❌ %1$d 个必需项未配置</string>
     <string name="runtime_configuration_summary_optional_missing">⚠ %1$d 个建议项未填写（不阻止运行）</string>
     <string name="runtime_configuration_summary_optional_complete">✓ 建议配置已填写</string>
+    <string name="runtime_configuration_summary_cli_required">⚠ %1$d 个必填启动参数（运行时输入）</string>
+    <string name="runtime_configuration_cli_required_section">CLI 启动参数（必填）</string>
+    <string name="runtime_configuration_cli_runtime_entry">这些值属于启动参数，不会保存为环境变量；点击“运行”时填写。</string>
+    <string name="runtime_configuration_cli_missing_title">缺少启动参数</string>
+    <string name="runtime_configuration_cli_missing_message">程序报告以下 CLI 启动参数缺失：\n%1$s\n\nSiftAlpha 已将它们识别为启动参数。再次点击“运行”时填写即可。</string>
+    <string name="runtime_cli_required_value_hint">请输入 %1$s</string>
+    <string name="runtime_cli_additional_arguments">其他可选参数</string>
+    <string name="runtime_cli_required_blank">请填写必填启动参数：%1$s</string>
+
     <string name="runtime_configuration_optional_title">建议配置：%1$s</string>
     <string name="runtime_configuration_optional_message">这是建议配置，填写后可能改善项目体验；稍后填写也不会阻止运行。</string>
     <string name="runtime_configuration_optional_fill">填写</string>

@@ -79,6 +79,7 @@ class EmbeddedPythonSession private constructor(context: Context) {
         workingDirectory: String = ".",
         environmentSitePackages: File? = null,
         environmentKey: String? = null,
+        arguments: List<String> = emptyList(),
     ): EmbeddedPythonSnapshot {
         val current = snapshot()
         check(EmbeddedPythonStatePolicy.canStart(current.state)) {
@@ -97,6 +98,7 @@ class EmbeddedPythonSession private constructor(context: Context) {
             generation = generation,
             environmentSitePackages = environmentSitePackages,
             environmentKey = environmentKey,
+            arguments = arguments,
         )
         return start(spec, home)
     }
@@ -130,6 +132,7 @@ class EmbeddedPythonSession private constructor(context: Context) {
                 spec.environmentSitePackages?.absolutePath.orEmpty(),
                 spec.entrypointFile.absolutePath,
                 spec.workingDirectoryFile.absolutePath,
+                spec.arguments.toTypedArray(),
                 spec.sessionId,
                 spec.generation,
             )

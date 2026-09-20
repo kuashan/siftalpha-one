@@ -35,6 +35,7 @@ class ProjectConfigurationInspector(context: Context) {
         val configuredProjectEnvKeys: Set<String>,
         val credentialCandidates: List<String>,
         val configurationCandidates: List<Requirement> = emptyList(),
+        val cliRequirements: List<PythonCliRequirement> = emptyList(),
     ) {
         val required: List<Requirement>
             get() = requirements.filter { it.required }
@@ -65,6 +66,7 @@ class ProjectConfigurationInspector(context: Context) {
     data class PythonConfiguration(
         val required: List<Requirement>,
         val candidates: List<Requirement>,
+        val cliRequirements: List<PythonCliRequirement> = emptyList(),
     )
 
     private data class Child(
@@ -124,6 +126,7 @@ class ProjectConfigurationInspector(context: Context) {
             configuredProjectEnvKeys = configuredKeys,
             credentialCandidates = credentialCandidates,
             configurationCandidates = configurationCandidates,
+            cliRequirements = python.cliRequirements,
         )
     }.getOrElse {
         emptyProfile()
@@ -139,6 +142,7 @@ class ProjectConfigurationInspector(context: Context) {
                 configuredProjectEnvKeys = stringSet(value.optJSONArray("configuredProjectEnvKeys")),
                 credentialCandidates = stringList(value.optJSONArray("credentialCandidates")),
                 configurationCandidates = requirementsFromJson(value.optJSONArray("configurationCandidates")),
+                cliRequirements = cliRequirementsFromJson(value.optJSONArray("cliRequirements")),
             )
         }.getOrNull()
     }
@@ -150,6 +154,7 @@ class ProjectConfigurationInspector(context: Context) {
             put("configuredProjectEnvKeys", stringsToJson(profile.configuredProjectEnvKeys))
             put("credentialCandidates", stringsToJson(profile.credentialCandidates))
             put("configurationCandidates", requirementsToJson(profile.configurationCandidates))
+            put("cliRequirements", cliRequirementsToJson(profile.cliRequirements))
         }
         cachePrefs.edit().putString(cacheKey(projectDocumentId), value.toString()).apply()
     }
@@ -204,6 +209,61 @@ class ProjectConfigurationInspector(context: Context) {
         }
     }
 
+    private fun cliRequirementsToJson(values: Collection<PythonCliRequirement>): JSONArray =
+        JSONArray().apply {
+            values.forEach { requirement ->
+                put(JSONObject().apply {
+                    put("name", requirement.name)
+                    put("token", requirement.token)
+                    put("kind", requirement.kind.name)
+                    put("required", requirement.required)
+                    put("source", requirement.source.name)
+                    requirement.evidence?.let { evidence ->
+                        put("evidence", JSONObject().apply {
+                            put("filePath", evidence.filePath ?: "")
+                            put("lineNumber", evidence.lineNumber ?: -1)
+                            put("detail", evidence.detail ?: "")
+                        })
+                    }
+                })
+            }
+        }
+
+    private fun cliRequirementsFromJson(values: JSONArray?): List<PythonCliRequirement> = buildList {
+        if (values == null) return@buildList
+        for (index in 0 until values.length()) {
+            val value = values.optJSONObject(index) ?: continue
+            val name = value.optString("name")
+            val token = value.optString("token")
+            if (name.isBlank() || token.isBlank()) continue
+            val kind = runCatching {
+                PythonCliArgumentKind.valueOf(value.optString("kind"))
+            }.getOrNull() ?: continue
+            val source = runCatching {
+                ConfigurationSource.valueOf(value.optString("source"))
+            }.getOrDefault(ConfigurationSource.STATIC_REQUIRED_READ)
+            val evidenceValue = value.optJSONObject("evidence")
+            val lineNumber = evidenceValue?.optInt("lineNumber", -1)?.takeIf { it > 0 }
+            val evidence = evidenceValue?.let {
+                ConfigurationEvidence(
+                    filePath = it.optString("filePath").takeIf { path -> path.isNotBlank() },
+                    lineNumber = lineNumber,
+                    detail = it.optString("detail").takeIf { detail -> detail.isNotBlank() },
+                )
+            }
+            add(
+                PythonCliRequirement(
+                    name = name,
+                    token = token,
+                    kind = kind,
+                    required = value.optBoolean("required", true),
+                    source = source,
+                    evidence = evidence,
+                ),
+            )
+        }
+    }
+
     private fun stringsToJson(values: Collection<String>): JSONArray = JSONArray().apply {
         values.forEach { value -> put(value) }
     }
@@ -221,7 +281,7 @@ class ProjectConfigurationInspector(context: Context) {
         "${projectDocumentId.length}:$projectDocumentId"
 
     companion object {
-        private const val CACHE_PREFS = "siftalpha_project_configuration_profile_cache_v1"
+        private const val CACHE_PREFS = "siftalpha_project_configuration_profile_cache_v2"
         private const val MAX_METADATA_BYTES = 128 * 1024
         private const val MAX_ENV_BYTES = 256 * 1024
         private const val MAX_PYTHON_FILES = 8
@@ -243,7 +303,13 @@ class ProjectConfigurationInspector(context: Context) {
             "USER",
         )
 
-        fun emptyProfile(): Profile = Profile(emptyList(), emptySet(), emptyList(), emptyList())
+        fun emptyProfile(): Profile = Profile(
+            requirements = emptyList(),
+            configuredProjectEnvKeys = emptySet(),
+            credentialCandidates = emptyList(),
+            configurationCandidates = emptyList(),
+            cliRequirements = emptyList(),
+        )
 
         /**
          * Finds conventional Python environment-variable reads without executing project code.
@@ -646,6 +712,7 @@ class ProjectConfigurationInspector(context: Context) {
 
         val required = linkedMapOf<String, Requirement>()
         val candidates = linkedMapOf<String, Requirement>()
+        val cliRequirements = linkedMapOf<String, PythonCliRequirement>()
         files.forEach { file ->
             val source = runCatching { projectStore.readProjectTextFile(file) }.getOrNull() ?: return@forEach
             val detected = parsePythonConfiguration(source, file.relativePath)
@@ -658,10 +725,14 @@ class ProjectConfigurationInspector(context: Context) {
                     candidates.putIfAbsent(requirement.name, requirement)
                 }
             }
+            PythonCliRequirementInspector.inspect(source, file.relativePath).forEach { requirement ->
+                cliRequirements.putIfAbsent(requirement.token, requirement)
+            }
         }
         return PythonConfiguration(
             required = required.values.toList(),
             candidates = candidates.values.toList(),
+            cliRequirements = cliRequirements.values.toList(),
         )
     }
 

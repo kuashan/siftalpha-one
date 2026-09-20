@@ -375,6 +375,7 @@ class ProjectRuntimeController(
     fun startEmbeddedPython(
         project: V04ProjectGateway.RuntimeProject,
         requiredConfiguration: Boolean = false,
+        pythonLaunchInvocation: PythonLaunchInvocation? = null,
     ): EmbeddedPythonSnapshot {
         val stager = checkNotNull(embeddedPythonProjectStager) { "Internal project staging is unavailable" }
         val route = resolveControlPath(
@@ -404,6 +405,15 @@ class ProjectRuntimeController(
         val alpineBinding = internalAlpineEnvironmentManager?.loadBinding(projectId, files.alpineSource)
         val entrypoint = gateway.resolveEmbeddedPythonEntrypoint(projectId)
             ?: error("EMBEDDED_R_ENTRYPOINT_UNRESOLVED")
+        val launchArguments = pythonLaunchInvocation?.let { invocation ->
+            check(invocation.kind == PythonLaunchKind.PYTHON_FILE) {
+                "EMBEDDED_R_CLI_CONSOLE_SCRIPT_UNSUPPORTED"
+            }
+            check(invocation.entrypoint == entrypoint) {
+                "EMBEDDED_R_CLI_ENTRYPOINT_MISMATCH"
+            }
+            invocation.arguments
+        }.orEmpty()
         val stagedRoot = stager.stage(projectId, entrypoint)
 
         return try {
@@ -422,6 +432,7 @@ class ProjectRuntimeController(
                     workingDirectory = ".",
                     environmentSitePackages = cpythonBinding.sitePackages,
                     environmentKey = cpythonBinding.environmentKey,
+                    arguments = launchArguments,
                 )
             } else {
                 val binding = alpineBinding ?: error("EMBEDDED_R_ENVIRONMENT_NOT_READY")
@@ -432,6 +443,7 @@ class ProjectRuntimeController(
                     executionRoot = stagedRoot,
                     entrypoint = entrypoint,
                     environmentRoot = binding.environmentRoot,
+                    arguments = launchArguments,
                 )
             }
             synchronized(embeddedStagingRoots) {

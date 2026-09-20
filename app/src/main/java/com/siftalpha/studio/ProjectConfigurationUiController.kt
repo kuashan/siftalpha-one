@@ -17,6 +17,8 @@ import com.siftalpha.studio.project.ConfigurationSource
 import com.siftalpha.studio.project.LegacyProjectConfigurationBridge
 import com.siftalpha.studio.project.ProjectConfigurationInspector
 import com.siftalpha.studio.project.ProjectSecretPolicyInspector
+import com.siftalpha.studio.project.PythonCliArgumentKind
+import com.siftalpha.studio.project.PythonCliRequirement
 import com.siftalpha.studio.runtime.ProjectConfigurationPreflight
 import com.siftalpha.studio.runtime.ProjectSecretStore
 import com.siftalpha.studio.runtime.RuntimeConfigurationDiagnostic
@@ -43,6 +45,7 @@ class ProjectConfigurationUiController(
         val protectedKeys: Set<String>,
         val preflight: ProjectConfigurationPreflight.Result,
         val runtimeHints: Set<String>,
+        val cliRequirements: List<PythonCliRequirement>,
         val runtimeConfigurationDiscovered: Boolean,
     ) {
         val allCandidateNames: List<String>
@@ -57,6 +60,7 @@ class ProjectConfigurationUiController(
     }
 
     private val runtimeHints = mutableMapOf<String, LinkedHashSet<String>>()
+    private val runtimeCliHints = mutableMapOf<String, LinkedHashSet<String>>()
     private val runtimeDiscoveryFolders = mutableSetOf<String>()
     private val discoveryPrefs = activity.getSharedPreferences(DISCOVERY_PREFS, Context.MODE_PRIVATE)
     private val legacyPolicyInspector = ProjectSecretPolicyInspector(activity.applicationContext)
@@ -97,6 +101,36 @@ class ProjectConfigurationUiController(
             runtimeHints.getOrPut(folderName) { linkedSetOf() }.addAll(persistedHints)
         }
         val knownHints = runtimeHints[folderName].orEmpty()
+        val persistedCliHints = discoveryPrefs.getStringSet(cliHintsKey(folderName), emptySet()).orEmpty()
+        if (persistedCliHints.isNotEmpty()) {
+            runtimeCliHints.getOrPut(folderName) { linkedSetOf() }.addAll(persistedCliHints)
+        }
+        val mergedCliRequirements = linkedMapOf<String, PythonCliRequirement>()
+        profile.cliRequirements.forEach { requirement ->
+            mergedCliRequirements.putIfAbsent(requirement.token, requirement)
+        }
+        runtimeCliHints[folderName].orEmpty().forEach { token ->
+            val normalized = token.trim()
+            if (normalized.isBlank()) return@forEach
+            val kind = if (normalized.startsWith("-")) {
+                PythonCliArgumentKind.OPTION
+            } else {
+                PythonCliArgumentKind.POSITIONAL
+            }
+            mergedCliRequirements.putIfAbsent(
+                normalized,
+                PythonCliRequirement(
+                    name = normalized.removePrefix("--").removePrefix("-"),
+                    token = normalized,
+                    kind = kind,
+                    required = true,
+                    source = ConfigurationSource.RUNTIME_DIAGNOSTIC,
+                    evidence = ConfigurationEvidence(
+                        detail = "Runtime reported missing CLI argument",
+                    ),
+                ),
+            )
+        }
         return Snapshot(
             profile = profile,
             protectedKeys = protected,
@@ -106,6 +140,7 @@ class ProjectConfigurationUiController(
                 runtimeRequiredNames = knownHints,
             ),
             runtimeHints = knownHints,
+            cliRequirements = mergedCliRequirements.values.toList(),
             runtimeConfigurationDiscovered = folderName in runtimeDiscoveryFolders ||
                 discoveryPrefs.getBoolean(discoveredKey(folderName), false),
         )
@@ -140,22 +175,35 @@ class ProjectConfigurationUiController(
                 append(activity.getString(R.string.runtime_configuration_summary_optional_complete))
             }
         }
+        val requiredCli = snapshot.cliRequirements.count { it.required }
+        if (requiredCli > 0) {
+            append('\n')
+            append(
+                activity.getString(
+                    R.string.runtime_configuration_summary_cli_required,
+                    requiredCli,
+                ),
+            )
+        }
     }
 
     fun statusText(snapshot: Snapshot): String = summaryText(snapshot)
 
     fun statusIsWarning(snapshot: Snapshot): Boolean =
-        snapshot.preflight.missingRequired.isNotEmpty()
+        snapshot.preflight.missingRequired.isNotEmpty() ||
+            snapshot.cliRequirements.any { it.required }
 
     fun hasOptionalReminders(snapshot: Snapshot): Boolean =
         snapshot.preflight.optionalMissingCount > 0
 
     fun clearRuntimeDiscovery(folderName: String) {
         runtimeHints.remove(folderName)
+        runtimeCliHints.remove(folderName)
         runtimeDiscoveryFolders.remove(folderName)
         discoveryPrefs.edit()
             .remove(discoveredKey(folderName))
             .remove(hintsKey(folderName))
+            .remove(cliHintsKey(folderName))
             .apply()
     }
 
@@ -172,11 +220,22 @@ class ProjectConfigurationUiController(
         )
         val items = buildItems(snapshot)
         if (items.isEmpty()) {
+            val cliText = cliRequirementsText(snapshot)
             AlertDialog.Builder(activity)
                 .setTitle(activity.getString(R.string.runtime_configuration_editor_title, projectName))
                 .setMessage(
-                    summaryText(snapshot) + "\n\n" +
-                        activity.getString(R.string.runtime_configuration_none),
+                    buildString {
+                        append(summaryText(snapshot))
+                        if (cliText.isNotBlank()) {
+                            append("\n\n")
+                            append(cliText)
+                            append("\n\n")
+                            append(activity.getString(R.string.runtime_configuration_cli_runtime_entry))
+                        } else {
+                            append("\n\n")
+                            append(activity.getString(R.string.runtime_configuration_none))
+                        }
+                    },
                 )
                 .setPositiveButton(R.string.common_close, null)
                 .show()
@@ -320,8 +379,18 @@ class ProjectConfigurationUiController(
             addView(content)
         }
         val requiredWasMissing = items.any { it.required && !it.isConfigured }
-        val message = activity.getString(R.string.runtime_configuration_editor_message) +
-            "\n\n" + summaryText(currentSnapshot)
+        val cliText = cliRequirementsText(currentSnapshot)
+        val message = buildString {
+            append(activity.getString(R.string.runtime_configuration_editor_message))
+            append("\n\n")
+            append(summaryText(currentSnapshot))
+            if (cliText.isNotBlank()) {
+                append("\n\n")
+                append(cliText)
+                append("\n")
+                append(activity.getString(R.string.runtime_configuration_cli_runtime_entry))
+            }
+        }
         dialog = AlertDialog.Builder(activity)
             .setTitle(activity.getString(R.string.runtime_configuration_editor_title, projectName))
             .setMessage(message)
@@ -418,6 +487,37 @@ class ProjectConfigurationUiController(
                             projectDocumentId = projectDocumentId,
                             folderName = folderName,
                             onCompleted = onConfigurationCompleted,
+                        )
+                    }
+                    .show()
+            }
+            onChanged()
+            return true
+        }
+
+        if (finding.missingCliArguments.isNotEmpty()) {
+            val hints = runtimeCliHints.getOrPut(folderName) { linkedSetOf() }
+            hints += finding.missingCliArguments
+            discoveryPrefs.edit()
+                .putBoolean(discoveredKey(folderName), true)
+                .putStringSet(cliHintsKey(folderName), hints.toSet())
+                .apply()
+            if (presentDialog) {
+                val names = finding.missingCliArguments.joinToString("\n") { "• $it" }
+                AlertDialog.Builder(activity)
+                    .setTitle(R.string.runtime_configuration_cli_missing_title)
+                    .setMessage(
+                        activity.getString(
+                            R.string.runtime_configuration_cli_missing_message,
+                            names,
+                        ),
+                    )
+                    .setNegativeButton(R.string.common_close, null)
+                    .setPositiveButton(R.string.runtime_configuration_button) { _, _ ->
+                        showConfiguration(
+                            projectName = projectName,
+                            projectDocumentId = projectDocumentId,
+                            folderName = folderName,
                         )
                     }
                     .show()
@@ -533,6 +633,26 @@ class ProjectConfigurationUiController(
         },
     )
 
+    private fun cliRequirementsText(snapshot: Snapshot): String {
+        val required = snapshot.cliRequirements.filter { it.required }
+        if (required.isEmpty()) return ""
+        return buildString {
+            append(activity.getString(R.string.runtime_configuration_cli_required_section))
+            required.forEach { requirement ->
+                append("\n• ")
+                append(requirement.token)
+                requirement.evidence?.filePath?.takeIf { it.isNotBlank() }?.let { file ->
+                    append(" · ")
+                    append(file)
+                    requirement.evidence.lineNumber?.let { line ->
+                        append(":")
+                        append(line)
+                    }
+                }
+            }
+        }
+    }
+
     private fun evidenceText(evidence: ConfigurationEvidence?): String {
         if (evidence == null) return ""
         val location = when {
@@ -568,6 +688,7 @@ class ProjectConfigurationUiController(
 
     private fun discoveredKey(folderName: String): String = "discovered:$folderName"
     private fun hintsKey(folderName: String): String = "hints:$folderName"
+    private fun cliHintsKey(folderName: String): String = "cli_hints:$folderName"
 
     companion object {
         internal fun planConfigurationSave(

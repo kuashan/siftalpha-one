@@ -12,9 +12,12 @@ object RuntimeConfigurationDiagnostic {
     data class Result(
         val missingEnvironmentNames: List<String>,
         val unnamedCredentialRequired: Boolean,
+        val missingCliArguments: List<String> = emptyList(),
     ) {
         val hasActionableFinding: Boolean
-            get() = missingEnvironmentNames.isNotEmpty() || unnamedCredentialRequired
+            get() = missingEnvironmentNames.isNotEmpty() ||
+                unnamedCredentialRequired ||
+                missingCliArguments.isNotEmpty()
     }
 
     private data class NamedMatch(
@@ -23,6 +26,10 @@ object RuntimeConfigurationDiagnostic {
     )
 
     private val ENV_NAME = Regex("^[A-Z_][A-Z0-9_]*$")
+    private val CLI_ARGUMENT = Regex("^(?:--?)?[A-Za-z0-9_][A-Za-z0-9_.-]*$")
+    private val argparseRequired = Regex(
+        "(?im)(?:^|\\n)[^\\n]*?the following arguments are required:\\s*([^\\n\\r]+)",
+    )
 
     private val namedPatterns = listOf(
         Regex(
@@ -69,14 +76,29 @@ object RuntimeConfigurationDiagnostic {
         val names = linkedSetOf<String>()
         matches.sortedBy { it.position }.forEach { names += it.name }
 
-        val unnamed = names.isEmpty() && genericCredentialPatterns.any { it.containsMatchIn(text) }
+        val cliArguments = linkedSetOf<String>()
+        argparseRequired.findAll(text).forEach { match ->
+            match.groupValues.getOrNull(1)
+                .orEmpty()
+                .split(',')
+                .asSequence()
+                .map { it.trim().trim('\'', '"') }
+                .filter { it.isNotBlank() && CLI_ARGUMENT.matches(it) }
+                .forEach { cliArguments += it }
+        }
+
+        val unnamed = names.isEmpty() &&
+            cliArguments.isEmpty() &&
+            genericCredentialPatterns.any { it.containsMatchIn(text) }
         return Result(
             missingEnvironmentNames = names.take(MAX_NAMES),
             unnamedCredentialRequired = unnamed,
+            missingCliArguments = cliArguments.take(MAX_CLI_ARGUMENTS),
         )
     }
 
     private const val MAX_NAMES = 10
+    private const val MAX_CLI_ARGUMENTS = 16
     private val IGNORED_GENERIC_WORDS = setOf(
         "API_KEY",
         "API_KEYS",

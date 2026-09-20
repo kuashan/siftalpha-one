@@ -23,6 +23,7 @@ data class EmbeddedPythonExecutionSpec(
     val generation: Long,
     val environmentSitePackages: File? = null,
     val environmentKey: String? = null,
+    val arguments: List<String> = emptyList(),
 ) {
     init {
         require(projectIdentity.isNotBlank()) { "project identity must not be blank" }
@@ -37,6 +38,10 @@ data class EmbeddedPythonExecutionSpec(
         require(generation > 0L) { "generation must be positive" }
         require((environmentSitePackages == null) == (environmentKey == null)) {
             "environment site-packages and environment key must be provided together"
+        }
+        require(arguments.size <= 64) { "too many Python arguments" }
+        require(arguments.all { it.length <= 4096 && '\u0000' !in it }) {
+            "invalid Python argument"
         }
         if (environmentSitePackages != null) {
             require(environmentSitePackages.isAbsolute) {

@@ -21,7 +21,10 @@ import android.widget.TextView
 import android.widget.Toast
 import com.siftalpha.studio.project.EmbeddedPythonProjectStager
 import com.siftalpha.studio.project.ProjectConfigurationInspector
+import com.siftalpha.studio.project.ConfigurationSource
 import com.siftalpha.studio.project.ProjectSecretPolicyInspector
+import com.siftalpha.studio.project.PythonCliArgumentKind
+import com.siftalpha.studio.project.PythonCliRequirement
 import com.siftalpha.studio.project.V04ProjectGateway
 import com.siftalpha.studio.project.WebProjectInspector
 import com.siftalpha.studio.presentation.ProjectActionPolicy
@@ -1881,11 +1884,15 @@ open class V04Activity : StudioActivity() {
         val webProfile = runCatching { webInspector.inspect(project.summary.documentId) }.getOrNull()
         val resolvedSelection =
             project.runtimeSelection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
+        val configurationSnapshot = configurationUi.snapshot(
+            project.summary.documentId,
+            project.folderName,
+        )
+        val requiredCli = configurationSnapshot.cliRequirements.filter { it.required }
         val isPythonCliCandidate =
-            controlRequest == RuntimeControlRequest.EXTERNAL_PROVIDER &&
-                webProfile != null &&
-                !webProfile.enabled &&
-                resolvedSelection?.primary == RuntimeKind.PYTHON
+            webProfile != null &&
+                resolvedSelection?.primary == RuntimeKind.PYTHON &&
+                (!webProfile.enabled || requiredCli.isNotEmpty())
 
         if (isPythonCliCandidate) {
             val cliWebProfile = checkNotNull(webProfile)
@@ -1911,9 +1918,16 @@ open class V04Activity : StudioActivity() {
                                 PythonLaunchInvocation.consoleScript(resolution.names.single(), args)
                             },
                             entryLabel = resolution.names.single(),
+                            requirements = requiredCli,
                         )
                     } else {
-                        showPythonConsoleScriptSelection(project, cliWebProfile, controlRequest, resolution.names)
+                        showPythonConsoleScriptSelection(
+                            project = project,
+                            webProfile = cliWebProfile,
+                            controlRequest = controlRequest,
+                            names = resolution.names,
+                            requirements = requiredCli,
+                        )
                     }
                 }
                 is PythonCliLaunchResolver.Resolution.PythonFile ->
@@ -1925,6 +1939,7 @@ open class V04Activity : StudioActivity() {
                             PythonLaunchInvocation.pythonFile(resolution.entrypoint, args)
                         },
                         entryLabel = resolution.entrypoint,
+                        requirements = requiredCli,
                     )
                 PythonCliLaunchResolver.Resolution.Missing ->
                     errorDialog(
@@ -1977,6 +1992,7 @@ open class V04Activity : StudioActivity() {
         webProfile: WebProjectInspector.Profile,
         controlRequest: RuntimeControlRequest,
         names: List<String>,
+        requirements: List<PythonCliRequirement> = emptyList(),
     ) {
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.runtime_cli_select_entry))
@@ -1992,6 +2008,7 @@ open class V04Activity : StudioActivity() {
                             PythonLaunchInvocation.consoleScript(name, args)
                         },
                         entryLabel = name,
+                        requirements = requirements,
                     )
                 }
             }
@@ -2005,29 +2022,96 @@ open class V04Activity : StudioActivity() {
         controlRequest: RuntimeControlRequest,
         invocationFactory: (List<String>) -> PythonLaunchInvocation,
         entryLabel: String,
+        requirements: List<PythonCliRequirement> = emptyList(),
     ) {
-        val input = EditText(this).apply {
+        val required = requirements.filter { it.required }
+        val structured = required.filter { requirement ->
+            requirement.kind == PythonCliArgumentKind.POSITIONAL ||
+                requirement.source != ConfigurationSource.RUNTIME_DIAGNOSTIC
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), 0, dp(20), dp(4))
+        }
+        val fields = structured.map { requirement ->
+            content.addView(TextView(this).apply {
+                text = requirement.token + " *"
+                textSize = 15f
+                setPadding(0, dp(8), 0, dp(2))
+            })
+            val input = EditText(this).apply {
+                hint = getString(R.string.runtime_cli_required_value_hint, requirement.token)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                setSingleLine(true)
+            }
+            content.addView(input)
+            requirement to input
+        }
+
+        if (required.any { it !in structured }) {
+            content.addView(TextView(this).apply {
+                text = required.filter { it !in structured }.joinToString(
+                    prefix = getString(R.string.runtime_configuration_cli_required_section) + "\n",
+                    separator = "\n",
+                ) { "• " + it.token }
+                textSize = 13f
+                setPadding(0, dp(8), 0, dp(4))
+            })
+        }
+
+        content.addView(TextView(this).apply {
+            text = getString(R.string.runtime_cli_additional_arguments)
+            textSize = 14f
+            setPadding(0, dp(8), 0, dp(2))
+        })
+        val additionalInput = EditText(this).apply {
             hint = getString(R.string.runtime_cli_arguments_hint)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             setSingleLine(false)
         }
-        AlertDialog.Builder(this)
+        content.addView(additionalInput)
+
+        val scroll = ScrollView(this).apply { addView(content) }
+        lateinit var dialog: AlertDialog
+        dialog = AlertDialog.Builder(this)
             .setTitle(getString(R.string.runtime_cli_arguments))
             .setMessage(getString(R.string.runtime_cli_entry_label, entryLabel))
-            .setView(input)
+            .setView(scroll)
             .setNegativeButton(getString(R.string.common_cancel), null)
-            .setPositiveButton(getString(R.string.runtime_button_run)) { _, _ ->
-                when (val parsed = RuntimeArgumentParser.parse(input.text?.toString().orEmpty())) {
+            .setPositiveButton(getString(R.string.runtime_button_run), null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val structuredArguments = mutableListOf<String>()
+                for ((requirement, input) in fields) {
+                    val value = input.text?.toString().orEmpty()
+                    if (value.isBlank()) {
+                        toast(getString(R.string.runtime_cli_required_blank, requirement.token))
+                        input.requestFocus()
+                        return@setOnClickListener
+                    }
+                    when (requirement.kind) {
+                        PythonCliArgumentKind.POSITIONAL -> structuredArguments += value
+                        PythonCliArgumentKind.OPTION -> {
+                            structuredArguments += requirement.token
+                            structuredArguments += value
+                        }
+                    }
+                }
+
+                when (val parsed = RuntimeArgumentParser.parse(additionalInput.text?.toString().orEmpty())) {
                     is RuntimeArgumentParser.Result.Success -> {
+                        val allArguments = structuredArguments + parsed.arguments
                         val invocation = runCatching {
-                            invocationFactory(parsed.arguments)
+                            invocationFactory(allArguments)
                         }.getOrElse {
                             errorDialog(
                                 getString(R.string.runtime_cli_unsupported),
                                 it.message ?: getString(R.string.runtime_cli_unsupported),
                             )
-                            return@setPositiveButton
+                            return@setOnClickListener
                         }
+                        dialog.dismiss()
                         startProject(project, webProfile, controlRequest, invocation)
                     }
                     is RuntimeArgumentParser.Result.Invalid ->
@@ -2037,7 +2121,8 @@ open class V04Activity : StudioActivity() {
                         )
                 }
             }
-            .show()
+        }
+        dialog.show()
     }
 
     private fun showRuntimeSelectionDialog(project: V04ProjectGateway.RuntimeProject) {
@@ -2303,6 +2388,7 @@ open class V04Activity : StudioActivity() {
     private fun startEmbeddedProject(
         project: V04ProjectGateway.RuntimeProject,
         requiredConfiguration: Boolean = false,
+        launchInvocation: PythonLaunchInvocation? = null,
     ) {
         val stateKey = project.summary.documentId
         val route = runCatching {
@@ -2362,6 +2448,7 @@ open class V04Activity : StudioActivity() {
                 runtime.startEmbeddedPython(
                     project = project,
                     requiredConfiguration = requiredConfiguration,
+                    pythonLaunchInvocation = launchInvocation,
                 )
             }
             runOnUiThread {
@@ -2733,6 +2820,28 @@ open class V04Activity : StudioActivity() {
 
         val mappedState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot)
         typedStates[stateKey] = mappedState
+        if (
+            snapshot.state == EmbeddedPythonState.FAILED &&
+            snapshot.exitCode != null &&
+            ::configurationUi.isInitialized
+        ) {
+            val findingKey = snapshot.sessionId + ":" + snapshot.generation
+            if (embeddedConfigurationFindings.add(findingKey)) {
+                configurationUi.showRuntimeFindingIfAny(
+                    projectName = project.summary.name,
+                    projectDocumentId = project.summary.documentId,
+                    folderName = project.folderName,
+                    output = buildString {
+                        append(snapshot.stdout)
+                        if (snapshot.stderr.isNotBlank()) {
+                            append('\n')
+                            append(snapshot.stderr)
+                        }
+                    },
+                    presentDialog = true,
+                )
+            }
+        }
         currentOperation(stateKey)
             ?.takeIf { it.action == RuntimeOperationAction.STOP && mappedState !in ACTIVE_RUNTIME_STATES }
             ?.let { operation ->
@@ -3068,7 +3177,11 @@ open class V04Activity : StudioActivity() {
                 ProjectRuntimeController.Action.PREPARE ->
                     prepareEmbeddedProject(project)
                 ProjectRuntimeController.Action.START ->
-                    startEmbeddedProject(project, requiredConfiguration)
+                    startEmbeddedProject(
+                        project = project,
+                        requiredConfiguration = requiredConfiguration,
+                        launchInvocation = launchInvocation,
+                    )
                 ProjectRuntimeController.Action.STOP ->
                     requestEmbeddedStop(project)
                 else -> Unit

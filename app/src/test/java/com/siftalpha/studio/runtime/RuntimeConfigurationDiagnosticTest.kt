@@ -67,6 +67,27 @@ class RuntimeConfigurationDiagnosticTest {
     }
 
     @Test
+    fun `argparse required positionals are actionable cli arguments`() {
+        val result = RuntimeConfigurationDiagnostic.inspect(
+            "usage: tool.py [-h] MARKET CODE\ntool.py: error: the following arguments are required: MARKET, CODE",
+        )
+
+        assertEquals(listOf("MARKET", "CODE"), result.missingCliArguments)
+        assertTrue(result.hasActionableFinding)
+        assertFalse(result.unnamedCredentialRequired)
+    }
+
+    @Test
+    fun `argparse required option is retained as cli token`() {
+        val result = RuntimeConfigurationDiagnostic.inspect(
+            "app.py: error: the following arguments are required: --region",
+        )
+
+        assertEquals(listOf("--region"), result.missingCliArguments)
+        assertTrue(result.missingEnvironmentNames.isEmpty())
+    }
+
+    @Test
     fun `multiple named variables are deduplicated`() {
         val result = RuntimeConfigurationDiagnostic.inspect(
             """

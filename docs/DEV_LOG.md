@@ -1070,3 +1070,19 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - This freeze is documentation-only. No application source, applicationId, Runtime behavior, Web behavior, STOP behavior or version number is changed by the freeze commit.
 - Future regressions must compare against the exact r34 commit above. The baseline branch must not be advanced or rewritten.
 
+## 2026-09-20 · alpha43-r35 CLI Launch Configuration
+
+- Starting development HEAD: `3964ad160fd931b1bf41b05c1541e30ac385c028`, whose parent r34 source is frozen separately at `baseline/alpha43-r34-known-good`.
+- Trigger: a newly imported Python project exited with code 2 while Project Config reported no required configuration. The project requires CLI positional arguments such as `MARKET` and `CODE`.
+- Root gap: SiftAlpha already had `PythonCliLaunchResolver`, `PythonLaunchInvocation`, `RuntimeArgumentParser`, and an External Runtime argument dialog, but Project Config modeled only environment/config/secret requirements and the Internal Runtime launch boundary dropped argv entirely.
+- Added high-confidence static argparse inspection for literal scalar required positionals and valued options declared with `required=True`. Dynamic parser construction, boolean actions and repeated nargs remain fail-closed and are left to runtime diagnostics.
+- Project configuration profiles now carry CLI requirements separately from environment requirements. The UI explicitly labels them as runtime launch parameters and no longer says there is no required configuration when required CLI input is known.
+- Added argparse runtime diagnosis for `the following arguments are required: ...`; runtime-discovered CLI tokens are persisted as project-scoped hints and participate in the next Run flow.
+- Python Run now enters the CLI flow for both External Runtime and Internal Runtime when a non-Web Python CLI project or required CLI arguments are known.
+- Internal Runtime argv is now carried through `PythonLaunchInvocation` -> `ProjectRuntimeController` -> Embedded CPython/Internal Alpine.
+- Embedded CPython now builds `sys.argv = [entrypoint] + arguments` at the native execution boundary. Internal Alpine builds a safely single-quoted argv command without eval or shell interpolation of user values.
+- Internal runtime terminal failures also feed the existing runtime-configuration diagnostic once per session/generation.
+- r34 remains immutable as the Known Good Functional Baseline; r35 does not modify the frozen baseline branch.
+- versionCode 161 / versionName 0.8.0-alpha43-r35.
+- First contract intentionally supports file-backed Python argv end-to-end. Existing External Runtime console-script support remains; Internal Runtime console-script execution is not widened by this change.
+

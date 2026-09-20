@@ -75,6 +75,53 @@ class EmbeddedPythonExecutionSpecTest {
     }
 
     @Test
+    fun acceptsBoundedPythonArguments() {
+        val root = File(System.getProperty("java.io.tmpdir"), "siftalpha-spec-args")
+        root.mkdirs()
+        File(root, "main.py").writeText("print('ok')")
+        try {
+            val spec = EmbeddedPythonExecutionSpec(
+                projectIdentity = "fixture-project-args",
+                executionRoot = root,
+                entrypoint = "main.py",
+                workingDirectory = ".",
+                runtimeKind = EmbeddedPythonRuntimeKind.CPYTHON,
+                sessionId = "siftalpha-x-args",
+                generation = 4L,
+                arguments = listOf("US", "AAPL", "--interval", "15"),
+            )
+
+            assertEquals(listOf("US", "AAPL", "--interval", "15"), spec.arguments)
+            assertEquals(emptyList<String>(), spec.validationErrors())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun rejectsNulInsidePythonArgument() {
+        val root = File(System.getProperty("java.io.tmpdir"), "siftalpha-spec-bad-args")
+        root.mkdirs()
+        File(root, "main.py").writeText("print('ok')")
+        try {
+            assertRejects {
+                EmbeddedPythonExecutionSpec(
+                    projectIdentity = "fixture-project-bad-args",
+                    executionRoot = root,
+                    entrypoint = "main.py",
+                    workingDirectory = ".",
+                    runtimeKind = EmbeddedPythonRuntimeKind.CPYTHON,
+                    sessionId = "siftalpha-x-bad-args",
+                    generation = 5L,
+                    arguments = listOf("bad\u0000value"),
+                )
+            }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun rejectsTraversalAndAbsoluteTargetsAtConstruction() {
         val root = File(System.getProperty("java.io.tmpdir"), "siftalpha-spec-invalid")
         root.mkdirs()

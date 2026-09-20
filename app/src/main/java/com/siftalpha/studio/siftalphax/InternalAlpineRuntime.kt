@@ -544,6 +544,7 @@ class InternalAlpineSession private constructor(context: Context) {
         executionRoot: File,
         entrypoint: String,
         environmentRoot: File,
+        arguments: List<String> = emptyList(),
     ): EmbeddedPythonSnapshot {
         check(canStart(projectIdentity)) { "Internal Alpine project session is already active" }
         val layout = InternalAlpineFiles.prepare(appContext)
@@ -553,8 +554,18 @@ class InternalAlpineSession private constructor(context: Context) {
         val stderr = File(sessionRoot, "stderr.log")
         val backgroundTelemetry = File(sessionRoot, "background-continuity.log")
         val generation = nextGeneration.incrementAndGet()
-        val safeEntrypoint = entrypoint.replace("'", "'\"'\"'")
-        val shell = "exec /siftalpha-env/venv/bin/python '/workspace/" + safeEntrypoint + "'"
+        require(arguments.size <= 64) { "too many Python arguments" }
+        require(arguments.all { it.length <= 4096 && '\u0000' !in it }) {
+            "invalid Python argument"
+        }
+        fun shellQuote(value: String): String =
+            "'" + value.replace("'", "'\"'\"'") + "'"
+        val commandParts = buildList {
+            add("/siftalpha-env/venv/bin/python")
+            add("/workspace/" + entrypoint)
+            addAll(arguments)
+        }
+        val shell = "exec " + commandParts.joinToString(" ", transform = ::shellQuote)
         val command = InternalAlpineFiles.buildCommand(
             appContext,
             layout,
