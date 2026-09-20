@@ -174,10 +174,14 @@ class ProjectRuntimeController(
         return EnvironmentPlanningContext(facts = facts, plan = plan)
     }
 
-    private fun requiresInternalNodeVite(plan: ProjectEnvironmentPlan): Boolean =
+    private fun requiresSupplementalNodePrepare(plan: ProjectEnvironmentPlan): Boolean =
         plan.detection.primaryRuntime == RuntimeKind.PYTHON &&
-            plan.detection.viteComponentCount > 0 &&
             RuntimeKind.NODE_JS in plan.detection.supplementalRuntimes &&
+            EnvironmentBuildStep.NODE_INSTALL in plan.buildSteps
+
+    private fun requiresInternalNodeVite(plan: ProjectEnvironmentPlan): Boolean =
+        requiresSupplementalNodePrepare(plan) &&
+            plan.detection.viteComponentCount > 0 &&
             EnvironmentBuildStep.NODE_BUILD in plan.buildSteps
 
     private fun blockedEnvironmentPlanMessage(plan: ProjectEnvironmentPlan): String =
@@ -815,16 +819,21 @@ class ProjectRuntimeController(
     }
     fun prepare(project: V04ProjectGateway.RuntimeProject): RuntimeCommand {
         val context = executionContext(project)
+        val plan = context.environmentPlan
+        if (!plan.readyToPrepare) return environmentPlanError(project, plan)
+        if (!plan.supports(EnvironmentBackend.EXTERNAL_PROVIDER)) {
+            return environmentBackendUnavailable(project, plan, EnvironmentBackend.EXTERNAL_PROVIDER)
+        }
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
             ?: return selectionError(project, context.selection)
-        return when (resolved.primary) {
+        val prepared = when (resolved.primary) {
             RuntimeKind.PYTHON -> {
                 val python = PythonDependencyDiagnostics.wrapPrepareFailure(
                     base = pythonAdapter.prepare(context.spec),
                     project = context.spec,
                     host = host,
                 )
-                if (RuntimeSupplementalCompositionPolicy.requiresNode(resolved)) {
+                if (requiresSupplementalNodePrepare(plan)) {
                     val node = supplementalNodeAdapter.prepareDetectedWebComponents(context.spec)
                     RuntimeEnvironmentComposer.prepare(
                         host = host,
@@ -837,8 +846,9 @@ class ProjectRuntimeController(
                 }
             }
             RuntimeKind.NODE_JS -> nodeExecutableAdapter.prepare(context.spec)
-            else -> executableUnavailable(project, resolved.primary)
+            else -> return executableUnavailable(project, resolved.primary)
         }
+        return withEnvironmentPlanDiagnostics(prepared, plan)
     }
 
     /**
@@ -877,7 +887,7 @@ class ProjectRuntimeController(
                     project = effectiveSpec,
                     host = host,
                 )
-                if (RuntimeSupplementalCompositionPolicy.requiresNode(resolved)) {
+                if (requiresSupplementalNodePrepare(context.environmentPlan)) {
                     RuntimeEnvironmentComposer.start(
                         host = host,
                         projectName = effectiveSpec.name,
@@ -913,7 +923,7 @@ class ProjectRuntimeController(
         return when (resolved.primary) {
             RuntimeKind.PYTHON -> {
                 val python = pythonAdapter.status(context.spec)
-                if (RuntimeSupplementalCompositionPolicy.requiresNode(resolved)) {
+                if (requiresSupplementalNodePrepare(context.environmentPlan)) {
                     RuntimeEnvironmentComposer.status(
                         host = host,
                         projectName = context.spec.name,
@@ -1013,14 +1023,15 @@ class ProjectRuntimeController(
         webLogDiscoveryAllowed: Boolean = false,
         webHintPorts: List<Int> = emptyList(),
     ): ExecutionContext {
-        val facts = gateway.runtimeFacts(project.summary.documentId)
-        val selection = ProjectRuntimeExecutionPlanner.select(
-            relativePaths = facts.relativePaths,
-            declaredType = facts.declaredType,
-        )
-        val resolvedPrimary = (selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved)?.primary
+        val planning = environmentPlanningContext(project)
+        val facts = planning.facts
+        val plan = planning.plan
+        val selection = plan.detection.selection
+        val resolvedPrimary = plan.detection.primaryRuntime
         val resolvedEntry = facts.declaredEntry ?: when (resolvedPrimary) {
-            RuntimeKind.NODE_JS -> project.summary.entry.takeUnless { it.endsWith(".py", ignoreCase = true) }.orEmpty()
+            RuntimeKind.NODE_JS -> project.summary.entry.takeUnless {
+                it.endsWith(".py", ignoreCase = true)
+            }.orEmpty()
             else -> project.summary.entry
         }
         val resolvedRun = facts.declaredRun ?: when (resolvedPrimary) {
@@ -1029,15 +1040,6 @@ class ProjectRuntimeController(
                 value.startsWith("python ") || value.startsWith("python3 ")
             }.orEmpty()
             else -> project.summary.run
-        }
-        val pythonRequiresVersion = if (
-            resolvedPrimary == RuntimeKind.PYTHON &&
-            facts.relativePaths.any { it == "pyproject.toml" }
-        ) {
-            gateway.readProjectRootText(project.summary.documentId, "pyproject.toml")
-                ?.let(::pythonRequiresVersion)
-        } else {
-            null
         }
         return ExecutionContext(
             spec = RuntimeProjectSpec(
@@ -1049,21 +1051,14 @@ class ProjectRuntimeController(
                 declaredEntry = facts.declaredEntry,
                 declaredRun = facts.declaredRun,
                 relativePaths = facts.relativePaths,
-                pythonRequiresVersion = pythonRequiresVersion,
+                pythonRequiresVersion = plan.detection.pythonRequiresVersion,
+                environmentPlanId = plan.planId,
                 webLogDiscoveryAllowed = webLogDiscoveryAllowed,
                 webHintPorts = webHintPorts.filter { it in 1..65535 }.distinct(),
             ),
             selection = selection,
+            environmentPlan = plan,
         )
-    }
-
-    private fun pythonRequiresVersion(pyprojectText: String): String? {
-        val parsed = Toml.parse(pyprojectText)
-        if (parsed.hasErrors()) return null
-        return parsed.getTable("project")
-            ?.getString("requires-python")
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
     }
 
     private fun basicSpec(project: V04ProjectGateway.RuntimeProject): RuntimeProjectSpec = RuntimeProjectSpec(
@@ -1071,6 +1066,44 @@ class ProjectRuntimeController(
         folderName = project.folderName,
         entry = project.summary.entry,
         run = project.summary.run,
+    )
+
+    private fun withEnvironmentPlanDiagnostics(
+        command: RuntimeCommand,
+        plan: ProjectEnvironmentPlan,
+    ): RuntimeCommand = command.copy(
+        shellScript = buildString {
+            plan.diagnosticLines().forEach { line ->
+                appendLine("echo " + host.sh(line))
+            }
+            append(command.shellScript)
+        },
+    )
+
+    private fun environmentPlanError(
+        project: V04ProjectGateway.RuntimeProject,
+        plan: ProjectEnvironmentPlan,
+    ): RuntimeCommand = simpleError(
+        projectName = project.summary.name,
+        lines = listOf(
+            "SIFTALPHA_ERROR=ENVIRONMENT_PLAN_BLOCKED",
+            "SIFTALPHA_ENV=NOT_READY",
+        ) + plan.diagnosticLines(),
+        exitCode = 82,
+    )
+
+    private fun environmentBackendUnavailable(
+        project: V04ProjectGateway.RuntimeProject,
+        plan: ProjectEnvironmentPlan,
+        backend: EnvironmentBackend,
+    ): RuntimeCommand = simpleError(
+        projectName = project.summary.name,
+        lines = listOf(
+            "SIFTALPHA_ERROR=ENVIRONMENT_PLAN_BACKEND_UNAVAILABLE",
+            "SIFTALPHA_ENV=NOT_READY",
+            "SIFTALPHA_ENV_BACKEND_REQUESTED=" + backend.wireValue,
+        ) + plan.diagnosticLines(),
+        exitCode = 82,
     )
 
     private fun selectionError(
