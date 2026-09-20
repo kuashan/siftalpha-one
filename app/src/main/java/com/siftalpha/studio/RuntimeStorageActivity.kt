@@ -832,25 +832,25 @@ class RuntimeStorageActivity : StudioActivity() {
             metric(getString(R.string.storage_internal_wheel_cache, formatSize(snapshot.wheelCacheKb))),
         )
         internalContainer.addView(
-            button(getString(R.string.storage_internal_clear_wheel_cache)) {
+            (button(getString(R.string.storage_internal_clear_wheel_cache)) {
                 confirmClearInternalWheelCache()
-            }.apply { isEnabled = snapshot.wheelCacheKb > 0L }),
+            }).apply { isEnabled = snapshot.wheelCacheKb > 0L },
         )
         internalContainer.addView(
             metric(getString(R.string.storage_internal_pip_cache, formatSize(snapshot.pipCacheKb))),
         )
         internalContainer.addView(
-            button(getString(R.string.storage_internal_clear_pip_cache)) {
+            (button(getString(R.string.storage_internal_clear_pip_cache)) {
                 confirmClearInternalPipCache()
-            }.apply { isEnabled = snapshot.pipCacheKb > 0L }),
+            }).apply { isEnabled = snapshot.pipCacheKb > 0L },
         )
         internalContainer.addView(
             metric(getString(R.string.storage_internal_npm_cache, formatSize(snapshot.npmCacheKb))),
         )
         internalContainer.addView(
-            button(getString(R.string.storage_internal_clear_npm_cache)) {
+            (button(getString(R.string.storage_internal_clear_npm_cache)) {
                 confirmClearInternalNpmCache()
-            }.apply { isEnabled = snapshot.npmCacheKb > 0L }),
+            }).apply { isEnabled = snapshot.npmCacheKb > 0L },
         )
 
         internalContainer.addView(section(getString(R.string.storage_internal_projects_title)))

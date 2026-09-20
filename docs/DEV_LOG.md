@@ -1326,3 +1326,10 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - External Provider clean/snapshot semantics remain unchanged; Termux is still required only for External Provider operations.
 - versionCode 171 / versionName 0.8.0-alpha43-r44-storage1.
 - Real-device acceptance is pending.
+
+
+### r44-storage1 cloud repair note
+
+- W0 #265 did not produce an APK. Repository validators passed, but Kotlin compilation failed on three RuntimeStorageActivity button-expression selectors introduced by the first storage-manager patch.
+- The failure was syntactic only; Internal Alpine Probe #52 passed.
+- The three button expressions were parenthesized without changing storage behavior, versionCode, or versionName.
