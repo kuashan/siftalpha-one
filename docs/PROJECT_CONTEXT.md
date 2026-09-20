@@ -659,3 +659,19 @@ Termux availability must never gate Internal R storage inspection or project-env
 Project source in Android shared storage is outside the Runtime Storage Manager deletion boundary. Internal R project cleanup removes only app-private Embedded CPython/Internal Alpine environments. Shared Runtime foundations such as the Internal Alpine rootfs are observable but are not ordinary project cleanup targets.
 
 alpha43-r44-storage1 is the first implementation of this provider-aware storage contract. The r44 known-good baseline remains frozen at 0285db2c26565e1aa2a47624d2cad8fa9c19e89f; this pre-r45 change requires separate cloud and real-device acceptance before it can become a new baseline.
+
+
+## Current temporary baseline after r44 closure
+
+r44 is closed. The current temporary Known Good Functional Baseline is:
+
+- versionName: 0.8.0-alpha43-r44-storage1
+- versionCode: 171
+- accepted source commit: 25596e855a7a141089568883b5d38e023982b6d3
+- frozen reference branch: baseline/alpha43-r44-final-known-good
+
+This baseline includes the previously accepted r44 Internal R modern-project Web path plus the provider-aware Unified Runtime Storage Manager. Internal R storage inspection and cleanup no longer depend on Termux, while External Provider storage management remains independent.
+
+The earlier baseline/alpha43-r44-known-good branch at 0285db2c26565e1aa2a47624d2cad8fa9c19e89f remains a historical frozen baseline and must not be moved.
+
+All subsequent r45+ work should use baseline/alpha43-r44-final-known-good as the primary regression reference until a later baseline is explicitly promoted.

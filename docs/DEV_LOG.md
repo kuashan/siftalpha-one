@@ -1333,3 +1333,25 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - W0 #265 did not produce an APK. Repository validators passed, but Kotlin compilation failed on three RuntimeStorageActivity button-expression selectors introduced by the first storage-manager patch.
 - The failure was syntactic only; Internal Alpine Probe #52 passed.
 - The three button expressions were parenthesized without changing storage behavior, versionCode, or versionName.
+
+
+## 2026-09-20 · alpha43-r44 final real-device acceptance / temporary baseline
+
+- Real-device acceptance for alpha43-r44-storage1 completed successfully.
+- Accepted source commit: 25596e855a7a141089568883b5d38e023982b6d3.
+- Accepted version: versionCode 171 / versionName 0.8.0-alpha43-r44-storage1.
+- Cloud evidence:
+  - W0 #266: SUCCESS;
+  - Internal Alpine Probe #52: SUCCESS;
+  - testDebugUnitTest: SUCCESS;
+  - assembleDebug: SUCCESS;
+  - stable APK Signature Scheme v2 signer unchanged.
+- Real-device acceptance confirms the Unified Runtime Storage Manager provider split:
+  - Internal R storage can be inspected without opening or depending on Termux;
+  - Internal R project environments can be cleaned independently;
+  - project source in Android shared storage is preserved;
+  - cleaned Internal R projects correctly require environment preparation again;
+  - External Provider storage management remains separately available through Termux.
+- r44 development is now closed. This accepted source is the temporary/current regression baseline for subsequent work.
+- Frozen reference branch: baseline/alpha43-r44-final-known-good.
+- The earlier baseline/alpha43-r44-known-good remains preserved as historical evidence and must not be moved.

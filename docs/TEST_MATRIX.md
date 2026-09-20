@@ -823,3 +823,18 @@ Real-device acceptance:
 - verify cleaning a currently running Internal R project is rejected;
 - verify Internal R Wheel/pip/npm cache cleanup works without opening Termux;
 - with Termux available, verify External Provider storage statistics and existing clean actions still work.
+
+
+### alpha43-r44 final closure — ACCEPTED
+
+- Version: 0.8.0-alpha43-r44-storage1 / versionCode 171.
+- Accepted commit: 25596e855a7a141089568883b5d38e023982b6d3.
+- W0 #266: PASS.
+- Internal Alpine Probe #52: PASS.
+- Real-device Unified Runtime Storage Manager acceptance: PASS.
+- Internal R inspection and cleanup without Termux: PASS.
+- Internal R project-source preservation after environment cleanup: PASS.
+- Internal R re-prepare requirement after cleanup: PASS.
+- External Provider storage path regression check: PASS per user acceptance.
+- Result: r44 is closed and becomes the temporary/current Known Good Functional Baseline.
+- Frozen branch: baseline/alpha43-r44-final-known-good.
