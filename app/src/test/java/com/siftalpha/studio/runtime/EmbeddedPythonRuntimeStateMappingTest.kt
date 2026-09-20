@@ -74,6 +74,80 @@ class EmbeddedPythonRuntimeStateMappingTest {
     }
 
     @Test
+    fun outputOnlyGrowthDoesNotRequireRuntimeCenterCardRebuild() {
+        val previous = EmbeddedPythonSnapshot(
+            projectIdentity = "doc",
+            sessionId = "session-1",
+            generation = 3,
+            state = EmbeddedPythonState.RUNNING,
+            stdout = "attempt 1",
+        )
+        val current = previous.copy(
+            stdout = "attempt 1\nattempt 2",
+            stderr = "diagnostic tail",
+        )
+
+        assertTrue(EmbeddedPythonObservationPolicy.shouldPresent(previous, current, null))
+        assertFalse(EmbeddedPythonObservationPolicy.requiresCardRefresh(previous, current))
+        assertTrue(
+            EmbeddedPythonObservationPolicy.requiresCardRefresh(
+                previous,
+                current.copy(state = EmbeddedPythonState.SUCCEEDED, exitCode = 0),
+            ),
+        )
+        assertTrue(
+            EmbeddedPythonObservationPolicy.requiresCardRefresh(
+                previous,
+                current.copy(sessionId = "session-2", generation = 4),
+            ),
+        )
+    }
+
+    @Test
+    fun liveOutputRenderingIsThrottledButManualAndTerminalUpdatesAreImmediate() {
+        assertFalse(
+            EmbeddedPythonObservationPolicy.shouldRenderOutput(
+                lastRenderedAtEpochMs = 1_000L,
+                nowEpochMs = 1_500L,
+                intervalMs = 750L,
+                manualAction = null,
+                structuralChanged = false,
+                active = true,
+            ),
+        )
+        assertTrue(
+            EmbeddedPythonObservationPolicy.shouldRenderOutput(
+                lastRenderedAtEpochMs = 1_000L,
+                nowEpochMs = 1_750L,
+                intervalMs = 750L,
+                manualAction = null,
+                structuralChanged = false,
+                active = true,
+            ),
+        )
+        assertTrue(
+            EmbeddedPythonObservationPolicy.shouldRenderOutput(
+                lastRenderedAtEpochMs = 1_700L,
+                nowEpochMs = 1_750L,
+                intervalMs = 750L,
+                manualAction = EmbeddedPythonObservationPolicy.ManualAction.LOGS,
+                structuralChanged = false,
+                active = true,
+            ),
+        )
+        assertTrue(
+            EmbeddedPythonObservationPolicy.shouldRenderOutput(
+                lastRenderedAtEpochMs = 1_700L,
+                nowEpochMs = 1_750L,
+                intervalMs = 750L,
+                manualAction = null,
+                structuralChanged = false,
+                active = false,
+            ),
+        )
+    }
+
+    @Test
     fun activeEmbeddedStateCannotStartAnotherSession() {
         assertFalse(com.siftalpha.studio.siftalphax.EmbeddedPythonStatePolicy.canStart(EmbeddedPythonState.RUNNING))
         assertTrue(com.siftalpha.studio.siftalphax.EmbeddedPythonStatePolicy.canStart(EmbeddedPythonState.STOPPED))

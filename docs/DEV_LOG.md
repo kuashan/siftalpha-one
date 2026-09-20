@@ -1016,3 +1016,19 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Embedded CPython keeps the existing in-process foreground lease path. No Worker, supervisor, runtime gate, External Runtime behavior change, WifiLock or network-policy change is introduced.
 - versionCode 157 / versionName 0.8.0-alpha43-r31.
 - Cloud CI, Internal Alpine Probe, signed APK evidence and real-device 10-15 minute OCI background acceptance remain required; CI success is not REAL_DEVICE_PASS.
+
+## 2026-09-20 · alpha43-r32 Runtime Center live-output stability
+
+- Starting source baseline: `85304c8b2f5d3530cced0e2932cd13550d2bd520`, version `0.8.0-alpha43-r31` / `157`.
+- Real-device r31 observation found two UI regressions while OCI produced continuous Internal Alpine output: the expanded output pane visibly flashed its custom scrollbar from top to bottom, and controls such as STOP/STATUS felt delayed or could appear to lose the first tap.
+- Root cause 1: the 180 ms Embedded R poll ran `embeddedPythonSnapshotFor()` on Android's main thread. Internal Alpine snapshots include large stdout/stderr tails, so frequent file reads and text construction competed directly with touch dispatch.
+- Root cause 2: stdout/stderr-only snapshot growth returned a generic changed result, causing `refresh()` to rebuild the project list with `removeAllViews()`. Buttons and the nested output ScrollView could be destroyed and recreated during interaction.
+- r32 moves Internal snapshot/environment observation to a dedicated single-thread executor and applies only the resulting UI state on the main thread.
+- Lifecycle observation remains 180 ms, while large live-output rendering is throttled to 750 ms. Manual STATUS/LOGS, structural state changes and terminal transitions remain immediate.
+- Added `EmbeddedPythonObservationPolicy.requiresCardRefresh()`: stdout/stderr-only growth updates the existing output surface and no longer rebuilds the whole project card.
+- Embedded STOP now dispatches snapshot lookup and the project-scoped Runtime stop request off the touch/main thread; the UI immediately enters STOPPING/DISPATCHING state.
+- `ProjectOutputPanelController` now preserves per-project nested scroll position, skips identical text replacement, suppresses transient scroll callbacks during text replacement, and removes the extra posted frame before tail-follow positioning.
+- r31 Internal Runtime Foreground Ownership, project-scoped STOP isolation, r24 Web baseline, r30 caches/Web wiring, External Runtime behavior and Worker freeze are unchanged.
+- versionCode 158 / versionName 0.8.0-alpha43-r32.
+- Cloud CI + signed APK are required before real-device acceptance. CI success must not be labeled REAL_DEVICE_PASS.
+

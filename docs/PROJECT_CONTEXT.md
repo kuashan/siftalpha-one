@@ -514,3 +514,12 @@ r31 is the second-layer background-continuity experiment. It does not add a Work
 The ownership key is session-specific and project-specific. STOP must match both identities before the service invokes the existing Internal Alpine process-tree termination path, so a STOP for one project cannot terminate sibling sessions. Embedded CPython remains in-process and continues using the existing foreground lease rather than being wrapped in a fake child-process owner.
 
 r31 deliberately does not add WifiLock or broader network-policy changes. The real-device success criterion is application progress, not mere process survival: OCI must keep producing CATCHER_HEARTBEAT / LAUNCH_ATTEMPT activity for at least 10-15 minutes while SiftAlpha is backgrounded. If the service-owned process remains alive and CPU ticks continue while OCI network work stalls, the next isolated layer is Network Background Continuity.
+
+## alpha43-r32 Runtime Center UI stability (2026-09-20)
+
+r32 is a presentation/responsiveness correction on top of r31, not a new Runtime architecture. The r31 foreground-service ownership model remains unchanged. Fast Runtime observation can continue in the background, while expensive snapshot/log reads no longer run on Android's main thread and stdout growth no longer implies rebuilding the whole project card.
+
+Internal live output is an in-place surface. Its update cadence is intentionally slower than lifecycle observation, manual actions bypass the throttle, and structural Runtime transitions still refresh control state immediately. The output controller retains per-project nested scroll state and masks the transient zero-scroll callback created when a TextView replaces a large log body.
+
+STOP remains project-scoped. r32 only changes dispatch threading so the UI does not wait for snapshot lookup or process-tree termination. It does not widen STOP scope, add Worker/supervisor/runtime gate, alter External Runtime behavior, restore the removed four-stage Web state, or add network/Wifi locks.
+

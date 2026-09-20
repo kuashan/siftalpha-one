@@ -200,6 +200,7 @@ open class V04Activity : StudioActivity() {
     private val externalObservationRunnables = mutableMapOf<String, Runnable>()
     private val deferredManualActions = mutableMapOf<String, DeferredManualAction>()
     private val embeddedStartExecutor = Executors.newSingleThreadExecutor()
+    private val embeddedObservationExecutor = Executors.newSingleThreadExecutor()
     private val internalWebObservationExecutor = Executors.newSingleThreadExecutor()
     private val internalWebObservationInFlight = mutableSetOf<String>()
     private val internalWebObservationCache = mutableMapOf<String, InternalWebObservationRecord>()
@@ -211,26 +212,46 @@ open class V04Activity : StudioActivity() {
     private val externalActivityTokens = mutableMapOf<Int, ProjectActivityRegistry.Token>()
     private val cancelledExternalExecutions = mutableSetOf<Int>()
     private val embeddedLastSnapshots = mutableMapOf<String, EmbeddedPythonSnapshot>()
+    private val embeddedLastOutputRenderAt = mutableMapOf<String, Long>()
     private val embeddedRuntimeOwnership = mutableMapOf<String, RuntimeOwnership>()
     private var embeddedPollProject: V04ProjectGateway.RuntimeProject? = null
+    private var embeddedPollInFlight = false
     private val embeddedPollRunnable = object : Runnable {
         override fun run() {
             val project = embeddedPollProject ?: return
-            if (!activityStarted || isFinishing || isDestroyed) return
+            if (!activityStarted || isFinishing || isDestroyed || embeddedPollInFlight) return
             val stateKey = project.summary.documentId
             if (embeddedRuntimeOwnership[stateKey] == RuntimeOwnership.EXTERNAL_PROVIDER) {
                 embeddedPollProject = null
                 return
             }
-            val snapshot = runCatching {
-                runtime.embeddedPythonSnapshotFor(project.summary.documentId)
-            }.getOrNull() ?: return
-            val changed = syncEmbeddedSnapshot(project, snapshot)
-            if (changed) refresh()
-            if (isEmbeddedActive(snapshot)) {
-                refreshHandler.postDelayed(this, EMBEDDED_POLL_INTERVAL_MS)
-            } else {
-                embeddedPollProject = null
+
+            embeddedPollInFlight = true
+            embeddedObservationExecutor.execute {
+                val snapshot = runCatching {
+                    runtime.embeddedPythonSnapshotFor(stateKey)
+                }.getOrNull()
+                runOnUiThread {
+                    embeddedPollInFlight = false
+                    if (!activityStarted || isFinishing || isDestroyed) return@runOnUiThread
+                    if (embeddedPollProject?.summary?.documentId != stateKey) return@runOnUiThread
+                    if (embeddedRuntimeOwnership[stateKey] == RuntimeOwnership.EXTERNAL_PROVIDER) {
+                        embeddedPollProject = null
+                        return@runOnUiThread
+                    }
+                    if (snapshot == null) {
+                        refreshHandler.postDelayed(this, EMBEDDED_POLL_INTERVAL_MS)
+                        return@runOnUiThread
+                    }
+
+                    val cardChanged = syncEmbeddedSnapshot(project, snapshot)
+                    if (cardChanged) refresh()
+                    if (isEmbeddedActive(snapshot)) {
+                        refreshHandler.postDelayed(this, EMBEDDED_POLL_INTERVAL_MS)
+                    } else {
+                        embeddedPollProject = null
+                    }
+                }
             }
         }
     }
@@ -429,6 +450,7 @@ open class V04Activity : StudioActivity() {
         operationDeadlineRunnables.values.forEach(refreshHandler::removeCallbacks)
         operationDeadlineRunnables.clear()
         embeddedStartExecutor.shutdownNow()
+        embeddedObservationExecutor.shutdownNow()
         internalWebObservationExecutor.shutdownNow()
         refreshExecutor.shutdownNow()
         super.onDestroy()
@@ -2412,9 +2434,11 @@ open class V04Activity : StudioActivity() {
             embeddedStartInFlight.remove(stateKey)
         }
 
-        val embeddedSnapshot = runCatching {
-            runtime.embeddedPythonSnapshotFor(stateKey)
-        }.getOrNull()
+        val embeddedSnapshot = embeddedLastSnapshots[stateKey]
+            ?.takeIf { ownsEmbeddedObservation(stateKey, it) }
+            ?: runCatching {
+                runtime.embeddedPythonSnapshotFor(stateKey)
+            }.getOrNull()
         val embeddedRunning = embeddedSnapshot != null && isEmbeddedActive(embeddedSnapshot)
 
         if (embeddedRunning) {
@@ -2464,37 +2488,55 @@ open class V04Activity : StudioActivity() {
     }
 
     private fun requestEmbeddedStop(project: V04ProjectGateway.RuntimeProject) {
+        val stateKey = project.summary.documentId
         val operation = beginOperation(
             project = project,
             action = RuntimeOperationAction.STOP,
             provider = RuntimeOperationProvider.INTERNAL,
         ) ?: return
-        val accepted = runCatching {
-            runtime.requestEmbeddedPythonStop(project.summary.documentId)
-        }.getOrDefault(false)
-        if (!accepted) {
-            finishOperation(
-                projectId = project.summary.documentId,
-                generation = operation.generation,
-                phase = RuntimeOperationPhase.FAILED,
-            )
-            toast(getString(R.string.runtime_stop_failed))
-            refreshEmbeddedProject(project)
-            return
-        }
-        invalidateInternalWebDiscovery(project.summary.documentId)
-        states[project.summary.documentId] = getString(R.string.runtime_action_stopping)
+
+        invalidateInternalWebDiscovery(stateKey)
+        states[stateKey] = getString(R.string.runtime_action_stopping)
         projectOutputs.write(
             project.folderName,
             listOf(
                 "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
-                "SIFTALPHA_X_PROJECT_ID=" + project.summary.documentId,
-                "SIFTALPHA_X_STOP_REQUEST=ACCEPTED",
+                "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                "SIFTALPHA_X_STOP_REQUEST=DISPATCHING",
             ).joinToString("\n"),
             expand = true,
         )
         refresh()
-        scheduleEmbeddedPolling(project)
+
+        embeddedObservationExecutor.execute {
+            val accepted = runCatching {
+                runtime.requestEmbeddedPythonStop(stateKey)
+            }.getOrDefault(false)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (!accepted) {
+                    finishOperation(
+                        projectId = stateKey,
+                        generation = operation.generation,
+                        phase = RuntimeOperationPhase.FAILED,
+                    )
+                    toast(getString(R.string.runtime_stop_failed))
+                    refreshEmbeddedProject(project)
+                    return@runOnUiThread
+                }
+
+                projectOutputs.write(
+                    project.folderName,
+                    listOf(
+                        "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                        "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                        "SIFTALPHA_X_STOP_REQUEST=ACCEPTED",
+                    ).joinToString("\n"),
+                    expand = true,
+                )
+                scheduleEmbeddedPolling(project)
+            }
+        }
     }
 
     private fun refreshEmbeddedProject(
@@ -2516,84 +2558,101 @@ open class V04Activity : StudioActivity() {
             null -> null
         }
         if (manualAction != null && operation == null) return
+
         if (manualAction != null) {
             states[stateKey] = getString(R.string.runtime_action_checking)
             refresh()
         }
-        val checkedEnvironmentReady = if (
-            manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS
-        ) {
-            runCatching { runtime.embeddedPythonEnvironmentReady(project) }.getOrNull()
-        } else {
-            null
-        }
-        if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
-            setEnvironmentReady(
-                stateKey,
-                ProjectRuntimeSelection.EMBEDDED_R,
-                checkedEnvironmentReady,
-            )
-        }
-        val snapshot = runCatching {
-            runtime.embeddedPythonSnapshotFor(stateKey)
-        }.getOrNull()
-        if (snapshot == null) {
-            typedStates[stateKey] = RuntimeState.UNKNOWN
-            states[stateKey] = getString(R.string.runtime_state_not_running)
-            failureReasons.remove(stateKey)
-            val diagnostics = mutableListOf(
-                "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
-                "SIFTALPHA_X_PROJECT_ID=" + stateKey,
-                "SIFTALPHA_X_STATE=IDLE",
-                "SIFTALPHA_X_RUNTIME_PHASE=IDLE",
-                "SIFTALPHA_X_PROJECT_STATUS=NOT_STARTED",
-            )
-            if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
-                diagnostics += "SIFTALPHA_X_ENVIRONMENT_READY=" + (
-                    checkedEnvironmentReady?.toString() ?: "UNKNOWN"
-                )
+
+        embeddedObservationExecutor.execute {
+            val checkedEnvironmentReady = if (
+                manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS
+            ) {
+                runCatching { runtime.embeddedPythonEnvironmentReady(project) }.getOrNull()
+            } else {
+                null
             }
-            when (manualAction) {
-                EmbeddedPythonObservationPolicy.ManualAction.STATUS -> {
-                    diagnostics += "SIFTALPHA_X_STATUS_CHECK=PASS"
-                    diagnostics += "SIFTALPHA_X_STATUS_SOURCE=INTERNAL_SNAPSHOT"
+            val snapshot = runCatching {
+                runtime.embeddedPythonSnapshotFor(stateKey)
+            }.getOrNull()
+
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+
+                if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
+                    setEnvironmentReady(
+                        stateKey,
+                        ProjectRuntimeSelection.EMBEDDED_R,
+                        checkedEnvironmentReady,
+                    )
                 }
-                EmbeddedPythonObservationPolicy.ManualAction.LOGS -> {
-                    diagnostics += "SIFTALPHA_X_LOG_REFRESH=PASS"
-                    diagnostics += "SIFTALPHA_X_LOG_SOURCE=INTERNAL_SNAPSHOT"
+
+                if (snapshot == null) {
+                    typedStates[stateKey] = RuntimeState.UNKNOWN
+                    states[stateKey] = getString(R.string.runtime_state_not_running)
+                    failureReasons.remove(stateKey)
+                    val diagnostics = mutableListOf(
+                        "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                        "SIFTALPHA_X_PROJECT_ID=" + stateKey,
+                        "SIFTALPHA_X_STATE=IDLE",
+                        "SIFTALPHA_X_RUNTIME_PHASE=IDLE",
+                        "SIFTALPHA_X_PROJECT_STATUS=NOT_STARTED",
+                    )
+                    if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
+                        diagnostics += "SIFTALPHA_X_ENVIRONMENT_READY=" + (
+                            checkedEnvironmentReady?.toString() ?: "UNKNOWN"
+                        )
+                    }
+                    when (manualAction) {
+                        EmbeddedPythonObservationPolicy.ManualAction.STATUS -> {
+                            diagnostics += "SIFTALPHA_X_STATUS_CHECK=PASS"
+                            diagnostics += "SIFTALPHA_X_STATUS_SOURCE=INTERNAL_SNAPSHOT"
+                        }
+                        EmbeddedPythonObservationPolicy.ManualAction.LOGS -> {
+                            diagnostics += "SIFTALPHA_X_LOG_REFRESH=PASS"
+                            diagnostics += "SIFTALPHA_X_LOG_SOURCE=INTERNAL_SNAPSHOT"
+                        }
+                        null -> Unit
+                    }
+                    projectOutputs.write(
+                        project.folderName,
+                        diagnostics.joinToString("\n"),
+                        expand = true,
+                    )
+                    if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
+                        persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
+                    }
+                    operation?.let {
+                        finishOperation(stateKey, it.generation, RuntimeOperationPhase.SUCCESS)
+                    }
+                    refresh()
+                    return@runOnUiThread
                 }
-                null -> Unit
+
+                if (!ownsEmbeddedObservation(stateKey, snapshot)) {
+                    operation?.let {
+                        finishOperation(stateKey, it.generation, RuntimeOperationPhase.FAILED)
+                    }
+                    return@runOnUiThread
+                }
+                if (embeddedRuntimeOwnership[stateKey] != RuntimeOwnership.EXTERNAL_PROVIDER) {
+                    embeddedRuntimeOwnership[stateKey] = RuntimeOwnershipPolicy.afterAcceptedStart(
+                        RuntimeControlRequest.EMBEDDED_R,
+                    )
+                }
+
+                val cardChanged = syncEmbeddedSnapshot(project, snapshot, manualAction)
+                if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
+                    persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
+                }
+                val hadManualOperation = operation != null
+                operation?.let {
+                    finishOperation(stateKey, it.generation, RuntimeOperationPhase.SUCCESS)
+                }
+                if (cardChanged || hadManualOperation) refresh()
+                if (isEmbeddedActive(snapshot)) scheduleEmbeddedPolling(project)
             }
-            projectOutputs.write(
-                project.folderName,
-                diagnostics.joinToString("\n"),
-                expand = true,
-            )
-            if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
-                persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
-            }
-            operation?.let {
-                finishOperation(stateKey, it.generation, RuntimeOperationPhase.SUCCESS)
-            }
-            refresh()
-            return
         }
-        if (!ownsEmbeddedObservation(stateKey, snapshot)) return
-        if (embeddedRuntimeOwnership[stateKey] != RuntimeOwnership.EXTERNAL_PROVIDER) {
-            embeddedRuntimeOwnership[stateKey] = RuntimeOwnershipPolicy.afterAcceptedStart(
-                RuntimeControlRequest.EMBEDDED_R,
-            )
-        }
-        val changed = syncEmbeddedSnapshot(project, snapshot, manualAction)
-        if (manualAction == EmbeddedPythonObservationPolicy.ManualAction.STATUS) {
-            persistRuntimeState(stateKey, ProjectRuntimeSelection.EMBEDDED_R)
-        }
-        val hadManualOperation = operation != null
-        operation?.let {
-            finishOperation(stateKey, it.generation, RuntimeOperationPhase.SUCCESS)
-        }
-        if (changed || hadManualOperation) refresh()
-        if (isEmbeddedActive(snapshot)) scheduleEmbeddedPolling(project)
     }
 
     private fun syncEmbeddedSnapshot(
@@ -2613,17 +2672,14 @@ open class V04Activity : StudioActivity() {
             snapshot = snapshot,
             observation = internalWebObservation,
         )
-        // Schedule discovery before the presentation early-return so an initial empty observation
-        // cannot permanently strand an unchanged RUNNING snapshot in DETECTING.
         if (snapshot.engine == InternalPythonBackend.ALPINE && isEmbeddedActive(snapshot)) {
             scheduleInternalWebObservation(project, snapshot)
         }
-        // Runtime-log URL evidence belongs to the current snapshot/session and must be wired
-        // before the presentation early-return. Otherwise a stable RUNNING snapshot can keep an
-        // explicit SIFTALPHA_WEB_URL invisible forever when PID/socket discovery is unavailable.
+
         val runtimeLogWebChanged = if (
             ::webInspector.isInitialized &&
-            ::webStateStore.isInitialized
+            ::webStateStore.isInitialized &&
+            webStateStore.snapshot(stateKey).candidateUrl == null
         ) {
             val safeStdout = if (::secretStore.isInitialized) {
                 secretStore.redactRuntimeText(project.folderName, snapshot.stdout)
@@ -2656,15 +2712,18 @@ open class V04Activity : StudioActivity() {
         }
 
         val previous = embeddedLastSnapshots[stateKey]
-        if (
-            !EmbeddedPythonObservationPolicy.shouldPresent(previous, snapshot, manualAction) &&
-            !internalWebChanged &&
-            !runtimeLogWebChanged
-        ) {
+        val shouldPresent = EmbeddedPythonObservationPolicy.shouldPresent(
+            previous = previous,
+            current = snapshot,
+            manualAction = manualAction,
+        )
+        if (!shouldPresent && !internalWebChanged && !runtimeLogWebChanged) {
             return false
         }
+
+        val structuralChanged = EmbeddedPythonObservationPolicy.requiresCardRefresh(previous, snapshot)
         embeddedLastSnapshots[stateKey] = snapshot
-        updateEmbeddedRichResult(project, snapshot)
+        val richResultChanged = updateEmbeddedRichResult(project, snapshot)
 
         val mappedState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot)
         typedStates[stateKey] = mappedState
@@ -2683,7 +2742,17 @@ open class V04Activity : StudioActivity() {
         } else {
             failureReasons.remove(stateKey)
         }
-        if (::projectOutputs.isInitialized) {
+
+        val now = System.currentTimeMillis()
+        val outputDue = EmbeddedPythonObservationPolicy.shouldRenderOutput(
+            lastRenderedAtEpochMs = embeddedLastOutputRenderAt[stateKey],
+            nowEpochMs = now,
+            intervalMs = EMBEDDED_OUTPUT_RENDER_INTERVAL_MS,
+            manualAction = manualAction,
+            structuralChanged = structuralChanged,
+            active = isEmbeddedActive(snapshot),
+        )
+        if (::projectOutputs.isInitialized && outputDue) {
             val internalWebDiagnostics = internalWebObservation
                 ?.diagnosticLines()
                 ?.joinToString("\n")
@@ -2699,8 +2768,13 @@ open class V04Activity : StudioActivity() {
                 expand = true,
                 forceFollowTail = isEmbeddedActive(snapshot),
             )
+            embeddedLastOutputRenderAt[stateKey] = now
         }
-        return true
+
+        return structuralChanged ||
+            internalWebChanged ||
+            runtimeLogWebChanged ||
+            richResultChanged
     }
 
     private fun scheduleInternalWebObservation(
@@ -2865,6 +2939,7 @@ open class V04Activity : StudioActivity() {
             RuntimeControlRequest.EXTERNAL_PROVIDER,
         )
         embeddedLastSnapshots.remove(projectDocumentId)
+        embeddedLastOutputRenderAt.remove(projectDocumentId)
         internalWebObservationCache.remove(projectDocumentId)
         internalWebObservationInFlight.remove(projectDocumentId)
         internalWebDiscoveryRetries.remove(projectDocumentId)
@@ -3799,7 +3874,7 @@ open class V04Activity : StudioActivity() {
     private fun updateEmbeddedRichResult(
         project: V04ProjectGateway.RuntimeProject,
         snapshot: EmbeddedPythonSnapshot,
-    ) {
+    ): Boolean {
         val safeOutput = if (::secretStore.isInitialized) {
             secretStore.redactRuntimeText(project.folderName, snapshot.stdout)
         } else {
@@ -3809,6 +3884,7 @@ open class V04Activity : StudioActivity() {
         if (changed && ::projectOutputs.isInitialized) {
             projectOutputs.collapse(project.folderName)
         }
+        return changed
     }
 
     private fun openBrowserForProject(
@@ -4444,6 +4520,7 @@ open class V04Activity : StudioActivity() {
         )
         private const val REFRESH_DEBOUNCE_MS = 120L
         private const val EMBEDDED_POLL_INTERVAL_MS = 180L
+        private const val EMBEDDED_OUTPUT_RENDER_INTERVAL_MS = 750L
         private const val EXTERNAL_OBSERVATION_INTERVAL_MS = 2_000L
         private const val EXTERNAL_WEB_LOG_PROBE_EVERY_STATUS =
             RuntimeWebDetectionCadence.FAST_EXTERNAL_WEB_LOG_STATUS_INTERVAL

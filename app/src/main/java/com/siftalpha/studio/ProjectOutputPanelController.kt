@@ -41,9 +41,12 @@ class ProjectOutputPanelController(
     private val contentByFolder = mutableMapOf<String, String>()
     private val expandedFolders = mutableSetOf<String>()
     private val followTailByFolder = mutableMapOf<String, Boolean>()
+    private val scrollYByFolder = mutableMapOf<String, Int>()
+    private val scrollCallbackSuppressionDepth = mutableMapOf<String, Int>()
     private val viewsByFolder = mutableMapOf<String, Views>()
 
     fun beginRefresh() {
+        scrollCallbackSuppressionDepth.clear()
         viewsByFolder.clear()
     }
 
@@ -51,6 +54,8 @@ class ProjectOutputPanelController(
         contentByFolder.keys.retainAll(folders)
         expandedFolders.retainAll(folders)
         followTailByFolder.keys.retainAll(folders)
+        scrollYByFolder.keys.retainAll(folders)
+        scrollCallbackSuppressionDepth.keys.retainAll(folders)
         viewsByFolder.keys.retainAll(folders)
     }
 
@@ -107,8 +112,12 @@ class ProjectOutputPanelController(
             }
         }
         scroll.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+            if ((scrollCallbackSuppressionDepth[folderName] ?: 0) > 0) {
+                return@setOnScrollChangeListener
+            }
             val range = OutputScrollMath.scrollRange(body.height, scroll.height)
             followTailByFolder[folderName] = scrollY >= range - dp(FOLLOW_TAIL_SLOP_DP)
+            scrollYByFolder[folderName] = scrollY
             scrollbar.updateMetrics(body.height, scroll.height, scrollY)
         }
 
@@ -140,7 +149,11 @@ class ProjectOutputPanelController(
             if (expanded) {
                 bodyRow.post {
                     updateScrollMetrics(folderName)
-                    if (followTailByFolder.getOrPut(folderName) { true }) scrollToBottom(folderName)
+                    if (followTailByFolder.getOrPut(folderName) { true }) {
+                        scrollToBottom(folderName)
+                    } else {
+                        restoreNestedScroll(folderName, scrollYByFolder[folderName] ?: 0)
+                    }
                 }
             }
         }
@@ -181,17 +194,18 @@ class ProjectOutputPanelController(
         expand: Boolean = true,
         forceFollowTail: Boolean = false,
     ) {
-        val looksLikeNewCommand = text.contains("executionId =") && !text.contains("exitCode =")
+        val contentChanged = contentByFolder[folderName] != text
         contentByFolder[folderName] = text
         if (expand) expandedFolders += folderName
+        val looksLikeNewCommand = text.contains("executionId =") && !text.contains("exitCode =")
         if (forceFollowTail || looksLikeNewCommand) followTailByFolder[folderName] = true
         val followTail = followTailByFolder.getOrPut(folderName) { true }
+
         viewsByFolder[folderName]?.let { views ->
             val previousNestedScrollY = views.scroll.scrollY
             val outerPage = findAncestorScrollView(views.scroll)
             val previousOuterScrollY = outerPage?.scrollY ?: 0
 
-            views.body.text = displayContent(folderName)
             val expanded = folderName in expandedFolders
             views.toggle.text = context.getString(
                 if (expanded) R.string.runtime_project_output_collapse else R.string.runtime_project_output_expand,
@@ -199,16 +213,48 @@ class ProjectOutputPanelController(
             views.tools.visibility = if (expanded) View.VISIBLE else View.GONE
             (views.scroll.parent as? View)?.visibility = if (expanded) View.VISIBLE else View.GONE
             views.copyAll.isEnabled = text.isNotBlank()
-            views.body.post {
+
+            if (!contentChanged) {
                 if (expanded) {
-                    if (followTail) {
-                        scrollToBottom(folderName)
-                    } else {
-                        restoreNestedScroll(folderName, previousNestedScrollY)
+                    views.body.post {
+                        if (followTail) {
+                            scrollToBottom(folderName)
+                        } else {
+                            restoreNestedScroll(
+                                folderName,
+                                scrollYByFolder[folderName] ?: previousNestedScrollY,
+                            )
+                        }
+                        updateScrollMetrics(folderName)
+                        restoreOuterPageIfReset(outerPage, previousOuterScrollY)
                     }
                 }
-                updateScrollMetrics(folderName)
-                restoreOuterPageIfReset(outerPage, previousOuterScrollY)
+                return@let
+            }
+
+            scrollCallbackSuppressionDepth[folderName] =
+                (scrollCallbackSuppressionDepth[folderName] ?: 0) + 1
+            views.body.text = displayContent(folderName)
+            views.body.post {
+                try {
+                    if (expanded) {
+                        if (followTail) {
+                            scrollToBottom(folderName)
+                        } else {
+                            restoreNestedScroll(folderName, previousNestedScrollY)
+                        }
+                    }
+                } finally {
+                    val remaining = (scrollCallbackSuppressionDepth[folderName] ?: 1) - 1
+                    if (remaining <= 0) {
+                        scrollCallbackSuppressionDepth.remove(folderName)
+                    } else {
+                        scrollCallbackSuppressionDepth[folderName] = remaining
+                    }
+                    scrollYByFolder[folderName] = views.scroll.scrollY
+                    updateScrollMetrics(folderName)
+                    restoreOuterPageIfReset(outerPage, previousOuterScrollY)
+                }
             }
         }
     }
@@ -258,22 +304,20 @@ class ProjectOutputPanelController(
     private fun restoreNestedScroll(folderName: String, previousScrollY: Int) {
         viewsByFolder[folderName]?.let { views ->
             val range = OutputScrollMath.scrollRange(views.body.height, views.scroll.height)
-            views.scroll.scrollTo(0, previousScrollY.coerceIn(0, range))
+            val restored = previousScrollY.coerceIn(0, range)
+            views.scroll.scrollTo(0, restored)
+            scrollYByFolder[folderName] = restored
         }
     }
 
     private fun scrollToBottom(folderName: String) {
         viewsByFolder[folderName]?.let { views ->
-            views.scroll.post {
-                // ScrollView.fullScroll() performs focus navigation in addition to scrolling.
-                // Because this log panel lives inside the Runtime Center's outer ScrollView and its
-                // TextView is selectable/focusable, calling fullScroll every live PREPARE poll can
-                // move focus across the hierarchy and make the whole page jump. Move only this
-                // nested log viewport instead; the outer page must remain exactly where the user put it.
-                val range = OutputScrollMath.scrollRange(views.body.height, views.scroll.height)
-                views.scroll.scrollTo(0, range)
-                views.scrollbar.updateMetrics(views.body.height, views.scroll.height, views.scroll.scrollY)
-            }
+            // Callers invoke this after layout. Avoid one extra posted frame where a replaced
+            // TextView temporarily reports scrollY=0 and the custom thumb flashes at the top.
+            val range = OutputScrollMath.scrollRange(views.body.height, views.scroll.height)
+            views.scroll.scrollTo(0, range)
+            scrollYByFolder[folderName] = range
+            views.scrollbar.updateMetrics(views.body.height, views.scroll.height, views.scroll.scrollY)
         }
     }
 

@@ -531,3 +531,16 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - No Worker, supervisor, runtime gate, WifiLock, four-stage Web state, unified Project Start Contract, global PID scan or port-range scan is introduced.
 - Real-device OCI: confirm CATCHER_HEARTBEAT/LAUNCH_ATTEMPT progress, background SiftAlpha for at least 10-15 minutes, return without restarting, refresh logs, and verify attempts continued throughout.
 - If ownership/PID/CPU remain healthy but network attempts stop, classify r31 as PARTIAL/FAIL and isolate the next investigation to Network Background Continuity.
+
+### alpha43-r32 Runtime Center live-output stability acceptance
+
+- Embedded R snapshot reads execute off Android's main thread; result presentation remains on the UI thread.
+- The 180 ms lifecycle observation cadence may continue, but active stdout/stderr rendering is bounded to at most once per 750 ms unless a manual STATUS/LOGS action, structural Runtime transition or terminal state requires immediate presentation.
+- stdout/stderr-only growth must not trigger a Runtime Center project-card rebuild.
+- Runtime state/session/generation/runtime-phase/stop-phase/terminal changes must still rebuild the card when controls or labels can change.
+- Expanded project output must preserve follow-tail behavior without a visible custom-scrollbar top-to-bottom flash. If the user scrolls upward, a later card refresh must restore the nested position rather than reset to the top.
+- STOP must give immediate UI feedback and perform the potentially blocking Internal Runtime stop request off the touch/main thread.
+- STATUS and Refresh Logs must not perform Internal snapshot/environment reads synchronously on the touch/main thread.
+- Real-device OCI: keep a large live log active for at least 5 minutes, interact with the output scrollbar and exercise STATUS/Refresh Logs/STOP. No first-tap loss, repeated card flicker or sustained UI freeze is acceptable.
+- r31 Runtime ownership diagnostics and the separate 10-15 minute background-continuity acceptance remain required; r32 CI success is not REAL_DEVICE_PASS.
+

@@ -34,6 +34,43 @@ object EmbeddedPythonObservationPolicy {
         manualAction: ManualAction?,
     ): Boolean = manualAction != null || previous != current
 
+    /**
+     * stdout/stderr growth belongs to the existing output view. Rebuild the Runtime Center card
+     * only when facts that affect controls, status, ownership or terminal presentation change.
+     */
+    fun requiresCardRefresh(
+        previous: EmbeddedPythonSnapshot?,
+        current: EmbeddedPythonSnapshot,
+    ): Boolean {
+        if (previous == null) return true
+        return previous.engine != current.engine ||
+            previous.sessionId != current.sessionId ||
+            previous.projectIdentity != current.projectIdentity ||
+            previous.generation != current.generation ||
+            previous.state != current.state ||
+            previous.runtimePhase != current.runtimePhase ||
+            previous.stopPhase != current.stopPhase ||
+            previous.stopResult != current.stopResult ||
+            previous.finishedAtEpochMs != current.finishedAtEpochMs ||
+            previous.exitCode != current.exitCode
+    }
+
+    fun shouldRenderOutput(
+        lastRenderedAtEpochMs: Long?,
+        nowEpochMs: Long,
+        intervalMs: Long,
+        manualAction: ManualAction?,
+        structuralChanged: Boolean,
+        active: Boolean,
+    ): Boolean {
+        require(intervalMs >= 0L)
+        return manualAction != null ||
+            structuralChanged ||
+            !active ||
+            lastRenderedAtEpochMs == null ||
+            nowEpochMs - lastRenderedAtEpochMs >= intervalMs
+    }
+
     fun outputText(
         snapshot: EmbeddedPythonSnapshot,
         manualAction: ManualAction? = null,
