@@ -317,6 +317,24 @@ class ProjectRuntimeController(
         val projectId = project.summary.documentId
         val requiresNodeVite = requiresInternalNodeVite(projectId)
         val files = internalDependencyFiles(projectId, requiresNodeVite)
+        val packagingPreflight = ProjectPackagingPreflight.inspect(
+            relativePaths = gateway.runtimeFacts(projectId).relativePaths,
+            pyprojectToml = files.pyprojectText,
+            requirementsText = files.requirementsText,
+        )
+        if (!packagingPreflight.ready) {
+            val diagnostics = ProjectPackagingPreflight.diagnosticLines(packagingPreflight)
+            progress?.invoke(
+                (
+                    listOf(
+                        "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
+                        "SIFTALPHA_X_PROJECT_ID=" + projectId,
+                        "SIFTALPHA_X_ENVIRONMENT_STAGE=FAILED",
+                    ) + diagnostics
+                ).joinToString("\n"),
+            )
+            throw IllegalStateException(diagnostics.joinToString("\n"))
+        }
         val cpythonSession = embeddedPythonSession
         val cpythonManager = embeddedPythonEnvironmentManager
         var cpythonError: Throwable? = null
@@ -521,6 +539,15 @@ class ProjectRuntimeController(
         )
     }
 
+    private fun projectPackagingPreflight(
+        projectDocumentId: String,
+        relativePaths: Collection<String>,
+    ): ProjectPackagingPreflight.Result = ProjectPackagingPreflight.inspect(
+        relativePaths = relativePaths,
+        pyprojectToml = gateway.readProjectRootText(projectDocumentId, "pyproject.toml"),
+        requirementsText = gateway.readProjectRootText(projectDocumentId, "requirements.txt"),
+    )
+
     private fun embeddedPythonDependencyInput(
         projectDocumentId: String,
     ): EmbeddedPythonDependencyInputV1 {
@@ -713,6 +740,17 @@ class ProjectRuntimeController(
             ?: return selectionError(project, context.selection)
         return when (resolved.primary) {
             RuntimeKind.PYTHON -> {
+                val packagingPreflight = projectPackagingPreflight(
+                    projectDocumentId = project.summary.documentId,
+                    relativePaths = context.spec.relativePaths,
+                )
+                if (!packagingPreflight.ready) {
+                    return simpleError(
+                        projectName = context.spec.name,
+                        lines = ProjectPackagingPreflight.diagnosticLines(packagingPreflight),
+                        exitCode = 82,
+                    )
+                }
                 val python = PythonDependencyDiagnostics.wrapPrepareFailure(
                     base = pythonAdapter.prepare(context.spec),
                     project = context.spec,
