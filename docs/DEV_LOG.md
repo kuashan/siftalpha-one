@@ -1097,3 +1097,8 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - External automatic observation already requests one final LOGS result after STATUS detects a terminal project. r35 now feeds that final Runtime output through the same configuration diagnostic.
 - Automatic final-log diagnosis is silent: it persists high-confidence missing CLI hints without opening a repeated dialog. A later Run uses those hints to present launch-argument input.
 - Manual LOGS may present the actionable configuration finding. Unrelated failures continue through the existing Runtime error path.
+
+### r35 pre-release Kotlin diagnostic dedupe correction
+
+- W0 Run #245 passed repository validators but Kotlin compilation found the terminal embedded-configuration diagnostic referenced an Activity-lifetime dedupe set that was missing from the final merged declaration block.
+- Restored `embeddedConfigurationFindings` as a session/generation-keyed set. This is a pre-release correction only; r35 remains versionCode 161.

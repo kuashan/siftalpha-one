@@ -215,6 +215,7 @@ open class V04Activity : StudioActivity() {
     private val externalActivityTokens = mutableMapOf<Int, ProjectActivityRegistry.Token>()
     private val cancelledExternalExecutions = mutableSetOf<Int>()
     private val embeddedLastSnapshots = mutableMapOf<String, EmbeddedPythonSnapshot>()
+    private val embeddedConfigurationFindings = mutableSetOf<String>()
     private val embeddedLastOutputRenderAt = mutableMapOf<String, Long>()
     private val embeddedRuntimeOwnership = mutableMapOf<String, RuntimeOwnership>()
     private var embeddedPollProject: V04ProjectGateway.RuntimeProject? = null
