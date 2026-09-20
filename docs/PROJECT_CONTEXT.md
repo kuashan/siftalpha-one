@@ -710,3 +710,20 @@ RuntimeWebAvailabilityTracker intentionally preserves previously verified endpoi
 r45b2 makes lifecycle freshness part of the presentation-change contract and keeps the last verified project-owned URL available as the provisional Web presentation target while that fresh probe runs. Browser opening still performs verifyNow before ACTION_VIEW, so a stale URL cannot bypass Endpoint Probe verification. Runtime ownership, Web Discovery scope, STOP semantics, provider separation and Worker freeze are unchanged.
 
 The r44 final frozen baseline branches remain unchanged. r45b2 requires cloud verification and focused real-device acceptance before any later baseline promotion.
+
+## r46 Environment compatibility contract
+
+r46 is intentionally not an incremental package manager. SiftAlpha remains a script/project Runtime manager: import a completed project, prepare its environment explicitly, then reuse that prepared environment for subsequent runs.
+
+The environment contract is now:
+
+1. A prepared project environment is reusable only while its project/dependency evidence and Python Runtime identity remain compatible.
+2. A new imported/project version that is explicitly prepared must end with an environment corresponding to the current project. External Python therefore prepares a clean candidate venv and activates it only after success instead of mutating the old venv in place.
+3. A project's explicit `requires-python` declaration is treated as authoritative compatibility evidence. Embedded CPython may fall back to Internal Alpine when the packaged CPython version does not satisfy it; Internal Alpine also verifies its actual installed Python version before preparing/reusing an environment.
+4. Adding a newer Python Runtime does not automatically migrate every old project. A project continues to use a compatible Runtime/environment; if no available Runtime satisfies its declared requirement, SiftAlpha reports incompatibility instead of silently using the wrong Python.
+5. r46 establishes the selection/binding contract for multiple Python Runtime versions, but the APK currently bundles only the existing Embedded CPython 3.14.7 path plus Internal Alpine's managed Python. Python 2 is not newly bundled by r46.
+
+Current r46 version: `0.8.0-alpha43-r46`, versionCode `175`.
+Implementation head verified by W0 #287: `6d33168b3cc2a13052d1ebd0715da4c98453e407`.
+Cloud verification: PASS. Real-device acceptance: pending.
+

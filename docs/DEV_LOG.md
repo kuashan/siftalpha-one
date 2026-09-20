@@ -1402,3 +1402,18 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Browser opening still performs verifyNow before ACTION_VIEW, so Endpoint Probe remains the final truth gate.
 - No Runtime, Internal Alpine, Worker, third-party source, port scanning, or project ownership semantics changed.
 - versionCode 174 / versionName 0.8.0-alpha43-r45b2.
+
+## r46 Runtime Compatibility & Environment Consistency
+
+- Version: `0.8.0-alpha43-r46` / versionCode `175`.
+- Starting accepted source: `1c594e3a3027be7eb1a95594e0e0a42f42d02550`.
+- Implementation head before documentation: `6d33168b3cc2a13052d1ebd0715da4c98453e407`.
+- Embedded CPython now publishes a stable Runtime Identity and project environment manifests must match that identity before reuse.
+- Internal Alpine records the actually installed Python full version plus Alpine/rootfs identity. A project `requires-python` declaration participates in the environment fingerprint and must match the current Alpine Python before prepare/reuse.
+- External Python preparation now creates a fresh candidate venv, installs and validates it, then replaces the previous project venv only after success. Removed dependencies therefore do not survive a successful re-prepare merely because the old venv was reused.
+- External Python ready state records `PYTHON_VERSION` and `REQUIRES_PYTHON`; a changed/unknown runtime invalidates readiness.
+- Runtime selection remains capability-based. The currently packaged Internal runtimes are Embedded CPython 3.14.7 and the Python supplied by the pinned Internal Alpine rootfs. r46 does not fabricate or bundle Python 2; a project whose declared Python requirement matches no available Runtime is rejected instead of being forced onto an incompatible newer Python.
+- W0 Cloud Build #287 / run `35509726405`: SUCCESS for implementation head `6d33168b...`; repository validators, unit tests and Debug APK assembly passed.
+- Internal Alpine Probe #56 / run `35509662187`: SUCCESS on the same r46 implementation line before the final fingerprint-parentheses cleanup; that cleanup changes only Kotlin fingerprint construction and is covered by W0 #287.
+- Real-device acceptance remains pending.
+

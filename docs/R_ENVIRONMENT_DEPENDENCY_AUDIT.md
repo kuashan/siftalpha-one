@@ -1042,3 +1042,15 @@ M Presentation / existing observation / result routing
 本审计的下一项正式工作仍然是：先基于本文件的 contract 再进行 Pure-Python Environment v1 的设计评审；不能把本文件当作已经实现的依赖安装能力。
 
 **No alpha44 production implementation was started.**
+
+## r46 compatibility closure
+
+The earlier persistence model already allowed repeated runs to reuse a prepared project environment. r46 therefore narrows the remaining contract to environment correctness across project re-prepare and Runtime changes.
+
+- Embedded CPython manifests now carry a concrete Runtime Identity. Environment schema advances to v3, so older bindings without a compatible Runtime identity are not silently reused.
+- Internal Alpine records both the actual Python full version and an identity derived from the pinned Alpine/rootfs plus that Python version. Project `requires-python` also participates in the dependency fingerprint.
+- External Python preparation is transactional at the project-venv level: build and validate a fresh candidate, then replace the previous venv. A failed prepare leaves the previous venv on disk, but its old readiness marker cannot satisfy changed project/runtime evidence.
+- External ready markers bind the prepared Python version and the project's declared Python requirement.
+- Runtime version selection is constrained by actually available Runtime implementations. r46 does not treat a newer Python as automatically compatible with a project requesting an older major/minor version, and it does not claim Python 2 support when no Python 2 Runtime is packaged.
+- Future Python Runtime providers can participate in the same compatibility-selection contract without changing the project-environment semantics.
+

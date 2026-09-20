@@ -921,3 +921,17 @@ Real-device gate:
 - return to SiftAlpha without pressing Refresh Logs;
 - confirm Open remains enabled and opens only after normal Endpoint Probe verification;
 - if the Web service is actually unavailable, confirm repeated fresh probe failure removes availability instead of preserving stale Open state.
+
+## r46 Runtime compatibility / environment consistency
+
+| Check | Expected | Evidence / status |
+| --- | --- | --- |
+| Embedded CPython environment reuse | Reuse only when project fingerprint and Runtime Identity both match | Unit coverage added; W0 #287 PASS |
+| Internal Alpine project requirement | `requires-python` participates in source fingerprint and must match actual Alpine Python | Unit coverage added; W0 #287 PASS |
+| Internal Alpine Runtime upgrade | Old project binding without/mismatching Python Runtime Identity is not READY | Source contract + W0 #287 PASS |
+| External Python re-prepare | Build a fresh candidate venv and replace old venv only after successful install/validation | Unit coverage added; W0 #287 PASS |
+| External Python version requirement | Reject declared Python requirement when current external Python cannot satisfy it | Unit coverage added; W0 #287 PASS |
+| External Python ready binding | Python version / requirement change makes old environment NOT_READY | Unit coverage added; W0 #287 PASS |
+| Internal Alpine assets | Existing reproducible rootfs/proot asset pipeline remains valid | Internal Alpine Probe #56 PASS |
+| Real-device upgrade/re-prepare | Existing r45b2 install upgrades to v175; old environment invalidation and re-prepare behave correctly | PENDING DEVICE ACCEPTANCE |
+
