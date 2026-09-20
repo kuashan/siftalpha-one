@@ -65,6 +65,15 @@ class PythonRuntimeAdapter(
     )
 
     private fun buildPrepare(project: RuntimeProjectSpec): String {
+        val plannedExtras = project.pythonInstallExtras
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .sorted()
+        require(plannedExtras.all { PYTHON_EXTRA_NAME.matches(it) }) {
+            "Invalid Python install extra in Environment Plan"
+        }
+        val plannedExtrasValue = plannedExtras.joinToString(",")
         val id = host.runtimeId(project.folderName)
         val path = "/root/projects/${project.folderName}"
         val venv = "/root/venvs/$id"
@@ -78,6 +87,7 @@ class PythonRuntimeAdapter(
             ready=${sh(ready)}
             required_python=${sh(project.pythonRequiresVersion.orEmpty())}
             required_plan=${sh(project.environmentPlanId.orEmpty())}
+            planned_extras=${sh(plannedExtrasValue)}
             mkdir -p /root/venvs /root/siftalpha/logs
             : >"${'$'}log"
             if ! command -v python3 >/dev/null 2>&1; then
@@ -188,42 +198,9 @@ SIFTALPHA_PYTHON_REQUIRES_CHECK
             elif [ "${'$'}dependency_source" = 'pyproject.toml' ]; then
               echo 'DEPENDENCY_SOURCE=pyproject.toml'
               install_target="${'$'}project"
-              web_extra=0
-              vite_component=0
-
-              if "${'$'}venv/bin/python" - "${'$'}project/pyproject.toml" <<'SIFTALPHA_PYPROJECT_WEB_EXTRA'
-import sys
-import tomllib
-
-with open(sys.argv[1], "rb") as handle:
-    data = tomllib.load(handle)
-
-optional = data.get("project", {}).get("optional-dependencies", {})
-raise SystemExit(0 if isinstance(optional, dict) and "web" in optional else 1)
-SIFTALPHA_PYPROJECT_WEB_EXTRA
-              then
-                web_extra=1
-              fi
-
-              while IFS= read -r package_json; do
-                package_dir="${'$'}{package_json%/package.json}"
-                if [ -f "${'$'}package_dir/vite.config.ts" ] || \
-                   [ -f "${'$'}package_dir/vite.config.js" ] || \
-                   [ -f "${'$'}package_dir/vite.config.mts" ] || \
-                   [ -f "${'$'}package_dir/vite.config.mjs" ] || \
-                   [ -f "${'$'}package_dir/vite.config.cjs" ]; then
-                  vite_component=1
-                  break
-                fi
-              done < <(
-                find "${'$'}project" -maxdepth 7 -type f -name package.json \
-                  ! -path '*/node_modules/*' ! -path '*/.git/*' \
-                  ! -path '*/dist/*' ! -path '*/build/*' 2>/dev/null | LC_ALL=C sort
-              )
-
-              if [ "${'$'}web_extra" -eq 1 ] && [ "${'$'}vite_component" -eq 1 ]; then
-                install_target="${'$'}project[web]"
-                echo 'SIFTALPHA_PYPROJECT_EXTRAS=web'
+              if [ -n "${'$'}planned_extras" ]; then
+                install_target="${'$'}project[${'$'}planned_extras]"
+                printf 'SIFTALPHA_PYPROJECT_EXTRAS=%s\n' "${'$'}planned_extras"
               else
                 echo 'SIFTALPHA_PYPROJECT_EXTRAS=none'
               fi
@@ -950,6 +927,8 @@ SIFTALPHA_RUNNER
     """.trimIndent()
 
     private fun sh(value: String): String = host.sh(value)
+
+    private val PYTHON_EXTRA_NAME = Regex("^[A-Za-z0-9][A-Za-z0-9._-]*$")
 }
 
 object RuntimeAdapterCatalog {
