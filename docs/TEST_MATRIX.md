@@ -604,3 +604,25 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
   - r34 Web discovery, foreground ownership, background telemetry, Runtime Center stability and project-scoped STOP semantics remain unchanged.
 - Cloud requirement: repository validators, unit tests and `assembleDebug` must pass before APK release. Real-device test must run the affected project with values for `MARKET` and `CODE`.
 
+### alpha43-r36 Click/Typer CLI discovery acceptance
+
+- Static discovery:
+  - Click `@click.argument("market")` and `@click.argument("code")` are recognized as required positional launch inputs.
+  - Click `required=False` remains non-blocking and is not promoted.
+  - Typer `name: str = typer.Argument(...)` is recognized as a required positional input.
+  - argparse coverage from r35 remains unchanged.
+- Runtime diagnostics:
+  - `Usage: run_all_strategies.py [OPTIONS] MARKET CODE` + `Error: Missing argument 'MARKET'.` yields `MARKET` and `CODE` in order.
+  - `Missing option '--region'` is retained as a required option token.
+  - generic Click `COMMAND [ARGS]...` metadata is not turned into project arguments.
+- File selection:
+  - likely top-level launchers (main/app/cli/__main__/run*/start*) are inspected before unrelated Python modules under the existing bounded scan.
+- Cache:
+  - r36 must not reuse the r35 v2 configuration profile cache; the first r36 inspection writes a fresh v3 profile.
+- Real-device easy_tdx-main acceptance:
+  - Project Config must show two required CLI launch arguments instead of claiming no configurable items.
+  - Run must present MARKET and CODE fields.
+  - Supplying valid values must launch with argv and eliminate the missing-MARKET exit-code-2 failure.
+- Regression:
+  - r34 Web, r31 ownership, r32 UI stability, r33 telemetry, r35 argv execution, project-scoped STOP and External Runtime behavior remain unchanged.
+

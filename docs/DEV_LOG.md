@@ -1102,3 +1102,20 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 
 - W0 Run #245 passed repository validators but Kotlin compilation found the terminal embedded-configuration diagnostic referenced an Activity-lifetime dedupe set that was missing from the final merged declaration block.
 - Restored `embeddedConfigurationFindings` as a session/generation-keyed set. This is a pre-release correction only; r35 remains versionCode 161.
+
+## 2026-09-20 · alpha43-r36 Click/Typer CLI discovery
+
+- Trigger: r35 cloud validation passed, but real-device Project Config for `easy_tdx-main` still reported no required configuration while the runtime exited with code 2.
+- Real-device evidence and prior runtime output showed the actual CLI error format:
+  `Usage: run_all_strategies.py [OPTIONS] MARKET CODE`
+  followed by `Error: Missing argument 'MARKET'.`
+- Root cause: r35's first CLI discovery contract recognized argparse only. The affected project uses Click/Typer-style semantics, so both static discovery and runtime diagnostic fallback missed the required positionals.
+- Added high-confidence Click decorator inspection for literal required `@click.argument(...)` positionals.
+- Added high-confidence Typer inspection for literal `typer.Argument(...)` parameters using the required ellipsis contract.
+- Runtime diagnostics now understand Click/Typer `Missing argument`, `Missing option`, and required unbracketed metavars from a `Usage: ... [OPTIONS] ...` line. Generic COMMAND/ARGS meta words are excluded.
+- Project Python inspection now prioritizes likely executable files such as `main.py`, `app.py`, `cli.py`, `__main__.py`, and top-level `run*.py` / `start*.py` before the bounded scan cap, so a real launcher is not displaced by unrelated alphabetically earlier modules.
+- Project configuration profile cache namespace advanced to v3 so r35's cached empty CLI profile cannot survive into r36.
+- r35 argv execution wiring is retained unchanged; this round changes discovery and stale-cache behavior, not Runtime ownership or Web behavior.
+- r34 remains the frozen Known Good Functional Baseline.
+- versionCode 162 / versionName 0.8.0-alpha43-r36.
+

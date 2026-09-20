@@ -281,7 +281,7 @@ class ProjectConfigurationInspector(context: Context) {
         "${projectDocumentId.length}:$projectDocumentId"
 
     companion object {
-        private const val CACHE_PREFS = "siftalpha_project_configuration_profile_cache_v2"
+        private const val CACHE_PREFS = "siftalpha_project_configuration_profile_cache_v3"
         private const val MAX_METADATA_BYTES = 128 * 1024
         private const val MAX_ENV_BYTES = 256 * 1024
         private const val MAX_PYTHON_FILES = 8
@@ -302,6 +302,24 @@ class ProjectConfigurationInspector(context: Context) {
             "TMPDIR",
             "USER",
         )
+
+        private fun pythonInspectionPriority(relativePath: String): Int {
+            val normalized = relativePath.replace('\\', '/')
+            val name = normalized.substringAfterLast('/').lowercase()
+            val topLevel = '/' !in normalized
+            val entryLike = name == "main.py" ||
+                name == "app.py" ||
+                name == "cli.py" ||
+                name == "__main__.py" ||
+                name.startsWith("run") ||
+                name.startsWith("start")
+            return when {
+                topLevel && entryLike -> 0
+                topLevel -> 1
+                entryLike -> 2
+                else -> 3
+            }
+        }
 
         fun emptyProfile(): Profile = Profile(
             requirements = emptyList(),
@@ -705,7 +723,7 @@ class ProjectConfigurationInspector(context: Context) {
             }
             .sortedWith(
                 compareBy<ProjectStore.FileNode> { file ->
-                    if ('/' !in file.relativePath) 0 else 1
+                    pythonInspectionPriority(file.relativePath)
                 }.thenBy { file -> file.relativePath.lowercase() },
             )
             .take(MAX_PYTHON_FILES)

@@ -88,6 +88,36 @@ class RuntimeConfigurationDiagnosticTest {
     }
 
     @Test
+    fun `click usage and missing argument expose all required positionals`() {
+        val result = RuntimeConfigurationDiagnostic.inspect(
+            "Usage: run_all_strategies.py [OPTIONS] MARKET CODE\n" +
+                "Try 'run_all_strategies.py --help' for help.\n\n" +
+                "Error: Missing argument 'MARKET'.",
+        )
+
+        assertEquals(listOf("MARKET", "CODE"), result.missingCliArguments)
+        assertTrue(result.hasActionableFinding)
+    }
+
+    @Test
+    fun `click missing option is retained`() {
+        val result = RuntimeConfigurationDiagnostic.inspect(
+            "Error: Missing option '--region'.",
+        )
+
+        assertEquals(listOf("--region"), result.missingCliArguments)
+    }
+
+    @Test
+    fun `click command meta words are not exposed as launch fields`() {
+        val result = RuntimeConfigurationDiagnostic.inspect(
+            "Usage: tool.py [OPTIONS] COMMAND [ARGS]...",
+        )
+
+        assertTrue(result.missingCliArguments.isEmpty())
+    }
+
+    @Test
     fun `multiple named variables are deduplicated`() {
         val result = RuntimeConfigurationDiagnostic.inspect(
             """

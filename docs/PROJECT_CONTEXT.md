@@ -555,3 +555,9 @@ The first high-confidence static contract recognizes conventional literal `argpa
 
 The existing `PythonLaunchInvocation` becomes the common argv contract for supported Python-file launches across External Runtime and Internal Runtime. Internal Alpine receives safely quoted distinct arguments, and Embedded CPython now reconstructs `sys.argv` natively for every session. r34 remains frozen as the current Known Good Functional Baseline for regression comparison.
 
+## alpha43-r36 Click/Typer CLI discovery
+
+r35 established the common argv execution contract but its first discovery implementation only modeled argparse. The real `easy_tdx-main` acceptance case uses Click/Typer-style CLI behavior, proven by the runtime's `Usage: ... [OPTIONS] MARKET CODE` and `Missing argument 'MARKET'` output.
+
+r36 broadens only CLI requirement discovery: literal Click required arguments, Typer ellipsis arguments, and Click/Typer runtime diagnostics are now recognized. Likely launcher files are prioritized within the bounded static scan, and the configuration profile cache moves to a new namespace so previously cached empty results are invalidated. The r35 argv transport/execution contract remains the execution layer.
+

@@ -30,6 +30,15 @@ object RuntimeConfigurationDiagnostic {
     private val argparseRequired = Regex(
         "(?im)(?:^|\\n)[^\\n]*?the following arguments are required:\\s*([^\\n\\r]+)",
     )
+    private val clickMissingArgument = Regex(
+        "(?im)(?:^|\\n)(?:Error:\\s*)?Missing argument ['\"]([^'\"]+)['\"]\\.?\\s*$",
+    )
+    private val clickMissingOption = Regex(
+        "(?im)(?:^|\\n)(?:Error:\\s*)?Missing option ['\"]([^'\"]+)['\"]\\.?\\s*$",
+    )
+    private val clickUsage = Regex(
+        "(?im)^Usage:\\s+[^\\n]*?\\[OPTIONS\\]\\s+([^\\n\\r]+)$",
+    )
 
     private val namedPatterns = listOf(
         Regex(
@@ -86,6 +95,35 @@ object RuntimeConfigurationDiagnostic {
                 .filter { it.isNotBlank() && CLI_ARGUMENT.matches(it) }
                 .forEach { cliArguments += it }
         }
+        clickUsage.findAll(text).forEach { match ->
+            match.groupValues.getOrNull(1)
+                .orEmpty()
+                .trim()
+                .split(Regex("\\s+"))
+                .asSequence()
+                .map { it.trim().trimEnd(',', '.', ':') }
+                .filter { token ->
+                    token.isNotBlank() &&
+                        !token.startsWith("[") &&
+                        token.matches(Regex("^[A-Z][A-Z0-9_.-]*$")) &&
+                        token !in CLICK_USAGE_META_WORDS
+                }
+                .forEach { cliArguments += it }
+        }
+        clickMissingArgument.findAll(text).forEach { match ->
+            match.groupValues.getOrNull(1)
+                .orEmpty()
+                .trim()
+                .takeIf { it.isNotBlank() && CLI_ARGUMENT.matches(it) }
+                ?.let { cliArguments += it }
+        }
+        clickMissingOption.findAll(text).forEach { match ->
+            match.groupValues.getOrNull(1)
+                .orEmpty()
+                .trim()
+                .takeIf { it.isNotBlank() && CLI_ARGUMENT.matches(it) }
+                ?.let { cliArguments += it }
+        }
 
         val unnamed = names.isEmpty() &&
             cliArguments.isEmpty() &&
@@ -99,6 +137,11 @@ object RuntimeConfigurationDiagnostic {
 
     private const val MAX_NAMES = 10
     private const val MAX_CLI_ARGUMENTS = 16
+    private val CLICK_USAGE_META_WORDS = setOf(
+        "COMMAND",
+        "ARGS",
+        "OPTIONS",
+    )
     private val IGNORED_GENERIC_WORDS = setOf(
         "API_KEY",
         "API_KEYS",
