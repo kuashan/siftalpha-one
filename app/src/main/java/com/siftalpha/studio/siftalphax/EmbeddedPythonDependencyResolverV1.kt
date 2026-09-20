@@ -166,7 +166,7 @@ class EmbeddedPythonDependencyResolverV1(
 
         val ordered = selected.values.sortedBy { it.normalizedName }
         val canonical = buildString {
-            append("runtime=cpython-3.14.7-android-arm64-v8a\n")
+            append("runtime=").append(EmbeddedPythonRuntimeIdentityV1.ID).append('\n')
             append("api=").append(androidApiLevel).append('\n')
             ordered.forEach { pkg ->
                 append(pkg.normalizedName)
