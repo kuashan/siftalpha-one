@@ -606,3 +606,10 @@ After building a detected Vite frontend, Python preparation checks the project's
 r42 adds an M-layer launch policy for Python-primary projects that package their own Vite Web UI. It sits ahead of the r37 entry-bound CLI fallback but is intentionally much stricter: explicit run metadata wins, Web capability must already be known, pyproject must declare its own web optional dependencies and console script, Vite build evidence must exist, and bounded source inspection must prove a literal serve subcommand with a browser-suppression option.
 
 When this contract is proven on the accepted External Provider route, SiftAlpha launches the project-owned console script with structured argv, keeps browser ownership inside SiftAlpha, and relies on the existing Runtime Identity -> Web Discovery -> Endpoint Probe truth chain before presenting the browser. A failed proof does not alter project behavior; it falls back to the existing CLI launch resolver.
+
+
+## alpha43-r43 Internal Alpine polyglot Web path
+
+r43 closes the provider split left by r42. A Python-primary project may now use Internal R when its only supplemental Runtime is Node/Vite. The capability is implemented inside Internal Alpine rather than by delegating to Termux: Alpine installs Node/npm on demand, builds detected Vite components from a staged project tree, installs the packaged Python project with its own declared web extra, and can execute the installed Python console script with structured argv.
+
+Embedded CPython remains the narrow Python-file backend. Node/Vite or console-script Web launches are deliberately forced to Internal Alpine. Project-owned Web availability still uses the established Runtime Identity / project PID ownership / candidate discovery / Endpoint Probe truth chain.

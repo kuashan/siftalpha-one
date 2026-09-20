@@ -24,14 +24,23 @@ enum class InternalPythonBackend {
 data class InternalAlpineDependencySource(
     val kind: Kind,
     val sourceFingerprint: String,
+    val requiresNodeVite: Boolean = false,
 ) {
     enum class Kind { REQUIREMENTS_TXT, PYPROJECT_TOML, NONE }
 
     companion object {
-        fun fromProjectFiles(requirementsText: String?, pyprojectText: String?): InternalAlpineDependencySource {
+        fun fromProjectFiles(
+            requirementsText: String?,
+            pyprojectText: String?,
+            requiresNodeVite: Boolean = false,
+        ): InternalAlpineDependencySource {
             val kind: Kind
             val source: String
             when {
+                requiresNodeVite && pyprojectText != null -> {
+                    kind = Kind.PYPROJECT_TOML
+                    source = "pyproject.toml\n" + pyprojectText.replace("\r\n", "\n").replace("\r", "\n")
+                }
                 requirementsText != null -> {
                     kind = Kind.REQUIREMENTS_TXT
                     source = "requirements.txt\n" + requirementsText.replace("\r\n", "\n").replace("\r", "\n")
@@ -45,10 +54,15 @@ data class InternalAlpineDependencySource(
                     source = "none\n"
                 }
             }
+            val fingerprintSource = source + "\nNODE_VITE=" + if (requiresNodeVite) "1" else "0"
             val digest = MessageDigest.getInstance("SHA-256")
-                .digest(source.toByteArray(Charsets.UTF_8))
+                .digest(fingerprintSource.toByteArray(Charsets.UTF_8))
                 .joinToString("") { "%02x".format(it.toInt() and 0xff) }
-            return InternalAlpineDependencySource(kind, "sha256:$digest")
+            return InternalAlpineDependencySource(
+                kind = kind,
+                sourceFingerprint = "sha256:$digest",
+                requiresNodeVite = requiresNodeVite,
+            )
         }
     }
 }
@@ -84,11 +98,94 @@ internal object InternalAlpinePythonRuntimeBootstrap {
     }
 }
 
+internal object InternalAlpineNodeRuntimeBootstrap {
+    private const val DEFAULT_MAX_ATTEMPTS = 4
+
+    fun installCommand(maxAttempts: Int = DEFAULT_MAX_ATTEMPTS): String {
+        require(maxAttempts >= 1) { "maxAttempts must be positive" }
+        return """
+            set -eu
+            apk_attempt=1
+            while :; do
+              set +e
+              apk add --no-cache nodejs npm
+              apk_code=${'$'}?
+              set -e
+              if [ "${'$'}apk_code" -eq 0 ]; then
+                break
+              fi
+              if [ "${'$'}apk_attempt" -ge "$maxAttempts" ]; then
+                printf 'SIFTALPHA_INTERNAL_ALPINE_NODE_APK_FAILED attempt=%s/%s exit=%s\n' "${'$'}apk_attempt" "$maxAttempts" "${'$'}apk_code"
+                exit "${'$'}apk_code"
+              fi
+              printf 'SIFTALPHA_INTERNAL_ALPINE_NODE_APK_RETRY attempt=%s/%s exit=%s\n' "${'$'}apk_attempt" "$maxAttempts" "${'$'}apk_code"
+              sleep_seconds=${'$'}((apk_attempt * 2))
+              sleep "${'$'}sleep_seconds"
+              apk_attempt=${'$'}((apk_attempt + 1))
+            done
+            node --version
+            npm --version
+        """.trimIndent()
+    }
+}
+
+internal object InternalAlpineViteBuildBootstrap {
+    fun buildCommand(): String = """
+        set -eu
+        components_file="/tmp/siftalpha-vite-components-${'$'}${'$'}"
+        trap 'rm -f "${'$'}components_file"' EXIT
+        : >"${'$'}components_file"
+        find /workspace -maxdepth 7 -type f -name package.json \
+          ! -path '*/node_modules/*' ! -path '*/.git/*' \
+          ! -path '*/dist/*' ! -path '*/build/*' 2>/dev/null | LC_ALL=C sort | \
+        while IFS= read -r package_json; do
+          package_dir="${'$'}{package_json%/package.json}"
+          if [ -f "${'$'}package_dir/vite.config.ts" ] || \
+             [ -f "${'$'}package_dir/vite.config.js" ] || \
+             [ -f "${'$'}package_dir/vite.config.mts" ] || \
+             [ -f "${'$'}package_dir/vite.config.mjs" ] || \
+             [ -f "${'$'}package_dir/vite.config.cjs" ]; then
+            printf '%s\n' "${'$'}package_json"
+          fi
+        done >"${'$'}components_file"
+
+        component_count="${'$'}(wc -l <"${'$'}components_file" | tr -d ' ')"
+        if [ "${'$'}component_count" -lt 1 ]; then
+          echo 'SIFTALPHA_NODE_ENV=NOT_REQUIRED'
+          exit 0
+        fi
+
+        printf 'SIFTALPHA_NODE_COMPONENTS=%s\n' "${'$'}component_count"
+        while IFS= read -r package_json; do
+          [ -n "${'$'}package_json" ] || continue
+          package_dir="${'$'}{package_json%/package.json}"
+          printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=VITE_INSTALL path=%s\n' "${'$'}package_dir"
+          if [ -f "${'$'}package_dir/pnpm-lock.yaml" ] || [ -f "${'$'}package_dir/yarn.lock" ]; then
+            echo 'SIFTALPHA_NODE_DIAG=UNSUPPORTED_PACKAGE_MANAGER'
+            exit 68
+          fi
+          (
+            cd "${'$'}package_dir"
+            if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+              npm ci --no-audit --no-fund
+            else
+              npm install --no-audit --no-fund --package-lock=false
+            fi
+            printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=VITE_BUILD path=%s\n' "${'$'}package_dir"
+            npm run build
+          )
+        done <"${'$'}components_file"
+        echo 'SIFTALPHA_NODE_ENV=READY'
+    """.trimIndent()
+}
 internal object InternalAlpineDependencyBootstrap {
     private const val PIP_COMMON =
         "--disable-pip-version-check --no-input --no-compile --timeout 30 --retries 4"
 
-    fun installCommand(kind: InternalAlpineDependencySource.Kind): String = buildString {
+    fun installCommand(
+        kind: InternalAlpineDependencySource.Kind,
+        installWebExtra: Boolean = false,
+    ): String = buildString {
         append("set -eu\n")
         append("printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=CREATE_VENV\\n'\n")
         append("virtualenv /siftalpha-env/venv\n")
@@ -105,9 +202,31 @@ internal object InternalAlpineDependencyBootstrap {
             }
             InternalAlpineDependencySource.Kind.PYPROJECT_TOML -> {
                 append("printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=INSTALL_DEPENDENCIES\\n'\n")
-                append("/siftalpha-env/venv/bin/python -m pip install ")
-                append(PIP_COMMON)
-                append(" /workspace\n")
+                if (installWebExtra) {
+                    append("if /siftalpha-env/venv/bin/python - /workspace/pyproject.toml <<'SIFTALPHA_INTERNAL_WEB_EXTRA'\n")
+                    append("import sys, tomllib\n")
+                    append("with open(sys.argv[1], 'rb') as handle:\n")
+                    append("    data = tomllib.load(handle)\n")
+                    append("optional = data.get('project', {}).get('optional-dependencies', {})\n")
+                    append("raise SystemExit(0 if isinstance(optional, dict) and 'web' in optional else 1)\n")
+                    append("SIFTALPHA_INTERNAL_WEB_EXTRA\n")
+                    append("then\n")
+                    append("  echo 'SIFTALPHA_PYPROJECT_EXTRAS=web'\n")
+                    append("  /siftalpha-env/venv/bin/python -m pip install ")
+                    append(PIP_COMMON)
+                    append(" '/workspace[web]'\n")
+                    append("else\n")
+                    append("  echo 'SIFTALPHA_PYPROJECT_EXTRAS=none'\n")
+                    append("  /siftalpha-env/venv/bin/python -m pip install ")
+                    append(PIP_COMMON)
+                    append(" /workspace\n")
+                    append("fi\n")
+                } else {
+                    append("echo 'SIFTALPHA_PYPROJECT_EXTRAS=none'\n")
+                    append("/siftalpha-env/venv/bin/python -m pip install ")
+                    append(PIP_COMMON)
+                    append(" /workspace\n")
+                }
             }
             InternalAlpineDependencySource.Kind.NONE -> Unit
         }
@@ -233,8 +352,13 @@ class InternalAlpineEnvironmentManager(context: Context) {
         InternalAlpineProcessControl.throwIfCancelled()
         ensurePythonRuntime(layout, projectIdentity, progress)
         InternalAlpineProcessControl.throwIfCancelled()
-        loadBinding(projectIdentity, source)?.let {
-            return PreparationResult(true, Outcome.READY_REUSED, it.environmentRoot, it.environmentKey)
+        if (source.requiresNodeVite) {
+            ensureNodeRuntime(layout, projectIdentity, progress)
+            InternalAlpineProcessControl.throwIfCancelled()
+        } else {
+            loadBinding(projectIdentity, source)?.let {
+                return PreparationResult(true, Outcome.READY_REUSED, it.environmentRoot, it.environmentKey)
+            }
         }
 
         val environmentRoot = InternalAlpineFiles.projectEnvironmentRoot(appContext, projectIdentity)
@@ -243,7 +367,27 @@ class InternalAlpineEnvironmentManager(context: Context) {
         check(temp.mkdirs())
         val log = File(temp, "prepare.log")
         try {
-            val command = InternalAlpineDependencyBootstrap.installCommand(source.kind)
+            if (source.requiresNodeVite) {
+                runCommand(
+                    builder = InternalAlpineFiles.buildCommand(
+                        appContext,
+                        layout,
+                        InternalAlpineViteBuildBootstrap.buildCommand(),
+                        binds = listOf(stagedProject to "/workspace"),
+                        workingDirectory = "/workspace",
+                    ),
+                    logFile = log,
+                    failurePrefix = "INTERNAL_ALPINE_VITE_PREPARE_FAILED",
+                    projectIdentity = projectIdentity,
+                    stage = "ALPINE_VITE_BUILD",
+                    progress = progress,
+                )
+                InternalAlpineProcessControl.throwIfCancelled()
+            }
+            val command = InternalAlpineDependencyBootstrap.installCommand(
+                kind = source.kind,
+                installWebExtra = source.requiresNodeVite,
+            )
             runCommand(
                 builder = InternalAlpineFiles.buildCommand(
                     appContext,
@@ -338,6 +482,36 @@ class InternalAlpineEnvironmentManager(context: Context) {
             failurePrefix = "INTERNAL_ALPINE_PYTHON_RUNTIME_PREPARE_FAILED",
             projectIdentity = projectIdentity,
             stage = "ALPINE_PYTHON_RUNTIME",
+            progress = progress,
+        )
+        InternalAlpineProcessControl.throwIfCancelled()
+        marker.writeText("READY=1\n")
+    }
+
+    private fun ensureNodeRuntime(
+        layout: InternalAlpineLayout,
+        projectIdentity: String,
+        progress: ((String) -> Unit)?,
+    ) {
+        InternalAlpineProcessControl.throwIfCancelled()
+        val marker = File(layout.rootfs, NODE_READY_MARKER)
+        if (
+            marker.isFile &&
+            Files.exists(File(layout.rootfs, "usr/bin/node").toPath(), LinkOption.NOFOLLOW_LINKS) &&
+            Files.exists(File(layout.rootfs, "usr/bin/npm").toPath(), LinkOption.NOFOLLOW_LINKS)
+        ) return
+
+        val log = File(layout.rootfs.parentFile, "node-runtime-prepare.log")
+        runCommand(
+            builder = InternalAlpineFiles.buildCommand(
+                appContext,
+                layout,
+                InternalAlpineNodeRuntimeBootstrap.installCommand(),
+            ),
+            logFile = log,
+            failurePrefix = "INTERNAL_ALPINE_NODE_RUNTIME_PREPARE_FAILED",
+            projectIdentity = projectIdentity,
+            stage = "ALPINE_NODE_RUNTIME",
             progress = progress,
         )
         InternalAlpineProcessControl.throwIfCancelled()
@@ -452,6 +626,7 @@ class InternalAlpineEnvironmentManager(context: Context) {
     companion object {
         private const val READY_MARKER = "siftalpha-alpine-environment-ready.txt"
         private const val PYTHON_READY_MARKER = ".siftalpha-python-runtime-ready"
+        private const val NODE_READY_MARKER = ".siftalpha-node-runtime-ready"
         private const val PROGRESS_INTERVAL_MS = 750L
         private const val PROGRESS_TAIL_CHARS = 16_000
 
@@ -545,6 +720,7 @@ class InternalAlpineSession private constructor(context: Context) {
         entrypoint: String,
         environmentRoot: File,
         arguments: List<String> = emptyList(),
+        consoleScript: String? = null,
     ): EmbeddedPythonSnapshot {
         check(canStart(projectIdentity)) { "Internal Alpine project session is already active" }
         val layout = InternalAlpineFiles.prepare(appContext)
@@ -560,12 +736,32 @@ class InternalAlpineSession private constructor(context: Context) {
         }
         fun shellQuote(value: String): String =
             "'" + value.replace("'", "'\"'\"'") + "'"
+        val safeConsoleScript = consoleScript?.also {
+            require(it.matches(Regex("^[A-Za-z0-9._-]+$")) && it != "." && it != "..") {
+                "invalid Python console script"
+            }
+        }
         val commandParts = buildList {
-            add("/siftalpha-env/venv/bin/python")
-            add("/workspace/" + entrypoint)
+            if (safeConsoleScript != null) {
+                add("/siftalpha-env/venv/bin/" + safeConsoleScript)
+            } else {
+                add("/siftalpha-env/venv/bin/python")
+                add("/workspace/" + entrypoint)
+            }
             addAll(arguments)
         }
-        val shell = "exec " + commandParts.joinToString(" ", transform = ::shellQuote)
+        val launchKind = if (safeConsoleScript != null) "CONSOLE_SCRIPT" else "PYTHON_FILE"
+        val launchExecutable = safeConsoleScript ?: "python"
+        val shell = buildString {
+            append("printf 'SIFTALPHA_LAUNCH_KIND=%s\\n' ")
+            append(shellQuote(launchKind))
+            append("; printf 'SIFTALPHA_LAUNCH_EXECUTABLE=%s\\n' ")
+            append(shellQuote(launchExecutable))
+            append("; printf 'SIFTALPHA_LAUNCH_ARGUMENT_COUNT=%s\\n' ")
+            append(shellQuote(arguments.size.toString()))
+            append("; exec ")
+            append(commandParts.joinToString(" ", transform = ::shellQuote))
+        }
         val command = InternalAlpineFiles.buildCommand(
             appContext,
             layout,

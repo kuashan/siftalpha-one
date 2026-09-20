@@ -124,20 +124,33 @@ class ProjectRuntimeController(
 
     fun runtimeSupported(): Boolean = host.runtimeSupported()
 
+    private fun requiresInternalNodeVite(projectDocumentId: String): Boolean {
+        val facts = gateway.runtimeFacts(projectDocumentId)
+        val selection = ProjectRuntimeExecutionPlanner.select(
+            relativePaths = facts.relativePaths,
+            declaredType = facts.declaredType,
+        ) as? ProjectRuntimeExecutionPlanner.Selection.Resolved ?: return false
+        return selection.primary == RuntimeKind.PYTHON &&
+            RuntimeSupplementalCompositionPolicy.requiresNode(selection)
+    }
+
     fun embeddedPythonCanStart(project: V04ProjectGateway.RuntimeProject): Boolean {
         val projectId = project.summary.documentId
-        val files = internalDependencyFiles(projectId)
-        val cpythonBinding = runCatching {
-            val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
-                files.requirementsText,
-                files.pyprojectText,
-            )
-            embeddedPythonEnvironmentManager?.loadBinding(projectId, input)
-        }.getOrNull()
-        if (cpythonBinding != null) {
-            val session = embeddedPythonSession ?: return false
-            return runCatching { EmbeddedPythonStatePolicy.canStart(session.snapshot().state) }
-                .getOrDefault(false)
+        val requiresNodeVite = requiresInternalNodeVite(projectId)
+        val files = internalDependencyFiles(projectId, requiresNodeVite)
+        if (!requiresNodeVite) {
+            val cpythonBinding = runCatching {
+                val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
+                    files.requirementsText,
+                    files.pyprojectText,
+                )
+                embeddedPythonEnvironmentManager?.loadBinding(projectId, input)
+            }.getOrNull()
+            if (cpythonBinding != null) {
+                val session = embeddedPythonSession ?: return false
+                return runCatching { EmbeddedPythonStatePolicy.canStart(session.snapshot().state) }
+                    .getOrDefault(false)
+            }
         }
         val alpineBinding = internalAlpineEnvironmentManager?.loadBinding(projectId, files.alpineSource)
         return alpineBinding != null && internalAlpineSession?.canStart(projectId) == true
@@ -225,10 +238,15 @@ class ProjectRuntimeController(
             resolvedEntrypoint = gateway.resolveEmbeddedPythonEntrypoint(project.summary.documentId),
             hasExternalDependencyRequirement = facts.hasExternalDependencyRequirement,
             hasProtectedConfigurationRequirement = requiredConfiguration,
-            embeddedRuntimeAvailable = embeddedPythonProjectStager != null && (
+            embeddedRuntimeAvailable = embeddedPythonProjectStager != null && if (
+                (selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved)
+                    ?.let(RuntimeSupplementalCompositionPolicy::requiresNode) == true
+            ) {
+                internalAlpineSession != null && internalAlpineEnvironmentManager != null
+            } else {
                 (embeddedPythonSession != null && embeddedPythonEnvironmentManager != null) ||
                     (internalAlpineSession != null && internalAlpineEnvironmentManager != null)
-                ),
+            },
         )
         return if (action == Action.PREPARE) {
             EmbeddedPythonCapabilityRouting.resolvePreparation(
@@ -247,18 +265,21 @@ class ProjectRuntimeController(
         project: V04ProjectGateway.RuntimeProject,
     ): Boolean {
         val projectId = project.summary.documentId
-        val files = internalDependencyFiles(projectId)
-        val cpythonReady = runCatching {
-            val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
-                files.requirementsText,
-                files.pyprojectText,
-            )
-            embeddedPythonEnvironmentManager?.loadBinding(
-                projectIdentity = projectId,
-                dependencyInput = input,
-            ) != null
-        }.getOrDefault(false)
-        if (cpythonReady) return true
+        val requiresNodeVite = requiresInternalNodeVite(projectId)
+        val files = internalDependencyFiles(projectId, requiresNodeVite)
+        if (!requiresNodeVite) {
+            val cpythonReady = runCatching {
+                val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
+                    files.requirementsText,
+                    files.pyprojectText,
+                )
+                embeddedPythonEnvironmentManager?.loadBinding(
+                    projectIdentity = projectId,
+                    dependencyInput = input,
+                ) != null
+            }.getOrDefault(false)
+            if (cpythonReady) return true
+        }
         return internalAlpineEnvironmentManager?.loadBinding(
             projectIdentity = projectId,
             source = files.alpineSource,
@@ -293,12 +314,13 @@ class ProjectRuntimeController(
             "Embedded R prepare route rejected: " + route.reason
         }
         val projectId = project.summary.documentId
-        val files = internalDependencyFiles(projectId)
+        val requiresNodeVite = requiresInternalNodeVite(projectId)
+        val files = internalDependencyFiles(projectId, requiresNodeVite)
         val cpythonSession = embeddedPythonSession
         val cpythonManager = embeddedPythonEnvironmentManager
         var cpythonError: Throwable? = null
 
-        if (cpythonSession != null && cpythonManager != null) {
+        if (!requiresNodeVite && cpythonSession != null && cpythonManager != null) {
             progress?.invoke(
                 listOf(
                     "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
@@ -393,13 +415,20 @@ class ProjectRuntimeController(
             "Internal Python requires a resolved Python project"
         }
         val projectId = project.summary.documentId
-        val files = internalDependencyFiles(projectId)
-        val cpythonInput = runCatching {
-            EmbeddedPythonRequirementParserV1.fromProjectFiles(
-                files.requirementsText,
-                files.pyprojectText,
-            )
-        }.getOrNull()
+        val requiresNodeVite = requiresInternalNodeVite(projectId)
+        val files = internalDependencyFiles(projectId, requiresNodeVite)
+        val forceAlpine = requiresNodeVite ||
+            pythonLaunchInvocation?.kind == PythonLaunchKind.CONSOLE_SCRIPT
+        val cpythonInput = if (!forceAlpine) {
+            runCatching {
+                EmbeddedPythonRequirementParserV1.fromProjectFiles(
+                    files.requirementsText,
+                    files.pyprojectText,
+                )
+            }.getOrNull()
+        } else {
+            null
+        }
         val cpythonBinding = cpythonInput?.let { input ->
             embeddedPythonEnvironmentManager?.loadBinding(projectId, input)
         }
@@ -407,15 +436,24 @@ class ProjectRuntimeController(
         val entrypoint = gateway.resolveEmbeddedPythonEntrypoint(projectId)
             ?: error("EMBEDDED_R_ENTRYPOINT_UNRESOLVED")
         val launchArguments = pythonLaunchInvocation?.let { invocation ->
-            check(invocation.kind == PythonLaunchKind.PYTHON_FILE) {
-                "EMBEDDED_R_CLI_CONSOLE_SCRIPT_UNSUPPORTED"
+            when (invocation.kind) {
+                PythonLaunchKind.PYTHON_FILE -> {
+                    check(invocation.entrypoint == entrypoint) {
+                        "EMBEDDED_R_CLI_ENTRYPOINT_MISMATCH"
+                    }
+                    invocation.arguments
+                }
+                PythonLaunchKind.CONSOLE_SCRIPT -> invocation.arguments
             }
-            check(invocation.entrypoint == entrypoint) {
-                "EMBEDDED_R_CLI_ENTRYPOINT_MISMATCH"
-            }
-            invocation.arguments
         }.orEmpty()
-        val stagedRoot = stager.stage(projectId, entrypoint)
+        val consoleScript = pythonLaunchInvocation
+            ?.takeIf { it.kind == PythonLaunchKind.CONSOLE_SCRIPT }
+            ?.executableName
+        val stagedRoot = if (requiresNodeVite || consoleScript != null) {
+            stager.stageAll(projectId)
+        } else {
+            stager.stage(projectId, entrypoint)
+        }
 
         return try {
             val snapshot = if (cpythonBinding != null) {
@@ -445,6 +483,7 @@ class ProjectRuntimeController(
                     entrypoint = entrypoint,
                     environmentRoot = binding.environmentRoot,
                     arguments = launchArguments,
+                    consoleScript = consoleScript,
                 )
             }
             synchronized(embeddedStagingRoots) {
@@ -458,13 +497,20 @@ class ProjectRuntimeController(
         }
     }
 
-    private fun internalDependencyFiles(projectDocumentId: String): InternalDependencyFiles {
+    private fun internalDependencyFiles(
+        projectDocumentId: String,
+        requiresNodeVite: Boolean = false,
+    ): InternalDependencyFiles {
         val requirements = gateway.readProjectRootText(projectDocumentId, "requirements.txt")
         val pyproject = gateway.readProjectRootText(projectDocumentId, "pyproject.toml")
         return InternalDependencyFiles(
             requirementsText = requirements,
             pyprojectText = pyproject,
-            alpineSource = InternalAlpineDependencySource.fromProjectFiles(requirements, pyproject),
+            alpineSource = InternalAlpineDependencySource.fromProjectFiles(
+                requirementsText = requirements,
+                pyprojectText = pyproject,
+                requiresNodeVite = requiresNodeVite,
+            ),
         )
     }
 

@@ -725,3 +725,30 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Regression: r41 Web-extra preparation, r40 Vite-first build, r39 safe insets, r38 Result Web, r37 CLI argv, Runtime ownership and project-scoped STOP remain unchanged.
 - Cloud validators, unit tests and assembleDebug must pass before APK release.
 - Real-device: run the prepared modern easy_tdx sample. The confirmation should show a project-owned serve command rather than run_all_strategies.py; after START, Uvicorn should remain running and SiftAlpha should verify/open the project Web UI.
+
+
+### alpha43-r43 Internal Alpine polyglot Web acceptance
+
+- Capability routing:
+  - Python-primary + NODE_JS supplemental => PREPARE and START may route to EMBEDDED_R.
+  - Any non-Node supplemental Runtime remains rejected.
+  - Python-only Embedded R behavior remains unchanged.
+- Internal environment:
+  - Node/Vite-required environment fingerprint differs from the same Python dependency metadata without Node/Vite.
+  - Internal Alpine installs nodejs/npm only for the Node/Vite path and retains bounded apk retries.
+  - Vite component discovery stays project-scoped and excludes node_modules/.git/dist/build.
+  - npm package-lock => npm ci; no lock => npm install without creating a lock; pnpm/yarn lockfiles fail closed.
+  - Vite build completes before Python package installation.
+  - pyproject with a declared web extra installs /workspace[web]; absent extra falls back to /workspace.
+- Internal launch:
+  - Native Web console script executes from /siftalpha-env/venv/bin using structured argv.
+  - Console-script names remain bounded to the existing safe command-name grammar.
+  - Node/Vite or console-script launches stage the complete project tree; ordinary Python-file launches retain the narrower staging path.
+  - Embedded CPython is never selected for a console-script Native Web launch.
+- Presentation:
+  - r42 Native Web discovery applies to EMBEDDED_R as well as External Provider.
+  - Web is not AVAILABLE until the existing Endpoint Probe verifies the project-owned localhost endpoint.
+- Regression:
+  - r42 External Native Web launch, r41 Web-extra preparation, r40 Vite-first preparation, r39 insets, r38 Result Web, r37 CLI argv, Runtime ownership and project-scoped STOP remain unchanged.
+- Cloud: validators, testDebugUnitTest, Internal Alpine Probe and assembleDebug must pass before APK release.
+- Real-device: select SiftAlpha R for easy_tdx_1-main, PREPARE once, verify SIFTALPHA_X_ENVIRONMENT_READY=true, then RUN. The launch should use the project-owned serve console script and the verified Web UI should become available without Termux.

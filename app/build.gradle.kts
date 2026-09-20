@@ -72,8 +72,9 @@ android {
         // alpha43-r40 fixes polyglot prepare ordering: frontend build assets precede Python packaging.
         // alpha43-r41 installs declared Web extras for detected Vite-backed Python Web projects.
         // alpha43-r42 adds high-confidence project-owned Python Web application launch discovery.
-        versionCode = 168
-        versionName = "0.8.0-alpha43-r42"
+        // alpha43-r43 extends that launch/preparation contract into Internal Alpine.
+        versionCode = 169
+        versionName = "0.8.0-alpha43-r43"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

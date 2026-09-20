@@ -1927,8 +1927,7 @@ open class V04Activity : StudioActivity() {
         val nativeWebProfile = webProfile?.takeIf { it.enabled }
         val nativeWebLaunch = if (
             nativeWebProfile != null &&
-            resolvedSelection?.primary == RuntimeKind.PYTHON &&
-            controlRequest == RuntimeControlRequest.EXTERNAL_PROVIDER
+            resolvedSelection?.primary == RuntimeKind.PYTHON
         ) {
             runCatching {
                 runtime.resolvePythonNativeWebLaunch(

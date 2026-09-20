@@ -1249,3 +1249,24 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - W0 Run #260 again reached Android resource compilation and showed that XML `&apos;` is decoded back to an apostrophe before Android string-resource parsing, so the same AAPT2 quoting rule still rejected the English message.
 - Reworded the English confirmation sentence to avoid possessive apostrophes entirely. No code, launch-policy, Web-discovery or Runtime behavior changed.
 - No r42 APK was released from Run #260; versionCode remains 168 / versionName 0.8.0-alpha43-r42.
+
+
+## 2026-09-20 · alpha43-r43 Internal Alpine polyglot Web preparation + native Web launch
+
+- Real-device r42 status evidence on easy_tdx_1-main with EMBEDDED_R showed IDLE / NOT_STARTED / SIFTALPHA_X_ENVIRONMENT_READY=false.
+- Root cause was not a failed project process. The Embedded-R capability gate rejected every supplemental Runtime, so a Python-primary project with a nested Vite/Node component could not enter Internal preparation. r42 Native Web launch discovery was also limited to the External Provider path.
+- r43 allows NODE_JS as the only supported supplemental Runtime for Python-primary Embedded R projects. Other supplemental Runtime kinds remain fail-closed.
+- Internal Alpine now owns the complete preparation order for this supported polyglot shape:
+  1. prepare Python runtime;
+  2. install Alpine nodejs/npm on demand with bounded apk retries;
+  3. discover nested Vite components in the staged project;
+  4. install npm dependencies and run each Vite build;
+  5. create the project venv;
+  6. install the Python project, using its declared [project.optional-dependencies].web extra when present;
+  7. pip check and verify Python.
+- Internal Alpine dependency fingerprints include whether Node/Vite preparation is required. Node/Vite prepares intentionally rebuild instead of reusing the previous environment marker so an explicit PREPARE cannot silently keep stale generated frontend assets.
+- Internal Alpine START now supports a bounded, validated installed Python console-script executable in addition to Python-file entrypoints. Console-script argv stays structured; no eval or user-input shell concatenation was introduced.
+- Native Web Application Launch Discovery is now provider-neutral: the same high-confidence resolver may produce the project-owned serve invocation for External Provider or Embedded R. Internal console-script launches are forced to Alpine; Embedded CPython remains Python-file-only.
+- Internal Web presentation truth remains unchanged: a launch candidate does not make Web available. PID-scoped discovery / log candidate discovery and the existing Endpoint Probe must still verify the local HTTP endpoint.
+- Worker remains frozen; STOP remains project-scoped.
+- versionCode 169 / versionName 0.8.0-alpha43-r43.

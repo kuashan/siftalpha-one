@@ -83,6 +83,59 @@ class InternalAlpineRuntimeTest {
     }
 
     @Test
+    fun nodeViteSourceUsesPyprojectAndGetsDistinctFingerprint() {
+        val plain = InternalAlpineDependencySource.fromProjectFiles(
+            requirementsText = "requests\n",
+            pyprojectText = "[project]\nname='demo'\n",
+        )
+        val web = InternalAlpineDependencySource.fromProjectFiles(
+            requirementsText = "requests\n",
+            pyprojectText = "[project]\nname='demo'\n",
+            requiresNodeVite = true,
+        )
+
+        assertEquals(InternalAlpineDependencySource.Kind.REQUIREMENTS_TXT, plain.kind)
+        assertEquals(InternalAlpineDependencySource.Kind.PYPROJECT_TOML, web.kind)
+        assertTrue(web.requiresNodeVite)
+        assertTrue(plain.sourceFingerprint != web.sourceFingerprint)
+    }
+
+    @Test
+    fun nodeRuntimeBootstrapUsesAlpinePackagesAndBoundedRetries() {
+        val command = InternalAlpineNodeRuntimeBootstrap.installCommand(maxAttempts = 4)
+
+        assertTrue(command.contains("apk add --no-cache nodejs npm"))
+        assertTrue(command.contains("SIFTALPHA_INTERNAL_ALPINE_NODE_APK_RETRY"))
+        assertTrue(command.contains("SIFTALPHA_INTERNAL_ALPINE_NODE_APK_FAILED"))
+        assertTrue(command.contains("node --version"))
+        assertTrue(command.contains("npm --version"))
+    }
+
+    @Test
+    fun viteBuildBootstrapUsesNpmAndRejectsUnmodeledPackageManagers() {
+        val command = InternalAlpineViteBuildBootstrap.buildCommand()
+
+        assertTrue(command.contains("vite.config.ts"))
+        assertTrue(command.contains("npm ci --no-audit --no-fund"))
+        assertTrue(command.contains("npm install --no-audit --no-fund --package-lock=false"))
+        assertTrue(command.contains("npm run build"))
+        assertTrue(command.contains("UNSUPPORTED_PACKAGE_MANAGER"))
+        assertTrue(command.contains("SIFTALPHA_NODE_ENV=READY"))
+    }
+
+    @Test
+    fun pyprojectBootstrapInstallsDeclaredWebExtraWhenRequested() {
+        val command = InternalAlpineDependencyBootstrap.installCommand(
+            kind = InternalAlpineDependencySource.Kind.PYPROJECT_TOML,
+            installWebExtra = true,
+        )
+
+        assertTrue(command.contains("SIFTALPHA_PYPROJECT_EXTRAS=web"))
+        assertTrue(command.contains("'/workspace[web]'"))
+        assertTrue(command.contains("tomllib"))
+    }
+
+    @Test
     fun dependencyBootstrapAvoidsInstallTimeBytecodeCompilationAndBoundsNetworkWaits() {
         val command = InternalAlpineDependencyBootstrap.installCommand(
             InternalAlpineDependencySource.Kind.REQUIREMENTS_TXT,

@@ -72,7 +72,7 @@ object EmbeddedPythonCapabilityRouting {
         if (resolved.primary != RuntimeKind.PYTHON) {
             return rejected(RuntimeControlReason.RUNTIME_NOT_PYTHON)
         }
-        if (resolved.supplemental.isNotEmpty()) {
+        if (resolved.supplemental.any { it != RuntimeKind.NODE_JS }) {
             return rejected(RuntimeControlReason.SUPPLEMENTAL_RUNTIME_UNSUPPORTED)
         }
         if (facts.hasProtectedConfigurationRequirement) {
@@ -118,7 +118,7 @@ object EmbeddedPythonCapabilityRouting {
         if (resolved.primary != RuntimeKind.PYTHON) {
             return rejected(RuntimeControlReason.RUNTIME_NOT_PYTHON)
         }
-        if (resolved.supplemental.isNotEmpty()) {
+        if (resolved.supplemental.any { it != RuntimeKind.NODE_JS }) {
             return rejected(RuntimeControlReason.SUPPLEMENTAL_RUNTIME_UNSUPPORTED)
         }
         return RuntimeControlDecision(

@@ -46,15 +46,38 @@ class EmbeddedPythonCapabilityRoutingTest {
     }
 
     @Test
-    fun supplementalRuntimeIsRejected() {
+    fun nodeSupplementalRuntimeRoutesToEmbeddedR() {
         val decision = EmbeddedPythonCapabilityRouting.resolve(
             facts(
-                paths = listOf("main.py", "frontend/package.json", "frontend/index.js"),
+                paths = listOf(
+                    "main.py",
+                    "frontend/package.json",
+                    "frontend/vite.config.ts",
+                    "frontend/src/index.js",
+                ),
             ),
         )
 
-        assertEquals(RuntimeControlPath.REJECTED, decision.path)
-        assertEquals(RuntimeControlReason.SUPPLEMENTAL_RUNTIME_UNSUPPORTED, decision.reason)
+        assertEquals(RuntimeControlPath.EMBEDDED_R, decision.path)
+        assertEquals(RuntimeControlReason.EMBEDDED_R_ELIGIBLE, decision.reason)
+    }
+
+    @Test
+    fun nodeSupplementalPreparationRoutesToEmbeddedR() {
+        val decision = EmbeddedPythonCapabilityRouting.resolvePreparation(
+            facts(
+                paths = listOf(
+                    "pyproject.toml",
+                    "main.py",
+                    "frontend/package.json",
+                    "frontend/vite.config.ts",
+                    "frontend/src/index.js",
+                ),
+            ),
+        )
+
+        assertEquals(RuntimeControlPath.EMBEDDED_R, decision.path)
+        assertEquals(RuntimeControlReason.EMBEDDED_R_ELIGIBLE, decision.reason)
     }
 
     @Test
