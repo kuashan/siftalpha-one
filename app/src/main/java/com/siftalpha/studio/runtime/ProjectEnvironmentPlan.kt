@@ -248,7 +248,7 @@ object ProjectEnvironmentDetector {
         val blocking = issues.any { it.blocking }
         var embeddedCpythonEligible =
             resolved?.primary == RuntimeKind.PYTHON &&
-                RuntimeKind.NODE_JS !in resolved.supplemental &&
+                viteComponents.isEmpty() &&
                 !blocking &&
                 dependencySource != EnvironmentDependencySource.UNSUPPORTED
 
@@ -497,10 +497,18 @@ object ProjectEnvironmentPlanner {
             add(EnvironmentBuildStep.ACQUIRE_RUNTIME)
             add(EnvironmentBuildStep.CREATE_ENVIRONMENT)
             val nodeNeeded = detection.primaryRuntime == RuntimeKind.NODE_JS ||
-                RuntimeKind.NODE_JS in detection.supplementalRuntimes
+                (
+                    RuntimeKind.NODE_JS in detection.supplementalRuntimes &&
+                        detection.viteComponentCount > 0
+                )
             if (nodeNeeded) {
                 add(EnvironmentBuildStep.NODE_INSTALL)
-                if (detection.viteComponentCount > 0) add(EnvironmentBuildStep.NODE_BUILD)
+                if (
+                    detection.primaryRuntime != RuntimeKind.NODE_JS ||
+                    detection.viteComponentCount > 0
+                ) {
+                    add(EnvironmentBuildStep.NODE_BUILD)
+                }
             }
             if (detection.primaryRuntime == RuntimeKind.PYTHON) {
                 add(EnvironmentBuildStep.PYTHON_INSTALL)
