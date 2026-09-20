@@ -89,4 +89,45 @@
     <string name="storage_proot_missing">proot-distro를 찾지 못해 런타임 저장공간을 확인할 수 없습니다.</string>
     <string name="storage_command_failed">작업 실패: %1$s</string>
     <string name="storage_command_sent">명령을 전송했습니다. executionId = %1$d</string>
+
+    <string name="storage_internal_provider_title">Internal R(내부 런타임)</string>
+    <string name="storage_external_provider_title">External Provider(외부 런타임)</string>
+    <string name="storage_internal_scanning">Internal R 저장공간을 계산하는 중…</string>
+    <string name="storage_refresh_done">저장공간 통계를 새로고침했습니다.</string>
+    <string name="storage_internal_scan_failed">Internal R 저장공간 계산 실패: %1$s</string>
+    <string name="storage_internal_total">Internal R 전체: %1$s</string>
+    <string name="storage_internal_project_env_total">Internal R 프로젝트 환경 합계: %1$s</string>
+    <string name="storage_internal_cpython_runtime">Embedded CPython 공유 런타임: %1$s</string>
+    <string name="storage_internal_alpine_rootfs">Internal Alpine 공유 루트 파일 시스템: %1$s</string>
+    <string name="storage_internal_staging">Internal R 프로젝트 스테이징: %1$s</string>
+    <string name="storage_internal_sessions">Internal R 세션 및 로그: %1$s</string>
+    <string name="storage_internal_unassociated">연결되지 않은 Internal R 환경: %1$s</string>
+    <string name="storage_internal_wheel_cache">Embedded CPython Wheel 캐시: %1$s</string>
+    <string name="storage_internal_pip_cache">Internal Alpine pip 캐시: %1$s</string>
+    <string name="storage_internal_npm_cache">Internal Alpine npm 캐시: %1$s</string>
+    <string name="storage_internal_projects_title">Internal R 프로젝트 환경</string>
+    <string name="storage_internal_project_none">준비된 Internal R 프로젝트 환경이 없습니다.</string>
+    <string name="storage_internal_project_env">%1$s · Internal R 사용량 %2$s</string>
+    <string name="storage_internal_cpython_env">Embedded CPython 프로젝트 환경: %1$s</string>
+    <string name="storage_internal_alpine_env">Internal Alpine 프로젝트 환경: %1$s</string>
+    <string name="storage_internal_clean_project">Internal R 프로젝트 환경 정리</string>
+    <string name="storage_internal_clean_project_title">%1$s의 Internal R 환경을 정리할까요?</string>
+    <string name="storage_internal_clean_project_message">SiftAlpha 앱 전용 저장공간의 Embedded CPython / Internal Alpine 프로젝트 환경만 삭제합니다. Android 공유 저장공간의 프로젝트 소스와 External Provider 데이터는 유지됩니다. 다음 Internal R 실행 전에 환경을 다시 준비해야 합니다.</string>
+    <string name="storage_internal_clean_project_done">Internal R 프로젝트 환경을 정리했습니다.</string>
+    <string name="storage_internal_runtime_active">이 프로젝트의 Internal R이 실행 중입니다. 환경을 정리하기 전에 프로젝트를 중지하세요.</string>
+    <string name="storage_internal_working">Internal R 저장공간을 처리하는 중…</string>
+    <string name="storage_internal_clear_wheel_cache">Internal R Wheel 캐시 정리</string>
+    <string name="storage_internal_clear_wheel_cache_title">Internal R Wheel 캐시를 정리할까요?</string>
+    <string name="storage_internal_clear_wheel_cache_message">다시 받을 수 있는 Embedded CPython Wheel 캐시만 삭제합니다. 준비된 프로젝트 환경, Internal Alpine, 프로젝트 소스는 유지됩니다.</string>
+    <string name="storage_internal_clear_wheel_cache_done">Internal R Wheel 캐시를 정리했습니다.</string>
+    <string name="storage_internal_clear_pip_cache">Internal R pip 캐시 정리</string>
+    <string name="storage_internal_clear_pip_cache_title">Internal R pip 캐시를 정리할까요?</string>
+    <string name="storage_internal_clear_pip_cache_message">Internal Alpine 내부의 재사용 가능한 pip 캐시만 삭제합니다. 프로젝트 가상환경과 프로젝트 소스는 유지됩니다.</string>
+    <string name="storage_internal_clear_pip_cache_done">Internal R pip 캐시를 정리했습니다.</string>
+    <string name="storage_internal_clear_npm_cache">Internal R npm 캐시 정리</string>
+    <string name="storage_internal_clear_npm_cache_title">Internal R npm 캐시를 정리할까요?</string>
+    <string name="storage_internal_clear_npm_cache_message">Internal Alpine 내부의 재사용 가능한 npm 패키지 캐시만 삭제합니다. 프로젝트 환경, 빌드 결과, 프로젝트 소스는 유지됩니다.</string>
+    <string name="storage_internal_clear_npm_cache_done">Internal R npm 캐시를 정리했습니다.</string>
+    <string name="storage_external_unavailable">External Provider 저장공간을 읽을 수 없습니다: %1$s. Internal R 통계와 정리는 계속 사용할 수 있습니다.</string>
+    <string name="storage_external_unavailable_short">External Provider를 읽을 수 없지만 Internal R에는 영향이 없습니다.</string>
 </resources>

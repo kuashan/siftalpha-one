@@ -1310,3 +1310,19 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - This source commit is promoted to the current Known Good Functional Baseline.
 - Frozen reference branch: baseline/alpha43-r44-known-good.
 - No feature/source changes are part of this closure commit.
+
+
+## 2026-09-20 · alpha43-r44-storage1 Unified Runtime Storage Manager
+
+- Priority pre-r45 repair: Runtime Storage Manager previously depended on Termux for the whole screen even though Internal R had become a production-capable path.
+- The screen now treats provider ownership explicitly:
+  - Internal R storage is inspected directly from SiftAlpha app-private files;
+  - External Provider storage continues to use the Termux RUN_COMMAND bridge;
+  - External Provider unavailability no longer blocks Internal R inspection or cleanup.
+- Internal R inspection includes total app-private Runtime usage, Embedded CPython runtime, Internal Alpine rootfs, project environments, staging, session/log data, Embedded CPython Wheel cache, Internal Alpine pip cache, Internal Alpine npm cache, and unassociated environment usage.
+- Internal project cleanup is routed through ProjectRuntimeController.cleanEmbeddedPythonEnvironment(), preserving active-runtime rejection and deleting both Embedded CPython and Internal Alpine project environments without touching Android shared-storage project source or External Provider data.
+- Reproducible Internal R caches can be cleared directly by the app without Termux. Shared Internal Alpine rootfs and Embedded CPython runtime remain visible but are not exposed as ordinary destructive one-tap cleanup targets.
+- Internal scans and cleanup run off the UI thread.
+- External Provider clean/snapshot semantics remain unchanged; Termux is still required only for External Provider operations.
+- versionCode 171 / versionName 0.8.0-alpha43-r44-storage1.
+- Real-device acceptance is pending.

@@ -798,3 +798,28 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
   - versionName 0.8.0-alpha43-r44
   - frozen branch baseline/alpha43-r44-known-good
 - Result: PASS. r44 replaces r34 as the project-level Known Good Functional Baseline. r34 remains a frozen historical reference and must not be moved.
+
+
+### alpha43-r44-storage1 Unified Runtime Storage Manager
+
+Cloud requirements:
+- localization parity for all new storage strings;
+- testDebugUnitTest PASS;
+- assembleDebug PASS;
+- stable v2 signing unchanged;
+- Internal Alpine Probe remains PASS.
+
+JVM safety coverage:
+- Internal R environment identity hashing remains stable and matches the existing project-environment layout;
+- clearing Embedded CPython Wheel cache removes only cache data;
+- clearing Internal Alpine pip/npm caches removes only reusable cache data;
+- cache cleanup must preserve Internal Alpine rootfs executables and project environments.
+
+Real-device acceptance:
+- open Runtime Storage Manager with Termux unavailable/not running and verify Internal R usage still renders;
+- verify External Provider reports unavailable without disabling the Internal R section;
+- clean one stopped Internal R project environment and verify Android shared-storage source remains intact;
+- return to Runtime Center and verify that Internal R must be prepared again for the cleaned project;
+- verify cleaning a currently running Internal R project is rejected;
+- verify Internal R Wheel/pip/npm cache cleanup works without opening Termux;
+- with Termux available, verify External Provider storage statistics and existing clean actions still work.

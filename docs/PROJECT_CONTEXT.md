@@ -648,3 +648,14 @@ The accepted r44 baseline includes the cumulative accepted behavior from the r34
 The accepted real-device test also confirmed the project-owned Web UI can dynamically refresh its data once the project Web service is running. SiftAlpha Result Web remains a separate fallback for terminal one-shot output and does not replace a verified project-owned Web UI.
 
 Worker remains frozen. STOP remains scoped to the current project. A future baseline promotion requires both successful cloud verification and explicit real-device acceptance.
+
+
+## Runtime Storage Manager provider split
+
+The Runtime Storage Manager must follow the same dual-provider contract as project execution. Internal R app-private storage is owned and maintained directly by SiftAlpha. External Provider storage remains owned through the Termux/PRoot command bridge.
+
+Termux availability must never gate Internal R storage inspection or project-environment cleanup. Conversely, Internal R cleanup must never delete External Provider data. The same project may have both provider environments at the same time; each provider is independently inspectable and independently cleanable.
+
+Project source in Android shared storage is outside the Runtime Storage Manager deletion boundary. Internal R project cleanup removes only app-private Embedded CPython/Internal Alpine environments. Shared Runtime foundations such as the Internal Alpine rootfs are observable but are not ordinary project cleanup targets.
+
+alpha43-r44-storage1 is the first implementation of this provider-aware storage contract. The r44 known-good baseline remains frozen at 0285db2c26565e1aa2a47624d2cad8fa9c19e89f; this pre-r45 change requires separate cloud and real-device acceptance before it can become a new baseline.

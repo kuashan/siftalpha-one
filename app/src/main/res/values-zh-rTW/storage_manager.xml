@@ -89,4 +89,45 @@
     <string name="storage_proot_missing">未偵測到 proot-distro，無法讀取執行環境空間。</string>
     <string name="storage_command_failed">操作失敗：%1$s</string>
     <string name="storage_command_sent">命令已送出，executionId = %1$d</string>
+
+    <string name="storage_internal_provider_title">Internal R（內建執行環境）</string>
+    <string name="storage_external_provider_title">External Provider（外部執行環境）</string>
+    <string name="storage_internal_scanning">正在統計 Internal R 空間…</string>
+    <string name="storage_refresh_done">空間統計已重新整理。</string>
+    <string name="storage_internal_scan_failed">Internal R 空間統計失敗：%1$s</string>
+    <string name="storage_internal_total">Internal R 總占用：%1$s</string>
+    <string name="storage_internal_project_env_total">Internal R 專案環境合計：%1$s</string>
+    <string name="storage_internal_cpython_runtime">Embedded CPython 共享執行環境：%1$s</string>
+    <string name="storage_internal_alpine_rootfs">Internal Alpine 共享根檔案系統：%1$s</string>
+    <string name="storage_internal_staging">Internal R 專案暫存：%1$s</string>
+    <string name="storage_internal_sessions">Internal R 工作階段與日誌：%1$s</string>
+    <string name="storage_internal_unassociated">Internal R 未關聯專案環境：%1$s</string>
+    <string name="storage_internal_wheel_cache">Embedded CPython Wheel 快取：%1$s</string>
+    <string name="storage_internal_pip_cache">Internal Alpine pip 快取：%1$s</string>
+    <string name="storage_internal_npm_cache">Internal Alpine npm 快取：%1$s</string>
+    <string name="storage_internal_projects_title">Internal R 專案環境</string>
+    <string name="storage_internal_project_none">目前沒有已準備的 Internal R 專案環境。</string>
+    <string name="storage_internal_project_env">%1$s · Internal R 環境占用 %2$s</string>
+    <string name="storage_internal_cpython_env">Embedded CPython 專案環境：%1$s</string>
+    <string name="storage_internal_alpine_env">Internal Alpine 專案環境：%1$s</string>
+    <string name="storage_internal_clean_project">清理 Internal R 專案環境</string>
+    <string name="storage_internal_clean_project_title">清理 %1$s 的 Internal R 環境？</string>
+    <string name="storage_internal_clean_project_message">只刪除該專案位於 SiftAlpha 應用程式私有空間中的 Embedded CPython / Internal Alpine 專案環境，不刪除 Android 共用儲存空間中的專案原始碼，也不清理 External Provider。下次使用 Internal R 執行前需要重新準備環境。</string>
+    <string name="storage_internal_clean_project_done">Internal R 專案環境已清理。</string>
+    <string name="storage_internal_runtime_active">該專案的 Internal R 仍在執行，不能清理專案環境。請先停止該專案。</string>
+    <string name="storage_internal_working">正在處理 Internal R 儲存空間…</string>
+    <string name="storage_internal_clear_wheel_cache">清理 Internal R Wheel 快取</string>
+    <string name="storage_internal_clear_wheel_cache_title">清理 Internal R Wheel 快取？</string>
+    <string name="storage_internal_clear_wheel_cache_message">只刪除 Embedded CPython 可重新下載的 Wheel 快取，不刪除已準備的專案環境、Internal Alpine 或專案原始碼。</string>
+    <string name="storage_internal_clear_wheel_cache_done">Internal R Wheel 快取已清理。</string>
+    <string name="storage_internal_clear_pip_cache">清理 Internal R pip 快取</string>
+    <string name="storage_internal_clear_pip_cache_title">清理 Internal R pip 快取？</string>
+    <string name="storage_internal_clear_pip_cache_message">只刪除 Internal Alpine 中可重新下載的 pip 快取，不刪除專案虛擬環境或專案原始碼。</string>
+    <string name="storage_internal_clear_pip_cache_done">Internal R pip 快取已清理。</string>
+    <string name="storage_internal_clear_npm_cache">清理 Internal R npm 快取</string>
+    <string name="storage_internal_clear_npm_cache_title">清理 Internal R npm 快取？</string>
+    <string name="storage_internal_clear_npm_cache_message">只刪除 Internal Alpine 中可重新下載的 npm 套件快取，不刪除專案環境、已建置結果或專案原始碼。</string>
+    <string name="storage_internal_clear_npm_cache_done">Internal R npm 快取已清理。</string>
+    <string name="storage_external_unavailable">External Provider 目前無法讀取：%1$s。Internal R 的統計與清理仍可正常使用。</string>
+    <string name="storage_external_unavailable_short">External Provider 目前無法讀取；不影響 Internal R。</string>
 </resources>

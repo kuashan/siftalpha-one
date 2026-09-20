@@ -74,8 +74,10 @@ android {
         // alpha43-r42 adds high-confidence project-owned Python Web application launch discovery.
         // alpha43-r43 extends that launch/preparation contract into Internal Alpine.
         // alpha43-r44 scales bounded Internal R source staging for modern multi-file projects.
-        versionCode = 170
-        versionName = "0.8.0-alpha43-r44"
+        // alpha43-r44-storage1 unifies Internal R storage inspection/cleanup with the existing
+        // External Provider storage manager without making Termux a prerequisite for Internal R.
+        versionCode = 171
+        versionName = "0.8.0-alpha43-r44-storage1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

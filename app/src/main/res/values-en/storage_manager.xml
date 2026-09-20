@@ -89,4 +89,45 @@
     <string name="storage_proot_missing">proot-distro was not found, so runtime storage cannot be inspected.</string>
     <string name="storage_command_failed">Operation failed: %1$s</string>
     <string name="storage_command_sent">Command sent, executionId = %1$d</string>
+
+    <string name="storage_internal_provider_title">Internal R</string>
+    <string name="storage_external_provider_title">External Provider</string>
+    <string name="storage_internal_scanning">Scanning Internal R storage…</string>
+    <string name="storage_refresh_done">Storage usage refreshed.</string>
+    <string name="storage_internal_scan_failed">Internal R storage scan failed: %1$s</string>
+    <string name="storage_internal_total">Internal R total: %1$s</string>
+    <string name="storage_internal_project_env_total">Internal R project environments: %1$s</string>
+    <string name="storage_internal_cpython_runtime">Embedded CPython shared runtime: %1$s</string>
+    <string name="storage_internal_alpine_rootfs">Internal Alpine shared root filesystem: %1$s</string>
+    <string name="storage_internal_staging">Internal R project staging: %1$s</string>
+    <string name="storage_internal_sessions">Internal R sessions and logs: %1$s</string>
+    <string name="storage_internal_unassociated">Unassociated Internal R environments: %1$s</string>
+    <string name="storage_internal_wheel_cache">Embedded CPython Wheel cache: %1$s</string>
+    <string name="storage_internal_pip_cache">Internal Alpine pip cache: %1$s</string>
+    <string name="storage_internal_npm_cache">Internal Alpine npm cache: %1$s</string>
+    <string name="storage_internal_projects_title">Internal R project environments</string>
+    <string name="storage_internal_project_none">No prepared Internal R project environments.</string>
+    <string name="storage_internal_project_env">%1$s · Internal R usage %2$s</string>
+    <string name="storage_internal_cpython_env">Embedded CPython project environment: %1$s</string>
+    <string name="storage_internal_alpine_env">Internal Alpine project environment: %1$s</string>
+    <string name="storage_internal_clean_project">Clean Internal R project environment</string>
+    <string name="storage_internal_clean_project_title">Clean the Internal R environment for %1$s?</string>
+    <string name="storage_internal_clean_project_message">This removes only the Embedded CPython and Internal Alpine project environments stored in SiftAlpha private app storage. Project source in Android shared storage and External Provider data are preserved. Prepare Internal R again before the next run.</string>
+    <string name="storage_internal_clean_project_done">Internal R project environment cleaned.</string>
+    <string name="storage_internal_runtime_active">Internal R is still running for this project. Stop the project before cleaning its environment.</string>
+    <string name="storage_internal_working">Updating Internal R storage…</string>
+    <string name="storage_internal_clear_wheel_cache">Clear Internal R Wheel cache</string>
+    <string name="storage_internal_clear_wheel_cache_title">Clear the Internal R Wheel cache?</string>
+    <string name="storage_internal_clear_wheel_cache_message">This removes only reproducible Embedded CPython Wheel cache data. Prepared project environments, Internal Alpine, and project source are preserved.</string>
+    <string name="storage_internal_clear_wheel_cache_done">Internal R Wheel cache cleared.</string>
+    <string name="storage_internal_clear_pip_cache">Clear Internal R pip cache</string>
+    <string name="storage_internal_clear_pip_cache_title">Clear the Internal R pip cache?</string>
+    <string name="storage_internal_clear_pip_cache_message">This removes only reusable pip cache data inside Internal Alpine. Project virtual environments and project source are preserved.</string>
+    <string name="storage_internal_clear_pip_cache_done">Internal R pip cache cleared.</string>
+    <string name="storage_internal_clear_npm_cache">Clear Internal R npm cache</string>
+    <string name="storage_internal_clear_npm_cache_title">Clear the Internal R npm cache?</string>
+    <string name="storage_internal_clear_npm_cache_message">This removes only reusable npm package cache data inside Internal Alpine. Project environments, built output, and project source are preserved.</string>
+    <string name="storage_internal_clear_npm_cache_done">Internal R npm cache cleared.</string>
+    <string name="storage_external_unavailable">External Provider storage is unavailable: %1$s. Internal R inspection and cleanup remain available.</string>
+    <string name="storage_external_unavailable_short">External Provider storage is unavailable. Internal R is unaffected.</string>
 </resources>

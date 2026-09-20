@@ -89,4 +89,45 @@
     <string name="storage_proot_missing">proot-distro が見つからないため、ランタイム容量を確認できません。</string>
     <string name="storage_command_failed">操作に失敗しました：%1$s</string>
     <string name="storage_command_sent">コマンドを送信しました。executionId = %1$d</string>
+
+    <string name="storage_internal_provider_title">Internal R（内部ランタイム）</string>
+    <string name="storage_external_provider_title">External Provider（外部ランタイム）</string>
+    <string name="storage_internal_scanning">Internal R のストレージを集計中…</string>
+    <string name="storage_refresh_done">ストレージ統計を更新しました。</string>
+    <string name="storage_internal_scan_failed">Internal R のストレージ集計に失敗しました: %1$s</string>
+    <string name="storage_internal_total">Internal R 合計: %1$s</string>
+    <string name="storage_internal_project_env_total">Internal R プロジェクト環境合計: %1$s</string>
+    <string name="storage_internal_cpython_runtime">Embedded CPython 共有ランタイム: %1$s</string>
+    <string name="storage_internal_alpine_rootfs">Internal Alpine 共有ルートファイルシステム: %1$s</string>
+    <string name="storage_internal_staging">Internal R プロジェクト一時領域: %1$s</string>
+    <string name="storage_internal_sessions">Internal R セッションとログ: %1$s</string>
+    <string name="storage_internal_unassociated">未関連 Internal R 環境: %1$s</string>
+    <string name="storage_internal_wheel_cache">Embedded CPython Wheel キャッシュ: %1$s</string>
+    <string name="storage_internal_pip_cache">Internal Alpine pip キャッシュ: %1$s</string>
+    <string name="storage_internal_npm_cache">Internal Alpine npm キャッシュ: %1$s</string>
+    <string name="storage_internal_projects_title">Internal R プロジェクト環境</string>
+    <string name="storage_internal_project_none">準備済みの Internal R プロジェクト環境はありません。</string>
+    <string name="storage_internal_project_env">%1$s · Internal R 使用量 %2$s</string>
+    <string name="storage_internal_cpython_env">Embedded CPython プロジェクト環境: %1$s</string>
+    <string name="storage_internal_alpine_env">Internal Alpine プロジェクト環境: %1$s</string>
+    <string name="storage_internal_clean_project">Internal R プロジェクト環境を削除</string>
+    <string name="storage_internal_clean_project_title">%1$s の Internal R 環境を削除しますか？</string>
+    <string name="storage_internal_clean_project_message">SiftAlpha のアプリ専用領域にある Embedded CPython / Internal Alpine のプロジェクト環境だけを削除します。Android 共有ストレージのプロジェクトソースと External Provider のデータは削除しません。次回の Internal R 実行前に再準備が必要です。</string>
+    <string name="storage_internal_clean_project_done">Internal R プロジェクト環境を削除しました。</string>
+    <string name="storage_internal_runtime_active">このプロジェクトの Internal R は実行中です。環境を削除する前に停止してください。</string>
+    <string name="storage_internal_working">Internal R ストレージを処理中…</string>
+    <string name="storage_internal_clear_wheel_cache">Internal R Wheel キャッシュを削除</string>
+    <string name="storage_internal_clear_wheel_cache_title">Internal R Wheel キャッシュを削除しますか？</string>
+    <string name="storage_internal_clear_wheel_cache_message">再取得可能な Embedded CPython Wheel キャッシュだけを削除します。準備済み環境、Internal Alpine、プロジェクトソースは保持します。</string>
+    <string name="storage_internal_clear_wheel_cache_done">Internal R Wheel キャッシュを削除しました。</string>
+    <string name="storage_internal_clear_pip_cache">Internal R pip キャッシュを削除</string>
+    <string name="storage_internal_clear_pip_cache_title">Internal R pip キャッシュを削除しますか？</string>
+    <string name="storage_internal_clear_pip_cache_message">Internal Alpine 内の再取得可能な pip キャッシュだけを削除します。プロジェクト仮想環境とソースは保持します。</string>
+    <string name="storage_internal_clear_pip_cache_done">Internal R pip キャッシュを削除しました。</string>
+    <string name="storage_internal_clear_npm_cache">Internal R npm キャッシュを削除</string>
+    <string name="storage_internal_clear_npm_cache_title">Internal R npm キャッシュを削除しますか？</string>
+    <string name="storage_internal_clear_npm_cache_message">Internal Alpine 内の再取得可能な npm キャッシュだけを削除します。プロジェクト環境、ビルド結果、ソースは保持します。</string>
+    <string name="storage_internal_clear_npm_cache_done">Internal R npm キャッシュを削除しました。</string>
+    <string name="storage_external_unavailable">External Provider のストレージを読み取れません: %1$s。Internal R の統計とクリーンアップは利用できます。</string>
+    <string name="storage_external_unavailable_short">External Provider は読み取れませんが、Internal R には影響しません。</string>
 </resources>

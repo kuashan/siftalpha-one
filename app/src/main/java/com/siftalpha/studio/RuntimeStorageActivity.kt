@@ -16,7 +16,9 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.siftalpha.studio.project.EmbeddedPythonProjectStager
 import com.siftalpha.studio.project.V04ProjectGateway
+import com.siftalpha.studio.runtime.InternalRuntimeStorageController
 import com.siftalpha.studio.runtime.ProjectRuntimeController
 import com.siftalpha.studio.runtime.RuntimeCommand
 import com.siftalpha.studio.runtime.RuntimeResult
@@ -26,6 +28,11 @@ import com.siftalpha.studio.runtime.RuntimeStoragePresentation
 import com.siftalpha.studio.runtime.RuntimeStorageSizeFormatter
 import com.siftalpha.studio.runtime.TermuxBackend
 import com.siftalpha.studio.runtime.TermuxResultBus
+import com.siftalpha.studio.siftalphax.EmbeddedPythonEnvironmentManager
+import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
+import com.siftalpha.studio.siftalphax.InternalAlpineEnvironmentManager
+import com.siftalpha.studio.siftalphax.InternalAlpineSession
+import java.util.concurrent.Executors
 
 class RuntimeStorageActivity : StudioActivity() {
 
@@ -46,6 +53,8 @@ class RuntimeStorageActivity : StudioActivity() {
     private lateinit var gateway: V04ProjectGateway
     private lateinit var runtime: ProjectRuntimeController
     private lateinit var storage: RuntimeStorageController
+    private lateinit var internalStorage: InternalRuntimeStorageController
+    private lateinit var internalContainer: LinearLayout
     private lateinit var overviewContainer: LinearLayout
     private lateinit var storageChart: RuntimeStorageChartView
     private lateinit var projectsContainer: LinearLayout
@@ -62,6 +71,8 @@ class RuntimeStorageActivity : StudioActivity() {
     private val pending = mutableMapOf<Int, PendingAction>()
     private var projectCache: Map<String, V04ProjectGateway.RuntimeProject> = emptyMap()
     private var selectedPageId: String = PAGE_OVERVIEW
+    private val internalStorageExecutor = Executors.newSingleThreadExecutor()
+    private var internalRefreshGeneration = 0L
 
     private val resultListener: (RuntimeResult) -> Unit = { result ->
         runOnUiThread {
@@ -80,8 +91,16 @@ class RuntimeStorageActivity : StudioActivity() {
             ?: PAGE_OVERVIEW
         backend = TermuxBackend(this)
         gateway = V04ProjectGateway(this)
-        runtime = ProjectRuntimeController(gateway)
+        runtime = ProjectRuntimeController(
+            gateway = gateway,
+            embeddedPythonSession = EmbeddedPythonSession.shared(this),
+            embeddedPythonProjectStager = EmbeddedPythonProjectStager(this),
+            embeddedPythonEnvironmentManager = EmbeddedPythonEnvironmentManager(this),
+            internalAlpineEnvironmentManager = InternalAlpineEnvironmentManager(this),
+            internalAlpineSession = InternalAlpineSession.shared(this),
+        )
         storage = RuntimeStorageController(gateway)
+        internalStorage = InternalRuntimeStorageController(filesDir)
         setContentView(buildUi())
     }
 
@@ -102,6 +121,12 @@ class RuntimeStorageActivity : StudioActivity() {
     override fun onStop() {
         TermuxResultBus.removeListener(resultListener)
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        internalRefreshGeneration += 1L
+        internalStorageExecutor.shutdownNow()
+        super.onDestroy()
     }
 
     private fun buildUi(): View {
@@ -141,7 +166,11 @@ class RuntimeStorageActivity : StudioActivity() {
         pageContainers[PAGE_OVERVIEW] = overviewPage
         root.addView(overviewPage)
 
-        overviewPage.addView(section(getString(R.string.storage_section_overview)))
+        overviewPage.addView(section(getString(R.string.storage_internal_provider_title)))
+        internalContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        overviewPage.addView(internalContainer)
+
+        overviewPage.addView(section(getString(R.string.storage_external_provider_title)))
         overviewContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         overviewPage.addView(overviewContainer)
 
@@ -244,7 +273,6 @@ class RuntimeStorageActivity : StudioActivity() {
     }
 
     private fun refreshStorage() {
-        if (!ensureBackendAccess()) return
         val projects = if (gateway.rootUri() == null) {
             emptyList()
         } else {
@@ -253,12 +281,52 @@ class RuntimeStorageActivity : StudioActivity() {
         projectCache = projects.associateBy { it.folderName }
         statusText.text = getString(R.string.storage_scanning)
         outputText.visibility = View.GONE
-        send(storage.snapshot(projects), PendingAction.Snapshot)
+
+        val generation = ++internalRefreshGeneration
+        internalContainer.removeAllViews()
+        internalContainer.addView(hint(getString(R.string.storage_internal_scanning)))
+        internalStorageExecutor.execute {
+            val result = runCatching { internalStorage.snapshot(projects) }
+            runOnUiThread {
+                if (generation != internalRefreshGeneration || isFinishing || isDestroyed) {
+                    return@runOnUiThread
+                }
+                result.onSuccess(::renderInternalSnapshot)
+                    .onFailure { error ->
+                        internalContainer.removeAllViews()
+                        internalContainer.addView(
+                            hint(
+                                getString(
+                                    R.string.storage_internal_scan_failed,
+                                    error.message ?: error.javaClass.simpleName,
+                                ),
+                            ),
+                        )
+                    }
+            }
+        }
+
+        val backendProblem = backendAccessProblem()
+        if (backendProblem == null) {
+            send(storage.snapshot(projects), PendingAction.Snapshot)
+        } else {
+            renderExternalUnavailable(backendProblem)
+        }
     }
 
     private fun handleResult(action: PendingAction, result: RuntimeResult) {
         val combined = (result.stdout + "\n" + result.stderr).trim()
         outputText.text = combined
+        if (!result.successful && action == PendingAction.Snapshot) {
+            val reason = when {
+                "SIFTALPHA_STORAGE_ERROR=PROOT_DISTRO_MISSING" in combined ->
+                    getString(R.string.storage_proot_missing)
+                combined.isNotBlank() -> combined.takeLast(800)
+                else -> result.exitCode.toString()
+            }
+            renderExternalUnavailable(reason)
+            return
+        }
         if (!result.successful) {
             when {
                 "SIFTALPHA_STORAGE_ERROR=ORPHAN_RUNTIME_IN_USE" in combined ->
@@ -333,7 +401,7 @@ class RuntimeStorageActivity : StudioActivity() {
         })
 
         if (!snapshot.ubuntuInstalled) {
-            statusText.text = getString(R.string.storage_not_installed)
+            statusText.text = getString(R.string.storage_refresh_done)
             overviewContainer.addView(hint(getString(R.string.storage_not_installed)))
             storageChart.render(RuntimeStorageChartModel.empty(), chartTexts())
             projectsContainer.addView(hint(getString(R.string.storage_project_none)))
@@ -345,7 +413,7 @@ class RuntimeStorageActivity : StudioActivity() {
             return
         }
 
-        statusText.text = getString(R.string.storage_ubuntu_total, formatSize(snapshot.ubuntuTotalKb))
+        statusText.text = getString(R.string.storage_refresh_done)
         overviewContainer.addView(metric(getString(R.string.storage_ubuntu_total, formatSize(snapshot.ubuntuTotalKb))))
         overviewContainer.addView(metric(getString(R.string.storage_ubuntu_base, formatSize(snapshot.ubuntuBaseKb))))
         overviewContainer.addView(metric(getString(R.string.storage_project_runtime_total, formatSize(snapshot.projectRuntimeKb))))
@@ -704,22 +772,244 @@ class RuntimeStorageActivity : StudioActivity() {
         runCatching { backend.execute(command) }
             .onSuccess { id ->
                 pending[id] = action
-                statusText.text = getString(R.string.storage_command_sent, id)
+                if (action != PendingAction.Snapshot) {
+                    statusText.text = getString(R.string.storage_command_sent, id)
+                }
                 TermuxResultBus.consume(id)?.let(resultListener)
             }
             .onFailure { error -> showError(error.message ?: error.javaClass.simpleName) }
     }
 
+    private fun backendAccessProblem(): String? = when {
+        !backend.isTermuxInstalled() -> getString(R.string.runtime_termux_missing_message)
+        !backend.hasRunCommandPermission() -> getString(R.string.runtime_permission_missing_message)
+        else -> null
+    }
+
     private fun ensureBackendAccess(): Boolean {
-        if (!backend.isTermuxInstalled()) {
-            showError(getString(R.string.runtime_termux_missing_message))
-            return false
+        val problem = backendAccessProblem() ?: return true
+        showError(problem)
+        return false
+    }
+
+    private fun renderInternalSnapshot(snapshot: InternalRuntimeStorageController.Snapshot) {
+        internalContainer.removeAllViews()
+        internalContainer.addView(
+            metric(getString(R.string.storage_internal_total, formatSize(snapshot.totalKb))),
+        )
+        internalContainer.addView(
+            metric(
+                getString(
+                    R.string.storage_internal_project_env_total,
+                    formatSize(snapshot.projectEnvironmentKb),
+                ),
+            ),
+        )
+        internalContainer.addView(
+            metric(getString(R.string.storage_internal_cpython_runtime, formatSize(snapshot.cpythonRuntimeKb))),
+        )
+        internalContainer.addView(
+            metric(getString(R.string.storage_internal_alpine_rootfs, formatSize(snapshot.alpineRootfsKb))),
+        )
+        internalContainer.addView(
+            metric(getString(R.string.storage_internal_staging, formatSize(snapshot.stagingKb))),
+        )
+        internalContainer.addView(
+            metric(getString(R.string.storage_internal_sessions, formatSize(snapshot.sessionDataKb))),
+        )
+        if (snapshot.unassociatedEnvironmentKb > 0L) {
+            internalContainer.addView(
+                metric(
+                    getString(
+                        R.string.storage_internal_unassociated,
+                        formatSize(snapshot.unassociatedEnvironmentKb),
+                    ),
+                ),
+            )
         }
-        if (!backend.hasRunCommandPermission()) {
-            showError(getString(R.string.runtime_permission_missing_message))
-            return false
+
+        internalContainer.addView(
+            metric(getString(R.string.storage_internal_wheel_cache, formatSize(snapshot.wheelCacheKb))),
+        )
+        internalContainer.addView(
+            button(getString(R.string.storage_internal_clear_wheel_cache)) {
+                confirmClearInternalWheelCache()
+            }.apply { isEnabled = snapshot.wheelCacheKb > 0L }),
+        )
+        internalContainer.addView(
+            metric(getString(R.string.storage_internal_pip_cache, formatSize(snapshot.pipCacheKb))),
+        )
+        internalContainer.addView(
+            button(getString(R.string.storage_internal_clear_pip_cache)) {
+                confirmClearInternalPipCache()
+            }.apply { isEnabled = snapshot.pipCacheKb > 0L }),
+        )
+        internalContainer.addView(
+            metric(getString(R.string.storage_internal_npm_cache, formatSize(snapshot.npmCacheKb))),
+        )
+        internalContainer.addView(
+            button(getString(R.string.storage_internal_clear_npm_cache)) {
+                confirmClearInternalNpmCache()
+            }.apply { isEnabled = snapshot.npmCacheKb > 0L }),
+        )
+
+        internalContainer.addView(section(getString(R.string.storage_internal_projects_title)))
+        if (snapshot.projects.isEmpty()) {
+            internalContainer.addView(hint(getString(R.string.storage_internal_project_none)))
+        } else {
+            snapshot.projects.forEach { usage ->
+                val project = projectCache[usage.folderName]
+                val box = cardBox()
+                box.addView(
+                    text(
+                        getString(
+                            R.string.storage_internal_project_env,
+                            usage.displayName,
+                            formatSize(usage.totalKb),
+                        ),
+                        14f,
+                        true,
+                    ).apply { setTextColor(Color.WHITE) },
+                )
+                if (usage.cpythonEnvironmentKb > 0L) {
+                    box.addView(
+                        metric(
+                            getString(
+                                R.string.storage_internal_cpython_env,
+                                formatSize(usage.cpythonEnvironmentKb),
+                            ),
+                        ),
+                    )
+                }
+                if (usage.alpineEnvironmentKb > 0L) {
+                    box.addView(
+                        metric(
+                            getString(
+                                R.string.storage_internal_alpine_env,
+                                formatSize(usage.alpineEnvironmentKb),
+                            ),
+                        ),
+                    )
+                }
+                if (project != null) {
+                    addProjectNavigation(box, project)
+                    box.addView(
+                        smallButton(getString(R.string.storage_internal_clean_project)) {
+                            confirmCleanInternalProject(project)
+                        },
+                    )
+                }
+                internalContainer.addView(box)
+            }
         }
-        return true
+        statusText.text = getString(R.string.storage_refresh_done)
+    }
+
+    private fun renderExternalUnavailable(reason: String) {
+        overviewContainer.removeAllViews()
+        projectCards.clear()
+        projectsContainer.removeAllViews()
+        orphansContainer.removeAllViews()
+        sharedRuntimeContainer.removeAllViews()
+        familySummaryContainers.values.forEach { it.removeAllViews() }
+        familyProjectsContainers.values.forEach { it.removeAllViews() }
+        storageChart.render(RuntimeStorageChartModel.empty(), chartTexts())
+
+        overviewContainer.addView(
+            hint(getString(R.string.storage_external_unavailable, reason)),
+        )
+        projectsContainer.addView(hint(getString(R.string.storage_external_unavailable_short)))
+        orphansContainer.addView(hint(getString(R.string.storage_external_unavailable_short)))
+        sharedRuntimeContainer.addView(hint(getString(R.string.storage_external_unavailable_short)))
+        RuntimeStoragePresentation.families.forEach { family ->
+            familySummaryContainers[family.id]?.addView(
+                hint(getString(R.string.storage_external_unavailable_short)),
+            )
+            familyProjectsContainers[family.id]?.addView(
+                hint(getString(R.string.storage_external_unavailable_short)),
+            )
+        }
+        statusText.text = getString(R.string.storage_refresh_done)
+    }
+
+    private fun confirmCleanInternalProject(project: V04ProjectGateway.RuntimeProject) {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.storage_internal_clean_project_title, project.summary.name))
+            .setMessage(getString(R.string.storage_internal_clean_project_message))
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .setPositiveButton(getString(R.string.storage_clean_project_confirm)) { _, _ ->
+                runInternalStorageAction(getString(R.string.storage_internal_clean_project_done)) {
+                    runtime.cleanEmbeddedPythonEnvironment(project)
+                }
+            }
+            .show()
+    }
+
+    private fun confirmClearInternalWheelCache() {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.storage_internal_clear_wheel_cache_title))
+            .setMessage(getString(R.string.storage_internal_clear_wheel_cache_message))
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .setPositiveButton(getString(R.string.common_confirm)) { _, _ ->
+                runInternalStorageAction(getString(R.string.storage_internal_clear_wheel_cache_done)) {
+                    internalStorage.clearWheelCache()
+                }
+            }
+            .show()
+    }
+
+    private fun confirmClearInternalPipCache() {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.storage_internal_clear_pip_cache_title))
+            .setMessage(getString(R.string.storage_internal_clear_pip_cache_message))
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .setPositiveButton(getString(R.string.common_confirm)) { _, _ ->
+                runInternalStorageAction(getString(R.string.storage_internal_clear_pip_cache_done)) {
+                    internalStorage.clearAlpinePipCache()
+                }
+            }
+            .show()
+    }
+
+    private fun confirmClearInternalNpmCache() {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.storage_internal_clear_npm_cache_title))
+            .setMessage(getString(R.string.storage_internal_clear_npm_cache_message))
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .setPositiveButton(getString(R.string.common_confirm)) { _, _ ->
+                runInternalStorageAction(getString(R.string.storage_internal_clear_npm_cache_done)) {
+                    internalStorage.clearAlpineNpmCache()
+                }
+            }
+            .show()
+    }
+
+    private fun runInternalStorageAction(
+        successMessage: String,
+        action: () -> Unit,
+    ) {
+        statusText.text = getString(R.string.storage_internal_working)
+        internalStorageExecutor.execute {
+            val result = runCatching(action)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                result.onSuccess {
+                    toast(successMessage)
+                    refreshStorage()
+                }.onFailure { error ->
+                    val message = if (
+                        generateSequence(error) { it.cause }
+                            .mapNotNull { it.message }
+                            .any { "EMBEDDED_R_RUNTIME_ACTIVE" in it }
+                    ) {
+                        getString(R.string.storage_internal_runtime_active)
+                    } else {
+                        error.message ?: error.javaClass.simpleName
+                    }
+                    showError(message)
+                }
+            }
+        }
     }
 
     private fun showError(message: String) {
