@@ -25,7 +25,7 @@ enum class InternalPythonBackend {
 data class InternalAlpineDependencySource(
     val kind: Kind,
     val sourceFingerprint: String,
-    val legacySourceFingerprint: String,
+    val legacySourceFingerprint: String = sourceFingerprint,
     val requiresNodeVite: Boolean = false,
     val projectRequiresPython: String? = null,
 ) {
