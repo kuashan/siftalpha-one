@@ -353,6 +353,11 @@ class InternalAlpineEnvironmentManager(context: Context) {
 
     data class LoadBinding(val environmentRoot: File, val environmentKey: String)
 
+    private data class PythonRuntimeIdentity(
+        val fullVersion: String,
+        val identity: String,
+    )
+
     @Synchronized
     fun prepare(
         projectIdentity: String,
@@ -365,7 +370,8 @@ class InternalAlpineEnvironmentManager(context: Context) {
         progress?.invoke(progressText(projectIdentity, "ALPINE_RUNTIME", ""))
         val layout = InternalAlpineFiles.prepare(appContext)
         InternalAlpineProcessControl.throwIfCancelled()
-        ensurePythonRuntime(layout, projectIdentity, progress)
+        val pythonRuntime = ensurePythonRuntime(layout, projectIdentity, progress)
+        requirePythonCompatibility(source, pythonRuntime)
         InternalAlpineProcessControl.throwIfCancelled()
         if (source.requiresNodeVite) {
             ensureNodeRuntime(layout, projectIdentity, progress)
@@ -417,9 +423,15 @@ class InternalAlpineEnvironmentManager(context: Context) {
                 stage = "ALPINE_PROJECT_DEPENDENCIES",
                 progress = progress,
             )
-            val environmentKey = environmentKey(projectIdentity, source.sourceFingerprint)
+            val environmentKey = environmentKey(
+                projectIdentity = projectIdentity,
+                fingerprint = source.sourceFingerprint,
+                runtimeIdentity = pythonRuntime.identity,
+            )
             File(temp, READY_MARKER).writeText(
                 "BACKEND=ALPINE\nSOURCE_FINGERPRINT=" + source.sourceFingerprint +
+                    "\nPYTHON_VERSION=" + pythonRuntime.fullVersion +
+                    "\nRUNTIME_IDENTITY=" + pythonRuntime.identity +
                     "\nENVIRONMENT_KEY=" + environmentKey + "\n",
             )
             if (environmentRoot.exists()) {
@@ -458,6 +470,11 @@ class InternalAlpineEnvironmentManager(context: Context) {
         projectIdentity: String,
         source: InternalAlpineDependencySource,
     ): LoadBinding? {
+        val runtime = readPythonRuntimeIdentity(
+            InternalAlpineFiles.rootfsDirectory(appContext),
+        ) ?: return null
+        if (!pythonRequirementMatches(source.projectRequiresPython, runtime.fullVersion)) return null
+
         val root = InternalAlpineFiles.projectEnvironmentRoot(appContext, projectIdentity)
         val marker = File(root, READY_MARKER)
         if (!marker.isFile) return null
@@ -467,6 +484,8 @@ class InternalAlpineEnvironmentManager(context: Context) {
         }.toMap()
         if (values["BACKEND"] != "ALPINE") return null
         if (values["SOURCE_FINGERPRINT"] != source.sourceFingerprint) return null
+        if (values["PYTHON_VERSION"] != runtime.fullVersion) return null
+        if (values["RUNTIME_IDENTITY"] != runtime.identity) return null
         val key = values["ENVIRONMENT_KEY"]?.takeIf { it.isNotBlank() } ?: return null
         val python = File(root, "venv/bin/python")
         if (!Files.exists(python.toPath(), LinkOption.NOFOLLOW_LINKS)) return null
@@ -477,31 +496,107 @@ class InternalAlpineEnvironmentManager(context: Context) {
         layout: InternalAlpineLayout,
         projectIdentity: String,
         progress: ((String) -> Unit)?,
-    ) {
+    ): PythonRuntimeIdentity {
         InternalAlpineProcessControl.throwIfCancelled()
         val marker = File(layout.rootfs, PYTHON_READY_MARKER)
+        val python = File(layout.rootfs, "usr/bin/python3")
+        val virtualenv = File(layout.rootfs, "usr/bin/virtualenv")
         if (
             marker.isFile &&
-            Files.exists(File(layout.rootfs, "usr/bin/python3").toPath(), LinkOption.NOFOLLOW_LINKS) &&
-            Files.exists(File(layout.rootfs, "usr/bin/virtualenv").toPath(), LinkOption.NOFOLLOW_LINKS)
-        ) return
+            Files.exists(python.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+            Files.exists(virtualenv.toPath(), LinkOption.NOFOLLOW_LINKS)
+        ) {
+            readPythonRuntimeIdentity(layout.rootfs)?.let { return it }
+        }
 
-        val log = File(layout.rootfs.parentFile, "python-runtime-prepare.log")
+        if (
+            !Files.exists(python.toPath(), LinkOption.NOFOLLOW_LINKS) ||
+            !Files.exists(virtualenv.toPath(), LinkOption.NOFOLLOW_LINKS)
+        ) {
+            val log = File(layout.rootfs.parentFile, "python-runtime-prepare.log")
+            runCommand(
+                builder = InternalAlpineFiles.buildCommand(
+                    appContext,
+                    layout,
+                    InternalAlpinePythonRuntimeBootstrap.installCommand(),
+                ),
+                logFile = log,
+                failurePrefix = "INTERNAL_ALPINE_PYTHON_RUNTIME_PREPARE_FAILED",
+                projectIdentity = projectIdentity,
+                stage = "ALPINE_PYTHON_RUNTIME",
+                progress = progress,
+            )
+            InternalAlpineProcessControl.throwIfCancelled()
+        }
+
+        val runtime = probePythonRuntimeIdentity(layout, projectIdentity, progress)
+        marker.writeText(
+            "READY=1\nPYTHON_VERSION=" + runtime.fullVersion +
+                "\nRUNTIME_IDENTITY=" + runtime.identity + "\n",
+        )
+        return runtime
+    }
+
+    private fun probePythonRuntimeIdentity(
+        layout: InternalAlpineLayout,
+        projectIdentity: String,
+        progress: ((String) -> Unit)?,
+    ): PythonRuntimeIdentity {
+        val log = File(layout.rootfs.parentFile, "python-runtime-version.log")
         runCommand(
             builder = InternalAlpineFiles.buildCommand(
                 appContext,
                 layout,
-                InternalAlpinePythonRuntimeBootstrap.installCommand(),
+                "python3 --version",
             ),
             logFile = log,
-            failurePrefix = "INTERNAL_ALPINE_PYTHON_RUNTIME_PREPARE_FAILED",
+            failurePrefix = "INTERNAL_ALPINE_PYTHON_RUNTIME_IDENTITY_FAILED",
             projectIdentity = projectIdentity,
-            stage = "ALPINE_PYTHON_RUNTIME",
+            stage = "ALPINE_PYTHON_RUNTIME_IDENTITY",
             progress = progress,
         )
-        InternalAlpineProcessControl.throwIfCancelled()
-        marker.writeText("READY=1\n")
+        val fullVersion = Regex("""Python\s+([0-9]+\.[0-9]+\.[0-9]+)""")
+            .find(log.readText())
+            ?.groupValues
+            ?.getOrNull(1)
+            ?: error("INTERNAL_ALPINE_PYTHON_RUNTIME_VERSION_UNRESOLVED")
+        return PythonRuntimeIdentity(
+            fullVersion = fullVersion,
+            identity = InternalAlpineFiles.pythonRuntimeIdentity(fullVersion),
+        )
     }
+
+    private fun readPythonRuntimeIdentity(rootfs: File): PythonRuntimeIdentity? {
+        val marker = File(rootfs, PYTHON_READY_MARKER)
+        if (!marker.isFile) return null
+        val values = marker.readLines().mapNotNull {
+            val index = it.indexOf('=')
+            if (index <= 0) null else it.substring(0, index) to it.substring(index + 1)
+        }.toMap()
+        val version = values["PYTHON_VERSION"]
+            ?.takeIf { it.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+")) }
+            ?: return null
+        val identity = values["RUNTIME_IDENTITY"]?.takeIf { it.isNotBlank() } ?: return null
+        if (identity != InternalAlpineFiles.pythonRuntimeIdentity(version)) return null
+        return PythonRuntimeIdentity(version, identity)
+    }
+
+    private fun requirePythonCompatibility(
+        source: InternalAlpineDependencySource,
+        runtime: PythonRuntimeIdentity,
+    ) {
+        val required = source.projectRequiresPython ?: return
+        check(pythonRequirementMatches(required, runtime.fullVersion)) {
+            "PROJECT_REQUIRES_PYTHON_UNAVAILABLE: requires-python=" + required +
+                " available=" + runtime.fullVersion + " backend=ALPINE"
+        }
+    }
+
+    private fun pythonRequirementMatches(required: String?, fullVersion: String): Boolean =
+        required == null ||
+            runCatching {
+                EmbeddedPythonRequirementParserV1.versionMatches(required, fullVersion)
+            }.getOrDefault(false)
 
     private fun ensureNodeRuntime(
         layout: InternalAlpineLayout,
@@ -631,9 +726,16 @@ class InternalAlpineEnvironmentManager(context: Context) {
         }
     }
 
-    private fun environmentKey(projectIdentity: String, fingerprint: String): String {
+    private fun environmentKey(
+        projectIdentity: String,
+        fingerprint: String,
+        runtimeIdentity: String,
+    ): String {
         val digest = MessageDigest.getInstance("SHA-256")
-            .digest(("alpine\n" + projectIdentity + "\n" + fingerprint + "\n").toByteArray())
+            .digest(
+                ("alpine\n" + projectIdentity + "\n" + fingerprint + "\n" + runtimeIdentity + "\n")
+                    .toByteArray(),
+            )
             .joinToString("") { "%02x".format(it.toInt() and 0xff) }
         return "alpine:$digest"
     }
