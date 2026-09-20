@@ -305,6 +305,69 @@ class ProjectEnvironmentPlanTest {
         assertTrue(lines.contains("SIFTALPHA_ENV_PLAN_READY=1"))
     }
 
+    @Test
+    fun embeddedCompatibilityResolutionCanSelectAlpineWithoutChangingBasePlanIdentity() {
+        val plan = ProjectEnvironmentPlanner.plan(
+            detect(
+                paths = listOf("pyproject.toml", "main.py"),
+                pyproject = """
+                    [project]
+                    name = "demo"
+                    dependencies = ["crc32c"]
+                """.trimIndent(),
+            ),
+            allCapabilities,
+        )
+        val baseId = plan.planId
+
+        val resolved = ProjectEnvironmentResolutionPlanner.embeddedIncompatible(
+            plan = plan,
+            detail = "NO_COMPATIBLE_WHEEL: crc32c",
+        )
+
+        assertEquals(baseId, resolved.plan.planId)
+        assertEquals(
+            EnvironmentCompatibilityResolutionState.EMBEDDED_CPYTHON_INCOMPATIBLE,
+            resolved.state,
+        )
+        assertEquals(EnvironmentBackend.INTERNAL_ALPINE, resolved.selectedBackend)
+        assertTrue(
+            resolved.diagnosticLines().contains(
+                "SIFTALPHA_ENV_SELECTED_BACKEND=internal_alpine",
+            ),
+        )
+    }
+
+    @Test
+    fun successfulEmbeddedResolutionKeepsExactDependencyFingerprint() {
+        val plan = ProjectEnvironmentPlanner.plan(
+            detect(
+                paths = listOf("pyproject.toml", "main.py"),
+                pyproject = """
+                    [project]
+                    name = "demo"
+                    dependencies = ["requests"]
+                """.trimIndent(),
+            ),
+            allCapabilities,
+        )
+
+        val resolved = ProjectEnvironmentResolutionPlanner.embeddedResolved(
+            plan = plan,
+            resolvedFingerprint = "sha256:resolved",
+            packageCount = 5,
+        )
+
+        assertEquals(EnvironmentBackend.EMBEDDED_CPYTHON, resolved.selectedBackend)
+        assertEquals("sha256:resolved", resolved.embeddedDependencyFingerprint)
+        assertEquals(5, resolved.embeddedDependencyCount)
+        assertTrue(
+            resolved.diagnosticLines().contains(
+                "SIFTALPHA_ENV_EMBEDDED_DEPENDENCY_COUNT=5",
+            ),
+        )
+    }
+
     private fun detect(
         paths: List<String>,
         pyproject: String?,
