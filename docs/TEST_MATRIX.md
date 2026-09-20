@@ -949,3 +949,22 @@ Real-device gate:
 | Existing incompatible/changed project | Keep NOT_READY and require Prepare | Preserved r46 checks + W0 #302 PASS |
 | Overwrite install from r46 to r46.1 | Previously prepared compatible projects remain usable without unnecessary re-prepare | PENDING REAL DEVICE |
 
+
+
+## alpha43-r46.2 — Web recognition
+
+| Area | Case | Expected |
+|---|---|---|
+| Fast signature | Dependency name only | Must not take high-confidence fast path |
+| Streamlit | dependency + conventional entry/source | Detect Web, default 8501, resolve `streamlit run` |
+| FastAPI | dependency + FastAPI app + Uvicorn evidence | Detect Web and resolve importable `module:app` |
+| Django | dependency + manage.py + settings.py + urls.py | Detect Web and resolve bounded runserver launch |
+| Python+Vite | project script + web extra + Vite + Web subcommand | Hybrid signature wins over backend-only framework |
+| Node | Next/Vite/Nuxt with package-script evidence | Detect common framework/default port |
+| Node server | Express/Fastify/Koa dependency + source listen | Detect only with combined source evidence |
+| PREPARE concurrency | Begin PREPARE | Background Web rediscovery runs without gating PREPARE |
+| Learned launch | Static candidate only | Store DISCOVERED; never auto-reuse |
+| Learned launch | Current owned endpoint passes Endpoint Probe | Promote to VERIFIED |
+| Learned launch | Later run | VERIFIED launch may skip deep rediscovery; endpoint is probed again |
+| Fresh install | No learned state | Rebuild Web capability from project evidence |
+| Result Web | Project Web unavailable | Result Web remains result presentation only; does not prove project Web |
