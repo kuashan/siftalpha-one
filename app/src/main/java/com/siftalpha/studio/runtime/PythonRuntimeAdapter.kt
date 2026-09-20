@@ -76,9 +76,9 @@ class PythonRuntimeAdapter(
             venv=${sh(venv)}
             log=${sh(log)}
             ready=${sh(ready)}
+            required_python=${sh(project.pythonRequiresVersion.orEmpty())}
             mkdir -p /root/venvs /root/siftalpha/logs
             : >"${'$'}log"
-            rm -f -- "${'$'}ready"
             if ! command -v python3 >/dev/null 2>&1; then
               echo 'SIFTALPHA_ERROR=PYTHON_MISSING'
               exit 72
@@ -91,20 +91,55 @@ class PythonRuntimeAdapter(
               apt-get update >>"${'$'}log" 2>&1
               apt-get install -y python3-venv python3-pip >>"${'$'}log" 2>&1
             fi
-            if [ ! -x "${'$'}venv/bin/python" ]; then
-              python3 -m venv "${'$'}venv" >>"${'$'}log" 2>&1
+
+            python_version="${'$'}(python3 -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))')"
+            if [ -n "${'$'}required_python" ]; then
+              set +e
+              python3 - "${'$'}required_python" <<'SIFTALPHA_PYTHON_REQUIRES_CHECK'
+import sys
+from pip._vendor.packaging.specifiers import SpecifierSet
+from pip._vendor.packaging.version import Version
+
+required = sys.argv[1]
+current = Version(".".join(str(v) for v in sys.version_info[:3]))
+try:
+    matches = current in SpecifierSet(required)
+except Exception:
+    raise SystemExit(2)
+raise SystemExit(0 if matches else 1)
+SIFTALPHA_PYTHON_REQUIRES_CHECK
+              requirement_code=${'$'}?
+              set -e
+              if [ "${'$'}requirement_code" -eq 2 ]; then
+                echo 'SIFTALPHA_ERROR=PYTHON_REQUIREMENT_UNSUPPORTED'
+                printf 'SIFTALPHA_PYTHON_REQUIRES=%s\n' "${'$'}required_python"
+                exit 74
+              elif [ "${'$'}requirement_code" -ne 0 ]; then
+                echo 'SIFTALPHA_ERROR=PYTHON_RUNTIME_UNAVAILABLE'
+                printf 'SIFTALPHA_PYTHON_REQUIRES=%s\n' "${'$'}required_python"
+                printf 'SIFTALPHA_PYTHON_AVAILABLE=%s\n' "${'$'}python_version"
+                exit 74
+              fi
             fi
+
+            candidate="${'$'}venv.prepare-${'$'}${'$'}"
+            backup="${'$'}venv.backup-${'$'}${'$'}"
+            rm -rf -- "${'$'}candidate" "${'$'}backup"
+            cleanup_candidate() { rm -rf -- "${'$'}candidate"; }
+            trap cleanup_candidate EXIT
+            python3 -m venv "${'$'}candidate" >>"${'$'}log" 2>&1
+
             ${dependencyFingerprintShell()}
             if [ "${'$'}dependency_source" = 'requirements.txt' ]; then
               echo 'DEPENDENCY_SOURCE=requirements.txt'
-              "${'$'}venv/bin/python" -m pip install -r "${'$'}project/requirements.txt" >>"${'$'}log" 2>&1
+              "${'$'}candidate/bin/python" -m pip install -r "${'$'}project/requirements.txt" >>"${'$'}log" 2>&1
             elif [ "${'$'}dependency_source" = 'pyproject.toml' ]; then
               echo 'DEPENDENCY_SOURCE=pyproject.toml'
               install_target="${'$'}project"
               web_extra=0
               vite_component=0
 
-              if "${'$'}venv/bin/python" - "${'$'}project/pyproject.toml" <<'SIFTALPHA_PYPROJECT_WEB_EXTRA'
+              if "${'$'}candidate/bin/python" - "${'$'}project/pyproject.toml" <<'SIFTALPHA_PYPROJECT_WEB_EXTRA'
 import sys
 import tomllib
 
@@ -140,13 +175,35 @@ SIFTALPHA_PYPROJECT_WEB_EXTRA
               else
                 echo 'SIFTALPHA_PYPROJECT_EXTRAS=none'
               fi
-              "${'$'}venv/bin/python" -m pip install -e "${'$'}install_target" >>"${'$'}log" 2>&1
+              "${'$'}candidate/bin/python" -m pip install -e "${'$'}install_target" >>"${'$'}log" 2>&1
             else
               echo 'DEPENDENCY_SOURCE=none'
             fi
-            "${'$'}venv/bin/python" --version 2>&1
+
+            "${'$'}candidate/bin/python" --version 2>&1
+            prepared_python_version="${'$'}("${'$'}candidate/bin/python" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))')"
+            if [ "${'$'}prepared_python_version" != "${'$'}python_version" ]; then
+              echo 'SIFTALPHA_ERROR=PYTHON_RUNTIME_IDENTITY_CHANGED_DURING_PREPARE'
+              exit 74
+            fi
+
+            if [ -e "${'$'}venv" ]; then
+              mv -- "${'$'}venv" "${'$'}backup"
+            fi
+            if ! mv -- "${'$'}candidate" "${'$'}venv"; then
+              if [ -e "${'$'}backup" ]; then
+                mv -- "${'$'}backup" "${'$'}venv" || true
+              fi
+              echo 'SIFTALPHA_ERROR=ENVIRONMENT_ACTIVATION_FAILED'
+              exit 76
+            fi
+            rm -rf -- "${'$'}backup"
+            trap - EXIT
+
             umask 077
-            printf 'SOURCE=%s\nHASH=%s\n' "${'$'}dependency_source" "${'$'}dependency_hash" >"${'$'}ready"
+            rm -f -- "${'$'}ready"
+            printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\n' \
+              "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}python_version" "${'$'}required_python" >"${'$'}ready"
             echo 'SIFTALPHA_ENV=READY'
             printf 'SIFTALPHA_ENV_DEPENDENCY_SOURCE=%s\n' "${'$'}dependency_source"
             tail -n 30 "${'$'}log" 2>/dev/null || true
@@ -406,7 +463,7 @@ $launchArgumentAssignments
             secrets=${sh(secrets)}
             incoming="/root/.siftalpha-host/${id}.secrets.in"
             mkdir -p /root/siftalpha/logs
-            ${environmentReadyCheckShell()}
+            ${environmentReadyCheckShell(project)}
             if [ "${'$'}env_ready" -ne 1 ]; then
               echo 'SIFTALPHA_ENV=NOT_READY'
               printf 'SIFTALPHA_ENV_REASON=%s\n' "${'$'}env_reason"
@@ -611,7 +668,7 @@ SIFTALPHA_RUNNER
             venv=${sh(venv)}
             ready=${sh(ready)}
             state=${sh(state)}
-            ${environmentReadyCheckShell()}
+            ${environmentReadyCheckShell(project)}
             if [ "${'$'}env_ready" -eq 1 ]; then
               echo 'SIFTALPHA_ENV=READY'
               printf 'SIFTALPHA_ENV_DEPENDENCY_SOURCE=%s\n' "${'$'}dependency_source"
@@ -771,20 +828,34 @@ SIFTALPHA_RUNNER
      * Requires project, venv and ready shell variables. Sets env_ready (0/1), env_reason,
      * dependency_source and dependency_hash without mutating the environment.
      */
-    private fun environmentReadyCheckShell(): String = """
+    private fun environmentReadyCheckShell(project: RuntimeProjectSpec): String = """
         ${dependencyFingerprintShell()}
+        required_python=${sh(project.pythonRequiresVersion.orEmpty())}
         env_ready=0
         env_reason='VENV_MISSING'
         if [ -x "${'$'}venv/bin/python" ]; then
-          env_reason='PREPARE_MARKER_MISSING'
-          if [ -f "${'$'}ready" ]; then
-            saved_source="${'$'}(awk -F= '/^SOURCE=/{print substr(${ '$' }0,8); exit}' "${'$'}ready" 2>/dev/null || true)"
-            saved_hash="${'$'}(awk -F= '/^HASH=/{print substr(${ '$' }0,6); exit}' "${'$'}ready" 2>/dev/null || true)"
-            if [ "${'$'}saved_source" = "${'$'}dependency_source" ] && [ "${'$'}saved_hash" = "${'$'}dependency_hash" ]; then
-              env_ready=1
-              env_reason='READY'
-            else
-              env_reason='DEPENDENCY_MANIFEST_CHANGED'
+          current_python_version="${'$'}("${'$'}venv/bin/python" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))' 2>/dev/null || true)"
+          if [ -z "${'$'}current_python_version" ]; then
+            env_reason='PYTHON_RUNTIME_UNAVAILABLE'
+          else
+            env_reason='PREPARE_MARKER_MISSING'
+            if [ -f "${'$'}ready" ]; then
+              saved_source="${'$'}(awk -F= '/^SOURCE=/{print substr(${ '$' }0,8); exit}' "${'$'}ready" 2>/dev/null || true)"
+              saved_hash="${'$'}(awk -F= '/^HASH=/{print substr(${ '$' }0,6); exit}' "${'$'}ready" 2>/dev/null || true)"
+              saved_python="${'$'}(awk -F= '/^PYTHON_VERSION=/{print substr(${ '$' }0,16); exit}' "${'$'}ready" 2>/dev/null || true)"
+              saved_requires="${'$'}(awk -F= '/^REQUIRES_PYTHON=/{print substr(${ '$' }0,17); exit}' "${'$'}ready" 2>/dev/null || true)"
+              if [ -z "${'$'}saved_python" ]; then
+                env_reason='PYTHON_RUNTIME_VERSION_UNKNOWN'
+              elif [ "${'$'}saved_python" != "${'$'}current_python_version" ]; then
+                env_reason='PYTHON_RUNTIME_VERSION_CHANGED'
+              elif [ "${'$'}saved_requires" != "${'$'}required_python" ]; then
+                env_reason='PYTHON_REQUIREMENT_CHANGED'
+              elif [ "${'$'}saved_source" = "${'$'}dependency_source" ] && [ "${'$'}saved_hash" = "${'$'}dependency_hash" ]; then
+                env_ready=1
+                env_reason='READY'
+              else
+                env_reason='DEPENDENCY_MANIFEST_CHANGED'
+              fi
             fi
           fi
         fi
