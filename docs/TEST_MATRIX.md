@@ -867,3 +867,34 @@ Real-device External Provider gate:
 - separately exercise a same-port conflict when two Web projects request the same fixed port and confirm failure is isolated to the conflicting project rather than stopping the already-running project.
 
 Only after this gate passes should r45-B replace the Embedded R single-project poll pointer with per-project observation state.
+
+
+### r45-B Embedded R Multi-Project Observation
+
+Automated contract:
+- project A and project B can both be tracked for Embedded R polling;
+- A in-flight polling must not block B from entering in-flight state;
+- finishing A polling must not clear B in-flight state;
+- untracking A must not untrack or modify B;
+- a non-tracked project cannot acquire polling ownership;
+- V04Activity no longer contains a global embeddedPollProject or global embeddedPollInFlight state.
+
+Cloud gate:
+- repository validators PASS;
+- testDebugUnitTest PASS;
+- assembleDebug PASS;
+- Internal Alpine Probe PASS;
+- stable v2 signing unchanged.
+
+Real-device Internal R gate:
+- prepare/start Internal R project A and keep it RUNNING;
+- start Internal R project B without stopping A;
+- confirm A and B remain independently RUNNING/observable;
+- verify STATUS and LOGS for each project remain project-scoped;
+- for Web projects, verify each project's Web Discovery and Endpoint Probe remain associated with its own Session/Generation;
+- STOP A and confirm B continues running, continues polling and keeps its Web/log state;
+- STOP B independently;
+- leave and return to Runtime Center while A+B are running and confirm both observations recover;
+- if two projects require the same fixed Web port, verify the conflict affects only the later conflicting project and never terminates the existing project.
+
+r45-B is not accepted until real-device evidence passes.

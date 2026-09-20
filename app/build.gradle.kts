@@ -78,8 +78,9 @@ android {
         // External Provider storage manager without making Termux a prerequisite for Internal R.
         // alpha43-r45a1 freezes the External Provider multi-project concurrency contract before
         // the shared per-project observation model is applied to Embedded R.
-        versionCode = 172
-        versionName = "0.8.0-alpha43-r45a1"
+        // alpha43-r45b1 replaces the single Embedded R poll pointer with project-scoped polling.
+        versionCode = 173
+        versionName = "0.8.0-alpha43-r45b1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

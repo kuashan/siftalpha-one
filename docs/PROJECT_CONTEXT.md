@@ -686,3 +686,16 @@ r45-A freezes and proves the existing External Provider multi-project contract. 
 r45-B will address the remaining Embedded R management-layer gap: V04Activity still uses a single `embeddedPollProject` / `embeddedPollInFlight` pair even though InternalAlpineSession and the foreground service can own multiple project sessions. The target is one shared per-project observation contract across providers, while keeping provider-specific process/runtime adapters separate.
 
 The r44 final baseline remains `baseline/alpha43-r44-final-known-good` until r45 is explicitly accepted.
+
+
+## r45-B Embedded R per-project observation
+
+External Provider multi-project behavior passed real-device acceptance in r45-A.
+
+Embedded R bottom layers were already project-keyed, including InternalAlpineSession and InternalRuntimeForegroundService ownership. The remaining management-layer limitation was V04Activity's single `embeddedPollProject` and global `embeddedPollInFlight`.
+
+r45-B replaces that UI observation singleton with project-scoped polling state. Every active Internal R project can remain tracked simultaneously. Poll completion, terminal state, provider switching and cancellation affect only the matching project identity.
+
+Provider-specific Runtime implementation remains separate; this change only aligns the M-layer observation contract with the already project-keyed R-layer session model.
+
+The frozen r44 final baseline remains `baseline/alpha43-r44-final-known-good` until r45 is explicitly closed.

@@ -31,6 +31,7 @@ import com.siftalpha.studio.presentation.ProjectActionPolicy
 import com.siftalpha.studio.presentation.ProjectUiSnapshot
 import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
 import com.siftalpha.studio.runtime.EmbeddedPythonObservationPolicy
+import com.siftalpha.studio.runtime.EmbeddedProjectPollRegistry
 import com.siftalpha.studio.runtime.ProjectActivityRegistry
 import com.siftalpha.studio.runtime.ProjectRuntimeController
 import com.siftalpha.studio.runtime.ProjectRuntimeExecutionPlanner
@@ -226,47 +227,9 @@ open class V04Activity : StudioActivity() {
     private val embeddedConfigurationFindings = mutableSetOf<String>()
     private val embeddedLastOutputRenderAt = mutableMapOf<String, Long>()
     private val embeddedRuntimeOwnership = mutableMapOf<String, RuntimeOwnership>()
-    private var embeddedPollProject: V04ProjectGateway.RuntimeProject? = null
-    private var embeddedPollInFlight = false
-    private val embeddedPollRunnable = object : Runnable {
-        override fun run() {
-            val project = embeddedPollProject ?: return
-            if (!activityStarted || isFinishing || isDestroyed || embeddedPollInFlight) return
-            val stateKey = project.summary.documentId
-            if (embeddedRuntimeOwnership[stateKey] == RuntimeOwnership.EXTERNAL_PROVIDER) {
-                embeddedPollProject = null
-                return
-            }
-
-            embeddedPollInFlight = true
-            embeddedObservationExecutor.execute {
-                val snapshot = runCatching {
-                    runtime.embeddedPythonSnapshotFor(stateKey)
-                }.getOrNull()
-                runOnUiThread {
-                    embeddedPollInFlight = false
-                    if (!activityStarted || isFinishing || isDestroyed) return@runOnUiThread
-                    if (embeddedPollProject?.summary?.documentId != stateKey) return@runOnUiThread
-                    if (embeddedRuntimeOwnership[stateKey] == RuntimeOwnership.EXTERNAL_PROVIDER) {
-                        embeddedPollProject = null
-                        return@runOnUiThread
-                    }
-                    if (snapshot == null) {
-                        refreshHandler.postDelayed(this, EMBEDDED_POLL_INTERVAL_MS)
-                        return@runOnUiThread
-                    }
-
-                    val cardChanged = syncEmbeddedSnapshot(project, snapshot)
-                    if (cardChanged) refresh()
-                    if (isEmbeddedActive(snapshot)) {
-                        refreshHandler.postDelayed(this, EMBEDDED_POLL_INTERVAL_MS)
-                    } else {
-                        embeddedPollProject = null
-                    }
-                }
-            }
-        }
-    }
+    private val embeddedPolls =
+        EmbeddedProjectPollRegistry<V04ProjectGateway.RuntimeProject>()
+    private val embeddedPollRunnables = mutableMapOf<String, Runnable>()
     private lateinit var rootState: TextView
     private lateinit var projectList: LinearLayout
     private lateinit var output: TextView
@@ -437,15 +400,15 @@ open class V04Activity : StudioActivity() {
     override fun onResume() {
         super.onResume()
         if (::projectList.isInitialized) refresh()
-        embeddedPollProject?.let(::scheduleEmbeddedPolling)
+        resumeEmbeddedPolling()
         resumeExternalObservations()
     }
 
     override fun onStop() {
         activityStarted = false
-        refreshHandler.removeCallbacks(embeddedPollRunnable)
-        // Observation state is retained, but all delayed UI work is paused with the Activity.
-        // The runtime itself remains owned by Termux and continues running.
+        embeddedPollRunnables.values.forEach(refreshHandler::removeCallbacks)
+        // Observation state is retained per project, but all delayed UI work is paused with the Activity.
+        // The Runtime itself continues in its provider-owned process/session layer.
         refreshHandler.removeCallbacksAndMessages(null)
         refreshScheduled = false
         if (::webAvailability.isInitialized) webAvailability.pause()
@@ -456,7 +419,8 @@ open class V04Activity : StudioActivity() {
 
     override fun onDestroy() {
         refreshHandler.removeCallbacksAndMessages(null)
-        embeddedPollProject = null
+        embeddedPolls.clear()
+        embeddedPollRunnables.clear()
         externalObservations.keys.toList().forEach(::invalidateExternalObservation)
         externalObservationRunnables.clear()
         deferredManualActions.clear()
@@ -2764,6 +2728,7 @@ open class V04Activity : StudioActivity() {
                 }
 
                 if (snapshot == null) {
+                    invalidateEmbeddedPolling(stateKey)
                     typedStates[stateKey] = RuntimeState.UNKNOWN
                     states[stateKey] = getString(R.string.runtime_state_not_running)
                     failureReasons.remove(stateKey)
@@ -2806,6 +2771,7 @@ open class V04Activity : StudioActivity() {
                 }
 
                 if (!ownsEmbeddedObservation(stateKey, snapshot)) {
+                    invalidateEmbeddedPolling(stateKey)
                     operation?.let {
                         finishOperation(stateKey, it.generation, RuntimeOperationPhase.FAILED)
                     }
@@ -3138,10 +3104,72 @@ open class V04Activity : StudioActivity() {
     }
 
     private fun scheduleEmbeddedPolling(project: V04ProjectGateway.RuntimeProject) {
-        embeddedPollProject = project
+        val stateKey = project.summary.documentId
+        embeddedPolls.track(stateKey, project)
         if (!activityStarted) return
-        refreshHandler.removeCallbacks(embeddedPollRunnable)
-        refreshHandler.post(embeddedPollRunnable)
+        val runnable = embeddedPollRunnableFor(stateKey)
+        refreshHandler.removeCallbacks(runnable)
+        refreshHandler.post(runnable)
+    }
+
+    private fun resumeEmbeddedPolling() {
+        if (!activityStarted) return
+        embeddedPolls.trackedKeys().forEach { stateKey ->
+            val runnable = embeddedPollRunnableFor(stateKey)
+            refreshHandler.removeCallbacks(runnable)
+            refreshHandler.post(runnable)
+        }
+    }
+
+    private fun embeddedPollRunnableFor(stateKey: String): Runnable =
+        embeddedPollRunnables.getOrPut(stateKey) {
+            object : Runnable {
+                override fun run() {
+                    val project = embeddedPolls.project(stateKey) ?: return
+                    if (!activityStarted || isFinishing || isDestroyed) return
+                    if (embeddedRuntimeOwnership[stateKey] == RuntimeOwnership.EXTERNAL_PROVIDER) {
+                        invalidateEmbeddedPolling(stateKey)
+                        return
+                    }
+                    if (!embeddedPolls.begin(stateKey)) return
+
+                    embeddedObservationExecutor.execute {
+                        val snapshot = runCatching {
+                            runtime.embeddedPythonSnapshotFor(stateKey)
+                        }.getOrNull()
+                        runOnUiThread {
+                            embeddedPolls.finish(stateKey)
+                            if (!activityStarted || isFinishing || isDestroyed) return@runOnUiThread
+                            val currentProject = embeddedPolls.project(stateKey) ?: return@runOnUiThread
+                            if (embeddedRuntimeOwnership[stateKey] == RuntimeOwnership.EXTERNAL_PROVIDER) {
+                                invalidateEmbeddedPolling(stateKey)
+                                return@runOnUiThread
+                            }
+                            if (snapshot == null) {
+                                embeddedPollRunnables[stateKey]?.let { next ->
+                                    refreshHandler.postDelayed(next, EMBEDDED_POLL_INTERVAL_MS)
+                                }
+                                return@runOnUiThread
+                            }
+
+                            val cardChanged = syncEmbeddedSnapshot(currentProject, snapshot)
+                            if (cardChanged) refresh()
+                            if (isEmbeddedActive(snapshot)) {
+                                embeddedPollRunnables[stateKey]?.let { next ->
+                                    refreshHandler.postDelayed(next, EMBEDDED_POLL_INTERVAL_MS)
+                                }
+                            } else {
+                                invalidateEmbeddedPolling(stateKey)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    private fun invalidateEmbeddedPolling(projectDocumentId: String) {
+        embeddedPolls.untrack(projectDocumentId)
+        embeddedPollRunnables.remove(projectDocumentId)?.let(refreshHandler::removeCallbacks)
     }
 
     private fun ownsEmbeddedObservation(
@@ -3161,10 +3189,7 @@ open class V04Activity : StudioActivity() {
         internalWebObservationCache.remove(projectDocumentId)
         internalWebObservationInFlight.remove(projectDocumentId)
         internalWebDiscoveryRetries.remove(projectDocumentId)
-        if (embeddedPollProject?.summary?.documentId == projectDocumentId) {
-            embeddedPollProject = null
-            refreshHandler.removeCallbacks(embeddedPollRunnable)
-        }
+        invalidateEmbeddedPolling(projectDocumentId)
     }
 
     private fun isEmbeddedActive(snapshot: EmbeddedPythonSnapshot): Boolean =

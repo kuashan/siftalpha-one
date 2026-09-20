@@ -1370,3 +1370,22 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Same-project concurrent-operation rejection remains covered by the existing activity contract tests.
 - versionCode 172 / versionName 0.8.0-alpha43-r45a1.
 - Next gate: cloud verification, then real-device External Provider dual-project acceptance before r45-B Embedded R observation changes.
+
+
+## 2026-09-20 · r45-B Embedded R Multi-Project Observation
+
+- r45-A External Provider dual-project real-device acceptance: PASS.
+- r45-B removes the remaining single-project Embedded R observation pointer from V04Activity.
+- Replaced global `embeddedPollProject` / `embeddedPollInFlight` state with `EmbeddedProjectPollRegistry`, keyed by project document identity.
+- Each Internal R project now owns independent:
+  - tracked polling membership;
+  - in-flight snapshot state;
+  - delayed poll Runnable;
+  - lifecycle cancellation/resume.
+- One project's in-flight snapshot no longer suppresses polling for another project.
+- Switching one project to External Provider invalidates only that project's Embedded R poll state.
+- Terminal or missing Embedded R snapshots remove only that project's polling registration.
+- Activity stop pauses all delayed per-project poll Runnables while retaining tracked project membership. Activity resume restarts all tracked Internal R polls.
+- Activity destruction clears only UI observation registries; provider-owned Runtime sessions continue according to the existing foreground-service/session architecture.
+- Added JVM regression coverage for independent project tracking, independent in-flight state, and project-scoped untracking.
+- versionCode 173 / versionName 0.8.0-alpha43-r45b1.
