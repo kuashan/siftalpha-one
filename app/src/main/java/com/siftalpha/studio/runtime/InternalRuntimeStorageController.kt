@@ -1,6 +1,7 @@
 package com.siftalpha.studio.runtime
 
 import com.siftalpha.studio.project.V04ProjectGateway
+import com.siftalpha.studio.storage.SiftAlphaStorage
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.LinkOption
@@ -63,17 +64,17 @@ class InternalRuntimeStorageController(private val filesDir: File) {
             unassociatedEnvironmentSizeKb(cpythonEnvironmentsRoot(), knownIds.keys) +
                 unassociatedEnvironmentSizeKb(alpineEnvironmentsRoot(), knownIds.keys)
 
-        val cpythonSessions = sizeKb(File(siftAlphaRoot(), "sessions"))
-        val alpineSessions = sizeKb(File(alpineRoot(), "sessions"))
+        val cpythonSessions = sizeKb(SiftAlphaStorage.cpythonSessionsRoot(filesDir))
+        val alpineSessions = sizeKb(SiftAlphaStorage.alpineSessionsRoot(filesDir))
 
         return Snapshot(
             totalKb = sizeKb(siftAlphaRoot()),
-            cpythonRuntimeKb = sizeKb(File(siftAlphaRoot(), "python")),
+            cpythonRuntimeKb = sizeKb(SiftAlphaStorage.cpythonRuntimeRoot(filesDir)),
             alpineRootfsKb = sizeKb(File(alpineRoot(), "rootfs")),
             wheelCacheKb = sizeKb(wheelCacheRoot()),
             pipCacheKb = sizeKb(alpinePipCacheRoot()),
             npmCacheKb = sizeKb(alpineNpmCacheRoot()),
-            stagingKb = sizeKb(File(siftAlphaRoot(), "projects")),
+            stagingKb = sizeKb(SiftAlphaStorage.projectsRoot(filesDir)),
             sessionDataKb = cpythonSessions + alpineSessions,
             projectEnvironmentKb = usages.sumOf { it.totalKb },
             unassociatedEnvironmentKb = unassociatedKb,
@@ -83,7 +84,7 @@ class InternalRuntimeStorageController(private val filesDir: File) {
 
     fun clearWheelCache() = clearReproducibleCache(
         target = wheelCacheRoot(),
-        allowedParent = File(siftAlphaRoot(), "cache"),
+        allowedParent = siftAlphaRoot(),
     )
 
     fun clearAlpinePipCache() = clearReproducibleCache(
@@ -137,11 +138,11 @@ class InternalRuntimeStorageController(private val filesDir: File) {
         return total
     }
 
-    private fun siftAlphaRoot(): File = File(filesDir, "siftalphax")
-    private fun alpineRoot(): File = File(siftAlphaRoot(), "alpine")
-    private fun cpythonEnvironmentsRoot(): File = File(siftAlphaRoot(), "environments")
-    private fun alpineEnvironmentsRoot(): File = File(alpineRoot(), "environments")
-    private fun wheelCacheRoot(): File = File(siftAlphaRoot(), "cache/wheels")
+    private fun siftAlphaRoot(): File = SiftAlphaStorage.root(filesDir)
+    private fun alpineRoot(): File = SiftAlphaStorage.alpineRuntimeRoot(filesDir)
+    private fun cpythonEnvironmentsRoot(): File = SiftAlphaStorage.cpythonEnvironmentsRoot(filesDir)
+    private fun alpineEnvironmentsRoot(): File = SiftAlphaStorage.alpineEnvironmentsRoot(filesDir)
+    private fun wheelCacheRoot(): File = SiftAlphaStorage.wheelhouseRoot(filesDir)
     private fun alpinePipCacheRoot(): File = File(alpineRoot(), "rootfs/root/.cache/pip")
     private fun alpineNpmCacheRoot(): File = File(alpineRoot(), "rootfs/root/.npm/_cacache")
 

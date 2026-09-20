@@ -6,10 +6,10 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import com.siftalpha.studio.runtime.InterruptibleProjectTreeDelete
 import com.siftalpha.studio.runtime.RuntimeOperationContract
+import com.siftalpha.studio.storage.SiftAlphaStorage
 
 object EmbeddedPythonFiles {
     private const val ASSET_ROOT = "siftalphax/python"
-    private const val PRIVATE_ROOT = "siftalphax"
     private const val READY_MARKER = ".siftalpha_x_assets_ready"
 
     fun prepare(context: Context): File {
@@ -63,12 +63,12 @@ object EmbeddedPythonFiles {
     fun sessionWorkspaceRoot(context: Context, sessionId: String): File =
         sessionWorkspaceRoot(context.filesDir, sessionId)
 
-    internal fun runtimeHome(filesDir: File): File = File(filesDir, "$PRIVATE_ROOT/python")
-    internal fun projectStagingRoot(filesDir: File): File = File(filesDir, "$PRIVATE_ROOT/projects")
+    internal fun runtimeHome(filesDir: File): File = SiftAlphaStorage.cpythonRuntimeRoot(filesDir)
+    internal fun projectStagingRoot(filesDir: File): File = SiftAlphaStorage.projectsRoot(filesDir)
 
     internal fun projectEnvironmentRoot(filesDir: File, projectIdentity: String): File {
         require(projectIdentity.isNotBlank()) { "projectIdentity must not be blank" }
-        val environments = File(filesDir, "$PRIVATE_ROOT/environments")
+        val environments = SiftAlphaStorage.cpythonEnvironmentsRoot(filesDir)
         check(environments.mkdirs() || environments.isDirectory) { "Unable to create Embedded Python environments root" }
         val root = File(environments, sha256Hex(projectIdentity))
         check(root.parentFile?.canonicalFile == environments.canonicalFile) {
@@ -79,14 +79,14 @@ object EmbeddedPythonFiles {
     }
 
     internal fun dependencyCacheRoot(filesDir: File): File {
-        val root = File(filesDir, "$PRIVATE_ROOT/cache/wheels")
+        val root = SiftAlphaStorage.wheelhouseRoot(filesDir)
         check(root.mkdirs() || root.isDirectory) { "Unable to create Embedded Python dependency cache root" }
         return root.canonicalFile
     }
 
     internal fun sessionWorkspaceRoot(filesDir: File, sessionId: String): File {
         require(sessionId.isNotBlank()) { "sessionId must not be blank" }
-        val sessions = File(filesDir, "$PRIVATE_ROOT/sessions")
+        val sessions = SiftAlphaStorage.cpythonSessionsRoot(filesDir)
         check(sessions.mkdirs() || sessions.isDirectory) { "Unable to create Embedded Python session workspace root" }
         val root = File(sessions, sha256Hex(sessionId))
         check(root.parentFile?.canonicalFile == sessions.canonicalFile) {

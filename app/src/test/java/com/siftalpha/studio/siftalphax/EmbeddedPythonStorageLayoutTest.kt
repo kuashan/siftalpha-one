@@ -6,6 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import com.siftalpha.studio.runtime.InterruptibleProjectTreeDelete
+import com.siftalpha.studio.storage.SiftAlphaStorage
 import org.junit.Test
 
 class EmbeddedPythonStorageLayoutTest {
@@ -18,12 +19,12 @@ class EmbeddedPythonStorageLayoutTest {
             val environment = EmbeddedPythonFiles.projectEnvironmentRoot(filesDir, "project-a")
             val cache = EmbeddedPythonFiles.dependencyCacheRoot(filesDir)
             val session = EmbeddedPythonFiles.sessionWorkspaceRoot(filesDir, "session-a")
-            val root = filesDir.resolve("siftalphax").canonicalFile
-            assertEquals(root, runtime.parentFile.canonicalFile)
+            val root = filesDir.resolve("SiftAlphaX").canonicalFile
+            assertEquals(root.resolve("runtimes").canonicalFile, runtime.parentFile.canonicalFile)
             assertEquals(root, staging.parentFile.canonicalFile)
-            assertEquals(root.resolve("environments").canonicalFile, environment.parentFile.canonicalFile)
-            assertEquals(root.resolve("cache/wheels").canonicalFile, cache)
-            assertEquals(root.resolve("sessions").canonicalFile, session.parentFile.canonicalFile)
+            assertEquals(root.resolve("environments/cpython").canonicalFile, environment.parentFile.canonicalFile)
+            assertEquals(root.resolve("wheelhouse").canonicalFile, cache)
+            assertEquals(root.resolve("sessions/cpython").canonicalFile, session.parentFile.canonicalFile)
         } finally {
             filesDir.deleteRecursively()
         }
@@ -49,7 +50,7 @@ class EmbeddedPythonStorageLayoutTest {
     fun runtimeRepairTargetDoesNotDeleteCallerProjectStaging() {
         val filesDir = Files.createTempDirectory("siftalpha-runtime-repair").toFile()
         try {
-            val privateRoot = filesDir.resolve("siftalphax").apply { mkdirs() }
+            val privateRoot = SiftAlphaStorage.runtimesRoot(filesDir).apply { mkdirs() }
             val runtime = EmbeddedPythonFiles.runtimeHome(filesDir).apply {
                 mkdirs()
                 resolve("partial.txt").writeText("partial")

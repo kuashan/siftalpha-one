@@ -2,6 +2,7 @@ package com.siftalpha.studio.siftalphax
 
 import android.content.Context
 import android.net.ConnectivityManager
+import com.siftalpha.studio.storage.SiftAlphaStorage
 import java.io.File
 import java.io.InputStream
 import java.nio.file.Files
@@ -83,14 +84,13 @@ object InternalAlpineFiles {
     private const val EXPECTED_ROOTFS_SHA256 =
         "f25a96d2846a4bc439093107c1b48a8b0c93dcb411e2cb9cfded6f790b2bc001"
     private const val FORMAT_VERSION = "1"
-    private const val PRIVATE_ROOT = "siftalphax/alpine"
     private const val READY_MARKER = ".siftalpha-rootfs-ready"
 
     @Synchronized
     fun prepare(context: Context): InternalAlpineLayout {
         throwIfCancelled()
         val appContext = context.applicationContext
-        val base = File(appContext.filesDir, PRIVATE_ROOT)
+        val base = SiftAlphaStorage.alpineRuntimeRoot(appContext.filesDir)
         check(base.mkdirs() || base.isDirectory) { "Unable to create Internal Alpine base" }
         val rootfs = File(base, "rootfs")
         val marker = File(rootfs, READY_MARKER)
@@ -110,7 +110,7 @@ object InternalAlpineFiles {
         check(loader.isFile && loader.canExecute()) {
             "INTERNAL_ALPINE_LOADER_UNAVAILABLE: " + loader.absolutePath
         }
-        val temp = File(appContext.cacheDir, "siftalpha-proot-tmp")
+        val temp = SiftAlphaStorage.prootTempRoot(appContext.filesDir)
         check(temp.mkdirs() || temp.isDirectory) { "Unable to create Internal Alpine temp directory" }
         val sharedMemory = File(base, "shm")
         check(sharedMemory.mkdirs() || sharedMemory.isDirectory) {
@@ -135,7 +135,7 @@ object InternalAlpineFiles {
         context.assets.open(ASSET_PROVENANCE).bufferedReader().use { it.readText() }
 
     internal fun rootfsDirectory(context: Context): File =
-        File(context.applicationContext.filesDir, "$PRIVATE_ROOT/rootfs")
+        File(SiftAlphaStorage.alpineRuntimeRoot(context.applicationContext.filesDir), "rootfs")
 
     internal fun rootfsMatchesCurrentAssets(context: Context): Boolean {
         val rootfs = rootfsDirectory(context)
@@ -156,7 +156,7 @@ object InternalAlpineFiles {
 
     fun projectEnvironmentRoot(context: Context, projectIdentity: String): File {
         require(projectIdentity.isNotBlank()) { "projectIdentity must not be blank" }
-        val environments = File(context.filesDir, "$PRIVATE_ROOT/environments")
+        val environments = SiftAlphaStorage.alpineEnvironmentsRoot(context.filesDir)
         check(environments.mkdirs() || environments.isDirectory) {
             "Unable to create Internal Alpine environments root"
         }
@@ -169,7 +169,7 @@ object InternalAlpineFiles {
 
     fun sessionRoot(context: Context, sessionId: String): File {
         require(sessionId.isNotBlank())
-        val sessions = File(context.filesDir, "$PRIVATE_ROOT/sessions")
+        val sessions = SiftAlphaStorage.alpineSessionsRoot(context.filesDir)
         check(sessions.mkdirs() || sessions.isDirectory)
         val root = File(sessions, sessionId)
         check(root.parentFile?.canonicalFile == sessions.canonicalFile)
@@ -213,7 +213,7 @@ object InternalAlpineFiles {
             "-lc",
             shellCommand,
         )
-        val pidRoot = File(context.cacheDir, "siftalpha-proot-pids")
+        val pidRoot = SiftAlphaStorage.alpinePidRoot(context.filesDir)
         check(pidRoot.mkdirs() || pidRoot.isDirectory) {
             "Unable to create Internal Alpine PID root"
         }

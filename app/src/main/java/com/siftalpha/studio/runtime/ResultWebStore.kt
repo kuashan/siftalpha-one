@@ -1,6 +1,7 @@
 package com.siftalpha.studio.runtime
 
 import android.content.Context
+import com.siftalpha.studio.storage.SiftAlphaStorage
 import org.json.JSONObject
 import java.io.File
 
@@ -21,7 +22,7 @@ class ResultWebStore(context: Context) {
     )
 
     private val appContext = context.applicationContext
-    private val root = File(appContext.filesDir, DIRECTORY).apply { mkdirs() }
+    private val root = SiftAlphaStorage.resultsRoot(appContext.filesDir).apply { mkdirs() }
     private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun saveIfChanged(
@@ -141,7 +142,6 @@ class ResultWebStore(context: Context) {
     private fun fingerprintKey(projectToken: String): String = "latest_fingerprint:" + projectToken
 
     companion object {
-        private const val DIRECTORY = "siftalpha-results"
         private const val PREFS = "siftalpha_result_web_store_v1"
         private const val HTML_SUFFIX = ".html"
         private const val META_SUFFIX = ".meta.json"
