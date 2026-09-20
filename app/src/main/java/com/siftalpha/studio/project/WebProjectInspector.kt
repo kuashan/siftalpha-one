@@ -90,16 +90,6 @@ class WebProjectInspector(context: Context) {
             ?.trim()
             ?.takeIf { it.isNotBlank() }
 
-        detectNode(tree, files, runCommand)?.let { detection ->
-            return Profile(
-                enabled = true,
-                framework = detection.framework,
-                source = "node-${detection.source}",
-                host = detection.host,
-                port = detection.port,
-            )
-        }
-
         val requirements = files.firstOrNull { it.relativePath.equals("requirements.txt", ignoreCase = true) }
             ?.let { readLimitedText(tree, it.id, MAX_SCAN_FILE_BYTES) }
         val pyproject = files.firstOrNull { it.relativePath.equals("pyproject.toml", ignoreCase = true) }
@@ -120,7 +110,8 @@ class WebProjectInspector(context: Context) {
                 compareBy<Child> {
                     val index = preferredNames.indexOf(it.name.lowercase())
                     if (index >= 0) index else Int.MAX_VALUE
-                }.thenBy { pathDepth(it.relativePath) }
+                }.thenBy { pythonWebSourcePriority(it.relativePath) }
+                    .thenBy { pathDepth(it.relativePath) }
                     .thenBy { it.relativePath.lowercase() },
             )
             .take(MAX_PY_FILES)
@@ -128,20 +119,34 @@ class WebProjectInspector(context: Context) {
         val pythonSources = pythonChildren
             .map { readLimitedText(tree, it.id, MAX_SCAN_FILE_BYTES) }
 
-        val detection = WebProjectDetector.detect(
+        val pythonDetection = WebProjectDetector.detect(
             requirements = requirements,
             pyproject = pyproject,
             pythonSources = pythonSources,
             runCommand = runCommand,
-        ) ?: return Profile(false, null, "none", null, null)
-
-        return Profile(
-            enabled = true,
-            framework = detection.framework,
-            source = detection.source,
-            host = detection.host,
-            port = detection.port,
+            relativePaths = files.map { it.relativePath },
         )
+        if (pythonDetection != null) {
+            return Profile(
+                enabled = true,
+                framework = pythonDetection.framework,
+                source = pythonDetection.source,
+                host = pythonDetection.host,
+                port = pythonDetection.port,
+            )
+        }
+
+        detectNode(tree, files, runCommand)?.let { detection ->
+            return Profile(
+                enabled = true,
+                framework = detection.framework,
+                source = "node-${detection.source}",
+                host = detection.host,
+                port = detection.port,
+            )
+        }
+
+        return Profile(false, null, "none", null, null)
     }
 
     private fun readCachedProfile(tree: Uri, projectDocumentId: String): Profile? {
@@ -219,6 +224,7 @@ class WebProjectInspector(context: Context) {
             packageStartCommand = packageStart,
             nodeSources = nodeSources,
             declaredRun = declaredRun,
+            relativePaths = files.map { it.relativePath },
         )
     }
 
@@ -308,6 +314,18 @@ class WebProjectInspector(context: Context) {
         else -> if (name.lowercase().startsWith("vite.config.")) 4 else 10
     }
 
+    private fun pythonWebSourcePriority(path: String): Int {
+        val normalized = path.replace('\\', '/').lowercase()
+        val name = normalized.substringAfterLast('/')
+        return when {
+            name in setOf("streamlit_app.py", "manage.py", "server.py", "serve.py", "web.py") -> 0
+            "/web/" in normalized || "/ui/" in normalized || "/server/" in normalized -> 1
+            "/cli/" in normalized && (name.contains("web") || name.contains("serve")) -> 2
+            name in setOf("app.py", "main.py", "__main__.py", "cli.py") -> 3
+            else -> 20
+        }
+    }
+
     private fun pathDepth(path: String): Int = path.count { it == '/' }
 
     companion object {
@@ -316,7 +334,7 @@ class WebProjectInspector(context: Context) {
         private const val MAX_METADATA_BYTES = 128 * 1024
         private const val MAX_PACKAGE_JSON_BYTES = 256 * 1024
         private const val MAX_SCAN_FILE_BYTES = 256 * 1024
-        private const val MAX_PY_FILES = 8
+        private const val MAX_PY_FILES = 24
         private const val MAX_NODE_FILES = 8
         private const val MAX_SCAN_DEPTH = 4
         private const val MAX_PROJECT_ENTRIES = 192
