@@ -968,3 +968,19 @@ Real-device gate:
 | Learned launch | Later run | VERIFIED launch may skip deep rediscovery; endpoint is probed again |
 | Fresh install | No learned state | Rebuild Web capability from project evidence |
 | Result Web | Project Web unavailable | Result Web remains result presentation only; does not prove project Web |
+
+
+## alpha43-r46.3 — External Python venv stable-prefix regression
+
+| Area | Case | Expected |
+|---|---|---|
+| venv creation | PREPARE replacement | Create new venv directly at final `/root/venvs/<runtime-id>` path |
+| relocation | Completed venv | Never rename a completed `.prepare-*` venv into final location |
+| console scripts | pip-generated entry point | Shebang/interpreter prefix is generated against final stable venv |
+| dependency install | requirements / pyproject | Use final `$venv/bin/python` throughout installation |
+| prefix identity | Post-install validation | `sys.executable == $venv/bin/python` before READY |
+| rollback | Dependency/install/validation failure | Delete partial replacement and restore prior venv |
+| READY rollback | Failed PREPARE with prior valid env | Restore prior READY marker with prior venv |
+| rollback failure | Previous env cannot be restored | Clear READY and emit `ENVIRONMENT_ROLLBACK_FAILED` |
+| successful activation | New env validated | Write new READY, delete backups, disarm rollback |
+| structured console launch | `$venv/bin/<script>` | Execute normally without exit 127 caused by stale temporary shebang |
