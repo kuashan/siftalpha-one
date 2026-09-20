@@ -87,6 +87,38 @@ class InternalAlpineRuntimeTest {
     }
 
     @Test
+    fun legacyFingerprintRemainsCompatibleWithPreR46RequirementsPrecedence() {
+        val first = InternalAlpineDependencySource.fromProjectFiles(
+            requirementsText = "requests\n",
+            pyprojectText = "[project]\nrequires-python=\">=3.10\"\n",
+        )
+        val second = InternalAlpineDependencySource.fromProjectFiles(
+            requirementsText = "requests\n",
+            pyprojectText = "[project]\nrequires-python=\"<3\"\n",
+        )
+
+        assertEquals(first.legacySourceFingerprint, second.legacySourceFingerprint)
+        assertTrue(first.sourceFingerprint != second.sourceFingerprint)
+    }
+
+    @Test
+    fun legacyVenvPythonVersionReadsVirtualenvAndBuiltinVenvFormats() {
+        assertEquals(
+            "3.12.11",
+            InternalAlpineEnvironmentManager.legacyVenvPythonVersion(
+                "home = /usr/bin\nversion_info = 3.12.11.final.0\n",
+            ),
+        )
+        assertEquals(
+            "3.11.9",
+            InternalAlpineEnvironmentManager.legacyVenvPythonVersion(
+                "home = /usr/bin\nversion = 3.11.9\n",
+            ),
+        )
+        assertEquals(null, InternalAlpineEnvironmentManager.legacyVenvPythonVersion("home=/usr/bin\n"))
+    }
+
+    @Test
     fun alpineRuntimeIdentityChangesWithPythonVersion() {
         val first = InternalAlpineFiles.pythonRuntimeIdentity("3.12.11")
         val second = InternalAlpineFiles.pythonRuntimeIdentity("3.13.1")
