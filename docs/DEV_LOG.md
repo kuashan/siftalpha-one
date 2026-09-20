@@ -1432,3 +1432,22 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Internal Alpine Probe #57 / run `35512163859`: SUCCESS.
 - Real-device migration acceptance: pending.
 
+
+
+## 2026-09-20 — alpha43-r46.2 Web capability discovery + learned launch
+
+Goal: make a fresh SiftAlpha install rediscover a project's own Web UI from project-owned evidence instead of depending on a previously learned endpoint. Result Web remains a separate one-shot output presentation and does not participate in Web-capability truth.
+
+Implementation:
+- Added `CommonWebSignatureRegistry` as a high-confidence fast path before bounded deep inspection.
+- Fast signatures require combined evidence, never a dependency name alone.
+- Python coverage includes Streamlit, Gradio, NiceGUI, Dash, FastAPI/Uvicorn, Flask, Django, Panel, Bokeh, aiohttp, Tornado, plus Python+Vite hybrid projects.
+- Node coverage includes Next.js, Vite, Nuxt, Express, Fastify and Koa.
+- Hybrid Python+Vite evidence has priority over backend-only FastAPI evidence so a packaged frontend is not bypassed by launching the backend directly.
+- Web source inspection now prioritizes Web/UI/server/CLI files and expands the bounded Python source sample from 8 to 24 files.
+- Native Python Web launch discovery now accepts requirements evidence, inspects up to 32 prioritized Python sources, and can resolve safe common launch contracts for high-confidence project shapes before the existing strict Python+Vite fallback.
+- Added `RuntimeWebLearnedLaunchStore`. A launch is saved as DISCOVERED before execution and becomes VERIFIED only after the current Runtime-owned endpoint passes Endpoint Probe. Only VERIFIED launch contracts can be reused automatically.
+- PREPARE now starts a background forced Web-profile rediscovery in parallel with environment work. It does not block environment preparation.
+- Existing `RuntimeWebLearnedEndpointStore` remains intact. Learned endpoint/port data is still only a hint and current-session Endpoint Probe remains mandatory.
+- R47 storage consolidation remains abandoned. R46.1 is the source baseline for this work.
+- versionCode intentionally advances from 176 to 178. Historical abandoned R47 used 177, so 177 is not reused.
