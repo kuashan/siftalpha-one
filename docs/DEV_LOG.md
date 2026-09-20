@@ -1234,3 +1234,11 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - The feature logic was not exercised; the only reported failure was the two new Native Web confirmation strings missing from en / ja / ko / zh-rTW resource sets.
 - Added translations for the same two resource keys in all required locales.
 - No r42 APK was released from Run #258; versionCode remains 168 / versionName 0.8.0-alpha43-r42.
+
+
+### r42 pre-release Android resource escaping correction
+
+- W0 Run #259 passed repository validators and reached Android resource compilation.
+- AAPT2 rejected the new English Native Web confirmation message because the literal apostrophe in "project's" was parsed as an Android string-resource quoting boundary.
+- The two possessive apostrophes are now encoded as XML `&apos;`; no Native Web launch logic changed.
+- No r42 APK was released from Run #259; versionCode remains 168 / versionName 0.8.0-alpha43-r42.
