@@ -6,7 +6,11 @@ import com.siftalpha.studio.runtime.InterruptibleProjectTreeDelete
 import com.siftalpha.studio.runtime.RuntimeOperationContract
 import java.io.File
 
-class EmbeddedPythonEnvironmentManager(context: Context) {
+class EmbeddedPythonEnvironmentManager(
+    context: Context,
+    private val dependencyResolver: EmbeddedPythonDependencyResolverV1 =
+        EmbeddedPythonDependencyResolverV1(),
+) {
     private val appContext = context.applicationContext
 
     enum class Outcome {
@@ -28,9 +32,17 @@ class EmbeddedPythonEnvironmentManager(context: Context) {
         val environmentKey: String,
     )
 
+    fun resolveDependencyPlan(
+        dependencyInput: EmbeddedPythonDependencyInputV1,
+    ): EmbeddedPythonDependencyPlanV1 = dependencyResolver.resolve(
+        input = dependencyInput,
+        androidApiLevel = Build.VERSION.SDK_INT,
+    )
+
     fun prepare(
         projectIdentity: String,
         dependencyInput: EmbeddedPythonDependencyInputV1,
+        resolvedPlan: EmbeddedPythonDependencyPlanV1? = null,
     ): PreparationResult {
         require(projectIdentity.isNotBlank()) { "projectIdentity must not be blank" }
         EmbeddedPythonFiles.prepare(appContext)
@@ -53,10 +65,11 @@ class EmbeddedPythonEnvironmentManager(context: Context) {
             )
         }
 
-        val plan = EmbeddedPythonDependencyResolverV1().resolve(
-            input = dependencyInput,
-            androidApiLevel = Build.VERSION.SDK_INT,
-        )
+        val plan = resolvedPlan?.also {
+            check(it.sourceFingerprint == dependencyInput.sourceFingerprint) {
+                "ENVIRONMENT_PLAN_SOURCE_FINGERPRINT_MISMATCH"
+            }
+        } ?: resolveDependencyPlan(dependencyInput)
         val installed = installer.install(
             projectIdentity = projectIdentity,
             environmentRoot = environmentRoot,
