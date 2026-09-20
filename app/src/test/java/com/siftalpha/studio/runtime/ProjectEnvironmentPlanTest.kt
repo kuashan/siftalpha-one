@@ -129,6 +129,59 @@ class ProjectEnvironmentPlanTest {
     }
 
     @Test
+    fun inlineReadmeFileIsCheckedWithoutTomlTypeCrash() {
+        val detection = detect(
+            paths = listOf("pyproject.toml", "README.md", "main.py"),
+            pyproject = """
+                [project]
+                name = "demo"
+                readme = { file = "README.md", content-type = "text/markdown" }
+            """.trimIndent(),
+        )
+        val plan = ProjectEnvironmentPlanner.plan(detection, allCapabilities)
+
+        assertTrue(plan.readyToPrepare)
+        assertTrue(plan.detection.blockingIssues.isEmpty())
+    }
+
+    @Test
+    fun pep639LicenseStringIsMetadataNotAFileReference() {
+        val detection = detect(
+            paths = listOf("pyproject.toml", "main.py"),
+            pyproject = """
+                [project]
+                name = "demo"
+                license = "MIT"
+            """.trimIndent(),
+        )
+        val plan = ProjectEnvironmentPlanner.plan(detection, allCapabilities)
+
+        assertTrue(plan.readyToPrepare)
+        assertTrue(plan.detection.blockingIssues.isEmpty())
+    }
+
+    @Test
+    fun invalidDependenciesTypeBecomesDetectionIssueInsteadOfCrash() {
+        val detection = detect(
+            paths = listOf("pyproject.toml", "main.py"),
+            pyproject = """
+                [project]
+                name = "demo"
+                dependencies = "requests"
+            """.trimIndent(),
+        )
+        val plan = ProjectEnvironmentPlanner.plan(detection, allCapabilities)
+
+        assertFalse(plan.readyToPrepare)
+        assertTrue(
+            plan.detection.blockingIssues.any {
+                it.kind == EnvironmentIssueKind.PYPROJECT_INVALID &&
+                    "dependencies" in it.detail
+            },
+        )
+    }
+
+    @Test
     fun nestedPnpmViteComponentIsRejectedBeforePrepare() {
         val detection = detect(
             paths = listOf(
