@@ -81,8 +81,10 @@ android {
         // alpha43-r45b1 replaces the single Embedded R poll pointer with project-scoped polling.
         // alpha43-r45b2 keeps verified Web presentation stable across Activity lifecycle resume
         // while a fresh Endpoint Probe revalidates the same project-owned localhost endpoint.
-        versionCode = 174
-        versionName = "0.8.0-alpha43-r45b2"
+        // alpha43-r46 binds project environments to their Python Runtime identity and makes
+        // External Python re-prepare replace the prior venv only after a clean prepare succeeds.
+        versionCode = 175
+        versionName = "0.8.0-alpha43-r46"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
