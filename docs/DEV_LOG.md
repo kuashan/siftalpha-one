@@ -1163,3 +1163,10 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - W0 Run #251 passed repository validators and reached Kotlin compilation.
 - Android WebView's `webViewClient` property is non-null in the current SDK stubs, so assigning `null` during ResultWebActivity teardown failed compilation.
 - Teardown now replaces the client with a fresh inert `WebViewClient` before destroy. No released APK existed from the failed build, so r38 remains versionCode 164.
+
+### r38 pre-release adaptive result section-copy correction
+
+- W0 Run #252 reached unit tests and exposed four `ConcurrentModificationException` failures in AdaptiveResultTest.
+- Root cause: `trimBlankEdges()` returned a `subList` view of the mutable section buffer; `splitSections.flush()` then cleared the backing buffer, invalidating the stored section view.
+- The helper now materializes an immutable copy before the buffer is cleared. The parser/rendering contract is otherwise unchanged.
+- No r38 APK was released from the failed build, so versionCode remains 164.

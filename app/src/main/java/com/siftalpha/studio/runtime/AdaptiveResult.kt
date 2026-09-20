@@ -413,7 +413,7 @@ object AdaptiveResultAnalyzer {
         var last = lines.size
         while (first < last && lines[first].isBlank()) first += 1
         while (last > first && lines[last - 1].isBlank()) last -= 1
-        return lines.subList(first, last)
+        return lines.subList(first, last).toList()
     }
 }
 
