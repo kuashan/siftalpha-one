@@ -83,8 +83,8 @@ android {
         // while a fresh Endpoint Probe revalidates the same project-owned localhost endpoint.
         // alpha43-r46 binds project environments to their Python Runtime identity and makes
         // External Python re-prepare replace the prior venv only after a clean prepare succeeds.
-        versionCode = 175
-        versionName = "0.8.0-alpha43-r46"
+        versionCode = 176
+        versionName = "0.8.0-alpha43-r46.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
