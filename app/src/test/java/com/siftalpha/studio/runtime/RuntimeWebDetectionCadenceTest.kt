@@ -42,3 +42,39 @@ class RuntimeWebDetectionCadenceTest {
         assertEquals(2_000L, RuntimeWebDetectionCadence.externalObservationDelay(false))
     }
 }
+
+
+class RuntimeWebAvailabilityPresentationPolicyTest {
+
+    @org.junit.Test
+    fun freshLifecycleSuccessNotifiesEvenWhenEndpointStaysReachable() {
+        org.junit.Assert.assertTrue(
+            RuntimeWebAvailabilityPresentationPolicy.shouldNotify(
+                previousReachable = true,
+                currentReachable = true,
+                previousLifecycleGeneration = 7,
+                currentLifecycleGeneration = 8,
+                previousInitialPending = false,
+                currentInitialPending = false,
+                previousVerifiedPending = false,
+                currentVerifiedPending = false,
+            ),
+        )
+    }
+
+    @org.junit.Test
+    fun unchangedFactInSameLifecycleDoesNotNotify() {
+        org.junit.Assert.assertFalse(
+            RuntimeWebAvailabilityPresentationPolicy.shouldNotify(
+                previousReachable = true,
+                currentReachable = true,
+                previousLifecycleGeneration = 8,
+                currentLifecycleGeneration = 8,
+                previousInitialPending = false,
+                currentInitialPending = false,
+                previousVerifiedPending = false,
+                currentVerifiedPending = false,
+            ),
+        )
+    }
+}

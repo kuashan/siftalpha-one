@@ -1389,3 +1389,16 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Activity destruction clears only UI observation registries; provider-owned Runtime sessions continue according to the existing foreground-service/session architecture.
 - Added JVM regression coverage for independent project tracking, independent in-flight state, and project-scoped untracking.
 - versionCode 173 / versionName 0.8.0-alpha43-r45b1.
+
+
+## 2026-09-20 · r45-B2 Web Availability lifecycle resume fix
+
+- r45-B Embedded R multi-project real-device acceptance: PASS.
+- Confirmed a pre-existing Web presentation lifecycle defect also present in both frozen r44 baselines.
+- Symptom: returning to SiftAlpha from another app could leave Open disabled until Refresh Logs forced another card rebuild, even though the project Runtime and localhost Web service were still alive.
+- Root cause: a fresh Endpoint Probe that remained reachable across an Activity lifecycle change could transition stale verified evidence into current-lifecycle verified evidence without triggering the UI callback because reachability stayed true -> true.
+- RuntimeWebAvailabilityTracker now treats lifecycle-generation freshness as a presentation change.
+- The project card keeps the last verified project-owned Web URL as the provisional presentation target while the foreground probe revalidates it.
+- Browser opening still performs verifyNow before ACTION_VIEW, so Endpoint Probe remains the final truth gate.
+- No Runtime, Internal Alpine, Worker, third-party source, port scanning, or project ownership semantics changed.
+- versionCode 174 / versionName 0.8.0-alpha43-r45b2.

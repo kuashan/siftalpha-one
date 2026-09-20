@@ -699,3 +699,14 @@ r45-B replaces that UI observation singleton with project-scoped polling state. 
 Provider-specific Runtime implementation remains separate; this change only aligns the M-layer observation contract with the already project-keyed R-layer session model.
 
 The frozen r44 final baseline remains `baseline/alpha43-r44-final-known-good` until r45 is explicitly closed.
+
+
+## alpha43-r45b2 Web Availability lifecycle continuity
+
+r45-B multi-project Internal R observation passed real-device acceptance. A separate older presentation defect was then isolated in the Web availability lifecycle.
+
+RuntimeWebAvailabilityTracker intentionally preserves previously verified endpoint identity across Activity stop/start and schedules a fresh foreground probe. The missing transition was presentation notification when the endpoint stayed reachable: true -> true hid the fact that evidence moved from an older lifecycle generation into the current lifecycle generation.
+
+r45b2 makes lifecycle freshness part of the presentation-change contract and keeps the last verified project-owned URL available as the provisional Web presentation target while that fresh probe runs. Browser opening still performs verifyNow before ACTION_VIEW, so a stale URL cannot bypass Endpoint Probe verification. Runtime ownership, Web Discovery scope, STOP semantics, provider separation and Worker freeze are unchanged.
+
+The r44 final frozen baseline branches remain unchanged. r45b2 requires cloud verification and focused real-device acceptance before any later baseline promotion.

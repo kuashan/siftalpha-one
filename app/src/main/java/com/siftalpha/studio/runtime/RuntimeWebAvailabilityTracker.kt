@@ -301,9 +301,16 @@ class RuntimeWebAvailabilityTracker(
             consecutiveFailures = current.consecutiveFailures,
         )
         if (
-            previous?.reachable != current.reachable ||
-            previousInitialPending != currentInitialPending ||
-            previousVerifiedPending != currentVerifiedPending
+            RuntimeWebAvailabilityPresentationPolicy.shouldNotify(
+                previousReachable = previous?.reachable,
+                currentReachable = current.reachable,
+                previousLifecycleGeneration = previous?.lifecycleGeneration,
+                currentLifecycleGeneration = current.lifecycleGeneration,
+                previousInitialPending = previousInitialPending,
+                currentInitialPending = currentInitialPending,
+                previousVerifiedPending = previousVerifiedPending,
+                currentVerifiedPending = currentVerifiedPending,
+            )
         ) {
             onChanged()
         }
@@ -341,4 +348,29 @@ class RuntimeWebAvailabilityTracker(
     private fun keyPrefix(projectKey: String): String = "${projectKey.length}:$projectKey:"
 
     private fun key(projectKey: String, url: String): String = "${keyPrefix(projectKey)}$url"
+}
+
+
+/**
+ * Pure presentation transition policy for Runtime Web availability.
+ *
+ * A successful foreground revalidation can keep reachability true while moving the evidence from
+ * the previous Activity lifecycle into the current one. That lifecycle freshness transition must
+ * still rebuild the card so Open reflects the newly verified current-lifecycle fact.
+ */
+internal object RuntimeWebAvailabilityPresentationPolicy {
+    fun shouldNotify(
+        previousReachable: Boolean?,
+        currentReachable: Boolean,
+        previousLifecycleGeneration: Int?,
+        currentLifecycleGeneration: Int,
+        previousInitialPending: Boolean,
+        currentInitialPending: Boolean,
+        previousVerifiedPending: Boolean,
+        currentVerifiedPending: Boolean,
+    ): Boolean =
+        previousReachable != currentReachable ||
+            previousLifecycleGeneration != currentLifecycleGeneration ||
+            previousInitialPending != currentInitialPending ||
+            previousVerifiedPending != currentVerifiedPending
 }

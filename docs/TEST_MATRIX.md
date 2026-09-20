@@ -898,3 +898,26 @@ Real-device Internal R gate:
 - if two projects require the same fixed Web port, verify the conflict affects only the later conflicting project and never terminates the existing project.
 
 r45-B is not accepted until real-device evidence passes.
+
+
+### r45-B2 Web Availability lifecycle resume
+
+Automated contract:
+- a reachable endpoint revalidated in a new Activity lifecycle must notify presentation even when reachability remains true;
+- an unchanged reachable result within the same lifecycle must not create a redundant presentation notification;
+- a previously verified project-owned Web URL remains the provisional presentation target while the fresh foreground probe runs;
+- browser launch still performs verifyNow before ACTION_VIEW.
+
+Cloud gate:
+- repository validators PASS;
+- testDebugUnitTest PASS;
+- assembleDebug PASS;
+- Internal Alpine Probe PASS;
+- stable v2 signing unchanged.
+
+Real-device gate:
+- run a Web project until Open is enabled;
+- open the project Web UI in the external browser or switch to another app;
+- return to SiftAlpha without pressing Refresh Logs;
+- confirm Open remains enabled and opens only after normal Endpoint Probe verification;
+- if the Web service is actually unavailable, confirm repeated fresh probe failure removes availability instead of preserving stale Open state.

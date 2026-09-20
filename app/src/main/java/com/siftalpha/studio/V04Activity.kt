@@ -756,7 +756,9 @@ open class V04Activity : StudioActivity() {
             runtimeState = typedState,
             endpointReachable = endpointReachable,
             verifiedWebIdentity = verifiedWebUrl != null,
-            reachableUrl = reachableWebUrl,
+            // Preserve the last verified project-owned URL as the presentation target while the
+            // fresh foreground lifecycle probe runs. Browser launch still calls verifyNow().
+            reachableUrl = verifiedWebUrl,
             framework = reachableWebFramework,
         )
         val webUiStatus = web.status
