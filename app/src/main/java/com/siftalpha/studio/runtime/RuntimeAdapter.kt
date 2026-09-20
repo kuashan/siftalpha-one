@@ -33,6 +33,8 @@ data class RuntimeProjectSpec(
     val declaredEntry: String? = null,
     val declaredRun: String? = null,
     val relativePaths: List<String> = emptyList(),
+    /** Explicit project-level Python compatibility requirement from pyproject.toml, when declared. */
+    val pythonRequiresVersion: String? = null,
     /** Optional one-shot argv-based Python launch selected at action time. */
     val pythonLaunchInvocation: PythonLaunchInvocation? = null,
     /** M-owned Web capability gate for weak Runtime log URL discovery. */
