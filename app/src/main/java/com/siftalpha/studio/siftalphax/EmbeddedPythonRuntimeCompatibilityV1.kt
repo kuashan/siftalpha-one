@@ -1,5 +1,9 @@
 package com.siftalpha.studio.siftalphax
 
+object EmbeddedPythonRuntimeIdentityV1 {
+    const val ID = "cpython-3.14.7-android-arm64-v8a"
+}
+
 data class EmbeddedPythonRuntimeCompatibilityContextV1(
     val implementationName: String = "cpython",
     val implementationVersion: String = "3.14.7",
