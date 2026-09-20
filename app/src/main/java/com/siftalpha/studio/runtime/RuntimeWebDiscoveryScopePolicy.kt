@@ -46,6 +46,34 @@ object RuntimeWebDiscoveryScopePolicy {
         return RuntimeWebCandidate(url, RuntimeWebCandidateSource.RUNTIME_LOG)
     }
 
+    /**
+     * Internal Runtime keeps stdout and stderr separate. Web frameworks such as Flask commonly
+     * announce their bound local URL on stderr, so both streams are legitimate Runtime-log evidence.
+     * Keep the existing evidence ordering: PID/socket first, then explicit SiftAlpha URL, then
+     * ordinary Web-project log text. Non-Web projects still cannot promote generic local URLs.
+     */
+    fun candidateFromStreams(
+        stdout: String,
+        stderr: String,
+        webCapabilityEnabled: Boolean,
+    ): RuntimeWebCandidate? {
+        val candidates = listOf(stdout, stderr)
+            .mapNotNull { stream ->
+                candidateFromOutput(
+                    output = stream,
+                    webCapabilityEnabled = webCapabilityEnabled,
+                )
+            }
+        return candidates.minByOrNull { candidate ->
+            when (candidate.source) {
+                RuntimeWebCandidateSource.PID_SOCKET -> 0
+                RuntimeWebCandidateSource.EXPLICIT -> 1
+                RuntimeWebCandidateSource.RUNTIME_LOG -> 2
+                RuntimeWebCandidateSource.UNKNOWN -> 3
+            }
+        }
+    }
+
     fun shouldClearPersistedCandidate(
         webCapabilityEnabled: Boolean,
         source: RuntimeWebCandidateSource,

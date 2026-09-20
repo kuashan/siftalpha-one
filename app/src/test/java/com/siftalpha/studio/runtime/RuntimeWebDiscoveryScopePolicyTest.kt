@@ -76,6 +76,41 @@ class RuntimeWebDiscoveryScopePolicyTest {
     }
 
     @Test
+    fun webProjectCanDiscoverFlaskUrlFromStderr() {
+        val candidate = RuntimeWebDiscoveryScopePolicy.candidateFromStreams(
+            stdout = "Starting initial feed fetch...",
+            stderr = " * Running on http://127.0.0.1:5001",
+            webCapabilityEnabled = true,
+        )
+
+        assertEquals("http://127.0.0.1:5001", candidate?.url)
+        assertEquals(RuntimeWebCandidateSource.RUNTIME_LOG, candidate?.source)
+    }
+
+    @Test
+    fun nonWebProjectCannotPromoteGenericStderrLocalUrl() {
+        assertNull(
+            RuntimeWebDiscoveryScopePolicy.candidateFromStreams(
+                stdout = "",
+                stderr = "debug helper listening on http://127.0.0.1:9000",
+                webCapabilityEnabled = false,
+            ),
+        )
+    }
+
+    @Test
+    fun explicitStdoutCandidateOutranksGenericStderrCandidate() {
+        val candidate = RuntimeWebDiscoveryScopePolicy.candidateFromStreams(
+            stdout = "SIFTALPHA_WEB_URL=http://127.0.0.1:8080/",
+            stderr = " * Running on http://127.0.0.1:5001",
+            webCapabilityEnabled = true,
+        )
+
+        assertEquals("http://127.0.0.1:8080/", candidate?.url)
+        assertEquals(RuntimeWebCandidateSource.EXPLICIT, candidate?.source)
+    }
+
+    @Test
     fun projectScopedSocketEvidenceRemainsUsableWithoutStaticWebProfile() {
         val candidate = RuntimeWebDiscoveryScopePolicy.candidateFromOutput(
             output = """

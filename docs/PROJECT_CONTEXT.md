@@ -531,3 +531,9 @@ The foreground service now owns a diagnostic continuity sampler in addition to t
 
 The purpose of r33 is to establish a time series while the Activity is absent. A single post-return PID-alive snapshot cannot distinguish a frozen child from a running process whose HTTP listener stalled. The persisted sample history can. Once real-device evidence identifies which dimension stops first, the next repair must remain isolated to that layer.
 
+## alpha43-r34 Internal Web late-listener recovery (2026-09-20)
+
+A direct r24-to-r33 audit showed that the core Internal Alpine Web discovery machinery was not removed or replaced: PID/socket discovery, bounded late-listener retry cadence, Web availability tracking, state persistence and endpoint verification remain the r24 design. The material gap exposed by situation-monitor is the fallback stream boundary. Internal Runtime snapshots keep stdout and stderr separate, while the Web log fallback inspected only stdout. Flask normally announces its bound localhost URL on stderr after situation-monitor finishes its synchronous startup feed fetch.
+
+r34 adds a stream-neutral fallback without weakening Web truth. Both Runtime streams may contribute candidate evidence, but ordinary log URLs remain allowed only for projects already classified as Web-capable, and every candidate still crosses the existing Android loopback Endpoint Probe before browser availability is presented. The r24 Web state model, r31 foreground ownership, r32 UI stability and r33 background telemetry stay intact.
+

@@ -2686,9 +2686,15 @@ open class V04Activity : StudioActivity() {
             } else {
                 snapshot.stdout
             }
+            val safeStderr = if (::secretStore.isInitialized) {
+                secretStore.redactRuntimeText(project.folderName, snapshot.stderr)
+            } else {
+                snapshot.stderr
+            }
             val webCapabilityEnabled = webProfileCache[stateKey]?.enabled == true
-            val candidate = RuntimeWebDiscoveryScopePolicy.candidateFromOutput(
-                output = safeStdout,
+            val candidate = RuntimeWebDiscoveryScopePolicy.candidateFromStreams(
+                stdout = safeStdout,
+                stderr = safeStderr,
                 webCapabilityEnabled = webCapabilityEnabled,
             )
             if (candidate != null) {

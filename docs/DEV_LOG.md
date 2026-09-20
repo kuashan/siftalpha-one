@@ -1045,3 +1045,16 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - versionCode 159 / versionName 0.8.0-alpha43-r33.
 - Real-device acceptance is diagnostic: background SiftAlpha while the same-device browser remains on the localhost page for 5-10 minutes, then return without restarting and refresh logs. The sample history must identify whether CPU ticks/stdout/Web reachability stop together or diverge.
 
+## 2026-09-20 · alpha43-r34 Internal Web stderr fallback
+
+- Starting source baseline: `2590acef1ec79680c512d55d6d59f970eb638d9a`, version `0.8.0-alpha43-r33` / `159`.
+- Trigger: real-device `situation-monitor` remains indefinitely in Web DETECTING even though r24 is the known-good Web baseline.
+- r24 vs r33 audit found the core Internal Alpine Web discovery, hint policy, retry cadence, endpoint availability tracker, Web state store, endpoint-probe callback wiring, and descendant-PID traversal unchanged. r30 project-cache identity also preserves the real SAF documentId, and EXPLICIT/PID_SOCKET candidates are not cleared by Web-profile scope reconciliation.
+- `situation-monitor` is a Flask project whose Web server starts only after a synchronous initial feed fetch. Flask commonly writes its bound local URL to stderr. Internal Embedded-R snapshot Web fallback was inspecting stdout only, leaving no generic fallback when PID/socket procfs observation misses.
+- Added `RuntimeWebDiscoveryScopePolicy.candidateFromStreams()`: inspect both stdout and stderr while preserving evidence priority PID_SOCKET > EXPLICIT > RUNTIME_LOG.
+- Generic local URLs from stderr remain gated by an M-confirmed Web profile; non-Web projects cannot promote arbitrary localhost text. EXPLICIT SIFTALPHA_WEB_URL and PID/socket evidence retain their existing semantics.
+- Candidate URLs still require the existing Android loopback Endpoint Probe before Web becomes AVAILABLE. No static hint is promoted directly to truth.
+- No four-stage Web presentation, RuntimeWebHttpReadinessProbe, unified Project Start Contract, Worker, supervisor, runtime gate, External Runtime change, global PID scan or port-range scan is introduced.
+- versionCode 160 / versionName 0.8.0-alpha43-r34.
+- Cloud CI + signed APK are required before real-device acceptance. Situation-monitor must transition from DETECTING to AVAILABLE only after its late Flask listener is actually reachable.
+

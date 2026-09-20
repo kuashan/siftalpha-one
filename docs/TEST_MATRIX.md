@@ -566,3 +566,13 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
   - CPU ticks/stdout continue + Web reachable while browser UI appears stale => browser/frontend refresh path.
   - Battery optimization/idle evidence is supporting context, not by itself proof of root cause.
 
+### alpha43-r34 Internal Web stderr fallback acceptance
+
+- r24 remains the functional Web baseline; existing Internal Alpine PID/socket discovery, retry cadence, Endpoint Probe and presentation semantics must remain unchanged.
+- For a confirmed Web project, a local Flask-style stderr line such as `Running on http://127.0.0.1:5001` may become a RUNTIME_LOG candidate.
+- A generic localhost URL on stderr must remain rejected when static Web capability is not enabled.
+- PID_SOCKET evidence must outrank weaker Runtime-log evidence; an explicit `SIFTALPHA_WEB_URL` must outrank generic Runtime-log evidence.
+- A stderr-derived candidate remains only a candidate and must pass the existing Android loopback Endpoint Probe before AVAILABLE/Open presentation.
+- Situation-monitor real-device test: start with Internal Alpine, allow the initial feed fetch to finish, and verify Web changes from DETECTING to AVAILABLE without manual log refresh or project restart.
+- If situation-monitor remains DETECTING, copy full logs and verify whether stderr contains the Flask bound URL, whether the candidate reaches RuntimeWebStateStore, and whether the Endpoint Probe completes. CI success is not REAL_DEVICE_PASS.
+
