@@ -361,6 +361,18 @@ class ProjectRuntimeController(
         project: V04ProjectGateway.RuntimeProject,
         progress: ((String) -> Unit)? = null,
     ): InternalEnvironmentPreparationResult {
+        val plan = environmentPlan(project)
+        check(plan.readyToPrepare) { blockedEnvironmentPlanMessage(plan) }
+        check(plan.detection.primaryRuntime == RuntimeKind.PYTHON) {
+            "Environment Plan does not describe a Python project"
+        }
+        check(
+            plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON) ||
+                plan.supports(EnvironmentBackend.INTERNAL_ALPINE)
+        ) {
+            "Environment Plan has no Internal R preparation backend"
+        }
+
         val route = resolveControlPath(
             project = project,
             action = Action.PREPARE,
@@ -369,19 +381,35 @@ class ProjectRuntimeController(
         check(route.path == RuntimeControlPath.EMBEDDED_R) {
             "Embedded R prepare route rejected: " + route.reason
         }
+
         val projectId = project.summary.documentId
-        val requiresNodeVite = requiresInternalNodeVite(projectId)
+        val requiresNodeVite = requiresInternalNodeVite(plan)
         val files = internalDependencyFiles(projectId, requiresNodeVite)
+        progress?.invoke(
+            buildList {
+                add("SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R")
+                add("SIFTALPHA_X_PROJECT_ID=" + projectId)
+                add("SIFTALPHA_X_ENVIRONMENT_STAGE=PREPARING")
+                addAll(plan.diagnosticLines())
+            }.joinToString("\n"),
+        )
+
         val cpythonSession = embeddedPythonSession
         val cpythonManager = embeddedPythonEnvironmentManager
         var cpythonError: Throwable? = null
 
-        if (!requiresNodeVite && cpythonSession != null && cpythonManager != null) {
+        if (
+            plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON) &&
+            !requiresNodeVite &&
+            cpythonSession != null &&
+            cpythonManager != null
+        ) {
             progress?.invoke(
                 listOf(
                     "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
                     "SIFTALPHA_X_PROJECT_ID=" + projectId,
                     "SIFTALPHA_X_ENVIRONMENT_STAGE=PREPARING",
+                    "SIFTALPHA_ENV_PLAN_ID=" + plan.planId,
                     "SIFTALPHA_X_INTERNAL_PREPARE_STAGE=CPYTHON",
                 ).joinToString("\n"),
             )
@@ -408,13 +436,20 @@ class ProjectRuntimeController(
                     backend = InternalPythonBackend.CPYTHON,
                 )
             } catch (error: Throwable) {
-                if (InternalPythonPreparationFallbackPolicy.backendFor(error) != InternalPythonBackend.ALPINE) throw error
+                val fallback = InternalPythonPreparationFallbackPolicy.backendFor(error)
+                if (
+                    fallback != InternalPythonBackend.ALPINE ||
+                    !plan.supports(EnvironmentBackend.INTERNAL_ALPINE)
+                ) {
+                    throw error
+                }
                 cpythonError = error
                 progress?.invoke(
                     listOf(
                         "SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R",
                         "SIFTALPHA_X_PROJECT_ID=" + projectId,
                         "SIFTALPHA_X_ENVIRONMENT_STAGE=PREPARING",
+                        "SIFTALPHA_ENV_PLAN_ID=" + plan.planId,
                         "SIFTALPHA_X_INTERNAL_PREPARE_STAGE=ALPINE_FALLBACK",
                         "SIFTALPHA_X_INTERNAL_PREPARE_FALLBACK_REASON=" +
                             error.message.orEmpty().lineSequence().firstOrNull().orEmpty(),
@@ -423,6 +458,9 @@ class ProjectRuntimeController(
             }
         }
 
+        check(plan.supports(EnvironmentBackend.INTERNAL_ALPINE)) {
+            cpythonError?.message ?: "Environment Plan does not allow Internal Alpine"
+        }
         val alpineManager = internalAlpineEnvironmentManager
             ?: throw cpythonError ?: error("Internal Alpine environment manager is unavailable")
         val stager = embeddedPythonProjectStager
@@ -469,22 +507,28 @@ class ProjectRuntimeController(
         check(route.path == RuntimeControlPath.EMBEDDED_R) {
             "Embedded R route rejected: " + route.reason
         }
-        val selection = project.runtimeSelection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
-        check(selection?.primary == RuntimeKind.PYTHON) {
-            "Internal Python requires a resolved Python project"
+        val plan = environmentPlan(project)
+        check(plan.readyToPrepare) { blockedEnvironmentPlanMessage(plan) }
+        check(plan.detection.primaryRuntime == RuntimeKind.PYTHON) {
+            "Internal Python requires a resolved Python Environment Plan"
         }
         val projectId = project.summary.documentId
-        val requiresNodeVite = requiresInternalNodeVite(projectId)
+        val requiresNodeVite = requiresInternalNodeVite(plan)
         val files = internalDependencyFiles(projectId, requiresNodeVite)
-        val forceAlpine = requiresNodeVite ||
-            pythonLaunchInvocation?.kind == PythonLaunchKind.CONSOLE_SCRIPT
+        val forceAlpine =
+            !plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON) ||
+                requiresNodeVite ||
+                pythonLaunchInvocation?.kind == PythonLaunchKind.CONSOLE_SCRIPT
+        if (forceAlpine) {
+            check(plan.supports(EnvironmentBackend.INTERNAL_ALPINE)) {
+                "Environment Plan does not allow Internal Alpine for this launch"
+            }
+        }
         val cpythonInput = if (!forceAlpine) {
-            runCatching {
-                EmbeddedPythonRequirementParserV1.fromProjectFiles(
-                    files.requirementsText,
-                    files.pyprojectText,
-                )
-            }.getOrNull()
+            EmbeddedPythonRequirementParserV1.fromProjectFiles(
+                files.requirementsText,
+                files.pyprojectText,
+            )
         } else {
             null
         }
@@ -564,6 +608,7 @@ class ProjectRuntimeController(
         requiresNodeVite: Boolean = false,
     ): InternalDependencyFiles {
         val requirements = gateway.readProjectRootText(projectDocumentId, "requirements.txt")
+            ?.takeIf(::hasActiveRequirements)
         val pyproject = gateway.readProjectRootText(projectDocumentId, "pyproject.toml")
         return InternalDependencyFiles(
             requirementsText = requirements,
@@ -575,6 +620,12 @@ class ProjectRuntimeController(
             ),
         )
     }
+
+    private fun hasActiveRequirements(text: String): Boolean =
+        text.lineSequence().any { line ->
+            val value = line.trim()
+            value.isNotBlank() && !value.startsWith("#")
+        }
 
     private fun embeddedPythonDependencyInput(
         projectDocumentId: String,
