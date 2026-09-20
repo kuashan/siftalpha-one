@@ -137,6 +137,14 @@ object InternalAlpineFiles {
     internal fun rootfsDirectory(context: Context): File =
         File(context.applicationContext.filesDir, "$PRIVATE_ROOT/rootfs")
 
+    internal fun rootfsMatchesCurrentAssets(context: Context): Boolean {
+        val rootfs = rootfsDirectory(context)
+        val marker = File(rootfs, READY_MARKER)
+        return marker.isFile &&
+            runCatching { marker.readText() == markerText() }.getOrDefault(false) &&
+            File(rootfs, "bin/busybox").exists()
+    }
+
     internal fun pythonRuntimeIdentity(pythonFullVersion: String): String {
         require(pythonFullVersion.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+"))) {
             "Invalid Python runtime version: $pythonFullVersion"
