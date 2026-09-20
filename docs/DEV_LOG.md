@@ -1091,3 +1091,9 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Pre-release source review caught that the first r35 native edit added the argv vector to the snapshot struct but not the live Session struct while later code referenced `session->arguments`.
 - Corrected the live Embedded CPython Session to own `std::vector<std::string> arguments`. No released APK existed from the broken commit, so versionCode remains 161 / versionName 0.8.0-alpha43-r35.
 - The frozen r34 baseline remains unchanged.
+
+### r35 external final-log CLI diagnosis
+
+- External automatic observation already requests one final LOGS result after STATUS detects a terminal project. r35 now feeds that final Runtime output through the same configuration diagnostic.
+- Automatic final-log diagnosis is silent: it persists high-confidence missing CLI hints without opening a repeated dialog. A later Run uses those hints to present launch-argument input.
+- Manual LOGS may present the actionable configuration finding. Unrelated failures continue through the existing Runtime error path.

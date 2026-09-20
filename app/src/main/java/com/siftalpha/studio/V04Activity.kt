@@ -3620,8 +3620,13 @@ open class V04Activity : StudioActivity() {
                     }
                     refresh()
                 }
+                val configurationFindingShown = showRuntimeConfigurationFinding(
+                    item = item,
+                    result = result,
+                    presentDialog = !item.automaticObservation,
+                )
                 if (!success) {
-                    if (!item.automaticObservation) runtimeError(result)
+                    if (!item.automaticObservation && !configurationFindingShown) runtimeError(result)
                 } else if (item.openBrowserAfterLogs) {
                     if (runtimeState != RuntimeState.RUNNING) {
                         errorDialog(
