@@ -22,6 +22,8 @@ object NodeWebProjectDetector {
         "vite" to setOf("vite", "@vitejs/plugin-react", "@vitejs/plugin-vue"),
         "fastify" to setOf("fastify"),
         "express" to setOf("express"),
+        "nuxt" to setOf("nuxt", "nuxt3"),
+        "koa" to setOf("koa"),
     )
 
     fun detect(
@@ -29,11 +31,30 @@ object NodeWebProjectDetector {
         packageStartCommand: String?,
         nodeSources: List<String>,
         declaredRun: String? = null,
+        relativePaths: Collection<String> = emptyList(),
     ): Detection? {
         val normalizedDependencies = dependencies.map { it.trim().lowercase() }.toSet()
         val sourceText = nodeSources.joinToString("\n")
         val effectiveRun = declaredRun?.takeIf { it.isNotBlank() }
             ?: packageStartCommand?.takeIf { it.isNotBlank() }
+        val fastSignature = CommonWebSignatureRegistry.detectNode(
+            dependencies = normalizedDependencies,
+            packageStartCommand = packageStartCommand,
+            relativePaths = relativePaths,
+            nodeSources = nodeSources,
+            declaredRun = declaredRun,
+        )
+        if (fastSignature != null) {
+            val explicitPort = extractCommandPort(effectiveRun)
+                ?: extractSourcePort(sourceText)
+            val port = explicitPort ?: fastSignature.defaultPort
+            return Detection(
+                framework = fastSignature.framework,
+                source = "signature-" + fastSignature.evidence.joinToString("+"),
+                host = port?.let { "127.0.0.1" },
+                port = port,
+            )
+        }
 
         val dependencyFramework = frameworkDependencies.entries
             .firstOrNull { (_, names) -> names.any { it in normalizedDependencies } }
@@ -47,6 +68,7 @@ object NodeWebProjectDetector {
         val port = explicitPort ?: when (framework) {
             "vite" -> 5173
             "next" -> 3000
+            "nuxt" -> 3000
             else -> null
         }
         val source = when {
@@ -71,6 +93,7 @@ object NodeWebProjectDetector {
             Regex("(?i)(^|[\\s;&|])next(?:\\s|$)").containsMatchIn(value) -> "next"
             Regex("(?i)(^|[\\s;&|])vite(?:\\s|$)").containsMatchIn(value) -> "vite"
             Regex("(?i)(^|[\\s;&|])fastify(?:\\s|$)").containsMatchIn(value) -> "fastify"
+            Regex("(?i)(^|[\\s;&|])(?:nuxt|nuxi)(?:\\s|$)").containsMatchIn(value) -> "nuxt"
             else -> null
         }
     }
@@ -78,6 +101,7 @@ object NodeWebProjectDetector {
     private fun frameworkFromSource(source: String): String? = when {
         Regex("(?i)(?:require\\(\\s*['\"]fastify['\"]\\s*\\)|from\\s+['\"]fastify['\"])").containsMatchIn(source) -> "fastify"
         Regex("(?i)(?:require\\(\\s*['\"]express['\"]\\s*\\)|from\\s+['\"]express['\"])").containsMatchIn(source) -> "express"
+        Regex("(?i)(?:require\\(\\s*['\"]koa['\"]\\s*\\)|from\\s+['\"]koa['\"])").containsMatchIn(source) -> "koa"
         Regex("(?i)(?:require\\(\\s*['\"](?:node:)?https?['\"]\\s*\\)|from\\s+['\"](?:node:)?https?['\"]|\\bcreateServer\\s*\\()").containsMatchIn(source) -> "node-http"
         else -> null
     }
