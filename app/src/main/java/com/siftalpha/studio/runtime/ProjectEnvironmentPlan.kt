@@ -173,11 +173,18 @@ object ProjectEnvironmentDetector {
         }
 
         val parsedPyproject = parsePyproject(input.pyprojectText, issues)
-        val projectTable = parsedPyproject?.getTable("project")
-        val requiresPython = projectTable
-            ?.getString("requires-python")
+        val projectTable = parsedPyproject?.get("project") as? TomlTable
+        val requiresPythonValue = projectTable?.get("requires-python")
+        val requiresPython = (requiresPythonValue as? String)
             ?.trim()
             ?.takeIf { it.isNotBlank() }
+        if (requiresPythonValue != null && requiresPythonValue !is String) {
+            issues += EnvironmentDetectionIssue(
+                EnvironmentIssueKind.PYPROJECT_INVALID,
+                "project.requires-python must be a string",
+                blocking = true,
+            )
+        }
 
         if (projectTable != null) {
             staticProjectReferences(projectTable).forEach { reference ->
@@ -225,7 +232,7 @@ object ProjectEnvironmentDetector {
             EnvironmentDependencySource.REQUIREMENTS_TXT ->
                 activeRequirements.count { !it.startsWith("-") }
             EnvironmentDependencySource.PYPROJECT_TOML ->
-                projectTable?.getArray("dependencies")?.size() ?: 0
+                directPyprojectDependencyCount(projectTable, issues)
             EnvironmentDependencySource.NONE,
             EnvironmentDependencySource.UNSUPPORTED,
             -> 0
@@ -329,15 +336,36 @@ object ProjectEnvironmentDetector {
     private data class StaticReference(val source: String, val path: String)
 
     private fun staticProjectReferences(project: TomlTable): List<StaticReference> = buildList {
-        project.getString("readme")?.takeIf { it.isNotBlank() }?.let {
-            add(StaticReference("project.readme", it))
+        when (val readme = project.get("readme")) {
+            is String -> readme.takeIf { it.isNotBlank() }?.let {
+                add(StaticReference("project.readme", it))
+            }
+            is TomlTable -> (readme.get("file") as? String)
+                ?.takeIf { it.isNotBlank() }
+                ?.let { add(StaticReference("project.readme.file", it)) }
         }
-        project.getTable("readme")?.getString("file")?.takeIf { it.isNotBlank() }?.let {
-            add(StaticReference("project.readme.file", it))
+        val license = project.get("license")
+        if (license is TomlTable) {
+            (license.get("file") as? String)
+                ?.takeIf { it.isNotBlank() }
+                ?.let { add(StaticReference("project.license.file", it)) }
         }
-        project.getTable("license")?.getString("file")?.takeIf { it.isNotBlank() }?.let {
-            add(StaticReference("project.license.file", it))
+    }
+
+    private fun directPyprojectDependencyCount(
+        project: TomlTable?,
+        issues: MutableList<EnvironmentDetectionIssue>,
+    ): Int {
+        val dependencies = project?.get("dependencies") ?: return 0
+        if (dependencies !is org.tomlj.TomlArray) {
+            issues += EnvironmentDetectionIssue(
+                EnvironmentIssueKind.PYPROJECT_INVALID,
+                "project.dependencies must be an array",
+                blocking = true,
+            )
+            return 0
         }
+        return dependencies.size()
     }
 
     private fun safeProjectReference(raw: String): String? {
