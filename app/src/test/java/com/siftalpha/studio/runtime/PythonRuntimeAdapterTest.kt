@@ -99,8 +99,8 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("REQUIRES_PYTHON=%s"))
         assertTrue(script.contains("SIFTALPHA_ENV=READY"))
 
-        val finalVenvCreation = script.indexOf("python3 -m venv \"$venv\"")
-        val pythonValidation = script.indexOf("$venv/bin/python")
+        val finalVenvCreation = script.indexOf("python3 -m venv \"${'$'}venv\"")
+        val pythonValidation = script.indexOf("${'$'}venv/bin/python")
         val prefixValidation = script.indexOf("prepared_python_executable")
         val readySignal = script.indexOf("echo 'SIFTALPHA_ENV=READY'")
         assertTrue("replacement venv must be created at the stable final path", finalVenvCreation >= 0)
@@ -114,16 +114,16 @@ class PythonRuntimeAdapterTest {
     fun `prepare transaction never relocates a built virtual environment`() {
         val script = adapter.prepare(project).shellScript
 
-        val backupMove = script.indexOf("mv -- \"$venv\" \"$backup\"")
-        val createFinal = script.indexOf("python3 -m venv \"$venv\"")
-        val installFinal = script.indexOf("\"$venv/bin/python\" -m pip install")
+        val backupMove = script.indexOf("mv -- \"${'$'}venv\" \"${'$'}backup\"")
+        val createFinal = script.indexOf("python3 -m venv \"${'$'}venv\"")
+        val installFinal = script.indexOf("\"${'$'}venv/bin/python\" -m pip install")
         val readyWrite = script.indexOf("REQUIRES_PYTHON=%s")
         val disableRollback = script.indexOf("trap - EXIT", readyWrite)
 
         assertTrue("old environment must be retained before replacement", backupMove >= 0)
         assertTrue("new environment must be created only after old environment is backed up", createFinal > backupMove)
         assertTrue("pip must install into the final stable prefix", installFinal > createFinal)
-        assertFalse("a completed venv must never be renamed from a temporary prefix", script.contains("mv -- \"$candidate\" \"$venv\""))
+        assertFalse("a completed venv must never be renamed from a temporary prefix", script.contains("mv -- \"${'$'}candidate\" \"${'$'}venv\""))
         assertTrue("rollback stays armed until the new READY marker is written", disableRollback > readyWrite)
     }
 
