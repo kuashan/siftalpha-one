@@ -25,6 +25,7 @@ enum class InternalPythonBackend {
 data class InternalAlpineDependencySource(
     val kind: Kind,
     val sourceFingerprint: String,
+    val legacySourceFingerprint: String,
     val requiresNodeVite: Boolean = false,
     val projectRequiresPython: String? = null,
 ) {
@@ -57,15 +58,18 @@ data class InternalAlpineDependencySource(
                     source = "none\n"
                 }
             }
-            val fingerprintSource = source +
-                "\nNODE_VITE=" + (if (requiresNodeVite) "1" else "0") +
+            val legacyFingerprintSource = source +
+                "\nNODE_VITE=" + (if (requiresNodeVite) "1" else "0")
+            val fingerprintSource = legacyFingerprintSource +
                 "\nREQUIRES_PYTHON=" + projectRequiresPython.orEmpty()
-            val digest = MessageDigest.getInstance("SHA-256")
-                .digest(fingerprintSource.toByteArray(Charsets.UTF_8))
-                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            fun fingerprint(value: String): String =
+                "sha256:" + MessageDigest.getInstance("SHA-256")
+                    .digest(value.toByteArray(Charsets.UTF_8))
+                    .joinToString("") { "%02x".format(it.toInt() and 0xff) }
             return InternalAlpineDependencySource(
                 kind = kind,
-                sourceFingerprint = "sha256:$digest",
+                sourceFingerprint = fingerprint(fingerprintSource),
+                legacySourceFingerprint = fingerprint(legacyFingerprintSource),
                 requiresNodeVite = requiresNodeVite,
                 projectRequiresPython = projectRequiresPython,
             )
