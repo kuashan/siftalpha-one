@@ -89,9 +89,10 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("apt-get install -y python3-venv python3-pip"))
         assertTrue(script.contains("DEPENDENCY_SOURCE=requirements.txt"))
         assertTrue(script.contains("DEPENDENCY_SOURCE=pyproject.toml"))
-        assertTrue(script.contains("SIFTALPHA_PYPROJECT_EXTRAS=web"))
-        assertTrue(script.contains("optional-dependencies"))
-        assertTrue(script.contains("vite.config.ts"))
+        assertTrue(script.contains("SIFTALPHA_PYPROJECT_EXTRAS=none"))
+        assertFalse(script.contains("optional-dependencies"))
+        assertFalse(script.contains("vite.config.ts"))
+        assertFalse(script.contains("SIFTALPHA_PYPROJECT_WEB_EXTRA"))
         assertTrue(script.contains("install_target="))
         assertTrue(script.contains("/root/siftalpha/env-ready-runtime-id.txt"))
         assertTrue(script.contains("sha256sum"))
@@ -109,6 +110,24 @@ class PythonRuntimeAdapterTest {
         assertTrue("READY must only be emitted after final Python validation", readySignal > prefixValidation)
     }
 
+
+    @Test
+    fun `planned web extra is executed without install-time project rediscovery`() {
+        val script = adapter.prepare(
+            project.copy(
+                environmentPlanId = "sha256:web-plan",
+                pythonInstallExtras = listOf("web"),
+            ),
+        ).shellScript
+
+        assertTrue(script.contains("planned_extras='web'"))
+        assertTrue(script.contains("SIFTALPHA_PYPROJECT_EXTRAS=%s"))
+        assertTrue(script.contains("install_target="$project[$planned_extras]""))
+        assertFalse(script.contains("tomllib"))
+        assertFalse(script.contains("optional-dependencies"))
+        assertFalse(script.contains("vite.config"))
+        assertFalse(script.contains("find "$project" -maxdepth"))
+    }
 
     @Test
     fun `prepare transaction never relocates a built virtual environment`() {
