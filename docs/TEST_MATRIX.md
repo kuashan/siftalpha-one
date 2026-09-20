@@ -775,3 +775,26 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
   - non-Node console-script START may use full-project staging without dropping prebuilt dist/build.
 - Cloud: repository validators, testDebugUnitTest, Internal Alpine Probe and assembleDebug must pass before APK release.
 - Real-device: select SiftAlpha R for easy_tdx_1-main, PREPARE again and verify the previous 512-file staging failure is gone. The next observed output must come from the actual Internal Alpine Node/Vite/Python preparation stages.
+
+
+### alpha43-r44 baseline closure — ACCEPTED
+
+- Cloud verification: PASS.
+  - W0 #263: SUCCESS.
+  - Internal Alpine Probe #51: SUCCESS.
+  - testDebugUnitTest + assembleDebug: SUCCESS.
+  - stable v2-signed test APK produced.
+- Real-device verification: PASS.
+  - SiftAlpha R / EMBEDDED_R selected.
+  - modern Python+Vite project PREPARE completed beyond the former 512-file staging limit.
+  - Internal Alpine Node/npm + Vite build + Python web-extra preparation completed.
+  - environment reached READY.
+  - project-owned Native Web launch completed without Termux.
+  - SiftAlpha opened the project Web UI.
+  - Web UI dynamic refresh behavior was observed as working in the accepted test.
+- Accepted source:
+  - commit 0285db2c26565e1aa2a47624d2cad8fa9c19e89f
+  - versionCode 170
+  - versionName 0.8.0-alpha43-r44
+  - frozen branch baseline/alpha43-r44-known-good
+- Result: PASS. r44 replaces r34 as the project-level Known Good Functional Baseline. r34 remains a frozen historical reference and must not be moved.

@@ -1284,3 +1284,29 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Node/Vite Internal Alpine PREPARE and START request source-build staging explicitly; non-Node console-script staging preserves prebuilt output directories.
 - Existing relative-path validation, duplicate-path rejection, symlink/path-escape defenses, partial-copy cleanup and project-scoped ownership remain unchanged.
 - versionCode 170 / versionName 0.8.0-alpha43-r44.
+
+
+## 2026-09-20 · alpha43-r44 Baseline Closure / real-device acceptance
+
+- Real-device acceptance is complete for 0.8.0-alpha43-r44 / versionCode 170.
+- Accepted source commit: 0285db2c26565e1aa2a47624d2cad8fa9c19e89f.
+- Cloud evidence:
+  - W0 Cloud Build #263: SUCCESS;
+  - Internal Alpine Probe #51: SUCCESS;
+  - testDebugUnitTest: SUCCESS;
+  - assembleDebug: SUCCESS;
+  - APK Signature Scheme v2: verified;
+  - trusted test signer unchanged: CN=SiftAlpha Studio Test, OU=Mobile, O=SiftAlpha, C=MY.
+- Real-device evidence confirmed the full Internal R Python+Node/Vite native-Web path:
+  - imported modern multi-file project no longer fails at the legacy 512-file staging ceiling;
+  - Internal R staging completes with bounded generated/dependency pruning;
+  - Internal Alpine Node/npm preparation succeeds;
+  - Vite frontend build succeeds;
+  - Python project installation with declared web extra succeeds;
+  - Native Web Application Launch Discovery selects the project-owned Web service rather than the one-shot CLI helper;
+  - the project-owned Web UI opens through SiftAlpha and updates dynamically;
+  - no Termux / External Runtime dependency is required for this accepted path.
+- Worker remains frozen. Project-scoped STOP, Runtime ownership and the Web Discovery -> Endpoint Probe truth gate remain unchanged.
+- This source commit is promoted to the current Known Good Functional Baseline.
+- Frozen reference branch: baseline/alpha43-r44-known-good.
+- No feature/source changes are part of this closure commit.

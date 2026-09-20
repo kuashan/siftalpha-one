@@ -622,3 +622,29 @@ r44 updates the SAF-to-app-private staging boundary for modern source projects. 
 Staging is still explicitly bounded. The system now prunes dependency installations, interpreter caches and tool caches before counting source nodes, and source-build staging also prunes generated dist/build-style outputs that the Internal Alpine pipeline regenerates. Full-project source copies use a larger bounded profile, while entrypoint-oriented copies remain stricter.
 
 The ordinary project-browser tree limits are not reused as execution limits. Staging has its own bounded traversal contract, preserving the no-silent-truncation guarantee. Path validation, duplicate rejection, app-private destination ownership, symlink defense and cleanup-on-failure remain part of the same trust boundary.
+
+
+## Current Known Good Functional Baseline: alpha43-r44
+
+As of 2026-09-20, the project-level Known Good Functional Baseline is now `0.8.0-alpha43-r44` / versionCode `170`, accepted source commit `0285db2c26565e1aa2a47624d2cad8fa9c19e89f`.
+
+The dedicated frozen reference branch `baseline/alpha43-r44-known-good` points directly at that accepted source commit and must not move. The earlier `baseline/alpha43-r34-known-good` remains preserved as a historical reference; r44 supersedes r34 as the current regression baseline.
+
+Cloud verification for the accepted source completed successfully with W0 Build #263, Internal Alpine Probe #51, unit tests, debug APK assembly and stable v2 signing. Real-device acceptance also completed successfully.
+
+The accepted r44 baseline includes the cumulative accepted behavior from the r34 line plus the later CLI/result/Web work through r44. In particular, the baseline now proves a complete generic Internal R path for a modern Python-primary project with a Node/Vite supplemental frontend:
+
+1. SAF project import and bounded source staging;
+2. generated/dependency directory pruning with explicit mobile-safe limits;
+3. Internal Alpine Node/npm preparation;
+4. Vite frontend build;
+5. Python environment installation using the project's own declared Web extra when present;
+6. high-confidence Native Web Application Launch Discovery;
+7. installed Python console-script launch inside Internal Alpine;
+8. Runtime Identity / project ownership preservation;
+9. Web Discovery followed by Endpoint Probe verification;
+10. project-owned Web UI presentation in SiftAlpha without depending on Termux.
+
+The accepted real-device test also confirmed the project-owned Web UI can dynamically refresh its data once the project Web service is running. SiftAlpha Result Web remains a separate fallback for terminal one-shot output and does not replace a verified project-owned Web UI.
+
+Worker remains frozen. STOP remains scoped to the current project. A future baseline promotion requires both successful cloud verification and explicit real-device acceptance.
