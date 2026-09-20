@@ -1242,3 +1242,10 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - AAPT2 rejected the new English Native Web confirmation message because the literal apostrophe in "project's" was parsed as an Android string-resource quoting boundary.
 - The two possessive apostrophes are now encoded as XML `&apos;`; no Native Web launch logic changed.
 - No r42 APK was released from Run #259; versionCode remains 168 / versionName 0.8.0-alpha43-r42.
+
+
+### r42 pre-release Android apostrophe parsing correction
+
+- W0 Run #260 again reached Android resource compilation and showed that XML `&apos;` is decoded back to an apostrophe before Android string-resource parsing, so the same AAPT2 quoting rule still rejected the English message.
+- Reworded the English confirmation sentence to avoid possessive apostrophes entirely. No code, launch-policy, Web-discovery or Runtime behavior changed.
+- No r42 APK was released from Run #260; versionCode remains 168 / versionName 0.8.0-alpha43-r42.
