@@ -130,6 +130,8 @@
     <string name="runtime_run_secret_configured">\n\nAPI keys: configured and will be injected through secure stdin environment variables.</string>
     <string name="runtime_run_secret_missing">\n\nAPI keys: not configured. Ordinary projects are unaffected; projects that require authentication will report missing credentials themselves.</string>
     <string name="runtime_run_web_detected">\n\nWeb: detected. Studio will register the local Dashboard address after the project starts.</string>
+    <string name="runtime_native_web_run_title">Run %1$s native Web app?</string>
+    <string name="runtime_native_web_run_message">A project-owned Web launch entry was detected with high confidence:\n\n%1$s\n\nSiftAlpha will start the project's local Web service. The project's own automatic browser launch is disabled; after endpoint verification, SiftAlpha will open the native Web interface.</string>
     <string name="runtime_run_title">Run %1$s?</string>
     <string name="runtime_run_message">Command to run:\n\n%1$s\n\nPrepare the environment before the first run.%2$s%3$s</string>
     <string name="runtime_command_generation_failed">Could not create runtime command</string>

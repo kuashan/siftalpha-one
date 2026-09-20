@@ -1226,3 +1226,11 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Native Web launch is resolved before r37 CLI entry binding only for the External Provider route, whose console-script execution contract is already established. Internal R retains its current Python-file-only launch contract.
 - If any proof is missing, launch falls back unchanged to the accepted CLI resolver and r37 entry-bound behavior.
 - versionCode 168 / versionName 0.8.0-alpha43-r42.
+
+
+### r42 pre-release localization validator correction
+
+- W0 Run #258 stopped at repository localization validation before Kotlin compilation.
+- The feature logic was not exercised; the only reported failure was the two new Native Web confirmation strings missing from en / ja / ko / zh-rTW resource sets.
+- Added translations for the same two resource keys in all required locales.
+- No r42 APK was released from Run #258; versionCode remains 168 / versionName 0.8.0-alpha43-r42.

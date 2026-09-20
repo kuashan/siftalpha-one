@@ -130,6 +130,8 @@
     <string name="runtime_run_secret_configured">\n\nAPI キー：設定済み。安全な stdin を通じて環境変数へ注入されます。</string>
     <string name="runtime_run_secret_missing">\n\nAPI キー：未設定。通常のプロジェクトには影響しません。認証が必要なプロジェクトは認証情報不足を自ら報告します。</string>
     <string name="runtime_run_web_detected">\n\nWeb：検出済み。実行後、Studio がローカルダッシュボードのアドレスを登録します。</string>
+    <string name="runtime_native_web_run_title">%1$s のネイティブ Web アプリを実行しますか？</string>
+    <string name="runtime_native_web_run_message">プロジェクト固有の Web 起動エントリを高い確度で検出しました：\n\n%1$s\n\nSiftAlpha がプロジェクトのローカル Web サービスを起動します。プロジェクト側の自動ブラウザ起動は無効化し、エンドポイント確認後に SiftAlpha がネイティブ Web 画面を開きます。</string>
     <string name="runtime_run_title">%1$s を実行しますか？</string>
     <string name="runtime_run_message">実行するコマンド：\n\n%1$s\n\n初回実行前に環境を準備してください。%2$s%3$s</string>
     <string name="runtime_command_generation_failed">実行コマンドを作成できません</string>

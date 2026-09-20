@@ -130,6 +130,8 @@
     <string name="runtime_run_secret_configured">\n\nAPI 金鑰：已設定，將透過安全 stdin 注入環境變數。</string>
     <string name="runtime_run_secret_missing">\n\nAPI 金鑰：未設定。一般專案不受影響；需要驗證的專案會自行回報缺少憑證。</string>
     <string name="runtime_run_web_detected">\n\nWeb：已識別；執行後 Studio 會自動登記本機儀表板位址。</string>
+    <string name="runtime_native_web_run_title">執行 %1$s 的原生網頁應用？</string>
+    <string name="runtime_native_web_run_message">已高可信度識別專案自帶網頁啟動入口：\n\n%1$s\n\nSiftAlpha 將啟動專案自己的本機 Web 服務；專案自身的自動瀏覽器開啟會停用，待端點驗證通過後由 SiftAlpha 開啟原生網頁介面。</string>
     <string name="runtime_run_title">執行 %1$s？</string>
     <string name="runtime_run_message">將執行：\n\n%1$s\n\n首次執行前請先準備環境。%2$s%3$s</string>
     <string name="runtime_command_generation_failed">無法產生執行命令</string>
