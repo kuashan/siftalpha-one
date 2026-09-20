@@ -68,8 +68,9 @@ android {
         // Rich Result, External execution semantics and Worker freeze remain unchanged.
         // alpha43-r38 preserves the frozen r34 baseline plus r35-r37 CLI work, then adds
         // an adaptive app-owned localhost Result Web Host for successful one-shot program output.
-        versionCode = 164
-        versionName = "0.8.0-alpha43-r38"
+        // alpha43-r39 adds Android 15+ system-bar safe insets to legacy View surfaces.
+        versionCode = 165
+        versionName = "0.8.0-alpha43-r39"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

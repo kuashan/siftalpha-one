@@ -40,4 +40,52 @@ class StudioImeInsetPolicyTest {
             ),
         )
     }
+    @Test
+    fun `system inset is added to original padding`() {
+        assertEquals(
+            58,
+            StudioWindowInsetPolicy.systemPadding(
+                base = 10,
+                inset = 48,
+            ),
+        )
+    }
+
+    @Test
+    fun `negative system inset never removes original padding`() {
+        assertEquals(
+            10,
+            StudioWindowInsetPolicy.systemPadding(
+                base = 10,
+                inset = -20,
+            ),
+        )
+    }
+
+    @Test
+    fun `hidden ime still preserves navigation bar inset`() {
+        assertEquals(
+            62,
+            StudioWindowInsetPolicy.bottomPadding(
+                baseBottom = 14,
+                systemBottom = 48,
+                imeBottom = 320,
+                imeVisible = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `visible ime uses larger obstruction instead of double counting navigation bar`() {
+        assertEquals(
+            334,
+            StudioWindowInsetPolicy.bottomPadding(
+                baseBottom = 14,
+                systemBottom = 48,
+                imeBottom = 320,
+                imeVisible = true,
+            ),
+        )
+    }
+
 }

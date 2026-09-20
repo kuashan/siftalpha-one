@@ -578,3 +578,10 @@ The in-app Result Web viewer uses an actual localhost URL, with JavaScript/file/
 
 r37 is the real-device-passed CLI execution baseline for this feature work. r34 remains the frozen product Known Good Functional Baseline until a later explicit baseline promotion.
 
+
+
+## alpha43-r39 Android system-bar safe insets
+
+r39 is a presentation-only correction discovered during r38 real-device Result Web acceptance. Android 15+ edge-to-edge enforcement placed the legacy View root at the physical window edge, while the shared StudioActivity inset handler previously protected only against the software keyboard. This allowed the Result Web Back / Copy link / Open in browser row to overlap the status bar.
+
+StudioActivity now applies the device-reported system-bar/display-cutout insets on top of each legacy View root's existing padding and reconciles the bottom system inset with the IME using the larger obstruction. The fix is shared so other legacy View surfaces receive the same correct safe-area behavior without hard-coded status-bar dimensions. Compose surfaces retain their existing safeDrawing handling. r38 adaptive Result Web behavior and Runtime semantics are unchanged.

@@ -1170,3 +1170,13 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Root cause: `trimBlankEdges()` returned a `subList` view of the mutable section buffer; `splitSections.flush()` then cleared the backing buffer, invalidating the stored section view.
 - The helper now materializes an immutable copy before the buffer is cleared. The parser/rendering contract is otherwise unchanged.
 - No r38 APK was released from the failed build, so versionCode remains 164.
+
+
+## 2026-09-20 · alpha43-r39 Android system-bar safe insets
+
+- Real-device r38 acceptance showed the Result Web viewer's top action row rendering underneath the Android status bar on an edge-to-edge device.
+- Root cause: shared `StudioActivity` handled Android 15+ IME bottom insets but preserved the original top/side padding, so legacy View surfaces did not consume status-bar/display-cutout or navigation-bar insets.
+- The shared View-activity boundary now adds the actual system-bar/display-cutout insets to the existing content padding. IME-visible bottom padding uses the larger of the navigation-bar and keyboard obstruction so those insets are not double-counted.
+- The fix is adaptive to device status-bar/cutout/navigation geometry; no fixed status-bar dp value is introduced.
+- Result parsing, Result Web HTML/CSS, Runtime ownership, Web discovery, project-scoped STOP, CLI argv behavior and the frozen r34 baseline are unchanged.
+- versionCode 165 / versionName 0.8.0-alpha43-r39.

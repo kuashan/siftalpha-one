@@ -669,3 +669,15 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Cloud: repository validators, `testDebugUnitTest`, native build and `assembleDebug` must pass.
 - Real-device: rerun easy_tdx-main; after `EXITED_SUCCESS`, project card should show Result Web ready and Open should display formatted sections/metrics/tables instead of requiring Raw Log reading.
 
+
+
+### alpha43-r39 Android system-bar inset acceptance
+
+- On Android 15+ edge-to-edge devices, the Result Web action row (Back / Copy link / Open in browser) must render fully below the status bar and any display cutout.
+- Existing Result Web URL text and WebView content must remain below the action row without overlap.
+- Legacy View roots must preserve their existing app padding while adding left/top/right system-bar/display-cutout insets.
+- Bottom padding must preserve the navigation-bar inset when the IME is hidden and use the larger IME obstruction when the keyboard is visible; navigation and IME insets must not be double-counted.
+- Android 14-and-earlier View layout behavior remains unchanged.
+- Regression: r38 adaptive result extraction/rendering, r37 CLI entry binding/argv, r34 Web truth gates, Runtime ownership and project-scoped STOP remain unchanged.
+- Cloud: repository validators, unit tests and assembleDebug must pass before APK release.
+- Real-device: open an r38-style Result Web page and verify the top three actions no longer overlap the system clock/network/battery area.

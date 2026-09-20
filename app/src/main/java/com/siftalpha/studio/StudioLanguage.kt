@@ -121,9 +121,32 @@ object StudioLanguage {
     }
 }
 
+internal object StudioWindowInsetPolicy {
+    fun systemPadding(base: Int, inset: Int): Int =
+        base + inset.coerceAtLeast(0)
+
+    fun bottomPadding(
+        baseBottom: Int,
+        systemBottom: Int,
+        imeBottom: Int,
+        imeVisible: Boolean,
+    ): Int {
+        val obstruction = maxOf(
+            systemBottom.coerceAtLeast(0),
+            if (imeVisible) imeBottom.coerceAtLeast(0) else 0,
+        )
+        return baseBottom + obstruction
+    }
+}
+
 internal object StudioImeInsetPolicy {
     fun bottomPadding(baseBottom: Int, imeBottom: Int, imeVisible: Boolean): Int =
-        if (imeVisible) baseBottom + imeBottom.coerceAtLeast(0) else baseBottom
+        StudioWindowInsetPolicy.bottomPadding(
+            baseBottom = baseBottom,
+            systemBottom = 0,
+            imeBottom = imeBottom,
+            imeVisible = imeVisible,
+        )
 }
 
 open class StudioActivity : Activity() {
@@ -132,11 +155,11 @@ open class StudioActivity : Activity() {
     }
 
     /**
-     * Android 15+ enforces edge-to-edge for this target SDK. adjustResize still supplies IME insets,
-     * but custom View hierarchies must consume those insets so focused editors are not covered by the
-     * keyboard. Applying this once at the shared Activity boundary protects every full-screen Studio
-     * editing surface (project editor, terminal input and future View-based editors) without changing
-     * Android 14-and-earlier layout behavior.
+     * Android 15+ enforces edge-to-edge for this target SDK. Legacy View hierarchies must consume
+     * system-bar/display-cutout insets as well as IME insets; otherwise top controls can render under
+     * the status bar and bottom content can render under navigation or the keyboard. Applying this
+     * once at the shared Activity boundary protects every full-screen Studio View surface without
+     * changing Android 14-and-earlier layout behavior.
      */
     override fun setContentView(view: View?) {
         super.setContentView(view)
@@ -152,17 +175,28 @@ open class StudioActivity : Activity() {
         val baseBottom = root.paddingBottom
 
         root.setOnApplyWindowInsetsListener { target, insets ->
+            val systemBars = insets.getInsets(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+            )
             val imeVisible = insets.isVisible(WindowInsets.Type.ime())
             val imeBottom = insets.getInsets(WindowInsets.Type.ime()).bottom
-            val bottom = StudioImeInsetPolicy.bottomPadding(baseBottom, imeBottom, imeVisible)
+            val left = StudioWindowInsetPolicy.systemPadding(baseLeft, systemBars.left)
+            val top = StudioWindowInsetPolicy.systemPadding(baseTop, systemBars.top)
+            val right = StudioWindowInsetPolicy.systemPadding(baseRight, systemBars.right)
+            val bottom = StudioWindowInsetPolicy.bottomPadding(
+                baseBottom = baseBottom,
+                systemBottom = systemBars.bottom,
+                imeBottom = imeBottom,
+                imeVisible = imeVisible,
+            )
 
             if (
-                target.paddingLeft != baseLeft ||
-                target.paddingTop != baseTop ||
-                target.paddingRight != baseRight ||
+                target.paddingLeft != left ||
+                target.paddingTop != top ||
+                target.paddingRight != right ||
                 target.paddingBottom != bottom
             ) {
-                target.setPadding(baseLeft, baseTop, baseRight, bottom)
+                target.setPadding(left, top, right, bottom)
             }
 
             if (imeVisible) {
