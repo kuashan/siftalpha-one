@@ -50,9 +50,17 @@
     <string name="runtime_configuration_runtime_unnamed_message">프로젝트가 API 키 또는 자격 증명이 필요하다고 명확히 보고했지만 신뢰할 수 있는 환경 변수 이름은 제공하지 않았습니다. Studio는 이름을 추측하지 않습니다. “구성”을 열어 프로젝트 선언과 자격 증명 후보를 확인하세요.</string>
 
     <string name="runtime_configuration_summary_required_complete">✓ 필수 구성이 완료됨</string>
-    <string name="runtime_configuration_summary_required_none">✓ 선언된 필수 구성이 없음</string>
+    <string name="runtime_configuration_summary_required_none">✓ 필수 환경 구성이 없음</string>
     <string name="runtime_configuration_summary_required_missing">❌ 필수 항목 %1$d개가 설정되지 않음</string>
     <string name="runtime_configuration_summary_optional_missing">⚠ 권장 항목 %1$d개가 입력되지 않음(실행을 차단하지 않음)</string>
+    <string name="runtime_configuration_summary_cli_required">⚠ 필수 실행 인수 %1$d개(실행 시 입력)</string>
+    <string name="runtime_configuration_cli_required_section">CLI 실행 인수(필수)</string>
+    <string name="runtime_configuration_cli_runtime_entry">이 값은 실행 인수이며 환경 변수로 저장되지 않습니다. “실행”을 누를 때 입력하세요.</string>
+    <string name="runtime_configuration_cli_missing_title">실행 인수가 필요합니다</string>
+    <string name="runtime_configuration_cli_missing_message">프로그램에서 다음 CLI 실행 인수가 누락되었다고 보고했습니다:\n%1$s\n\nSiftAlpha가 이를 실행 인수로 인식했습니다. 다음에 “실행”을 누를 때 입력하세요.</string>
+    <string name="runtime_cli_required_value_hint">%1$s 입력</string>
+    <string name="runtime_cli_additional_arguments">추가 선택 인수</string>
+    <string name="runtime_cli_required_blank">필수 실행 인수를 입력하세요: %1$s</string>
     <string name="runtime_configuration_summary_optional_complete">✓ 권장 구성이 입력됨</string>
     <string name="runtime_configuration_optional_title">권장 구성: %1$s</string>
     <string name="runtime_configuration_optional_message">권장 구성입니다. 입력하면 프로젝트 경험이 좋아질 수 있으며 나중에 입력해도 실행을 차단하지 않습니다.</string>

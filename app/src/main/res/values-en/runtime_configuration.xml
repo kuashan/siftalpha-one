@@ -50,9 +50,17 @@
     <string name="runtime_configuration_runtime_unnamed_message">The project explicitly reported that an API key or credential is required, but it did not provide a reliable environment-variable name. Studio will not guess a name; open Configuration to review declared items and credential candidates.</string>
 
     <string name="runtime_configuration_summary_required_complete">✓ Required configuration complete</string>
-    <string name="runtime_configuration_summary_required_none">✓ No required configuration declared</string>
+    <string name="runtime_configuration_summary_required_none">✓ No required environment configuration</string>
     <string name="runtime_configuration_summary_required_missing">❌ %1$d required item(s) missing</string>
     <string name="runtime_configuration_summary_optional_missing">⚠ %1$d suggested item(s) not filled (does not block run)</string>
+    <string name="runtime_configuration_summary_cli_required">⚠ %1$d required launch argument(s) (entered at run time)</string>
+    <string name="runtime_configuration_cli_required_section">CLI launch arguments (required)</string>
+    <string name="runtime_configuration_cli_runtime_entry">These values are launch arguments. They are not saved as environment variables; enter them when you tap Run.</string>
+    <string name="runtime_configuration_cli_missing_title">Launch arguments required</string>
+    <string name="runtime_configuration_cli_missing_message">The program reported these CLI launch arguments as missing:\n%1$s\n\nSiftAlpha recognized them as launch arguments. Enter them the next time you tap Run.</string>
+    <string name="runtime_cli_required_value_hint">Enter %1$s</string>
+    <string name="runtime_cli_additional_arguments">Additional optional arguments</string>
+    <string name="runtime_cli_required_blank">Enter the required launch argument: %1$s</string>
     <string name="runtime_configuration_summary_optional_complete">✓ Suggested configuration complete</string>
     <string name="runtime_configuration_optional_title">Suggested configuration: %1$s</string>
     <string name="runtime_configuration_optional_message">This is suggested configuration. Filling it may improve the project experience; postponing it will not block a run.</string>

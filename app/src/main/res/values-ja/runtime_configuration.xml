@@ -50,9 +50,17 @@
     <string name="runtime_configuration_runtime_unnamed_message">プロジェクトは API キーまたは資格情報が必要だと明確に報告しましたが、信頼できる環境変数名は示していません。Studio は名前を推測しません。「設定」を開いてプロジェクトの宣言と資格情報候補を確認してください。</string>
 
     <string name="runtime_configuration_summary_required_complete">✓ 必須設定は完了しています</string>
-    <string name="runtime_configuration_summary_required_none">✓ 必須設定はありません</string>
+    <string name="runtime_configuration_summary_required_none">✓ 必須の環境設定はありません</string>
     <string name="runtime_configuration_summary_required_missing">❌ 必須項目が %1$d 件未設定です</string>
     <string name="runtime_configuration_summary_optional_missing">⚠ 任意の候補が %1$d 件未入力です（実行は妨げません）</string>
+    <string name="runtime_configuration_summary_cli_required">⚠ 必須の起動引数が %1$d 件あります（実行時に入力）</string>
+    <string name="runtime_configuration_cli_required_section">CLI 起動引数（必須）</string>
+    <string name="runtime_configuration_cli_runtime_entry">これらは起動引数です。環境変数として保存せず、「実行」を押したときに入力します。</string>
+    <string name="runtime_configuration_cli_missing_title">起動引数が不足しています</string>
+    <string name="runtime_configuration_cli_missing_message">プログラムから次の CLI 起動引数が不足していると報告されました：\n%1$s\n\nSiftAlpha はこれらを起動引数として認識しました。次回「実行」を押したときに入力してください。</string>
+    <string name="runtime_cli_required_value_hint">%1$s を入力</string>
+    <string name="runtime_cli_additional_arguments">その他の任意引数</string>
+    <string name="runtime_cli_required_blank">必須の起動引数を入力してください：%1$s</string>
     <string name="runtime_configuration_summary_optional_complete">✓ 任意設定は入力済みです</string>
     <string name="runtime_configuration_optional_title">任意設定：%1$s</string>
     <string name="runtime_configuration_optional_message">これは任意設定です。入力すると体験が改善する場合があります。後回しにしても実行は妨げません。</string>

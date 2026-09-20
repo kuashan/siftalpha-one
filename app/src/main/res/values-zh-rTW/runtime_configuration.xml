@@ -50,9 +50,17 @@
     <string name="runtime_configuration_runtime_unnamed_message">專案明確回報需要 API 金鑰或憑證，但沒有提供可靠的環境變數名稱。Studio 不會猜測名稱；請開啟「設定」查看專案宣告與候選憑證。</string>
 
     <string name="runtime_configuration_summary_required_complete">✓ 必要設定已完成</string>
-    <string name="runtime_configuration_summary_required_none">✓ 未宣告必要設定</string>
+    <string name="runtime_configuration_summary_required_none">✓ 沒有必要的環境設定</string>
     <string name="runtime_configuration_summary_required_missing">❌ 有 %1$d 個必要項目未設定</string>
     <string name="runtime_configuration_summary_optional_missing">⚠ 有 %1$d 個建議項目未填寫（不會阻止執行）</string>
+    <string name="runtime_configuration_summary_cli_required">⚠ 有 %1$d 個必要啟動參數（執行時輸入）</string>
+    <string name="runtime_configuration_cli_required_section">CLI 啟動參數（必要）</string>
+    <string name="runtime_configuration_cli_runtime_entry">這些值屬於啟動參數，不會儲存為環境變數；點選「執行」時輸入。</string>
+    <string name="runtime_configuration_cli_missing_title">缺少啟動參數</string>
+    <string name="runtime_configuration_cli_missing_message">程式回報缺少以下 CLI 啟動參數：\n%1$s\n\nSiftAlpha 已將它們辨識為啟動參數。下次點選「執行」時填寫即可。</string>
+    <string name="runtime_cli_required_value_hint">請輸入 %1$s</string>
+    <string name="runtime_cli_additional_arguments">其他選用參數</string>
+    <string name="runtime_cli_required_blank">請填寫必要啟動參數：%1$s</string>
     <string name="runtime_configuration_summary_optional_complete">✓ 建議設定已填寫</string>
     <string name="runtime_configuration_optional_title">建議設定：%1$s</string>
     <string name="runtime_configuration_optional_message">這是建議設定，填寫後可能改善專案體驗；稍後填寫也不會阻止執行。</string>
