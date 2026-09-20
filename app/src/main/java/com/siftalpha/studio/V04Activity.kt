@@ -42,6 +42,7 @@ import com.siftalpha.studio.runtime.RichResultDetectionPolicy
 import com.siftalpha.studio.runtime.PresentationTargetResolver
 import com.siftalpha.studio.runtime.PythonCliLaunchResolver
 import com.siftalpha.studio.runtime.PythonLaunchInvocation
+import com.siftalpha.studio.runtime.PythonNativeWebLaunchCandidate
 import com.siftalpha.studio.runtime.RuntimeArgumentParser
 import com.siftalpha.studio.runtime.RuntimeCommand
 import com.siftalpha.studio.runtime.RuntimeControlPath
@@ -1923,6 +1924,31 @@ open class V04Activity : StudioActivity() {
             project.folderName,
         )
         val requiredCli = configurationSnapshot.cliRequirements.filter { it.required }
+        val nativeWebProfile = webProfile?.takeIf { it.enabled }
+        val nativeWebLaunch = if (
+            nativeWebProfile != null &&
+            resolvedSelection?.primary == RuntimeKind.PYTHON &&
+            controlRequest == RuntimeControlRequest.EXTERNAL_PROVIDER
+        ) {
+            runCatching {
+                runtime.resolvePythonNativeWebLaunch(
+                    project = project,
+                    webProjectEnabled = true,
+                )
+            }.getOrNull()
+        } else {
+            null
+        }
+        if (nativeWebLaunch != null && nativeWebProfile != null) {
+            showPythonNativeWebRunConfirmation(
+                project = project,
+                webProfile = nativeWebProfile,
+                controlRequest = controlRequest,
+                candidate = nativeWebLaunch,
+            )
+            return
+        }
+
         val isPythonCliCandidate =
             webProfile != null &&
                 resolvedSelection?.primary == RuntimeKind.PYTHON &&
@@ -2001,6 +2027,31 @@ open class V04Activity : StudioActivity() {
         showGenericRunConfirmation(project, webProfile, controlRequest)
     }
 
+    private fun showPythonNativeWebRunConfirmation(
+        project: V04ProjectGateway.RuntimeProject,
+        webProfile: WebProjectInspector.Profile,
+        controlRequest: RuntimeControlRequest,
+        candidate: PythonNativeWebLaunchCandidate,
+    ) {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.runtime_native_web_run_title, project.summary.name))
+            .setMessage(
+                getString(
+                    R.string.runtime_native_web_run_message,
+                    candidate.displayCommand(),
+                ),
+            )
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .setPositiveButton(getString(R.string.runtime_button_run)) { _, _ ->
+                startProject(
+                    project = project,
+                    webProfile = webProfile,
+                    controlRequest = controlRequest,
+                    launchInvocation = candidate.toInvocation(),
+                )
+            }
+            .show()
+    }
     private fun showGenericRunConfirmation(
         project: V04ProjectGateway.RuntimeProject,
         webProfile: WebProjectInspector.Profile?,

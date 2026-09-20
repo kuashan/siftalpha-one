@@ -336,6 +336,54 @@ class V04ProjectGateway(private val context: Context) {
         }.getOrNull()
     }
 
+    /**
+     * Read a bounded set of project text files with one project-tree scan.
+     *
+     * Action-time launch discovery may need a few high-priority Python command sources. Keeping this
+     * batched avoids repeating a recursive SAF walk for every candidate file.
+     */
+    fun readProjectTextFiles(
+        projectDocumentId: String,
+        relativePaths: Collection<String>,
+        maxFiles: Int = 16,
+        maxBytesPerFile: Int = 128 * 1024,
+    ): Map<String, String> {
+        require(maxFiles in 1..32) { "启动源码读取文件数无效" }
+        require(maxBytesPerFile in 1..MAX_ROOT_TEXT_BYTES) { "启动源码读取上限无效" }
+        val requested = relativePaths
+            .asSequence()
+            .mapNotNull(EmbeddedPythonEntrypointPolicy::safeRelativePath)
+            .distinct()
+            .take(maxFiles)
+            .toList()
+        if (requested.isEmpty()) return emptyMap()
+
+        val wanted = requested.toSet()
+        val files = projectStore.listProjectTree(projectDocumentId)
+            .asSequence()
+            .filterNot { it.isDirectory }
+            .map { node ->
+                node.relativePath.replace('\\', '/').trim('/') to node
+            }
+            .filter { (path, _) -> path in wanted }
+            .toMap()
+
+        val result = linkedMapOf<String, String>()
+        requested.forEach { path ->
+            val file = files[path] ?: return@forEach
+            val bytes = projectStore.readProjectFileBytes(file, maxBytesPerFile + 1)
+            if (bytes.size > maxBytesPerFile) return@forEach
+            val text = runCatching {
+                Charsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes))
+                    .toString()
+            }.getOrNull() ?: return@forEach
+            result[path] = text
+        }
+        return result
+    }
     /** Resolve the one entrypoint M is willing to hand to Embedded R. R never scans or guesses. */
     fun resolveEmbeddedPythonEntrypoint(projectDocumentId: String): String? {
         val objectValue = metadata(projectDocumentId)

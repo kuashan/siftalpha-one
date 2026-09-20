@@ -599,3 +599,10 @@ The composed environment command also suppresses child-level global SIFTALPHA_EN
 ## alpha43-r41 Declared Web-extra installation
 
 After building a detected Vite frontend, Python preparation checks the project's own pyproject metadata. If the project explicitly declares a web optional-dependency group, SiftAlpha installs the editable project with that declared extra. This makes the packaged frontend and its Python Web-serving dependencies ready in one PREPARE without application-specific dependency injection. Node preparation also clears its shared prepare log at the beginning of each new run.
+
+
+## alpha43-r42 Native Web Application Launch Discovery
+
+r42 adds an M-layer launch policy for Python-primary projects that package their own Vite Web UI. It sits ahead of the r37 entry-bound CLI fallback but is intentionally much stricter: explicit run metadata wins, Web capability must already be known, pyproject must declare its own web optional dependencies and console script, Vite build evidence must exist, and bounded source inspection must prove a literal serve subcommand with a browser-suppression option.
+
+When this contract is proven on the accepted External Provider route, SiftAlpha launches the project-owned console script with structured argv, keeps browser ownership inside SiftAlpha, and relies on the existing Runtime Identity -> Web Discovery -> Endpoint Probe truth chain before presenting the browser. A failed proof does not alter project behavior; it falls back to the existing CLI launch resolver.

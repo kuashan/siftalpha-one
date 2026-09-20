@@ -1207,3 +1207,22 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Supplemental Node preparation truncates the current prepare log at the start of each run so stale traceback fragments cannot leak from a previous failed prepare.
 - Runtime lifecycle, project-scoped STOP, Result Web, safe insets, r40 ordering and CLI argument semantics are unchanged.
 - versionCode 167 / versionName 0.8.0-alpha43-r41.
+
+
+## 2026-09-20 · alpha43-r42 Native Web Application Launch Discovery
+
+- r41 real-device acceptance proved the Vite frontend, generated dist, declared Python web extra, FastAPI/Uvicorn dependencies and final environment readiness all succeed for a modern Python+Vite Web project.
+- The remaining launch gap was policy: required CLI arguments discovered in a one-shot helper script still caused r37's correct entry-bound CLI rule to select that helper even when the project also exposed a complete project-owned Web application.
+- Added a fail-closed Native Web Application Launch resolver. It never matches on project/package name alone.
+- Automatic native-Web launch requires all of the following:
+  - no explicit project run command;
+  - the project is already classified Web-capable;
+  - pyproject declares a non-empty [project.optional-dependencies].web group;
+  - a Vite package.json + vite.config.* component exists;
+  - pyproject declares a safe project console script (single script, or a unique script matching the project name);
+  - bounded high-priority Python source inspection finds a literal serve subcommand declaration;
+  - the serve command exposes an explicit browser-suppression option so SiftAlpha retains browser ownership.
+- When the serve source exposes --host, SiftAlpha binds the project server to 127.0.0.1 and adds the detected browser-suppression flag. No port scan or package-specific command is hard-coded.
+- Native Web launch is resolved before r37 CLI entry binding only for the External Provider route, whose console-script execution contract is already established. Internal R retains its current Python-file-only launch contract.
+- If any proof is missing, launch falls back unchanged to the accepted CLI resolver and r37 entry-bound behavior.
+- versionCode 168 / versionName 0.8.0-alpha43-r42.

@@ -704,3 +704,24 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - PREPARE emits SIFTALPHA_PYPROJECT_EXTRAS=web|none.
 - Node PREPARE starts with a fresh log; previous failures must not appear in a new successful run.
 - Regression: r40 Vite-first ordering, r39 safe insets, r38 Result Web, Web discovery, CLI launch binding and project-scoped STOP remain unchanged.
+
+
+### alpha43-r42 Native Web Application Launch Discovery acceptance
+
+- High-confidence Python+Vite Web project:
+  - Web classification is already enabled;
+  - pyproject has [project.optional-dependencies].web;
+  - Vite package.json + vite.config.* exists;
+  - a safe console script is declared;
+  - Python source contains a literal serve command plus a browser-suppression option.
+  - Result: Native Web launch wins before unrelated required CLI arguments from a one-shot helper.
+- The generated argv must remain structured: console script + serve + optional --host 127.0.0.1 + detected browser-suppression flag. No shell concatenation of user input is introduced.
+- Explicit project run metadata remains authoritative and disables automatic Native Web launch.
+- Missing Web extra, missing Vite evidence, missing serve declaration, or missing browser-suppression capability must fail closed and preserve existing CLI behavior.
+- Multiple console scripts are not guessed unless exactly one canonically matches the declared project name.
+- Existing r37 behavior remains mandatory: if Native Web proof fails, CLI requirements from one exact Python entrypoint may still bind launch to that Python file.
+- Existing Web truth gate remains mandatory: launch evidence does not make the browser available; Runtime Web Discovery + Endpoint Probe must still verify a project-owned local HTTP endpoint.
+- External Provider only for this round; Internal R console-script support is unchanged.
+- Regression: r41 Web-extra preparation, r40 Vite-first build, r39 safe insets, r38 Result Web, r37 CLI argv, Runtime ownership and project-scoped STOP remain unchanged.
+- Cloud validators, unit tests and assembleDebug must pass before APK release.
+- Real-device: run the prepared modern easy_tdx sample. The confirmation should show a project-owned serve command rather than run_all_strategies.py; after START, Uvicorn should remain running and SiftAlpha should verify/open the project Web UI.

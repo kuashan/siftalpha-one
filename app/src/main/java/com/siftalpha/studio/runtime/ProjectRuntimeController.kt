@@ -578,6 +578,76 @@ class ProjectRuntimeController(
         )
     }
 
+    /**
+     * Resolve a high-confidence project-owned Python Web application launch.
+     *
+     * This is action-time inspection only. Explicit project run metadata always wins, and failure to
+     * prove the native Web contract simply falls back to the existing CLI launch flow.
+     */
+    fun resolvePythonNativeWebLaunch(
+        project: V04ProjectGateway.RuntimeProject,
+        webProjectEnabled: Boolean,
+    ): PythonNativeWebLaunchCandidate? {
+        if (!webProjectEnabled) return null
+        val projectId = project.summary.documentId
+        val facts = gateway.runtimeFacts(projectId)
+        if (!facts.declaredRun.isNullOrBlank()) return null
+        val pyprojectToml = if (facts.relativePaths.any { it == "pyproject.toml" }) {
+            gateway.readProjectRootText(projectId, "pyproject.toml")
+        } else {
+            null
+        } ?: return null
+
+        val sourcePaths = facts.relativePaths
+            .asSequence()
+            .map { it.replace('\\', '/').trim().trim('/') }
+            .filter { it.endsWith(".py", ignoreCase = true) }
+            .filterNot { path ->
+                path.split('/').any { part ->
+                    part in setOf(
+                        ".git",
+                        ".venv",
+                        "venv",
+                        "__pycache__",
+                        "node_modules",
+                        "dist",
+                        "build",
+                        "site-packages",
+                    )
+                }
+            }
+            .sortedWith(
+                compareBy<String> { nativeWebSourcePriority(it) }
+                    .thenBy { it.count { ch -> ch == '/' } }
+                    .thenBy { it.lowercase() },
+            )
+            .take(16)
+            .toList()
+        val sources = gateway.readProjectTextFiles(projectId, sourcePaths)
+
+        return PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = facts.declaredRun,
+            pyprojectToml = pyprojectToml,
+            relativePaths = facts.relativePaths,
+            pythonSources = sources,
+            webProjectEnabled = webProjectEnabled,
+        )
+    }
+
+    private fun nativeWebSourcePriority(path: String): Int {
+        val normalized = path.replace('\\', '/').lowercase()
+        val name = normalized.substringAfterLast('/')
+        return when {
+            name == "cmd_web.py" -> 0
+            name in setOf("web.py", "server.py", "serve.py") -> 1
+            "/web/" in normalized -> 2
+            "/cli/" in normalized && name.startsWith("cmd_") -> 3
+            name == "__main__.py" -> 4
+            name == "cli.py" -> 5
+            name == "app.py" -> 6
+            else -> 20
+        }
+    }
     fun prepare(project: V04ProjectGateway.RuntimeProject): RuntimeCommand {
         val context = executionContext(project)
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
