@@ -111,6 +111,20 @@ class PythonRuntimeAdapterTest {
     }
 
     @Test
+    fun `legacy external readiness marker migrates only with venv version evidence`() {
+        val script = adapter.status(
+            project.copy(pythonRequiresVersion = ">=3.10"),
+        ).shellScript
+
+        assertTrue(script.contains("pyvenv.cfg"))
+        assertTrue(script.contains("legacy_created_python"))
+        assertTrue(script.contains("pip._vendor.packaging.specifiers"))
+        assertTrue(script.contains("migrated_ready"))
+        assertTrue(script.contains("READY_MIGRATED"))
+        assertTrue(script.contains("PYTHON_RUNTIME_VERSION_UNKNOWN"))
+    }
+
+    @Test
     fun `start preserves generic secret injection readiness guard auto entry and host lifecycle`() {
         host.quotedInputs.clear()
         val command = adapter.start(project)
