@@ -649,7 +649,12 @@ class ProjectRuntimeController(
             gateway.readProjectRootText(projectId, "pyproject.toml")
         } else {
             null
-        } ?: return null
+        }
+        val requirementsText = if (facts.relativePaths.any { it.equals("requirements.txt", ignoreCase = true) }) {
+            gateway.readProjectRootText(projectId, "requirements.txt")
+        } else {
+            null
+        }
 
         val sourcePaths = facts.relativePaths
             .asSequence()
@@ -674,7 +679,7 @@ class ProjectRuntimeController(
                     .thenBy { it.count { ch -> ch == '/' } }
                     .thenBy { it.lowercase() },
             )
-            .take(16)
+            .take(32)
             .toList()
         val sources = gateway.readProjectTextFiles(projectId, sourcePaths)
 
@@ -684,6 +689,7 @@ class ProjectRuntimeController(
             relativePaths = facts.relativePaths,
             pythonSources = sources,
             webProjectEnabled = webProjectEnabled,
+            requirementsText = requirementsText,
         )
     }
 
