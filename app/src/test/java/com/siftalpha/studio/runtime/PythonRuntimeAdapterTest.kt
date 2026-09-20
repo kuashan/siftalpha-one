@@ -78,9 +78,13 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("HOST_WRAP_BEGIN"))
         assertFalse(script.contains("HOST_CANCELABLE_BEGIN:runtime-id:prepare"))
         assertTrue(script.contains("python3 -m venv"))
-        assertTrue(script.contains("venv.prepare-"))
-        assertTrue(script.contains("cleanup_candidate"))
+        assertFalse(script.contains("venv.prepare-"))
+        assertTrue(script.contains("venv.backup-"))
+        assertTrue(script.contains("ready.backup-"))
+        assertTrue(script.contains("rollback_prepare"))
         assertTrue(script.contains("ENVIRONMENT_ACTIVATION_FAILED"))
+        assertTrue(script.contains("ENVIRONMENT_ROLLBACK_FAILED"))
+        assertTrue(script.contains("PYTHON_ENVIRONMENT_PREFIX_MISMATCH"))
         assertTrue(script.contains("python3 -m pip --version"))
         assertTrue(script.contains("apt-get install -y python3-venv python3-pip"))
         assertTrue(script.contains("DEPENDENCY_SOURCE=requirements.txt"))
@@ -95,10 +99,32 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("REQUIRES_PYTHON=%s"))
         assertTrue(script.contains("SIFTALPHA_ENV=READY"))
 
-        val pythonValidation = script.indexOf("candidate/bin/python")
+        val finalVenvCreation = script.indexOf("python3 -m venv \"$venv\"")
+        val pythonValidation = script.indexOf("$venv/bin/python")
+        val prefixValidation = script.indexOf("prepared_python_executable")
         val readySignal = script.indexOf("echo 'SIFTALPHA_ENV=READY'")
-        assertTrue("environment must be validated before READY is emitted", pythonValidation >= 0)
-        assertTrue("READY must only be emitted after final Python validation", readySignal > pythonValidation)
+        assertTrue("replacement venv must be created at the stable final path", finalVenvCreation >= 0)
+        assertTrue("dependency work must use the stable final venv", pythonValidation > finalVenvCreation)
+        assertTrue("stable-prefix validation must occur before READY", prefixValidation > pythonValidation)
+        assertTrue("READY must only be emitted after final Python validation", readySignal > prefixValidation)
+    }
+
+
+    @Test
+    fun `prepare transaction never relocates a built virtual environment`() {
+        val script = adapter.prepare(project).shellScript
+
+        val backupMove = script.indexOf("mv -- \"$venv\" \"$backup\"")
+        val createFinal = script.indexOf("python3 -m venv \"$venv\"")
+        val installFinal = script.indexOf("\"$venv/bin/python\" -m pip install")
+        val readyWrite = script.indexOf("REQUIRES_PYTHON=%s")
+        val disableRollback = script.indexOf("trap - EXIT", readyWrite)
+
+        assertTrue("old environment must be retained before replacement", backupMove >= 0)
+        assertTrue("new environment must be created only after old environment is backed up", createFinal > backupMove)
+        assertTrue("pip must install into the final stable prefix", installFinal > createFinal)
+        assertFalse("a completed venv must never be renamed from a temporary prefix", script.contains("mv -- \"$candidate\" \"$venv\""))
+        assertTrue("rollback stays armed until the new READY marker is written", disableRollback > readyWrite)
     }
 
     @Test
