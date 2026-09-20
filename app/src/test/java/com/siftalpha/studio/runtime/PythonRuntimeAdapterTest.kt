@@ -78,6 +78,9 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("HOST_WRAP_BEGIN"))
         assertFalse(script.contains("HOST_CANCELABLE_BEGIN:runtime-id:prepare"))
         assertTrue(script.contains("python3 -m venv"))
+        assertTrue(script.contains("venv.prepare-"))
+        assertTrue(script.contains("cleanup_candidate"))
+        assertTrue(script.contains("ENVIRONMENT_ACTIVATION_FAILED"))
         assertTrue(script.contains("python3 -m pip --version"))
         assertTrue(script.contains("apt-get install -y python3-venv python3-pip"))
         assertTrue(script.contains("DEPENDENCY_SOURCE=requirements.txt"))
@@ -88,13 +91,23 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("install_target="))
         assertTrue(script.contains("/root/siftalpha/env-ready-runtime-id.txt"))
         assertTrue(script.contains("sha256sum"))
-        assertTrue(script.contains("printf 'SOURCE=%s\\nHASH=%s\\n'"))
+        assertTrue(script.contains("PYTHON_VERSION=%s"))
+        assertTrue(script.contains("REQUIRES_PYTHON=%s"))
         assertTrue(script.contains("SIFTALPHA_ENV=READY"))
 
-        val pythonValidation = script.indexOf("\"${'$'}venv/bin/python\" --version")
+        val pythonValidation = script.indexOf("candidate/bin/python")
         val readySignal = script.indexOf("echo 'SIFTALPHA_ENV=READY'")
         assertTrue("environment must be validated before READY is emitted", pythonValidation >= 0)
         assertTrue("READY must only be emitted after final Python validation", readySignal > pythonValidation)
+    }
+
+    @Test
+    fun `prepare rejects unavailable declared Python version before dependency install`() {
+        val script = adapter.prepare(project.copy(pythonRequiresVersion = "<3")).shellScript
+
+        assertTrue(script.contains("SpecifierSet"))
+        assertTrue(script.contains("SIFTALPHA_ERROR=PYTHON_RUNTIME_UNAVAILABLE"))
+        assertTrue(script.contains("SIFTALPHA_PYTHON_REQUIRES"))
     }
 
     @Test
@@ -112,6 +125,8 @@ class PythonRuntimeAdapterTest {
         assertTrue(rawQuotedInputs.contains("_VALUE_B64"))
         assertTrue(rawQuotedInputs.contains("SIFTALPHA_ERROR=ENV_NOT_READY"))
         assertTrue(rawQuotedInputs.contains("DEPENDENCY_MANIFEST_CHANGED"))
+        assertTrue(rawQuotedInputs.contains("PYTHON_RUNTIME_VERSION_CHANGED"))
+        assertTrue(rawQuotedInputs.contains("PYTHON_REQUIREMENT_CHANGED"))
         assertTrue(rawQuotedInputs.contains("SIFTALPHA_ENTRY_AUTO"))
         assertTrue(rawQuotedInputs.contains("PYTHONUNBUFFERED=1"))
         assertTrue(rawQuotedInputs.contains("VIRTUAL_ENV"))
