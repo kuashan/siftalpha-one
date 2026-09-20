@@ -58,7 +58,7 @@ data class InternalAlpineDependencySource(
                 }
             }
             val fingerprintSource = source +
-                "\nNODE_VITE=" + if (requiresNodeVite) "1" else "0" +
+                "\nNODE_VITE=" + (if (requiresNodeVite) "1" else "0") +
                 "\nREQUIRES_PYTHON=" + projectRequiresPython.orEmpty()
             val digest = MessageDigest.getInstance("SHA-256")
                 .digest(fingerprintSource.toByteArray(Charsets.UTF_8))
