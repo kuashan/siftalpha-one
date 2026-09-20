@@ -613,3 +613,12 @@ When this contract is proven on the accepted External Provider route, SiftAlpha 
 r43 closes the provider split left by r42. A Python-primary project may now use Internal R when its only supplemental Runtime is Node/Vite. The capability is implemented inside Internal Alpine rather than by delegating to Termux: Alpine installs Node/npm on demand, builds detected Vite components from a staged project tree, installs the packaged Python project with its own declared web extra, and can execute the installed Python console script with structured argv.
 
 Embedded CPython remains the narrow Python-file backend. Node/Vite or console-script Web launches are deliberately forced to Internal Alpine. Project-owned Web availability still uses the established Runtime Identity / project PID ownership / candidate discovery / Endpoint Probe truth chain.
+
+
+## alpha43-r44 Scalable Internal Project Staging
+
+r44 updates the SAF-to-app-private staging boundary for modern source projects. The earlier 512-file / 1024-node limits were appropriate for the first narrow Embedded Python experiments but became an artificial blocker once Internal Alpine gained Python+Node/Vite preparation.
+
+Staging is still explicitly bounded. The system now prunes dependency installations, interpreter caches and tool caches before counting source nodes, and source-build staging also prunes generated dist/build-style outputs that the Internal Alpine pipeline regenerates. Full-project source copies use a larger bounded profile, while entrypoint-oriented copies remain stricter.
+
+The ordinary project-browser tree limits are not reused as execution limits. Staging has its own bounded traversal contract, preserving the no-silent-truncation guarantee. Path validation, duplicate rejection, app-private destination ownership, symlink defense and cleanup-on-failure remain part of the same trust boundary.

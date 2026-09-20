@@ -371,7 +371,10 @@ class ProjectRuntimeController(
             ?: throw cpythonError ?: error("Internal Alpine environment manager is unavailable")
         val stager = embeddedPythonProjectStager
             ?: throw cpythonError ?: error("Internal project staging is unavailable")
-        val staged = stager.stageAll(projectId)
+        val staged = stager.stageAll(
+            projectDocumentId = projectId,
+            sourceBuild = requiresNodeVite,
+        )
         return try {
             val prepared = alpineManager.prepare(
                 projectIdentity = projectId,
@@ -450,7 +453,10 @@ class ProjectRuntimeController(
             ?.takeIf { it.kind == PythonLaunchKind.CONSOLE_SCRIPT }
             ?.executableName
         val stagedRoot = if (requiresNodeVite || consoleScript != null) {
-            stager.stageAll(projectId)
+            stager.stageAll(
+                projectDocumentId = projectId,
+                sourceBuild = requiresNodeVite,
+            )
         } else {
             stager.stage(projectId, entrypoint)
         }

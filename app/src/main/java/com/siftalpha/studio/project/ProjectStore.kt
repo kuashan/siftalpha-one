@@ -169,16 +169,30 @@ if __name__ == "__main__":
      * 全项目递归扫描只用于搜索 / 最近文件 / 精确定位等需要完整视图的后台操作。
      */
     fun listProjectTree(projectDocumentId: String): List<FileNode> =
-        collectProjectTree(projectDocumentId).nodes
+        collectProjectTree(
+            projectDocumentId = projectDocumentId,
+            maxDepth = MAX_TREE_DEPTH,
+            maxItems = MAX_TREE_ITEMS,
+            skippedDirectories = SKIPPED_TREE_DIRECTORIES,
+        ).nodes
 
     /**
-     * Staging must never silently execute a truncated SAF tree. The ordinary tree API preserves its
-     * historical bounded behavior; the Embedded R boundary rejects an incomplete source tree.
+     * Staging must never silently execute a truncated SAF tree. Generated/dependency directories are
+     * pruned before they consume the staging traversal budget, while the execution copy remains
+     * explicitly bounded for mobile storage and memory safety.
      */
-    fun listProjectTreeForStaging(projectDocumentId: String): List<FileNode> {
-        val collected = collectProjectTree(projectDocumentId)
+    fun listProjectTreeForStaging(
+        projectDocumentId: String,
+        sourceBuild: Boolean = false,
+    ): List<FileNode> {
+        val collected = collectProjectTree(
+            projectDocumentId = projectDocumentId,
+            maxDepth = MAX_STAGING_TREE_DEPTH,
+            maxItems = EmbeddedPythonProjectStager.FULL_PROJECT_LIMITS.maxNodes,
+            skippedDirectories = EmbeddedPythonStagingPolicy.skippedDirectoryNames(sourceBuild),
+        )
         check(!collected.truncated) {
-            "项目文件树超过内置 R 暂存边界，未启动运行"
+            "项目源码树经过生成目录过滤后仍超过内置 R 暂存边界，未启动运行"
         }
         return collected.nodes
     }
@@ -188,18 +202,23 @@ if __name__ == "__main__":
         val truncated: Boolean,
     )
 
-    private fun collectProjectTree(projectDocumentId: String): ProjectTreeCollection {
+    private fun collectProjectTree(
+        projectDocumentId: String,
+        maxDepth: Int,
+        maxItems: Int,
+        skippedDirectories: Set<String>,
+    ): ProjectTreeCollection {
         val treeUri = rootUri() ?: error("项目目录不可用")
         val result = mutableListOf<FileNode>()
         var truncated = false
 
         fun walk(parentId: String, depth: Int, parentPath: String) {
-            if (depth > MAX_TREE_DEPTH) {
+            if (depth > maxDepth) {
                 truncated = true
                 return
             }
-            for (child in sortedVisibleChildren(treeUri, parentId)) {
-                if (result.size >= MAX_TREE_ITEMS) {
+            for (child in sortedTreeChildren(treeUri, parentId, skippedDirectories)) {
+                if (result.size >= maxItems) {
                     truncated = true
                     return
                 }
@@ -547,10 +566,17 @@ if __name__ == "__main__":
     }
 
     private fun sortedVisibleChildren(treeUri: Uri, parentId: String): List<ChildDocument> =
+        sortedTreeChildren(treeUri, parentId, SKIPPED_TREE_DIRECTORIES)
+
+    private fun sortedTreeChildren(
+        treeUri: Uri,
+        parentId: String,
+        skippedDirectories: Set<String>,
+    ): List<ChildDocument> =
         listChildren(treeUri, parentId)
             .filterNot { child ->
                 child.mimeType == DocumentsContract.Document.MIME_TYPE_DIR &&
-                    child.name in SKIPPED_TREE_DIRECTORIES
+                    child.name.lowercase() in skippedDirectories
             }
             .sortedWith(
                 compareBy<ChildDocument> {
@@ -735,6 +761,7 @@ if __name__ == "__main__":
         private const val KEY_RECENT_PREFIX = "recent_files_"
         private const val MAX_TREE_DEPTH = 12
         private const val MAX_TREE_ITEMS = 1500
+        private const val MAX_STAGING_TREE_DEPTH = 20
         private const val MAX_EDIT_FILE_BYTES = 1024 * 1024
         private const val MAX_ENTRY_NAME_CHARS = 180
         private const val MAX_SEARCH_FILES = 250
@@ -765,7 +792,7 @@ if __name__ == "__main__":
             "venv",
             "__pycache__",
             "node_modules",
-        )
+        ).map { it.lowercase() }.toSet()
         private val TEXT_FILENAMES = setOf(
             ".project.json",
             ".gitignore",

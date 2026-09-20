@@ -73,8 +73,9 @@ android {
         // alpha43-r41 installs declared Web extras for detected Vite-backed Python Web projects.
         // alpha43-r42 adds high-confidence project-owned Python Web application launch discovery.
         // alpha43-r43 extends that launch/preparation contract into Internal Alpine.
-        versionCode = 169
-        versionName = "0.8.0-alpha43-r43"
+        // alpha43-r44 scales bounded Internal R source staging for modern multi-file projects.
+        versionCode = 170
+        versionName = "0.8.0-alpha43-r44"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

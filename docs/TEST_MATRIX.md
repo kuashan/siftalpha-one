@@ -752,3 +752,26 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
   - r42 External Native Web launch, r41 Web-extra preparation, r40 Vite-first preparation, r39 insets, r38 Result Web, r37 CLI argv, Runtime ownership and project-scoped STOP remain unchanged.
 - Cloud: validators, testDebugUnitTest, Internal Alpine Probe and assembleDebug must pass before APK release.
 - Real-device: select SiftAlpha R for easy_tdx_1-main, PREPARE once, verify SIFTALPHA_X_ENVIRONMENT_READY=true, then RUN. The launch should use the project-owned serve console script and the verified Web UI should become available without Termux.
+
+
+### alpha43-r44 scalable Internal project staging acceptance
+
+- Generated/dependency pruning:
+  - node_modules, virtual environments, Python caches and common tool caches never enter Internal R staging.
+  - source-build staging additionally excludes dist/build/out and generated Web/coverage directories because Internal Alpine rebuilds those outputs.
+  - ordinary non-source-build staging preserves prebuilt dist/build assets.
+- Limits remain explicit:
+  - entrypoint staging: <=4096 nodes, <=2048 files, <=8 MiB/file, <=64 MiB total;
+  - full-project staging: <=8192 nodes, <=4096 files, <=16 MiB/file, <=128 MiB total.
+  - exceeding post-filter limits must still fail closed and remove any partial staging root.
+- Traversal:
+  - the normal project/UI tree keeps its existing historical bound;
+  - staging uses a separate bounded traversal and prunes ignored directories before they consume the execution-source budget.
+- Security regression:
+  - unsafe relative paths, duplicates, symlink destinations, path escape, oversized files and oversized total payload remain rejected.
+- Internal Alpine integration:
+  - Python+Node/Vite PREPARE uses sourceBuild=true;
+  - Python+Node/Vite Native Web START uses sourceBuild=true;
+  - non-Node console-script START may use full-project staging without dropping prebuilt dist/build.
+- Cloud: repository validators, testDebugUnitTest, Internal Alpine Probe and assembleDebug must pass before APK release.
+- Real-device: select SiftAlpha R for easy_tdx_1-main, PREPARE again and verify the previous 512-file staging failure is gone. The next observed output must come from the actual Internal Alpine Node/Vite/Python preparation stages.

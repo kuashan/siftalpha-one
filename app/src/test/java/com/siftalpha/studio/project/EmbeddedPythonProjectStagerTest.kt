@@ -61,6 +61,86 @@ class EmbeddedPythonProjectStagerTest {
     }
 
     @Test
+    fun sourceBuildFiltersGeneratedTreesBeforeApplyingLimits() {
+        val base = Files.createTempDirectory("siftalpha-stager-source-build").toFile()
+        val destination = File(base, "stage")
+        val nodes = listOf(
+            node("src", directory = true),
+            node("src/app.py"),
+            node("web-ui", directory = true),
+            node("web-ui/src", directory = true),
+            node("web-ui/src/main.ts"),
+            node("web-ui/dist", directory = true),
+            node("web-ui/dist/bundle.js"),
+            node("node_modules", directory = true),
+            node("node_modules/pkg", directory = true),
+            node("node_modules/pkg/index.js"),
+        )
+        try {
+            val staged = EmbeddedPythonProjectStager.stageNodes(
+                destination = destination,
+                nodes = nodes,
+                entrypoint = null,
+                limits = EmbeddedPythonStagingLimits(
+                    maxNodes = 5,
+                    maxFiles = 2,
+                    maxFileBytes = 256,
+                    maxTotalBytes = 1024,
+                ),
+                sourceBuild = true,
+            ) { node, _ -> node.relativePath.toByteArray() }
+
+            assertTrue(File(staged, "src/app.py").isFile)
+            assertTrue(File(staged, "web-ui/src/main.ts").isFile)
+            assertFalse(File(staged, "web-ui/dist").exists())
+            assertFalse(File(staged, "node_modules").exists())
+        } finally {
+            base.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun ordinaryStagingKeepsPrebuiltDistButStillDropsDependencyCaches() {
+        val base = Files.createTempDirectory("siftalpha-stager-runtime-copy").toFile()
+        val destination = File(base, "stage")
+        try {
+            val staged = EmbeddedPythonProjectStager.stageNodes(
+                destination = destination,
+                nodes = listOf(
+                    node("dist", directory = true),
+                    node("dist/runtime.json"),
+                    node("node_modules", directory = true),
+                    node("node_modules/pkg", directory = true),
+                    node("node_modules/pkg/index.js"),
+                ),
+                entrypoint = null,
+                limits = EmbeddedPythonStagingLimits(
+                    maxNodes = 2,
+                    maxFiles = 1,
+                    maxFileBytes = 256,
+                    maxTotalBytes = 1024,
+                ),
+                sourceBuild = false,
+            ) { node, _ -> node.relativePath.toByteArray() }
+
+            assertTrue(File(staged, "dist/runtime.json").isFile)
+            assertFalse(File(staged, "node_modules").exists())
+        } finally {
+            base.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun modernFullProjectLimitsRemainBoundedButExceedLegacyCeilings() {
+        val limits = EmbeddedPythonProjectStager.FULL_PROJECT_LIMITS
+
+        assertTrue(limits.maxNodes >= 8_192)
+        assertTrue(limits.maxFiles >= 4_096)
+        assertTrue(limits.maxFileBytes >= 16 * 1024 * 1024)
+        assertTrue(limits.maxTotalBytes >= 128L * 1024L * 1024L)
+    }
+
+    @Test
     fun rejectsUnsafeRelativePathBeforeCreatingStagingRoot() {
         val base = Files.createTempDirectory("siftalpha-stager-unsafe").toFile()
         val destination = File(base, "stage")

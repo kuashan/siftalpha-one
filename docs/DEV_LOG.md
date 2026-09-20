@@ -1270,3 +1270,17 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Internal Web presentation truth remains unchanged: a launch candidate does not make Web available. PID-scoped discovery / log candidate discovery and the existing Endpoint Probe must still verify the local HTTP endpoint.
 - Worker remains frozen; STOP remains project-scoped.
 - versionCode 169 / versionName 0.8.0-alpha43-r43.
+
+
+## 2026-09-20 · alpha43-r44 Scalable Internal Project Staging
+
+- Real-device r43 acceptance entered the new Internal Alpine polyglot path but PREPARE failed before Node/Vite work began because the imported source project contained more than the legacy 512-file Embedded R staging ceiling.
+- The failure was a staging-capacity mismatch, not a Python, Node, Vite, pip or Web-server failure.
+- Internal source staging now separates ordinary runtime copies from source-build copies. Dependency/cache directories are always pruned; source-build copies additionally prune generated build outputs that are recreated by the Internal Alpine prepare pipeline.
+- Always-pruned directories include .git, virtual environments, __pycache__, node_modules and common tool caches. Source-build pruning additionally removes dist/build/out and common generated Web/coverage outputs before they consume the staging traversal budget.
+- Ordinary staging keeps prebuilt dist/build directories when they may be runtime-owned assets; the stricter generated-output pruning is applied only when the caller explicitly declares a source build.
+- Full-project staging remains bounded but is sized for modern source trees: 8192 nodes, 4096 files, 16 MiB per file and 128 MiB total. Entrypoint-oriented staging remains stricter at 4096 nodes, 2048 files, 8 MiB per file and 64 MiB total.
+- ProjectStore now has a staging-specific bounded traversal (depth 20 / node budget from the full-project staging contract) so the ordinary UI tree's historical 1500-item bound is not reused as an execution-source ceiling.
+- Node/Vite Internal Alpine PREPARE and START request source-build staging explicitly; non-Node console-script staging preserves prebuilt output directories.
+- Existing relative-path validation, duplicate-path rejection, symlink/path-escape defenses, partial-copy cleanup and project-scoped ownership remain unchanged.
+- versionCode 170 / versionName 0.8.0-alpha43-r44.
