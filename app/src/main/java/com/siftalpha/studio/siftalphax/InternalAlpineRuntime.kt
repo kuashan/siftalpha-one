@@ -15,6 +15,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+import org.tomlj.Toml
 
 enum class InternalPythonBackend {
     CPYTHON,
@@ -25,6 +26,7 @@ data class InternalAlpineDependencySource(
     val kind: Kind,
     val sourceFingerprint: String,
     val requiresNodeVite: Boolean = false,
+    val projectRequiresPython: String? = null,
 ) {
     enum class Kind { REQUIREMENTS_TXT, PYPROJECT_TOML, NONE }
 
@@ -36,6 +38,7 @@ data class InternalAlpineDependencySource(
         ): InternalAlpineDependencySource {
             val kind: Kind
             val source: String
+            val projectRequiresPython = pyprojectText?.let(::extractRequiresPython)
             when {
                 requiresNodeVite && pyprojectText != null -> {
                     kind = Kind.PYPROJECT_TOML
@@ -54,7 +57,9 @@ data class InternalAlpineDependencySource(
                     source = "none\n"
                 }
             }
-            val fingerprintSource = source + "\nNODE_VITE=" + if (requiresNodeVite) "1" else "0"
+            val fingerprintSource = source +
+                "\nNODE_VITE=" + if (requiresNodeVite) "1" else "0" +
+                "\nREQUIRES_PYTHON=" + projectRequiresPython.orEmpty()
             val digest = MessageDigest.getInstance("SHA-256")
                 .digest(fingerprintSource.toByteArray(Charsets.UTF_8))
                 .joinToString("") { "%02x".format(it.toInt() and 0xff) }
@@ -62,7 +67,17 @@ data class InternalAlpineDependencySource(
                 kind = kind,
                 sourceFingerprint = "sha256:$digest",
                 requiresNodeVite = requiresNodeVite,
+                projectRequiresPython = projectRequiresPython,
             )
+        }
+
+        private fun extractRequiresPython(pyprojectText: String): String? {
+            val parsed = Toml.parse(pyprojectText)
+            if (parsed.hasErrors()) return null
+            return parsed.getTable("project")
+                ?.getString("requires-python")
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
         }
     }
 }
