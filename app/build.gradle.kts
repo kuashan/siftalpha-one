@@ -70,8 +70,9 @@ android {
         // an adaptive app-owned localhost Result Web Host for successful one-shot program output.
         // alpha43-r39 adds Android 15+ system-bar safe insets to legacy View surfaces.
         // alpha43-r40 fixes polyglot prepare ordering: frontend build assets precede Python packaging.
-        versionCode = 166
-        versionName = "0.8.0-alpha43-r40"
+        // alpha43-r41 installs declared Web extras for detected Vite-backed Python Web projects.
+        versionCode = 167
+        versionName = "0.8.0-alpha43-r41"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

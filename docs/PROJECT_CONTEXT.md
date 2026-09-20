@@ -594,3 +594,8 @@ r40 closes a general environment-composition gap for Python-primary projects tha
 SiftAlpha already had a generic supplemental Vite builder, but the composed PREPARE order was Python first and Node second. r40 reverses that dependency edge for the Python+Node composition: detected frontend assets are built first, then the Python environment is installed against the now-complete project tree. No application-specific patch, package name, or fixed frontend path is introduced.
 
 The composed environment command also suppresses child-level global SIFTALPHA_ENV markers and publishes one final project-level environment result. Runtime lifecycle semantics and Web presentation priorities are unchanged.
+
+
+## alpha43-r41 Declared Web-extra installation
+
+After building a detected Vite frontend, Python preparation checks the project's own pyproject metadata. If the project explicitly declares a web optional-dependency group, SiftAlpha installs the editable project with that declared extra. This makes the packaged frontend and its Python Web-serving dependencies ready in one PREPARE without application-specific dependency injection. Node preparation also clears its shared prepare log at the beginning of each new run.

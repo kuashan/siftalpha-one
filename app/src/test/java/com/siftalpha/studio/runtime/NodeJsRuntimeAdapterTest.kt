@@ -41,6 +41,8 @@ class NodeJsRuntimeAdapterTest {
         assertTrue(shell.contains("workspace_output/index.html"))
         assertTrue(shell.contains("SIFTALPHA_NODE_ENV=READY"))
         assertTrue(shell.contains("node-ready-runtime-id.txt"))
+        assertTrue(shell.contains(": >"))
+        assertFalse(shell.contains("touch \""))
     }
 
     @Test

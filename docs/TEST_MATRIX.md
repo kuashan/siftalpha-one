@@ -694,3 +694,13 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Regression: r38 Result Web, r39 system-bar safe insets, Python CLI launch binding, Web truth gates, Runtime ownership and project-scoped STOP remain unchanged.
 - Cloud: repository validators, unit tests and assembleDebug must pass before APK release.
 - Real-device: re-prepare a source archive where pyproject force-includes a generated frontend dist directory; frontend build must complete first and Python editable install must no longer fail with `Forced include not found`.
+
+
+### alpha43-r41 Python Web-extra preparation
+
+- pyproject + declared web extra + detected Vite component => editable install uses the project's web extra.
+- No declared web extra or no detected Vite component => base editable install remains unchanged.
+- SiftAlpha must not hard-code FastAPI, Uvicorn or application-specific dependency names.
+- PREPARE emits SIFTALPHA_PYPROJECT_EXTRAS=web|none.
+- Node PREPARE starts with a fresh log; previous failures must not appear in a new successful run.
+- Regression: r40 Vite-first ordering, r39 safe insets, r38 Result Web, Web discovery, CLI launch binding and project-scoped STOP remain unchanged.

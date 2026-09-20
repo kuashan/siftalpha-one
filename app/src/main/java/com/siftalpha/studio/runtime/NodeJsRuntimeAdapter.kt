@@ -58,7 +58,7 @@ class NodeJsRuntimeAdapter(
             node_version='${MANAGED_NODE_VERSION}'
             node_base_url='${MANAGED_NODE_BASE_URL}'
             mkdir -p /root/siftalpha/logs "${'$'}work_root" "${'$'}toolchain_root"
-            touch "${'$'}log"
+            : >"${'$'}log"
             rm -f -- "${'$'}ready"
 
             ${componentHelpersShell()}

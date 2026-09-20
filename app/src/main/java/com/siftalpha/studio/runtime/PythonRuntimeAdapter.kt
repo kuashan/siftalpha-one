@@ -100,7 +100,47 @@ class PythonRuntimeAdapter(
               "${'$'}venv/bin/python" -m pip install -r "${'$'}project/requirements.txt" >>"${'$'}log" 2>&1
             elif [ "${'$'}dependency_source" = 'pyproject.toml' ]; then
               echo 'DEPENDENCY_SOURCE=pyproject.toml'
-              "${'$'}venv/bin/python" -m pip install -e "${'$'}project" >>"${'$'}log" 2>&1
+              install_target="${'$'}project"
+              web_extra=0
+              vite_component=0
+
+              if "${'$'}venv/bin/python" - "${'$'}project/pyproject.toml" <<'SIFTALPHA_PYPROJECT_WEB_EXTRA'
+import sys
+import tomllib
+
+with open(sys.argv[1], "rb") as handle:
+    data = tomllib.load(handle)
+
+optional = data.get("project", {}).get("optional-dependencies", {})
+raise SystemExit(0 if isinstance(optional, dict) and "web" in optional else 1)
+SIFTALPHA_PYPROJECT_WEB_EXTRA
+              then
+                web_extra=1
+              fi
+
+              while IFS= read -r package_json; do
+                package_dir="${'$'}{package_json%/package.json}"
+                if [ -f "${'$'}package_dir/vite.config.ts" ] || \
+                   [ -f "${'$'}package_dir/vite.config.js" ] || \
+                   [ -f "${'$'}package_dir/vite.config.mts" ] || \
+                   [ -f "${'$'}package_dir/vite.config.mjs" ] || \
+                   [ -f "${'$'}package_dir/vite.config.cjs" ]; then
+                  vite_component=1
+                  break
+                fi
+              done < <(
+                find "${'$'}project" -maxdepth 7 -type f -name package.json \
+                  ! -path '*/node_modules/*' ! -path '*/.git/*' \
+                  ! -path '*/dist/*' ! -path '*/build/*' 2>/dev/null | LC_ALL=C sort
+              )
+
+              if [ "${'$'}web_extra" -eq 1 ] && [ "${'$'}vite_component" -eq 1 ]; then
+                install_target="${'$'}project[web]"
+                echo 'SIFTALPHA_PYPROJECT_EXTRAS=web'
+              else
+                echo 'SIFTALPHA_PYPROJECT_EXTRAS=none'
+              fi
+              "${'$'}venv/bin/python" -m pip install -e "${'$'}install_target" >>"${'$'}log" 2>&1
             else
               echo 'DEPENDENCY_SOURCE=none'
             fi

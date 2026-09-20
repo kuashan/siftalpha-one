@@ -1197,3 +1197,13 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - W0 Run #255 failed during Kotlin compilation before tests because the remote edit path interpreted JavaScript replacement-string dollar tokens while applying the shell template, duplicating suffix content in RuntimeEnvironmentComposer.kt.
 - Restored RuntimeEnvironmentComposer.kt from the clean r39 parent and reapplied only the intended r40 prepare-order change with literal-safe source construction.
 - No APK was released from Run #255; versionCode remains 166 / versionName 0.8.0-alpha43-r40.
+
+
+## 2026-09-20 · alpha43-r41 Python Web extras + fresh Node prepare log
+
+- r40 real-device evidence confirmed Vite-first preparation and successful editable Python packaging after frontend dist generation.
+- Python prepare now reads pyproject.toml with Python 3.12 tomllib. When the project declares [project.optional-dependencies].web and contains a detected Vite component, editable installation uses the project-declared [web] extra. SiftAlpha injects no dependency package names.
+- PREPARE emits SIFTALPHA_PYPROJECT_EXTRAS=web or none.
+- Supplemental Node preparation truncates the current prepare log at the start of each run so stale traceback fragments cannot leak from a previous failed prepare.
+- Runtime lifecycle, project-scoped STOP, Result Web, safe insets, r40 ordering and CLI argument semantics are unchanged.
+- versionCode 167 / versionName 0.8.0-alpha43-r41.
