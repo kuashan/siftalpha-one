@@ -42,6 +42,7 @@ class EmbeddedPythonEnvironmentManager(context: Context) {
             projectIdentity = projectIdentity,
             environmentRoot = environmentRoot,
             sourceFingerprint = dependencyInput.sourceFingerprint,
+            runtimeIdentity = EmbeddedPythonRuntimeIdentityV1.ID,
         )?.let { existing ->
             return PreparationResult(
                 ready = true,
@@ -99,6 +100,7 @@ class EmbeddedPythonEnvironmentManager(context: Context) {
             projectIdentity = projectIdentity,
             environmentRoot = environmentRoot,
             sourceFingerprint = dependencyInput.sourceFingerprint,
+            runtimeIdentity = EmbeddedPythonRuntimeIdentityV1.ID,
         ) ?: return null
         return LoadBinding(
             sitePackages = installed.sitePackages,
