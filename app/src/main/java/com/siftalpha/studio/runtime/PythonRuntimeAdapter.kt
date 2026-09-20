@@ -77,6 +77,7 @@ class PythonRuntimeAdapter(
             log=${sh(log)}
             ready=${sh(ready)}
             required_python=${sh(project.pythonRequiresVersion.orEmpty())}
+            required_plan=${sh(project.environmentPlanId.orEmpty())}
             mkdir -p /root/venvs /root/siftalpha/logs
             : >"${'$'}log"
             if ! command -v python3 >/dev/null 2>&1; then
@@ -246,8 +247,8 @@ SIFTALPHA_PYPROJECT_WEB_EXTRA
             fi
 
             umask 077
-            printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\n' \
-              "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}python_version" "${'$'}required_python" >"${'$'}ready"
+            printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nPLAN_ID=%s\n' \
+              "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}python_version" "${'$'}required_python" "${'$'}required_plan" >"${'$'}ready"
 
             rm -rf -- "${'$'}backup"
             rm -f -- "${'$'}ready_backup"
@@ -885,6 +886,7 @@ SIFTALPHA_RUNNER
     private fun environmentReadyCheckShell(project: RuntimeProjectSpec): String = """
         ${dependencyFingerprintShell()}
         required_python=${sh(project.pythonRequiresVersion.orEmpty())}
+        required_plan=${sh(project.environmentPlanId.orEmpty())}
         env_ready=0
         env_reason='VENV_MISSING'
         if [ -x "${'$'}venv/bin/python" ]; then
@@ -898,6 +900,7 @@ SIFTALPHA_RUNNER
               saved_hash="${'$'}(awk -F= '/^HASH=/{print substr(${ '$' }0,6); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_python="${'$'}(awk -F= '/^PYTHON_VERSION=/{print substr(${ '$' }0,16); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_requires="${'$'}(awk -F= '/^REQUIRES_PYTHON=/{print substr(${ '$' }0,17); exit}' "${'$'}ready" 2>/dev/null || true)"
+              saved_plan="${'$'}(awk -F= '/^PLAN_ID=/{print substr(${ '$' }0,9); exit}' "${'$'}ready" 2>/dev/null || true)"
               if [ "${'$'}saved_source" != "${'$'}dependency_source" ] || [ "${'$'}saved_hash" != "${'$'}dependency_hash" ]; then
                 env_reason='DEPENDENCY_MANIFEST_CHANGED'
               elif [ -z "${'$'}saved_python" ]; then
@@ -914,8 +917,8 @@ SIFTALPHA_RUNNER
                   if [ "${'$'}legacy_requirement_ok" -eq 1 ]; then
                     umask 077
                     migrated_ready="${'$'}ready.migrate-${'$'}${'$'}"
-                    printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\n' \
-                      "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" >"${'$'}migrated_ready"
+                    printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nPLAN_ID=%s\n' \
+                      "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" "${'$'}required_plan" >"${'$'}migrated_ready"
                     mv -f -- "${'$'}migrated_ready" "${'$'}ready"
                     env_ready=1
                     env_reason='READY_MIGRATED'
@@ -927,6 +930,16 @@ SIFTALPHA_RUNNER
                 env_reason='PYTHON_RUNTIME_VERSION_CHANGED'
               elif [ "${'$'}saved_requires" != "${'$'}required_python" ]; then
                 env_reason='PYTHON_REQUIREMENT_CHANGED'
+              elif [ -n "${'$'}required_plan" ] && [ -z "${'$'}saved_plan" ]; then
+                umask 077
+                migrated_ready="${'$'}ready.plan-${'$'}${'$'}"
+                printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nPLAN_ID=%s\n' \
+                  "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" "${'$'}required_plan" >"${'$'}migrated_ready"
+                mv -f -- "${'$'}migrated_ready" "${'$'}ready"
+                env_ready=1
+                env_reason='READY_PLAN_MIGRATED'
+              elif [ -n "${'$'}required_plan" ] && [ "${'$'}saved_plan" != "${'$'}required_plan" ]; then
+                env_reason='ENVIRONMENT_PLAN_CHANGED'
               else
                 env_ready=1
                 env_reason='READY'
