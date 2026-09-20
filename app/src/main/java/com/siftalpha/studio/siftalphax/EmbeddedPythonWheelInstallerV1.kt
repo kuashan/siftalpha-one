@@ -84,20 +84,46 @@ class EmbeddedPythonWheelInstallerV1(
         runtimeIdentity: String,
     ): InstalledEnvironment? {
         val marker = File(environmentRoot, READY_MARKER)
-        val manifestFile = File(environmentRoot, MANIFEST_FILE)
         val sitePackages = File(environmentRoot, SITE_PACKAGES)
-        if (!marker.isFile || !manifestFile.isFile || !sitePackages.isDirectory) return null
-        val manifest = runCatching {
-            Json.parseToJsonElement(manifestFile.readText()).jsonObject
-        }.getOrNull() ?: return null
-        if (manifest["schema"]?.jsonPrimitive?.content != SCHEMA) return null
-        if (manifest["projectIdentity"]?.jsonPrimitive?.content != projectIdentity) return null
-        if (manifest["sourceFingerprint"]?.jsonPrimitive?.content != sourceFingerprint) return null
-        if (manifest["runtimeIdentity"]?.jsonPrimitive?.content != runtimeIdentity) return null
-        val environmentKey = manifest["environmentKey"]?.jsonPrimitive?.content ?: return null
+        if (!marker.isFile || !sitePackages.isDirectory) return null
+
+        readManifest(File(environmentRoot, MANIFEST_FILE))?.let { manifest ->
+            if (manifest["schema"]?.jsonPrimitive?.content != SCHEMA) return@let
+            if (manifest["projectIdentity"]?.jsonPrimitive?.content != projectIdentity) return@let
+            if (manifest["sourceFingerprint"]?.jsonPrimitive?.content != sourceFingerprint) return@let
+            if (manifest["runtimeIdentity"]?.jsonPrimitive?.content != runtimeIdentity) return@let
+            val environmentKey = manifest["environmentKey"]?.jsonPrimitive?.content ?: return@let
+            if (!environmentKey.matches(Regex("sha256:[0-9a-f]{64}"))) return@let
+            return InstalledEnvironment(sitePackages.canonicalFile, environmentKey)
+        }
+
+        if (runtimeIdentity != LEGACY_V2_RUNTIME_IDENTITY) return null
+        val legacyFile = File(environmentRoot, LEGACY_MANIFEST_FILE)
+        val legacy = readManifest(legacyFile) ?: return null
+        if (legacy["schema"]?.jsonPrimitive?.content != LEGACY_SCHEMA) return null
+        if (legacy["projectIdentity"]?.jsonPrimitive?.content != projectIdentity) return null
+        if (legacy["sourceFingerprint"]?.jsonPrimitive?.content != sourceFingerprint) return null
+        val environmentKey = legacy["environmentKey"]?.jsonPrimitive?.content ?: return null
         if (!environmentKey.matches(Regex("sha256:[0-9a-f]{64}"))) return null
+
+        val migrated = buildJsonObject {
+            legacy.forEach { (key, value) ->
+                if (key != "schema" && key != "runtimeIdentity") put(key, value)
+            }
+            put("schema", SCHEMA)
+            put("runtimeIdentity", runtimeIdentity)
+        }
+        File(environmentRoot, MANIFEST_FILE).writeText(migrated.toString() + "\n")
+        marker.writeText(SCHEMA + "\n")
         return InstalledEnvironment(sitePackages.canonicalFile, environmentKey)
     }
+
+    private fun readManifest(file: File) =
+        if (!file.isFile) {
+            null
+        } else {
+            runCatching { Json.parseToJsonElement(file.readText()).jsonObject }.getOrNull()
+        }
 
     private fun cachedWheel(wheel: EmbeddedPythonIndexWheelV1): File {
         PypiEmbeddedPythonPackageIndexV1.requireTrustedArtifactUrl(wheel.url)
@@ -298,6 +324,9 @@ class EmbeddedPythonWheelInstallerV1(
         const val STATE_FILE = "state-v1.txt"
         const val MANIFEST_FILE = "manifest-v3.json"
         const val SITE_PACKAGES = "site-packages"
+        internal const val LEGACY_SCHEMA = "siftalpha.internal-python-environment.v2"
+        internal const val LEGACY_MANIFEST_FILE = "manifest-v2.json"
+        internal const val LEGACY_V2_RUNTIME_IDENTITY = "cpython-3.14.7-android-arm64-v8a"
         private const val MAX_REDIRECTS = 5
         private const val MAX_WHEEL_BYTES = 96L * 1024L * 1024L
         private const val MAX_ENTRY_BYTES = 128L * 1024L * 1024L
