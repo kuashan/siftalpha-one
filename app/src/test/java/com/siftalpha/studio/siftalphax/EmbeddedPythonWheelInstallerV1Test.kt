@@ -6,6 +6,7 @@ import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -73,7 +74,16 @@ class EmbeddedPythonWheelInstallerV1Test {
                     projectIdentity = "project-a",
                     environmentRoot = environment,
                     sourceFingerprint = plan.sourceFingerprint,
+                    runtimeIdentity = EmbeddedPythonRuntimeIdentityV1.ID,
                 ) != null,
+            )
+            assertNull(
+                EmbeddedPythonWheelInstallerV1(cache).readReadyBinding(
+                    projectIdentity = "project-a",
+                    environmentRoot = environment,
+                    sourceFingerprint = plan.sourceFingerprint,
+                    runtimeIdentity = "cpython-9.9.9-android-arm64-v8a",
+                ),
             )
         } finally {
             root.deleteRecursively()
