@@ -299,7 +299,11 @@ class ProjectRuntimeController(
         val plan = runCatching { environmentPlan(project) }.getOrNull() ?: return false
         if (!plan.readyToPrepare) return false
         val requiresNodeVite = requiresInternalNodeVite(plan)
-        val files = internalDependencyFiles(projectId, requiresNodeVite)
+        val files = internalDependencyFiles(
+            projectDocumentId = projectId,
+            requiresNodeVite = requiresNodeVite,
+            pythonInstallExtras = plan.pythonInstallExtras,
+        )
         if (plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON) && !requiresNodeVite) {
             val cpythonBinding = runCatching {
                 val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
@@ -429,7 +433,11 @@ class ProjectRuntimeController(
         val plan = runCatching { environmentPlan(project) }.getOrNull() ?: return false
         if (!plan.readyToPrepare) return false
         val requiresNodeVite = requiresInternalNodeVite(plan)
-        val files = internalDependencyFiles(projectId, requiresNodeVite)
+        val files = internalDependencyFiles(
+            projectDocumentId = projectId,
+            requiresNodeVite = requiresNodeVite,
+            pythonInstallExtras = plan.pythonInstallExtras,
+        )
         if (plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON) && !requiresNodeVite) {
             val cpythonReady = runCatching {
                 val input = EmbeddedPythonRequirementParserV1.fromProjectFiles(
@@ -493,7 +501,11 @@ class ProjectRuntimeController(
 
         val projectId = project.summary.documentId
         val requiresNodeVite = requiresInternalNodeVite(plan)
-        val files = internalDependencyFiles(projectId, requiresNodeVite)
+        val files = internalDependencyFiles(
+            projectDocumentId = projectId,
+            requiresNodeVite = requiresNodeVite,
+            pythonInstallExtras = plan.pythonInstallExtras,
+        )
         progress?.invoke(
             buildList {
                 add("SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R")
@@ -630,7 +642,11 @@ class ProjectRuntimeController(
         }
         val projectId = project.summary.documentId
         val requiresNodeVite = requiresInternalNodeVite(plan)
-        val files = internalDependencyFiles(projectId, requiresNodeVite)
+        val files = internalDependencyFiles(
+            projectDocumentId = projectId,
+            requiresNodeVite = requiresNodeVite,
+            pythonInstallExtras = plan.pythonInstallExtras,
+        )
         val forceAlpine =
             !plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON) ||
                 requiresNodeVite ||
@@ -722,6 +738,7 @@ class ProjectRuntimeController(
     private fun internalDependencyFiles(
         projectDocumentId: String,
         requiresNodeVite: Boolean = false,
+        pythonInstallExtras: List<String> = emptyList(),
     ): InternalDependencyFiles {
         val requirements = gateway.readProjectRootText(projectDocumentId, "requirements.txt")
             ?.takeIf(::hasActiveRequirements)
@@ -733,6 +750,7 @@ class ProjectRuntimeController(
                 requirementsText = requirements,
                 pyprojectText = pyproject,
                 requiresNodeVite = requiresNodeVite,
+                pythonInstallExtras = pythonInstallExtras,
             ),
         )
     }
@@ -1174,6 +1192,7 @@ class ProjectRuntimeController(
                 relativePaths = facts.relativePaths,
                 pythonRequiresVersion = plan.detection.pythonRequiresVersion,
                 environmentPlanId = plan.planId,
+                pythonInstallExtras = plan.pythonInstallExtras,
                 webLogDiscoveryAllowed = webLogDiscoveryAllowed,
                 webHintPorts = webHintPorts.filter { it in 1..65535 }.distinct(),
             ),
