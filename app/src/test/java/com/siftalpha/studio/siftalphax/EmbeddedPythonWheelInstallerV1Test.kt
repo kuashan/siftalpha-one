@@ -126,6 +126,42 @@ class EmbeddedPythonWheelInstallerV1Test {
         }
     }
 
+    @Test
+    fun migratesCompatibleLegacyV2EnvironmentWithoutReinstall() {
+        val root = Files.createTempDirectory("siftalpha-wheel-migrate").toFile()
+        try {
+            val cache = File(root, "cache").apply { mkdirs() }
+            val environment = File(root, "environment").apply { mkdirs() }
+            File(environment, EmbeddedPythonWheelInstallerV1.SITE_PACKAGES).mkdirs()
+            File(environment, EmbeddedPythonWheelInstallerV1.READY_MARKER)
+                .writeText(EmbeddedPythonWheelInstallerV1.LEGACY_SCHEMA + "\n")
+            val sourceFingerprint = "sha256:" + "1".repeat(64)
+            val environmentKey = "sha256:" + "3".repeat(64)
+            File(environment, EmbeddedPythonWheelInstallerV1.LEGACY_MANIFEST_FILE).writeText(
+                """{"schema":"${EmbeddedPythonWheelInstallerV1.LEGACY_SCHEMA}","projectIdentity":"project-a","sourceFingerprint":"$sourceFingerprint","resolvedFingerprint":"sha256:${"2".repeat(64)}","environmentKey":"$environmentKey","packages":[]}""" + "\n",
+            )
+
+            val migrated = EmbeddedPythonWheelInstallerV1(cache).readReadyBinding(
+                projectIdentity = "project-a",
+                environmentRoot = environment,
+                sourceFingerprint = sourceFingerprint,
+                runtimeIdentity = EmbeddedPythonRuntimeIdentityV1.ID,
+            )
+
+            assertTrue(migrated != null)
+            assertEquals(environmentKey, migrated?.environmentKey)
+            val currentManifest = File(environment, EmbeddedPythonWheelInstallerV1.MANIFEST_FILE)
+            assertTrue(currentManifest.isFile)
+            assertTrue(currentManifest.readText().contains(EmbeddedPythonRuntimeIdentityV1.ID))
+            assertEquals(
+                EmbeddedPythonWheelInstallerV1.SCHEMA,
+                File(environment, EmbeddedPythonWheelInstallerV1.READY_MARKER).readText().trim(),
+            )
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     private fun sha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
         file.inputStream().use { input ->
