@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="runtime_result_web_ready">결과 페이지 생성됨 · %1$s</string>
+    <string name="runtime_result_web_back">뒤로</string>
+    <string name="runtime_result_web_copy_link">링크 복사</string>
+    <string name="runtime_result_web_external">브라우저에서 열기</string>
+    <string name="runtime_result_web_link_copied">로컬 결과 링크를 복사했습니다</string>
+    <string name="runtime_result_web_load_failed">로컬 결과 페이지를 시작할 수 없습니다</string>
+</resources>

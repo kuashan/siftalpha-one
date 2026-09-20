@@ -84,6 +84,10 @@ import com.siftalpha.studio.runtime.RuntimeWebUrl
 import com.siftalpha.studio.runtime.RichResultDocument
 import com.siftalpha.studio.runtime.RichResultLifecyclePolicy
 import com.siftalpha.studio.runtime.RichResultParser
+import com.siftalpha.studio.runtime.AdaptiveResultAnalyzer
+import com.siftalpha.studio.runtime.AdaptiveResultHtmlRenderer
+import com.siftalpha.studio.runtime.ResultWebStore
+import com.siftalpha.studio.runtime.RuntimeProgramOutputExtractor
 import com.siftalpha.studio.runtime.TermuxBackend
 import com.siftalpha.studio.siftalphax.EmbeddedPythonEnvironmentManager
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
@@ -189,6 +193,9 @@ open class V04Activity : StudioActivity() {
     private val webProfileCache = mutableMapOf<String, WebProjectInspector.Profile>()
     /** Activity-lifetime Rich Result cache; raw output remains owned by ProjectOutputPanelController. */
     private val richResults = mutableMapOf<String, RichResultDocument>()
+    private lateinit var resultWebStore: ResultWebStore
+    private val resultWebResults = mutableMapOf<String, ResultWebStore.ResultRef>()
+    private val resultWebSuppressedProjects = mutableSetOf<String>()
     private val refreshHandler = Handler(Looper.getMainLooper())
     private val refreshExecutor = Executors.newSingleThreadExecutor()
     private var refreshScheduled = false
@@ -388,6 +395,7 @@ open class V04Activity : StudioActivity() {
             }
         }
         projectOutputs = ProjectOutputPanelController(this)
+        resultWebStore = ResultWebStore(this)
         configurationUi = ProjectConfigurationUiController(
             activity = this,
             inspector = configurationInspector,
@@ -788,9 +796,20 @@ open class V04Activity : StudioActivity() {
         )
         val webUiStatus = web.status
         val richResult = richResults[stateKey]
+        val resultWeb = if (stateKey in resultWebSuppressedProjects) {
+            null
+        } else {
+            resultWebResults[stateKey]
+                ?: if (::resultWebStore.isInitialized) {
+                    resultWebStore.latest(stateKey)?.also { resultWebResults[stateKey] = it }
+                } else {
+                    null
+                }
+        }
         val presentationTarget = PresentationTargetResolver.resolve(
             webPresentationKnown = verifiedWebUrl != null,
             richResultAvailable = richResult != null,
+            resultWebAvailable = resultWeb != null,
         )
         val pendingItem = pending.values.firstOrNull { item ->
             (item.documentId == summary.documentId ||
@@ -1032,6 +1051,18 @@ open class V04Activity : StudioActivity() {
                 setPadding(0, dp(2), 0, dp(2))
             })
         }
+        resultWeb?.let { result ->
+            box.addView(
+                text(
+                    getString(R.string.runtime_result_web_ready, result.summary),
+                    13f,
+                    true,
+                ).apply {
+                    setTextColor(Color.rgb(170, 224, 190))
+                    setPadding(0, dp(2), 0, dp(2))
+                },
+            )
+        }
         richResult?.let { document ->
             box.addView(text(getString(R.string.runtime_rich_result_count, document.items.size), 13f, true).apply {
                 setTextColor(Color.rgb(170, 224, 190))
@@ -1190,10 +1221,12 @@ open class V04Activity : StudioActivity() {
                 webUrl = verifiedWebUrl,
                 webFramework = reachableWebFramework,
                 richResult = richResult,
+                resultWeb = resultWeb,
             )
         }.apply {
             isEnabled = when (presentationTarget) {
                 PresentationTarget.WEB -> policy.isEnabled(ProjectActionPolicy.Action.OPEN_BROWSER)
+                PresentationTarget.RESULT_WEB -> true
                 PresentationTarget.RICH_RESULT -> true
                 PresentationTarget.NONE -> false
             }
@@ -2430,6 +2463,8 @@ open class V04Activity : StudioActivity() {
         invalidateInternalWebDiscovery(stateKey)
         embeddedStartInFlight += stateKey
         richResults.remove(stateKey)
+        resultWebResults.remove(stateKey)
+        resultWebSuppressedProjects += stateKey
         typedStates[stateKey] = RuntimeState.STARTING
         states[stateKey] = getString(R.string.runtime_action_starting)
         failureReasons.remove(stateKey)
@@ -2821,6 +2856,19 @@ open class V04Activity : StudioActivity() {
         val structuralChanged = EmbeddedPythonObservationPolicy.requiresCardRefresh(previous, snapshot)
         embeddedLastSnapshots[stateKey] = snapshot
         val richResultChanged = updateEmbeddedRichResult(project, snapshot)
+        val resultWebChanged = if (snapshot.state == EmbeddedPythonState.SUCCEEDED) {
+            updateResultWeb(
+                project = project,
+                stdout = snapshot.stdout,
+                stderr = snapshot.stderr,
+                explicitSourcePath = snapshot.entrypoint,
+            )
+        } else {
+            false
+        }
+        if (resultWebChanged && ::projectOutputs.isInitialized) {
+            projectOutputs.collapse(project.folderName)
+        }
 
         val mappedState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot)
         typedStates[stateKey] = mappedState
@@ -2893,7 +2941,8 @@ open class V04Activity : StudioActivity() {
         return structuralChanged ||
             internalWebChanged ||
             runtimeLogWebChanged ||
-            richResultChanged
+            richResultChanged ||
+            resultWebChanged
     }
 
     private fun scheduleInternalWebObservation(
@@ -3299,6 +3348,8 @@ open class V04Activity : StudioActivity() {
         }
         if (action == ProjectRuntimeController.Action.START) {
             richResults.remove(stateKey)
+            resultWebResults.remove(stateKey)
+            resultWebSuppressedProjects += stateKey
             markExternalRuntimeOwner(stateKey)
             beginExternalObservation(
                 project = project,
@@ -3491,6 +3542,17 @@ open class V04Activity : StudioActivity() {
             false
         }
         if (richResultChanged && ::projectOutputs.isInitialized) {
+            projectOutputs.collapse(item.folderName)
+        }
+        val resultWebChanged = if (
+            runtimeState == RuntimeState.EXITED_SUCCESS &&
+            item.action == ProjectRuntimeController.Action.LOGS
+        ) {
+            updateExternalResultWeb(item, result)
+        } else {
+            false
+        }
+        if (resultWebChanged && ::projectOutputs.isInitialized) {
             projectOutputs.collapse(item.folderName)
         }
         val runtimeCandidate = RuntimeWebDiscoveryScopePolicy.candidateFromOutput(
@@ -3942,6 +4004,81 @@ open class V04Activity : StudioActivity() {
         }
     }
 
+    private fun updateExternalResultWeb(
+        item: Pending,
+        result: RuntimeResult,
+    ): Boolean {
+        val projectKey = item.documentId ?: return false
+        val project = gateway.projects().firstOrNull { it.summary.documentId == projectKey }
+            ?: return false
+        return updateResultWeb(
+            project = project,
+            stdout = result.stdout,
+            stderr = result.stderr,
+        )
+    }
+
+    private fun updateResultWeb(
+        project: V04ProjectGateway.RuntimeProject,
+        stdout: String,
+        stderr: String,
+        explicitSourcePath: String? = null,
+    ): Boolean {
+        if (!::resultWebStore.isInitialized) return false
+        val extracted = RuntimeProgramOutputExtractor.extract(
+            stdout = stdout,
+            stderr = stderr,
+            explicitSourcePath = explicitSourcePath,
+        )
+        if (extracted.text.isBlank()) return false
+
+        val sourcePath = extracted.sourcePath
+            ?: project.summary.entry
+                .takeIf { it.endsWith(".py", ignoreCase = true) }
+            ?: runCatching {
+                gateway.resolveEmbeddedPythonEntrypoint(project.summary.documentId)
+            }.getOrNull()
+        val normalizedExtracted = if (sourcePath != extracted.sourcePath) {
+            extracted.copy(sourcePath = sourcePath)
+        } else {
+            extracted
+        }
+        val sourceText = sourcePath?.let { path ->
+            runCatching {
+                gateway.readProjectTextFile(project.summary.documentId, path)
+            }.getOrNull()
+        }
+        val document = AdaptiveResultAnalyzer.analyze(
+            projectName = project.summary.name,
+            extracted = normalizedExtracted,
+            sourceText = sourceText,
+        )
+        val html = AdaptiveResultHtmlRenderer.render(document)
+        val saved = resultWebStore.saveIfChanged(
+            projectKey = project.summary.documentId,
+            projectName = project.summary.name,
+            document = document,
+            html = html,
+        )
+        val previous = resultWebResults[project.summary.documentId]
+        resultWebResults[project.summary.documentId] = saved.ref
+        resultWebSuppressedProjects.remove(project.summary.documentId)
+        return saved.changed || previous != saved.ref
+    }
+
+    private fun openResultWeb(
+        projectName: String,
+        result: ResultWebStore.ResultRef?,
+    ) {
+        if (result == null) return
+        startActivity(
+            Intent(this, ResultWebActivity::class.java).apply {
+                putExtra(ResultWebActivity.EXTRA_RESULT_ID, result.id)
+                putExtra(ResultWebActivity.EXTRA_PROJECT_NAME, projectName)
+            },
+        )
+    }
+
     private fun mergeRichResult(stateKey: String, output: String): Boolean {
         val previous = richResults[stateKey]
         val detected = RichResultParser.parse(output)
@@ -3963,11 +4100,13 @@ open class V04Activity : StudioActivity() {
         webUrl: String?,
         webFramework: String?,
         richResult: RichResultDocument?,
+        resultWeb: ResultWebStore.ResultRef?,
     ) {
         when (
             PresentationTargetResolver.resolve(
                 webPresentationKnown = webUrl != null,
                 richResultAvailable = richResult != null,
+                resultWebAvailable = resultWeb != null,
             )
         ) {
             PresentationTarget.WEB -> openBrowserForProject(
@@ -3977,6 +4116,7 @@ open class V04Activity : StudioActivity() {
                 url = webUrl,
                 framework = webFramework,
             )
+            PresentationTarget.RESULT_WEB -> openResultWeb(projectName, resultWeb)
             PresentationTarget.RICH_RESULT -> openRichResultViewer(projectName, richResult)
             PresentationTarget.NONE -> Unit
         }

@@ -66,10 +66,10 @@ android {
         // alpha43-r24 closes Web continuity gaps: bounded Internal discovery retries, stable
         // foreground Web presentation, CPython foreground-runtime leases, and learned endpoints.
         // Rich Result, External execution semantics and Worker freeze remain unchanged.
-        // alpha43-r37 preserves the frozen r34 baseline plus r35/r36 CLI work, then binds
-        // discovered CLI requirements to their actual Python entrypoint before launch selection.
-        versionCode = 163
-        versionName = "0.8.0-alpha43-r37"
+        // alpha43-r38 preserves the frozen r34 baseline plus r35-r37 CLI work, then adds
+        // an adaptive app-owned localhost Result Web Host for successful one-shot program output.
+        versionCode = 164
+        versionName = "0.8.0-alpha43-r38"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

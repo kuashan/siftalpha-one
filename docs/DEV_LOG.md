@@ -1129,3 +1129,24 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - r35 argv transport and r36 Click/Typer discovery remain unchanged.
 - versionCode 163 / versionName 0.8.0-alpha43-r37.
 
+## 2026-09-20 · alpha43-r38 Local Result Web Host
+
+- r37 CLI Launch Configuration received real-device acceptance: `exitCode=0`, `SIFTALPHA_LAUNCH_KIND=PYTHON_FILE`, executable `python`, and the easy_tdx strategy run completed all 16 strategies successfully.
+- New UX gap: successful one-shot CLI analysis results were still mixed into Raw Log diagnostics, making rankings, metrics and trade records difficult to inspect.
+- r38 adds an app-owned Local Result Web Host bound only to loopback. Result pages are served from `localhost` and opened inside SiftAlpha through a hardened WebView; no result data is uploaded.
+- Successful terminal one-shot output is separated from SiftAlpha Runtime envelope lines, redacted before result generation, analyzed, rendered to HTML, persisted in app-private storage, and exposed as the project's primary Result Web presentation when no project-owned Web page is available.
+- Adaptive layout is output-first and source-aware:
+  - section banners / Markdown headings -> sections;
+  - key/value runs and pipe-separated key/value summaries -> metric cards;
+  - whitespace tables and CSV/TSV -> responsive tables;
+  - date/numeric x-axis tables with numeric series -> inline SVG line charts;
+  - unrecognized content -> safe preformatted text;
+  - selected Python entrypoint source is read only as bounded Presentation Hints for tabular/chart/JSON/CSV/Markdown intent. Source hints never override actual Runtime output and never fabricate chart data.
+- Generated HTML escapes program content, disables JavaScript in the in-app WebView, serves only app-private stored result IDs, and applies restrictive HTTP response headers.
+- The result store keeps recent generated result pages in app-private files and deduplicates repeated final-log observations by content fingerprint.
+- Project-owned Web remains higher priority than Result Web. Result Web is higher priority than the legacy LINK_LIST Rich Result viewer.
+- A new START suppresses the previous run's Result Web from the active project card until the new run produces a result; historical files remain stored.
+- External structured Python-file launches now emit `SIFTALPHA_LAUNCH_ENTRYPOINT` so the result analyzer can inspect the exact source file that produced the output. Internal Runtime already exposes its entrypoint in the session snapshot.
+- r34 remains the frozen Known Good Functional Baseline. r38 does not change Worker freeze, project-scoped STOP, Runtime ownership, Web discovery truth gates, or External/Internal argv semantics.
+- versionCode 164 / versionName 0.8.0-alpha43-r38.
+

@@ -278,6 +278,24 @@ class PythonRuntimeAdapterTest {
     }
 
     @Test
+    fun `structured python file launch publishes result source entrypoint`() {
+        host.quotedInputs.clear()
+        adapter.start(
+            project.copy(
+                pythonLaunchInvocation = PythonLaunchInvocation.pythonFile(
+                    entrypoint = "run_all_strategies.py",
+                    arguments = listOf("SH", "600519"),
+                ),
+            ),
+        )
+        val runner = host.quotedInputs.joinToString("\n---\n")
+
+        assertTrue(runner.contains("launch_entrypoint='run_all_strategies.py'"))
+        assertTrue(runner.contains("SIFTALPHA_LAUNCH_ENTRYPOINT=%s"))
+        assertTrue(runner.contains("SIFTALPHA_LAUNCH_ARGUMENT_COUNT=%s"))
+    }
+
+    @Test
     fun `custom run command remains delegated instead of forced to python entry`() {
         host.quotedInputs.clear()
         val custom = project.copy(run = "python -m package.worker --mode live")

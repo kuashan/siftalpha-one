@@ -634,3 +634,38 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - easy_tdx-main real-device acceptance: final launch must report PYTHON_FILE / `run_all_strategies.py`, pass MARKET and CODE as argv, and must not execute `easy-tdx MARKET CODE`.
 - r34 baseline behavior, project-scoped STOP, Web discovery, Internal ownership and External Runtime semantics remain unchanged.
 
+### alpha43-r38 Local Result Web Host acceptance
+
+- Output extraction:
+  - Runtime/Web/identity envelope markers are removed from the user result.
+  - Program stdout remains byte-order/line-order faithful after ANSI control sanitization.
+  - explicit Python launch entrypoint is retained as result source evidence.
+- Adaptive analysis:
+  - repeated key/value output becomes metric cards;
+  - easy_tdx-style whitespace performance tables become HTML tables;
+  - CSV/TSV tables are recognized generically;
+  - date/numeric x-axis tables with >=3 points and numeric value columns produce inline SVG curves;
+  - ranking tables do not become misleading time-series curves;
+  - unknown output always falls back to readable preformatted text.
+- Source-aware presentation:
+  - bounded entrypoint source inspection may increase confidence for table/chart/CSV/JSON/Markdown presentation;
+  - source hints must never synthesize missing values or override actual Runtime output.
+- Security/privacy:
+  - Result Web Host binds to 127.0.0.1 only;
+  - user-facing URL uses localhost;
+  - generated result HTML is stored only in app-private storage;
+  - HTML program content is escaped;
+  - WebView JavaScript/file/content access is disabled;
+  - only GET/HEAD and safe result IDs are served.
+- Lifecycle:
+  - repeated final LOGS with identical program output do not create duplicate results;
+  - new START hides the previous result from the active card until the new run succeeds;
+  - app restart can reopen the latest persisted result after the localhost host starts on demand.
+- Presentation priority:
+  - verified project Web > SiftAlpha Result Web > legacy Rich Result > none.
+- Regression:
+  - r37 CLI entry binding/argv behavior remains unchanged;
+  - r34 Web baseline, r31 ownership, r32 Runtime Center stability, r33 telemetry and project-scoped STOP remain unchanged.
+- Cloud: repository validators, `testDebugUnitTest`, native build and `assembleDebug` must pass.
+- Real-device: rerun easy_tdx-main; after `EXITED_SUCCESS`, project card should show Result Web ready and Open should display formatted sections/metrics/tables instead of requiring Raw Log reading.
+

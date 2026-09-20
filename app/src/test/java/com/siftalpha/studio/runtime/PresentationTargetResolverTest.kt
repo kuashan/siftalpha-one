@@ -44,6 +44,30 @@ class PresentationTargetResolverTest {
     }
 
     @Test
+    fun localResultWebWinsOverLegacyRichResultWhenProjectWebIsUnavailable() {
+        assertEquals(
+            PresentationTarget.RESULT_WEB,
+            PresentationTargetResolver.resolve(
+                webPresentationKnown = false,
+                richResultAvailable = true,
+                resultWebAvailable = true,
+            ),
+        )
+    }
+
+    @Test
+    fun verifiedProjectWebStillWinsOverLocalResultWeb() {
+        assertEquals(
+            PresentationTarget.WEB,
+            PresentationTargetResolver.resolve(
+                webPresentationKnown = true,
+                richResultAvailable = true,
+                resultWebAvailable = true,
+            ),
+        )
+    }
+
+    @Test
     fun noWebAndNoRichResultHasNoOpenTarget() {
         assertEquals(
             PresentationTarget.NONE,

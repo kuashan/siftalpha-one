@@ -565,3 +565,16 @@ r36 broadens only CLI requirement discovery: literal Click required arguments, T
 
 r37 fixes the remaining separation between CLI requirement discovery and launch-target selection. CLI requirements now carry entrypoint evidence into action-time resolution. A pyproject console script cannot inherit positional arguments discovered from a different Python file. Only an exact evidence match to the resolved fallback entrypoint allows that Python file to supersede a generic console-script candidate.
 
+## alpha43-r38 Local Result Web Host
+
+r38 introduces a second Web concept that is intentionally separate from Project Web.
+
+- Project Web is owned by the running project and discovered/probed by the existing Runtime Web pipeline.
+- Result Web is owned by SiftAlpha. It is generated after successful one-shot output, stored in app-private storage, and served from a loopback-only local HTTP host even though the project process has already exited.
+
+The adaptive Result Web contract is output-first with fail-safe presentation. Structured patterns become sections, metric cards, tables and data-backed curves; anything uncertain remains text. Bounded source inspection provides presentation hints only. Source code never supplies fabricated result values.
+
+The in-app Result Web viewer uses an actual localhost URL, with JavaScript/file/content access disabled. Result history is persisted independently of Runtime process lifetime; the local server itself starts on demand and may use a different ephemeral port after app-process restart.
+
+r37 is the real-device-passed CLI execution baseline for this feature work. r34 remains the frozen product Known Good Functional Baseline until a later explicit baseline promotion.
+

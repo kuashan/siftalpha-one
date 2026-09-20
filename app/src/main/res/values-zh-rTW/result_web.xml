@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="runtime_result_web_ready">結果網頁：已產生 · %1$s</string>
+    <string name="runtime_result_web_back">返回</string>
+    <string name="runtime_result_web_copy_link">複製連結</string>
+    <string name="runtime_result_web_external">用瀏覽器開啟</string>
+    <string name="runtime_result_web_link_copied">已複製本機結果連結</string>
+    <string name="runtime_result_web_load_failed">無法啟動本機結果網頁</string>
+</resources>

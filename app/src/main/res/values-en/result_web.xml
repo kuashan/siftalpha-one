@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="runtime_result_web_ready">Result page ready · %1$s</string>
+    <string name="runtime_result_web_back">Back</string>
+    <string name="runtime_result_web_copy_link">Copy link</string>
+    <string name="runtime_result_web_external">Open in browser</string>
+    <string name="runtime_result_web_link_copied">Local result link copied</string>
+    <string name="runtime_result_web_load_failed">Unable to start the local result page</string>
+</resources>

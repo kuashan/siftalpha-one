@@ -307,6 +307,35 @@ class V04ProjectGateway(private val context: Context) {
         }
     }
 
+    /**
+     * Read one bounded project text file at result-presentation time.
+     *
+     * This is presentation evidence only. Source hints can improve layout choices, but they never
+     * override the actual Runtime output captured for the result.
+     */
+    fun readProjectTextFile(
+        projectDocumentId: String,
+        relativePath: String,
+        maxBytes: Int = MAX_ROOT_TEXT_BYTES,
+    ): String? {
+        val safePath = EmbeddedPythonEntrypointPolicy.safeRelativePath(relativePath) ?: return null
+        require(maxBytes in 1..MAX_ROOT_TEXT_BYTES) { "结果源码读取上限无效" }
+        val file = projectStore.listProjectTree(projectDocumentId)
+            .firstOrNull {
+                !it.isDirectory &&
+                    it.relativePath.replace('\\', '/').trim('/') == safePath
+            } ?: return null
+        val bytes = projectStore.readProjectFileBytes(file, maxBytes + 1)
+        if (bytes.size > maxBytes) return null
+        return runCatching {
+            Charsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString()
+        }.getOrNull()
+    }
+
     /** Resolve the one entrypoint M is willing to hand to Embedded R. R never scans or guesses. */
     fun resolveEmbeddedPythonEntrypoint(projectDocumentId: String): String? {
         val objectValue = metadata(projectDocumentId)

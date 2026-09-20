@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="runtime_result_web_ready">结果网页：已生成 · %1$s</string>
+    <string name="runtime_result_web_back">返回</string>
+    <string name="runtime_result_web_copy_link">复制链接</string>
+    <string name="runtime_result_web_external">浏览器打开</string>
+    <string name="runtime_result_web_link_copied">已复制本地结果链接</string>
+    <string name="runtime_result_web_load_failed">无法启动本地结果网页</string>
+</resources>

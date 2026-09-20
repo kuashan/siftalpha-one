@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="runtime_result_web_ready">結果ページを生成しました · %1$s</string>
+    <string name="runtime_result_web_back">戻る</string>
+    <string name="runtime_result_web_copy_link">リンクをコピー</string>
+    <string name="runtime_result_web_external">ブラウザで開く</string>
+    <string name="runtime_result_web_link_copied">ローカル結果リンクをコピーしました</string>
+    <string name="runtime_result_web_load_failed">ローカル結果ページを開始できません</string>
+</resources>
