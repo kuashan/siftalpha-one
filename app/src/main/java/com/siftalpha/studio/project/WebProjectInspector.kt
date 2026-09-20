@@ -47,11 +47,25 @@ class WebProjectInspector(context: Context) {
         val depth: Int,
     )
 
-    private val resolver = context.contentResolver
-    private val projectStore = ProjectStore(context)
+    private val appContext = context.applicationContext
+    private val resolver = appContext.contentResolver
+    private val projectStore = ProjectStore(appContext)
+    private val cachePrefs = appContext.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE)
 
-    fun inspect(projectDocumentId: String): Profile {
+    fun inspect(
+        projectDocumentId: String,
+        forceRefresh: Boolean = false,
+    ): Profile {
         val tree = projectStore.rootUri() ?: return Profile(false, null, "none", null, null)
+        if (!forceRefresh) {
+            readCachedProfile(tree, projectDocumentId)?.let { return it }
+        }
+        val profile = inspectFresh(tree, projectDocumentId)
+        cacheProfile(tree, projectDocumentId, profile)
+        return profile
+    }
+
+    private fun inspectFresh(tree: Uri, projectDocumentId: String): Profile {
         val files = projectFiles(tree, projectDocumentId)
         val metadata = files.firstOrNull { it.relativePath == ".project.json" }
             ?.let { readLimitedText(tree, it.id, MAX_METADATA_BYTES) }
@@ -129,6 +143,36 @@ class WebProjectInspector(context: Context) {
             port = detection.port,
         )
     }
+
+    private fun readCachedProfile(tree: Uri, projectDocumentId: String): Profile? {
+        val raw = cachePrefs.getString(cacheKey(projectDocumentId), null) ?: return null
+        return runCatching {
+            val value = JSONObject(raw)
+            if (value.optString("rootUri") != tree.toString()) return@runCatching null
+            Profile(
+                enabled = value.optBoolean("enabled", false),
+                framework = value.optString("framework").takeIf { it.isNotBlank() },
+                source = value.optString("source").ifBlank { "none" },
+                host = value.optString("host").takeIf { it.isNotBlank() },
+                port = value.optInt("port", -1).takeIf { it in 1..65535 },
+            )
+        }.getOrNull()
+    }
+
+    private fun cacheProfile(tree: Uri, projectDocumentId: String, profile: Profile) {
+        val value = JSONObject().apply {
+            put("rootUri", tree.toString())
+            put("enabled", profile.enabled)
+            put("framework", profile.framework ?: "")
+            put("source", profile.source)
+            put("host", profile.host ?: "")
+            put("port", profile.port ?: -1)
+        }
+        cachePrefs.edit().putString(cacheKey(projectDocumentId), value.toString()).apply()
+    }
+
+    private fun cacheKey(projectDocumentId: String): String =
+        "${projectDocumentId.length}:$projectDocumentId"
 
     private fun detectNode(
         tree: Uri,
@@ -267,6 +311,7 @@ class WebProjectInspector(context: Context) {
     private fun pathDepth(path: String): Int = path.count { it == '/' }
 
     companion object {
+        private const val CACHE_PREFS = "siftalpha_web_project_profile_cache_v1"
         private val IGNORED_DIRECTORIES = setOf(".git", "node_modules", "dist", "build", ".next", ".venv", "venv")
         private const val MAX_METADATA_BYTES = 128 * 1024
         private const val MAX_PACKAGE_JSON_BYTES = 256 * 1024

@@ -6,6 +6,7 @@ import android.provider.DocumentsContract
 import com.siftalpha.studio.runtime.NodeStartContractPolicy
 import com.siftalpha.studio.runtime.ProjectRuntimeExecutionPlanner
 import com.siftalpha.studio.runtime.RuntimeKind
+import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
@@ -38,21 +39,227 @@ class V04ProjectGateway(private val context: Context) {
         val mime: String,
     )
 
-    private val resolver = context.contentResolver
-    private val projectStore = ProjectStore(context)
+    private data class ProjectIndexEntry(
+        val summary: ProjectStore.ProjectSummary,
+        val folderName: String,
+        val sourceUrl: String?,
+        val rootNames: List<String>,
+        val declaredType: String?,
+    ) {
+        fun toRuntimeProject(): RuntimeProject = RuntimeProject(
+            summary = summary,
+            folderName = folderName,
+            sourceUrl = sourceUrl,
+            runtimeSelection = ProjectRuntimeExecutionPlanner.select(
+                relativePaths = rootNames,
+                declaredType = declaredType,
+            ),
+        )
+    }
+
+    private val appContext = context.applicationContext
+    private val resolver = appContext.contentResolver
+    private val projectStore = ProjectStore(appContext)
+    private val indexPrefs = appContext.getSharedPreferences(PROJECT_INDEX_PREFS, Context.MODE_PRIVATE)
 
     fun rootUri(): Uri? = projectStore.rootUri()
 
-    fun projects(): List<RuntimeProject> =
-        projectStore.listProjects().map { storedSummary ->
-            val summary = normalizeRuntimeSummary(storedSummary)
-            RuntimeProject(
-                summary = summary,
-                folderName = documentDisplayName(summary.documentId) ?: summary.name,
-                sourceUrl = sourceUrl(summary.documentId),
-                runtimeSelection = runtimeSelection(summary.documentId),
+    fun projects(forceRefresh: Boolean = false): List<RuntimeProject> {
+        val tree = rootUri() ?: return emptyList()
+        if (!forceRefresh) {
+            readCachedProjectIndex(tree)?.let { cached ->
+                return cached.map(ProjectIndexEntry::toRuntimeProject)
+            }
+        }
+        val scanned = scanProjectIndex(tree)
+        writeProjectIndex(tree, scanned)
+        return scanned.map(ProjectIndexEntry::toRuntimeProject)
+    }
+
+    private fun scanProjectIndex(tree: Uri): List<ProjectIndexEntry> {
+        val rootId = DocumentsContract.getTreeDocumentId(tree)
+        return children(tree, rootId)
+            .asSequence()
+            .filter { it.mime == DocumentsContract.Document.MIME_TYPE_DIR }
+            .filterNot { it.name.startsWith(".") }
+            .map { directory -> scanProjectIndexEntry(tree, directory) }
+            .sortedBy { it.summary.name.lowercase() }
+            .toList()
+    }
+
+    private fun scanProjectIndexEntry(tree: Uri, directory: Child): ProjectIndexEntry {
+        // One root-directory query per project. All card facts below are derived from this snapshot
+        // instead of repeatedly querying the same SAF directory through separate helper methods.
+        val rootItems = children(tree, directory.id)
+        val rootNames = rootItems.map { it.name }
+        val metadataChild = rootItems.firstOrNull { it.name == ".project.json" }
+        val fallbackMetadataChild = rootItems.firstOrNull { it.name == ".project.json.txt" }
+        val runtimeMetadata = metadataChild
+            ?.let { runCatching { JSONObject(readText(tree, it.id)) }.getOrNull() }
+        val summaryMetadata = runtimeMetadata ?: fallbackMetadataChild
+            ?.let { runCatching { JSONObject(readText(tree, it.id)) }.getOrNull() }
+
+        val explicitEntry = summaryMetadata?.optString("entry")?.takeIf { it.isNotBlank() }
+        val explicitRun = summaryMetadata?.optString("run")?.takeIf { it.isNotBlank() }
+        val summaryDeclaredType = summaryMetadata?.optString("type")?.trim()?.lowercase().orEmpty()
+        val childNames = rootNames.map { it.lowercase() }.toSet()
+        val hasNodeRoot = "package.json" in childNames
+        val hasPythonRoot = childNames.any { it in PYTHON_ROOT_EVIDENCE } ||
+            rootItems.any { it.name.endsWith(".py", ignoreCase = true) }
+        val inferredPythonEntry = ENTRY_PRIORITY.firstOrNull { wanted ->
+            rootItems.any { it.name == wanted }
+        } ?: rootItems.firstOrNull { it.name.endsWith(".py", ignoreCase = true) }?.name
+        val nodePrimary = when {
+            summaryDeclaredType in NODE_DECLARED_TYPES -> true
+            summaryDeclaredType.isNotBlank() -> false
+            hasNodeRoot && !hasPythonRoot -> true
+            else -> false
+        }
+        val pythonPrimary = when {
+            summaryDeclaredType == "python" || summaryDeclaredType == "py" -> true
+            summaryDeclaredType.isNotBlank() -> false
+            hasPythonRoot && !hasNodeRoot -> true
+            else -> false
+        }
+        val packageHasStart = if ("package.json" in childNames) {
+            rootNodePackageHasStart(tree, rootItems)
+        } else {
+            false
+        }
+        val nodeHasStart = nodePrimary && packageHasStart
+        val entry = when {
+            explicitEntry != null -> explicitEntry
+            nodePrimary -> "package.json"
+            pythonPrimary -> inferredPythonEntry.orEmpty()
+            else -> ""
+        }
+        val run = when {
+            explicitRun != null -> explicitRun
+            nodePrimary && nodeHasStart -> "npm start"
+            pythonPrimary && entry.isNotBlank() -> "python $entry"
+            else -> ""
+        }
+        val sourceObject = summaryMetadata?.optJSONObject("source")
+        val source = when {
+            sourceObject == null -> "本地项目"
+            sourceObject.optString("repository").isNotBlank() -> {
+                val label = sourceObject.optString("label").ifBlank { "GitHub" }
+                "$label · ${sourceObject.optString("repository")}"
+            }
+            sourceObject.optString("label").isNotBlank() -> sourceObject.optString("label")
+            sourceObject.optString("type").isNotBlank() -> sourceObject.optString("type")
+            else -> "本地项目"
+        }
+        var summary = ProjectStore.ProjectSummary(
+            name = summaryMetadata?.optString("name")?.takeIf { it.isNotBlank() } ?: directory.name,
+            description = summaryMetadata?.optString("description") ?: "",
+            entry = entry,
+            run = run,
+            source = source,
+            documentId = directory.id,
+        )
+
+        val runtimeDeclaredType = runtimeMetadata?.optString("type")?.takeIf { it.isNotBlank() }
+        val selection = ProjectRuntimeExecutionPlanner.select(rootNames, runtimeDeclaredType)
+        if (
+            selection is ProjectRuntimeExecutionPlanner.Selection.Resolved &&
+            selection.primary == RuntimeKind.NODE_JS
+        ) {
+            val declaredEntry = runtimeMetadata?.optString("entry")?.takeIf { it.isNotBlank() }
+            val declaredRun = runtimeMetadata?.optString("run")?.takeIf { it.isNotBlank() }
+            val start = NodeStartContractPolicy.resolve(
+                declaredRun = declaredRun,
+                hasPackageStartScript = packageHasStart,
+            )
+            summary = summary.copy(
+                entry = declaredEntry ?: "package.json",
+                run = (start as? NodeStartContractPolicy.Result.Resolved)?.command.orEmpty(),
             )
         }
+
+        return ProjectIndexEntry(
+            summary = summary,
+            folderName = directory.name,
+            sourceUrl = runtimeMetadata
+                ?.optJSONObject("source")
+                ?.optString("url")
+                ?.takeIf { it.isNotBlank() },
+            rootNames = rootNames,
+            declaredType = runtimeDeclaredType,
+        )
+    }
+
+    private fun readCachedProjectIndex(tree: Uri): List<ProjectIndexEntry>? {
+        val raw = indexPrefs.getString(PROJECT_INDEX_KEY, null) ?: return null
+        return runCatching {
+            val root = JSONObject(raw)
+            if (root.optInt("version", 0) != PROJECT_INDEX_VERSION) return@runCatching null
+            if (root.optString("rootUri") != tree.toString()) return@runCatching null
+            val values = root.optJSONArray("projects") ?: return@runCatching null
+            buildList {
+                for (index in 0 until values.length()) {
+                    val value = values.optJSONObject(index) ?: continue
+                    val documentId = value.optString("documentId")
+                    val folderName = value.optString("folderName")
+                    val name = value.optString("name")
+                    if (documentId.isBlank() || folderName.isBlank() || name.isBlank()) continue
+                    val rootNamesJson = value.optJSONArray("rootNames") ?: JSONArray()
+                    val rootNames = buildList {
+                        for (item in 0 until rootNamesJson.length()) {
+                            rootNamesJson.optString(item).takeIf { it.isNotBlank() }?.let(::add)
+                        }
+                    }
+                    add(
+                        ProjectIndexEntry(
+                            summary = ProjectStore.ProjectSummary(
+                                name = name,
+                                description = value.optString("description"),
+                                entry = value.optString("entry"),
+                                run = value.optString("run"),
+                                source = value.optString("source").ifBlank { "本地项目" },
+                                documentId = documentId,
+                            ),
+                            folderName = folderName,
+                            sourceUrl = value.optString("sourceUrl").takeIf { it.isNotBlank() },
+                            rootNames = rootNames,
+                            declaredType = value.optString("declaredType").takeIf { it.isNotBlank() },
+                        ),
+                    )
+                }
+            }
+        }.getOrNull()
+    }
+
+    private fun writeProjectIndex(tree: Uri, values: List<ProjectIndexEntry>) {
+        val projects = JSONArray().apply {
+            values.forEach { entry ->
+                put(JSONObject().apply {
+                    put("documentId", entry.summary.documentId)
+                    put("folderName", entry.folderName)
+                    put("name", entry.summary.name)
+                    put("description", entry.summary.description)
+                    put("entry", entry.summary.entry)
+                    put("run", entry.summary.run)
+                    put("source", entry.summary.source)
+                    put("sourceUrl", entry.sourceUrl ?: "")
+                    put("declaredType", entry.declaredType ?: "")
+                    put("rootNames", JSONArray().apply {
+                        entry.rootNames.forEach { rootName -> put(rootName) }
+                    })
+                })
+            }
+        }
+        val root = JSONObject().apply {
+            put("version", PROJECT_INDEX_VERSION)
+            put("rootUri", tree.toString())
+            put("projects", projects)
+        }
+        indexPrefs.edit().putString(PROJECT_INDEX_KEY, root.toString()).apply()
+    }
+
+    private fun invalidateProjectIndex() {
+        indexPrefs.edit().remove(PROJECT_INDEX_KEY).apply()
+    }
 
     /**
      * Full runtime facts are loaded only when a Runtime action needs them. Runtime Center refresh uses
@@ -261,6 +468,7 @@ class V04ProjectGateway(private val context: Context) {
             ?.takeIf { it.isNotBlank() }
 
     private fun runtimeProject(projectId: String): RuntimeProject {
+        invalidateProjectIndex()
         val storedSummary = projectStore.listProjects().firstOrNull { it.documentId == projectId }
             ?: error("项目创建成功，但暂时无法重新读取")
         val summary = normalizeRuntimeSummary(storedSummary)
@@ -623,6 +831,23 @@ class V04ProjectGateway(private val context: Context) {
     }
 
     companion object {
+        private const val PROJECT_INDEX_PREFS = "siftalpha_project_index_cache_v1"
+        private const val PROJECT_INDEX_KEY = "current_root_index"
+        private const val PROJECT_INDEX_VERSION = 1
+        private val ENTRY_PRIORITY = listOf("main.py", "app.py", "run.py", "manage.py")
+        private val NODE_DECLARED_TYPES = setOf("node", "nodejs", "javascript", "js")
+        private val PYTHON_ROOT_EVIDENCE = setOf(
+            "requirements.txt",
+            "pyproject.toml",
+            "setup.py",
+            "setup.cfg",
+            "pipfile",
+            "poetry.lock",
+            "main.py",
+            "app.py",
+            "run.py",
+            "manage.py",
+        )
         private val PROJECT_NAME = Regex("^[A-Za-z0-9._-]+$")
         private val SOURCE_LIKE_EXTENSIONS = setOf(
             "py", "txt", "md", "json", "toml", "yaml", "yml", "ini", "cfg", "sh", "sql",

@@ -66,10 +66,10 @@ android {
         // alpha43-r24 closes Web continuity gaps: bounded Internal discovery retries, stable
         // foreground Web presentation, CPython foreground-runtime leases, and learned endpoints.
         // Rich Result, External execution semantics and Worker freeze remain unchanged.
-        // alpha43-r29 keeps the r24 product/Web baseline and makes Internal Runtime launch wait
-        // for foreground-service + partial-wake-lock readiness, with background diagnostics.
-        versionCode = 155
-        versionName = "0.8.0-alpha43-r29"
+        // alpha43-r30 keeps the r24 product/Web baseline plus r29 foreground-ready launch,
+        // then adds fast persisted project inspection caches and fixes Internal Web URL wiring.
+        versionCode = 156
+        versionName = "0.8.0-alpha43-r30"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

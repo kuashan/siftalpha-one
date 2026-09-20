@@ -74,10 +74,18 @@ class ProjectConfigurationUiController(
             get() = missingRequiredKeys.isEmpty()
     }
 
-    fun snapshot(projectDocumentId: String, folderName: String): Snapshot {
-        val inspected = runCatching { inspector.inspect(projectDocumentId) }
+    fun snapshot(
+        projectDocumentId: String,
+        folderName: String,
+        forceProjectInspection: Boolean = false,
+    ): Snapshot {
+        val inspected = runCatching {
+            inspector.inspect(projectDocumentId, forceRefresh = forceProjectInspection)
+        }
             .getOrElse { ProjectConfigurationInspector.emptyProfile() }
-        val legacyPolicy = runCatching { legacyPolicyInspector.inspect(projectDocumentId) }
+        val legacyPolicy = runCatching {
+            legacyPolicyInspector.inspect(projectDocumentId, forceRefresh = forceProjectInspection)
+        }
             .getOrElse {
                 ProjectSecretPolicyInspector.Policy(ProjectSecretPolicyInspector.BinanceApiPolicy.UNSPECIFIED)
             }
@@ -157,7 +165,11 @@ class ProjectConfigurationUiController(
         folderName: String,
         onCompleted: () -> Unit = {},
     ) {
-        val snapshot = snapshot(projectDocumentId, folderName)
+        val snapshot = snapshot(
+            projectDocumentId,
+            folderName,
+            forceProjectInspection = true,
+        )
         val items = buildItems(snapshot)
         if (items.isEmpty()) {
             AlertDialog.Builder(activity)

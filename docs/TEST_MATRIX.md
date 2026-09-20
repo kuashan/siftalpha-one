@@ -507,3 +507,16 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
   - SIFTALPHA_X_RUNTIME_CPU_TICKS_START / NOW
   - SIFTALPHA_X_FGS_HEARTBEAT_EPOCH_MS / AGE_MS
 - Real-device OCI acceptance: start OCI in Internal Runtime, confirm retries are progressing, background SiftAlpha for 5-10 minutes, return and copy logs. Compare heartbeat freshness, Runtime PID liveness, CPU ticks and OCI application log progress.
+
+
+### alpha43-r30 project cache + Internal Web wiring acceptance
+
+- r24 Web/product behavior remains the baseline; r29 foreground-ready Runtime ordering remains intact.
+- First r30 load may populate caches from SAF. Subsequent ordinary Activity/runtime/Web refreshes must reuse cached project/configuration/Web inspection facts.
+- Explicit "刷新项目" must bypass and rewrite all three inspection caches.
+- A selected-root URI change must make old cached entries ineligible.
+- Runtime PREPARE/START continues to read authoritative current project facts rather than trusting UI cache content.
+- Internal Alpine current-session stdout containing SIFTALPHA_WEB_URL=http://127.0.0.1:<port>/ must publish that URL as a candidate even when PID/socket observation returns NO_CANDIDATE.
+- Browser/Open remains disabled until the existing Android Endpoint Probe verifies the loopback listener.
+- No SEARCHING/LISTENER_FOUND/STARTING_WEB/AVAILABLE four-stage presentation is reintroduced.
+- Real-device OCI test: with OCI RUNNING and logging SIFTALPHA_WEB_URL, Web should progress from detection to the normal r24 available/open state once 127.0.0.1 listener verification succeeds.

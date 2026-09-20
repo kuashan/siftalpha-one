@@ -988,3 +988,19 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - These diagnostics are intended to distinguish service death, Runtime process death/freeze, and a still-running Runtime whose application/network work has stopped.
 - versionCode 155 / versionName 0.8.0-alpha43-r29.
 - Cloud CI and real-device verification pending.
+
+
+## 2026-09-20 · alpha43-r30 project cache + Internal Web URL wiring
+
+- r24 remains the known usable functional/Web baseline and is not modified.
+- r30 is based directly on r29.
+- Added persisted Project Index Cache for Runtime Center. Normal Activity/lifecycle/runtime refreshes reuse the selected root URI plus cached project-card identity instead of rescanning SAF on every refresh.
+- Explicit "刷新项目" and successful local/GitHub imports request a forced real-project inspection and rewrite the cache.
+- Forced project-index refresh reads the selected root once and each project root once, then derives name/source/entry/run/runtime-selection facts from that snapshot instead of repeatedly querying the same SAF directory.
+- Added persisted WebProjectInspector and ProjectConfigurationInspector/legacy-secret-policy caches, keyed by project identity and selected root URI. Normal card refreshes reuse them; explicit project refresh bypasses and rewrites them.
+- Runtime PREPARE/START facts remain authoritative live reads. The UI cache does not replace action-time source/dependency/runtime inspection.
+- Fixed Internal Alpine Web wiring: explicit SIFTALPHA_WEB_URL from the current embedded snapshot is reconciled into RuntimeWebStateStore before the snapshot-presentation early return.
+- Explicit Runtime URL remains only a candidate. The existing Android loopback Endpoint Probe must still succeed before Browser presentation is enabled.
+- No four-stage Web presentation is restored. No port-range scan, global socket scan, Worker, External Runtime, STOP-scope, or Rich Result behavior is changed.
+- versionCode 156 / versionName 0.8.0-alpha43-r30.
+- Cloud CI and real-device verification pending.

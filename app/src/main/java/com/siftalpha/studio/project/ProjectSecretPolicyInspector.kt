@@ -34,11 +34,35 @@ class ProjectSecretPolicyInspector(context: Context) {
         val name: String,
     )
 
-    private val resolver = context.contentResolver
-    private val projectStore = ProjectStore(context.applicationContext)
+    private val appContext = context.applicationContext
+    private val resolver = appContext.contentResolver
+    private val projectStore = ProjectStore(appContext)
+    private val cachePrefs = appContext.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE)
 
-    fun inspect(projectDocumentId: String): Policy = runCatching {
-        val tree = projectStore.rootUri() ?: return@runCatching unspecified()
+    fun inspect(
+        projectDocumentId: String,
+        forceRefresh: Boolean = false,
+    ): Policy {
+        val tree = projectStore.rootUri() ?: return unspecified()
+        val key = cacheKey(projectDocumentId)
+        if (!forceRefresh) {
+            val root = cachePrefs.getString("$key:root", null)
+            val raw = cachePrefs.getString("$key:value", null)
+            if (root == tree.toString() && raw != null) {
+                runCatching { BinanceApiPolicy.valueOf(raw) }.getOrNull()?.let {
+                    return Policy(it)
+                }
+            }
+        }
+        val policy = inspectFresh(tree, projectDocumentId)
+        cachePrefs.edit()
+            .putString("$key:root", tree.toString())
+            .putString("$key:value", policy.binanceApi.name)
+            .apply()
+        return policy
+    }
+
+    private fun inspectFresh(tree: Uri, projectDocumentId: String): Policy = runCatching {
         val child = children(tree, projectDocumentId)
             .firstOrNull { it.name == ".project.json" }
             ?: return@runCatching unspecified()
@@ -49,7 +73,11 @@ class ProjectSecretPolicyInspector(context: Context) {
         unspecified()
     }
 
+    private fun cacheKey(projectDocumentId: String): String =
+        "${projectDocumentId.length}:$projectDocumentId"
+
     companion object {
+        private const val CACHE_PREFS = "siftalpha_project_secret_policy_cache_v1"
         private const val MAX_METADATA_BYTES = 128 * 1024
 
         private fun unspecified() = Policy(BinanceApiPolicy.UNSPECIFIED)

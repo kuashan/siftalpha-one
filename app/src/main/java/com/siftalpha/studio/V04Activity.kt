@@ -191,6 +191,9 @@ open class V04Activity : StudioActivity() {
     private var refreshScheduled = false
     private var refreshInFlight = false
     private var refreshGeneration = 0L
+    // A user/import requested disk refresh must survive refresh coalescing. Ordinary lifecycle,
+    // Runtime, Web and configuration callbacks stay cache-only.
+    private var forceProjectInspectionPending = false
     private var activityStarted = false
     private val externalObservations = mutableMapOf<String, ExternalObservation>()
     private val externalObservationGenerations = mutableMapOf<String, Long>()
@@ -472,7 +475,9 @@ open class V04Activity : StudioActivity() {
             )
             importRow.addView(smallButton("GitHub") { showGitHubDialog() }, weight().apply { marginStart = dp(5) })
             root.addView(importRow)
-            root.addView(button(getString(R.string.runtime_center_refresh)) { refresh() }.apply {
+            root.addView(button(getString(R.string.runtime_center_refresh)) {
+                refresh(forceProjectInspection = true)
+            }.apply {
                 (layoutParams as LinearLayout.LayoutParams).topMargin = dp(7)
             })
         }
@@ -495,22 +500,26 @@ open class V04Activity : StudioActivity() {
         return scroll
     }
 
-    private fun refresh() {
+    private fun refresh(forceProjectInspection: Boolean = false) {
         if (!::projectList.isInitialized) return
 
-        // Coalesce onStart/onResume/result/probe callbacks and keep the currently rendered
-        // workspace visible while SAF/configuration reads happen off the main thread.
+        // Coalesce onStart/onResume/result/probe callbacks. Only explicit project-content changes
+        // consume the expensive SAF inspection path; normal UI/runtime refreshes reuse persisted
+        // project/configuration/Web inspection caches.
         refreshGeneration += 1
+        if (forceProjectInspection) forceProjectInspectionPending = true
         if (refreshScheduled || refreshInFlight) return
         refreshScheduled = true
         val selectedId = selectedProjectDocumentId
         refreshHandler.postDelayed({
             refreshScheduled = false
             val requestGeneration = refreshGeneration
+            val forceInspection = forceProjectInspectionPending
+            forceProjectInspectionPending = false
             refreshInFlight = true
             refreshExecutor.execute {
                 val result = runCatching {
-                    loadRefreshResult(selectedId)
+                    loadRefreshResult(selectedId, forceInspection)
                 }.getOrElse { error ->
                     ProjectRefreshResult(
                         rootSelected = true,
@@ -531,7 +540,10 @@ open class V04Activity : StudioActivity() {
         }, REFRESH_DEBOUNCE_MS)
     }
 
-    private fun loadRefreshResult(selectedId: String?): ProjectRefreshResult {
+    private fun loadRefreshResult(
+        selectedId: String?,
+        forceProjectInspection: Boolean,
+    ): ProjectRefreshResult {
         val rootSelected = gateway.rootUri() != null
         if (!rootSelected) {
             return ProjectRefreshResult(
@@ -542,7 +554,7 @@ open class V04Activity : StudioActivity() {
 
         val runtimeSupported = runCatching { runtime.runtimeSupported() }.getOrDefault(false)
         return try {
-            val projects = gateway.projects().let { allProjects ->
+            val projects = gateway.projects(forceRefresh = forceProjectInspection).let { allProjects ->
                 selectedId?.let { id ->
                     allProjects.filter { it.summary.documentId == id }
                 } ?: allProjects
@@ -553,9 +565,13 @@ open class V04Activity : StudioActivity() {
                     configurationSnapshot = configurationUi.snapshot(
                         project.summary.documentId,
                         project.folderName,
+                        forceProjectInspection = forceProjectInspection,
                     ),
                     webProfile = runCatching {
-                        webInspector.inspect(project.summary.documentId)
+                        webInspector.inspect(
+                            project.summary.documentId,
+                            forceRefresh = forceProjectInspection,
+                        )
                     }.getOrElse {
                         WebProjectInspector.Profile(false, null, "none", null, null)
                     },
@@ -2602,36 +2618,53 @@ open class V04Activity : StudioActivity() {
         if (snapshot.engine == InternalPythonBackend.ALPINE && isEmbeddedActive(snapshot)) {
             scheduleInternalWebObservation(project, snapshot)
         }
-        val previous = embeddedLastSnapshots[stateKey]
-        if (
-            !EmbeddedPythonObservationPolicy.shouldPresent(previous, snapshot, manualAction) &&
-            !internalWebChanged
+        // Runtime-log URL evidence belongs to the current snapshot/session and must be wired
+        // before the presentation early-return. Otherwise a stable RUNNING snapshot can keep an
+        // explicit SIFTALPHA_WEB_URL invisible forever when PID/socket discovery is unavailable.
+        val runtimeLogWebChanged = if (
+            ::webInspector.isInitialized &&
+            ::webStateStore.isInitialized
         ) {
-            return false
-        }
-        embeddedLastSnapshots[stateKey] = snapshot
-        updateEmbeddedRichResult(project, snapshot)
-
-        if (::webInspector.isInitialized && ::webStateStore.isInitialized) {
             val safeStdout = if (::secretStore.isInitialized) {
                 secretStore.redactRuntimeText(project.folderName, snapshot.stdout)
             } else {
                 snapshot.stdout
             }
             val webCapabilityEnabled = webProfileCache[stateKey]?.enabled == true
-            RuntimeWebDiscoveryScopePolicy.candidateFromOutput(
+            val candidate = RuntimeWebDiscoveryScopePolicy.candidateFromOutput(
                 output = safeStdout,
                 webCapabilityEnabled = webCapabilityEnabled,
-            )?.let { candidate ->
+            )
+            if (candidate != null) {
                 val existingWeb = webStateStore.snapshot(stateKey)
-                webStateStore.rememberCandidateUrl(
-                    projectKey = stateKey,
-                    url = candidate.url,
-                    framework = existingWeb.framework,
-                    source = candidate.source,
-                )
+                val changed = existingWeb.candidateUrl != candidate.url ||
+                    existingWeb.source != candidate.source
+                if (changed) {
+                    webStateStore.rememberCandidateUrl(
+                        projectKey = stateKey,
+                        url = candidate.url,
+                        framework = existingWeb.framework,
+                        source = candidate.source,
+                    )
+                }
+                changed
+            } else {
+                false
             }
+        } else {
+            false
         }
+
+        val previous = embeddedLastSnapshots[stateKey]
+        if (
+            !EmbeddedPythonObservationPolicy.shouldPresent(previous, snapshot, manualAction) &&
+            !internalWebChanged &&
+            !runtimeLogWebChanged
+        ) {
+            return false
+        }
+        embeddedLastSnapshots[stateKey] = snapshot
+        updateEmbeddedRichResult(project, snapshot)
 
         val mappedState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot)
         typedStates[stateKey] = mappedState
@@ -4127,7 +4160,7 @@ open class V04Activity : StudioActivity() {
                         append("SOURCE=${project.summary.source}")
                     }
                     toast(getString(R.string.runtime_project_imported, project.summary.name))
-                    refresh()
+                    refresh(forceProjectInspection = true)
                 }
             } catch (e: Throwable) {
                 runOnUiThread {
@@ -4260,7 +4293,7 @@ open class V04Activity : StudioActivity() {
                         )}",
                     )
                 }
-                refresh()
+                refresh(forceProjectInspection = project != null)
             }
         }.start()
     }

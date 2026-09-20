@@ -3,6 +3,8 @@ package com.siftalpha.studio.project
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * Reads project configuration requirements without guessing that every .env.example entry is required.
@@ -70,11 +72,25 @@ class ProjectConfigurationInspector(context: Context) {
         val name: String,
     )
 
-    private val resolver = context.contentResolver
-    private val projectStore = ProjectStore(context.applicationContext)
+    private val appContext = context.applicationContext
+    private val resolver = appContext.contentResolver
+    private val projectStore = ProjectStore(appContext)
+    private val cachePrefs = appContext.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE)
 
-    fun inspect(projectDocumentId: String): Profile = runCatching {
-        val tree = projectStore.rootUri() ?: return@runCatching emptyProfile()
+    fun inspect(
+        projectDocumentId: String,
+        forceRefresh: Boolean = false,
+    ): Profile {
+        val tree = projectStore.rootUri() ?: return emptyProfile()
+        if (!forceRefresh) {
+            readCachedProfile(tree, projectDocumentId)?.let { return it }
+        }
+        val profile = inspectFresh(tree, projectDocumentId)
+        cacheProfile(tree, projectDocumentId, profile)
+        return profile
+    }
+
+    private fun inspectFresh(tree: Uri, projectDocumentId: String): Profile = runCatching {
         val children = children(tree, projectDocumentId)
         val byName = children.associateBy { it.name }
 
@@ -113,7 +129,99 @@ class ProjectConfigurationInspector(context: Context) {
         emptyProfile()
     }
 
+    private fun readCachedProfile(tree: Uri, projectDocumentId: String): Profile? {
+        val raw = cachePrefs.getString(cacheKey(projectDocumentId), null) ?: return null
+        return runCatching {
+            val value = JSONObject(raw)
+            if (value.optString("rootUri") != tree.toString()) return@runCatching null
+            Profile(
+                requirements = requirementsFromJson(value.optJSONArray("requirements")),
+                configuredProjectEnvKeys = stringSet(value.optJSONArray("configuredProjectEnvKeys")),
+                credentialCandidates = stringList(value.optJSONArray("credentialCandidates")),
+                configurationCandidates = requirementsFromJson(value.optJSONArray("configurationCandidates")),
+            )
+        }.getOrNull()
+    }
+
+    private fun cacheProfile(tree: Uri, projectDocumentId: String, profile: Profile) {
+        val value = JSONObject().apply {
+            put("rootUri", tree.toString())
+            put("requirements", requirementsToJson(profile.requirements))
+            put("configuredProjectEnvKeys", stringsToJson(profile.configuredProjectEnvKeys))
+            put("credentialCandidates", stringsToJson(profile.credentialCandidates))
+            put("configurationCandidates", requirementsToJson(profile.configurationCandidates))
+        }
+        cachePrefs.edit().putString(cacheKey(projectDocumentId), value.toString()).apply()
+    }
+
+    private fun requirementsToJson(values: Collection<Requirement>): JSONArray = JSONArray().apply {
+        values.forEach { requirement ->
+            put(JSONObject().apply {
+                put("name", requirement.name)
+                put("secret", requirement.secret)
+                put("required", requirement.required)
+                put("description", requirement.description)
+                put("source", requirement.source.name)
+                requirement.evidence?.let { evidence ->
+                    put("evidence", JSONObject().apply {
+                        put("filePath", evidence.filePath ?: "")
+                        put("lineNumber", evidence.lineNumber ?: -1)
+                        put("detail", evidence.detail ?: "")
+                    })
+                }
+            })
+        }
+    }
+
+    private fun requirementsFromJson(values: JSONArray?): List<Requirement> = buildList {
+        if (values == null) return@buildList
+        for (index in 0 until values.length()) {
+            val value = values.optJSONObject(index) ?: continue
+            val name = value.optString("name")
+            if (name.isBlank()) continue
+            val source = runCatching {
+                ConfigurationSource.valueOf(value.optString("source"))
+            }.getOrDefault(ConfigurationSource.STATIC_OPTIONAL_READ)
+            val evidenceValue = value.optJSONObject("evidence")
+            val lineNumber = evidenceValue?.optInt("lineNumber", -1)?.takeIf { it > 0 }
+            val evidence = evidenceValue?.let {
+                ConfigurationEvidence(
+                    filePath = it.optString("filePath").takeIf { path -> path.isNotBlank() },
+                    lineNumber = lineNumber,
+                    detail = it.optString("detail").takeIf { detail -> detail.isNotBlank() },
+                )
+            }
+            add(
+                Requirement(
+                    name = name,
+                    secret = value.optBoolean("secret", false),
+                    required = value.optBoolean("required", false),
+                    description = value.optString("description"),
+                    source = source,
+                    evidence = evidence,
+                ),
+            )
+        }
+    }
+
+    private fun stringsToJson(values: Collection<String>): JSONArray = JSONArray().apply {
+        values.forEach { value -> put(value) }
+    }
+
+    private fun stringList(values: JSONArray?): List<String> = buildList {
+        if (values == null) return@buildList
+        for (index in 0 until values.length()) {
+            values.optString(index).takeIf { it.isNotBlank() }?.let(::add)
+        }
+    }
+
+    private fun stringSet(values: JSONArray?): Set<String> = stringList(values).toSet()
+
+    private fun cacheKey(projectDocumentId: String): String =
+        "${projectDocumentId.length}:$projectDocumentId"
+
     companion object {
+        private const val CACHE_PREFS = "siftalpha_project_configuration_profile_cache_v1"
         private const val MAX_METADATA_BYTES = 128 * 1024
         private const val MAX_ENV_BYTES = 256 * 1024
         private const val MAX_PYTHON_FILES = 8

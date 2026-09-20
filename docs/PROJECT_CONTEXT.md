@@ -501,3 +501,8 @@ This build intentionally uses r24 behavior as the product baseline and adds only
 ## alpha43-r29 background execution experiment
 
 r24 remains the known usable functional baseline. r29 does not alter Web behavior. It tests only the first-layer background hypothesis: Android foreground-service state and PARTIAL_WAKE_LOCK must be established before Internal Runtime launch, and the resulting service/process state must be observable through explicit diagnostics. If real-device OCI still stops progressing while FGS heartbeat, wake lock and Runtime PID remain healthy, the next investigation should distinguish Runtime scheduling from network/application progress before any larger ownership migration.
+
+
+## alpha43-r30 current test line
+
+r24 remains the known usable baseline. r29 added the first-layer foreground-ready launch ordering and diagnostics. r30 builds only on r29: it adds persisted Runtime Center inspection caches to avoid repeated SAF scans and repairs the Internal Runtime log-URL wiring so a current-session SIFTALPHA_WEB_URL reaches the existing endpoint verification path before snapshot presentation can early-return. Runtime execution facts remain live/action-time reads, and the four-stage Web experiment remains removed.
