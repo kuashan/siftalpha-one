@@ -63,12 +63,33 @@ object WebProjectDetector {
         pyproject: String?,
         pythonSources: List<String>,
         runCommand: String? = null,
+        relativePaths: Collection<String> = emptyList(),
     ): Detection? {
         val dependencyText = buildString {
             if (!requirements.isNullOrBlank()) appendLine(requirements)
             if (!pyproject.isNullOrBlank()) appendLine(pyproject)
         }
         val sourceText = pythonSources.joinToString("\n")
+        val fastSignature = CommonWebSignatureRegistry.detectPython(
+            requirements = requirements,
+            pyproject = pyproject,
+            relativePaths = relativePaths,
+            pythonSources = pythonSources.mapIndexed { index, source ->
+                "source-" + index + ".py" to source
+            }.toMap(),
+            runCommand = runCommand,
+        )
+        if (fastSignature != null) {
+            val port = extractRunCommandPort(runCommand)
+                ?: extractSourcePort(sourceText)
+                ?: fastSignature.defaultPort
+            return Detection(
+                framework = fastSignature.framework,
+                source = "signature-" + fastSignature.evidence.joinToString("+"),
+                host = port?.let { "127.0.0.1" },
+                port = port,
+            )
+        }
 
         val dependencyFramework = rules
             .firstOrNull { it.dependencyRegex.containsMatchIn(dependencyText) }
@@ -213,7 +234,8 @@ object WebProjectDetector {
     fun normalizeFramework(raw: String?): String? {
         val value = raw?.trim()?.lowercase().orEmpty()
         return when (value) {
-            "streamlit", "gradio", "dash", "fastapi", "flask", "python-http" -> value
+            "streamlit", "gradio", "nicegui", "dash", "fastapi", "flask", "django",
+            "panel", "bokeh", "aiohttp", "tornado", "python-vite-web", "python-http" -> value
             else -> value.takeIf { it.isNotBlank() }
         }
     }
