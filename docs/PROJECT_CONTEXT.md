@@ -585,3 +585,12 @@ r37 is the real-device-passed CLI execution baseline for this feature work. r34 
 r39 is a presentation-only correction discovered during r38 real-device Result Web acceptance. Android 15+ edge-to-edge enforcement placed the legacy View root at the physical window edge, while the shared StudioActivity inset handler previously protected only against the software keyboard. This allowed the Result Web Back / Copy link / Open in browser row to overlap the status bar.
 
 StudioActivity now applies the device-reported system-bar/display-cutout insets on top of each legacy View root's existing padding and reconciles the bottom system inset with the IME using the larger obstruction. The fix is shared so other legacy View surfaces receive the same correct safe-area behavior without hard-coded status-bar dimensions. Compose surfaces retain their existing safeDrawing handling. r38 adaptive Result Web behavior and Runtime semantics are unchanged.
+
+
+## alpha43-r40 Polyglot prepare dependency ordering
+
+r40 closes a general environment-composition gap for Python-primary projects that also contain build-time Node/Vite frontend components. Some Python packaging backends intentionally include generated frontend assets in the wheel/editable package while keeping those assets out of source control. Such projects require the frontend build to finish before Python package metadata/build hooks run.
+
+SiftAlpha already had a generic supplemental Vite builder, but the composed PREPARE order was Python first and Node second. r40 reverses that dependency edge for the Python+Node composition: detected frontend assets are built first, then the Python environment is installed against the now-complete project tree. No application-specific patch, package name, or fixed frontend path is introduced.
+
+The composed environment command also suppresses child-level global SIFTALPHA_ENV markers and publishes one final project-level environment result. Runtime lifecycle semantics and Web presentation priorities are unchanged.

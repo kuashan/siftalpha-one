@@ -1180,3 +1180,13 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - The fix is adaptive to device status-bar/cutout/navigation geometry; no fixed status-bar dp value is introduced.
 - Result parsing, Result Web HTML/CSS, Runtime ownership, Web discovery, project-scoped STOP, CLI argv behavior and the frozen r34 baseline are unchanged.
 - versionCode 165 / versionName 0.8.0-alpha43-r39.
+
+
+## 2026-09-20 · alpha43-r40 Polyglot prepare dependency ordering
+
+- Real-device preparation of a Python-primary project with a nested Vite Web UI exposed a generic orchestration bug. The project's Python packaging declared a generated frontend directory as a forced wheel include; the source archive intentionally did not contain that build output.
+- SiftAlpha already detected and could build the nested Node/Vite component, but RuntimeEnvironmentComposer ran Python preparation first. `pip install -e` therefore failed before the supplemental Node step had a chance to create the required dist directory.
+- Multi-runtime preparation now runs the detected supplemental Node/Vite build before Python packaging. This supports the general class of Python packages whose build/editable metadata consumes generated frontend assets; no project-specific package name/path is hard-coded.
+- Child `SIFTALPHA_ENV` markers from both preparation steps are filtered so the composed command emits one authoritative project-level READY/NOT_READY result while retaining `SIFTALPHA_NODE_ENV` diagnostics.
+- Runtime START/STOP ownership, Web discovery, r38 Result Web, r39 system-bar insets, CLI argv semantics and the frozen r34 baseline are unchanged.
+- versionCode 166 / versionName 0.8.0-alpha43-r40.

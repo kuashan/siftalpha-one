@@ -681,3 +681,16 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Regression: r38 adaptive result extraction/rendering, r37 CLI entry binding/argv, r34 Web truth gates, Runtime ownership and project-scoped STOP remain unchanged.
 - Cloud: repository validators, unit tests and assembleDebug must pass before APK release.
 - Real-device: open an r38-style Result Web page and verify the top three actions no longer overlap the system clock/network/battery area.
+
+
+### alpha43-r40 polyglot prepare ordering acceptance
+
+- Given a Python-primary project with a detected nested Vite component, supplemental Node preparation must execute before Python dependency installation.
+- A generated Vite output required by pyproject/setup packaging must exist before `pip install -e` is invoked.
+- Supplemental Node preparation failure must stop the composed PREPARE before Python installation and end with one project-level `SIFTALPHA_ENV=NOT_READY`.
+- Successful Node preparation followed by successful Python preparation must end with one authoritative project-level `SIFTALPHA_ENV=READY`.
+- Child global environment markers are filtered; `SIFTALPHA_NODE_ENV` remains visible for diagnostics.
+- Projects without a required Vite component continue to accept `SIFTALPHA_NODE_ENV=NOT_REQUIRED` and proceed to Python preparation.
+- Regression: r38 Result Web, r39 system-bar safe insets, Python CLI launch binding, Web truth gates, Runtime ownership and project-scoped STOP remain unchanged.
+- Cloud: repository validators, unit tests and assembleDebug must pass before APK release.
+- Real-device: re-prepare a source archive where pyproject force-includes a generated frontend dist directory; frontend build must complete first and Python editable install must no longer fail with `Forced include not found`.

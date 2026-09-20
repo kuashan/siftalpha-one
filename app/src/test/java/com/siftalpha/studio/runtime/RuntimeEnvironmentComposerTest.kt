@@ -38,6 +38,26 @@ class RuntimeEnvironmentComposerTest {
     }
 
     @Test
+    fun `prepare builds supplemental frontend before python packaging`() {
+        val shell = RuntimeEnvironmentComposer.prepare(FakeHost(), "Project", primary, node).shellScript
+
+        val nodeIndex = shell.indexOf("node_output=")
+        val primaryIndex = shell.indexOf("primary_output=")
+        assertTrue(nodeIndex >= 0)
+        assertTrue(primaryIndex > nodeIndex)
+    }
+
+    @Test
+    fun `prepare strips child project environment markers from both steps`() {
+        val shell = RuntimeEnvironmentComposer.prepare(FakeHost(), "Project", primary, node).shellScript
+
+        val markerFilterCount = "SIFTALPHA_ENV=READY".toRegex().findAll(shell).count()
+        assertTrue(shell.contains("SIFTALPHA_NODE_ENV=(READY|NOT_REQUIRED)"))
+        assertTrue(markerFilterCount >= 3)
+        assertTrue(shell.trimEnd().contains("echo 'SIFTALPHA_ENV=READY'"))
+    }
+
+    @Test
     fun `start blocks stale supplemental environment before primary process`() {
         val secretProvider = { "secret-payload" }
         val primaryStart = RuntimeCommand(

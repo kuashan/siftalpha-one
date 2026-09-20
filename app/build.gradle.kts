@@ -69,8 +69,9 @@ android {
         // alpha43-r38 preserves the frozen r34 baseline plus r35-r37 CLI work, then adds
         // an adaptive app-owned localhost Result Web Host for successful one-shot program output.
         // alpha43-r39 adds Android 15+ system-bar safe insets to legacy View surfaces.
-        versionCode = 165
-        versionName = "0.8.0-alpha43-r39"
+        // alpha43-r40 fixes polyglot prepare ordering: frontend build assets precede Python packaging.
+        versionCode = 166
+        versionName = "0.8.0-alpha43-r40"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
