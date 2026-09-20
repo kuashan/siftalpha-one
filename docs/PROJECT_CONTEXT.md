@@ -745,30 +745,3 @@ Current migration release: `0.8.0-alpha43-r46.1`, versionCode `176`.
 Code verification: W0 #302 PASS at `28a1bde86d9b144646b9608c3cd69d9eb08c90db`.
 Real-device acceptance remains pending.
 
-## r47 frozen storage ownership contract
-
-SiftAlpha now has one fixed app-owned runtime-data root:
-
-`filesDir/SiftAlphaX/`
-
-The directory layout is frozen at layout version 1:
-- `runtimes/`
-- `environments/`
-- `projects/`
-- `sessions/`
-- `logs/`
-- `results/`
-- `wheelhouse/`
-- `state/`
-- `temp/`
-
-`layout.info` identifies the layout and explicitly records that user source is excluded from app ownership.
-
-User-selected source trees remain user-owned and live outside this root. SiftAlpha may stage execution copies under `SiftAlphaX/projects/`, but cleanup, reset, project-runtime deletion or uninstall must never delete the user's original SAF source tree.
-
-R47 intentionally does not migrate old internal runtime environments because this is still a development-stage reset with no production user base. Known legacy app-private runtime/result/temp/PID roots are deleted once, then the new layout marker is committed. A valid layout 1 marker prevents future launches from repeating the reset.
-
-This is not a general "upgrade deletes environments" policy. After R47, normal app upgrades must preserve `SiftAlphaX/` unless a future, explicitly approved storage redesign says otherwise.
-
-All new SiftAlpha-owned file paths should be obtained through `SiftAlphaStorage`, not hard-coded independently by runtime modules.
-

@@ -6,7 +6,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
-import com.siftalpha.studio.storage.SiftAlphaStorage
 
 class InternalRuntimeStorageControllerTest {
 
@@ -22,24 +21,24 @@ class InternalRuntimeStorageControllerTest {
     fun clearReproducibleCachesPreservesRuntimeAndProjectData() {
         val root = Files.createTempDirectory("siftalpha-internal-storage").toFile()
         try {
-            val filesRoot = File(root, "SiftAlphaX")
-            val wheel = File(filesRoot, "wheelhouse/pkg.whl").apply {
+            val filesRoot = File(root, "siftalphax")
+            val wheel = File(filesRoot, "cache/wheels/pkg.whl").apply {
                 parentFile!!.mkdirs()
                 writeBytes(ByteArray(2048))
             }
-            val pip = File(filesRoot, "runtimes/alpine/rootfs/root/.cache/pip/http/pkg").apply {
+            val pip = File(filesRoot, "alpine/rootfs/root/.cache/pip/http/pkg").apply {
                 parentFile!!.mkdirs()
                 writeBytes(ByteArray(1024))
             }
-            val npm = File(filesRoot, "runtimes/alpine/rootfs/root/.npm/_cacache/content/pkg").apply {
+            val npm = File(filesRoot, "alpine/rootfs/root/.npm/_cacache/content/pkg").apply {
                 parentFile!!.mkdirs()
                 writeBytes(ByteArray(1024))
             }
-            val busybox = File(filesRoot, "runtimes/alpine/rootfs/bin/busybox").apply {
+            val busybox = File(filesRoot, "alpine/rootfs/bin/busybox").apply {
                 parentFile!!.mkdirs()
                 writeText("runtime")
             }
-            val env = File(filesRoot, "environments/alpine/project/venv/bin/python").apply {
+            val env = File(filesRoot, "alpine/environments/project/venv/bin/python").apply {
                 parentFile!!.mkdirs()
                 writeText("project")
             }

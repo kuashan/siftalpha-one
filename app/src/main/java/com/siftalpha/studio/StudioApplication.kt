@@ -5,7 +5,6 @@ import android.app.Application
 import android.content.Intent
 import android.os.Bundle
 import android.os.Process
-import com.siftalpha.studio.storage.SiftAlphaStorage
 import java.io.PrintWriter
 import java.io.StringWriter
 import kotlin.system.exitProcess
@@ -21,9 +20,8 @@ class StudioApplication : Application(), Application.ActivityLifecycleCallbacks 
 
     override fun onCreate() {
         super.onCreate()
-        installCrashRecorder()
-        SiftAlphaStorage.initialize(this)
         StudioLanguage.applyPersisted(this)
+        installCrashRecorder()
         registerActivityLifecycleCallbacks(this)
     }
 

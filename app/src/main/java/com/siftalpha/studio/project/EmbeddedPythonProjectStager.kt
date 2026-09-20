@@ -1,7 +1,6 @@
 package com.siftalpha.studio.project
 
 import android.content.Context
-import com.siftalpha.studio.storage.SiftAlphaStorage
 import java.io.File
 import java.nio.file.Files
 import java.util.UUID
@@ -100,7 +99,7 @@ class EmbeddedPythonProjectStager(
 
     fun stage(projectDocumentId: String, entrypoint: String): File {
         require(projectDocumentId.isNotBlank()) { "项目身份不能为空" }
-        val projectsRoot = SiftAlphaStorage.projectsRoot(appContext.filesDir)
+        val projectsRoot = File(appContext.filesDir, PRIVATE_PROJECTS_PATH)
         check(projectsRoot.mkdirs() || projectsRoot.isDirectory) {
             "无法创建内置 R 项目暂存目录"
         }
@@ -131,7 +130,7 @@ class EmbeddedPythonProjectStager(
         sourceBuild: Boolean = false,
     ): File {
         require(projectDocumentId.isNotBlank()) { "项目身份不能为空" }
-        val projectsRoot = SiftAlphaStorage.projectsRoot(appContext.filesDir)
+        val projectsRoot = File(appContext.filesDir, PRIVATE_PROJECTS_PATH)
         check(projectsRoot.mkdirs() || projectsRoot.isDirectory) {
             "无法创建内置 R 项目暂存目录"
         }
@@ -152,7 +151,7 @@ class EmbeddedPythonProjectStager(
 
     fun cleanup(stagingRoot: File) {
         if (!stagingRoot.exists()) return
-        val projectsRoot = SiftAlphaStorage.projectsRoot(appContext.filesDir)
+        val projectsRoot = File(appContext.filesDir, PRIVATE_PROJECTS_PATH)
         val canonicalProjectsRoot = projectsRoot.canonicalFile
         val canonicalRoot = stagingRoot.canonicalFile
         check(canonicalRoot != canonicalProjectsRoot && pathWithin(canonicalProjectsRoot, canonicalRoot)) {
@@ -165,7 +164,7 @@ class EmbeddedPythonProjectStager(
     }
 
     companion object {
-        const val PRIVATE_PROJECTS_PATH = "SiftAlphaX/projects"
+        const val PRIVATE_PROJECTS_PATH = "siftalphax/projects"
         val ENTRYPOINT_LIMITS = EmbeddedPythonStagingLimits(
             maxNodes = 4_096,
             maxFiles = 2_048,

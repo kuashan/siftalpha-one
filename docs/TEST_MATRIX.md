@@ -949,18 +949,3 @@ Real-device gate:
 | Existing incompatible/changed project | Keep NOT_READY and require Prepare | Preserved r46 checks + W0 #302 PASS |
 | Overwrite install from r46 to r46.1 | Previously prepared compatible projects remain usable without unnecessary re-prepare | PENDING REAL DEVICE |
 
-## r47 SiftAlphaX storage ownership
-
-| Check | Expected | Status |
-| --- | --- | --- |
-| First R47 initialization | Delete only known legacy app-private runtime/result/temp/PID roots and create SiftAlphaX layout 1 | Unit regression + W0 #304 PASS |
-| User source safety | User-owned source outside app-private roots remains untouched | Unit regression PASS |
-| One-time reset behavior | Second initialization with valid layout marker preserves existing SiftAlphaX data | Unit regression + W0 #304 PASS |
-| Embedded CPython paths | Runtime, environment, project staging, sessions and wheelhouse resolve under SiftAlphaX | Layout regression + W0 #304 PASS |
-| Internal Alpine paths | RootFS/runtime, environments, sessions, PID state and proot temp resolve under SiftAlphaX | W0 #304 + Alpine Probe #58 PASS |
-| Result Web path | App-owned local result pages live under SiftAlphaX/results | W0 #304 PASS |
-| Storage Manager paths | Internal storage accounting/cleanup follows the new ownership registry | Unit regression + W0 #304 PASS |
-| Uninstall expectation | Android removes SiftAlphaX because it is inside app-private filesDir | Android platform contract; real-device uninstall spot-check optional |
-| Existing R46 environment after overwrite | Legacy internal environment is intentionally reset once; project requires Prepare again | PENDING REAL DEVICE |
-| User project source after overwrite | Original SAF/AcodeProjects source remains present and unchanged | PENDING REAL DEVICE |
-
