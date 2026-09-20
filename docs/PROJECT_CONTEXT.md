@@ -764,3 +764,23 @@ Static recognition can produce only a launch candidate. Runtime Identity -> proj
 A launch contract is persisted first as DISCOVERED and promoted to VERIFIED only after a current Runtime-owned endpoint is reachable. Only VERIFIED launch contracts are eligible for fast reuse on later runs. Uninstalling SiftAlpha removes these app-private learned records; a fresh install must still rediscover Web capability from the project itself.
 
 Current development version: `0.8.0-alpha43-r46.2`, versionCode `178`. R46.1 remains the parent functional baseline; abandoned R47 storage consolidation is not part of this release.
+
+
+## alpha43-r46.3 External Python environment transaction contract
+
+External Python virtual environments are treated as prefix-bound and non-relocatable. SiftAlpha must not build a complete venv under one absolute path and rename it to another after pip has generated entry points.
+
+PREPARE transaction:
+1. compute project dependency evidence;
+2. preserve the previous READY marker and previous final venv as rollback backups;
+3. create the replacement venv directly at the final stable project venv path;
+4. install dependencies/project through that final venv;
+5. verify Python runtime identity and final `sys.executable` prefix;
+6. write the replacement READY marker;
+7. delete backups and disarm rollback.
+
+If any step after backup fails, SiftAlpha removes the partial new venv and restores the prior venv + READY marker. This keeps the R46.1 transactional intent without relying on unsupported venv relocation.
+
+This fix is generic and applies to any Python project whose package installation generates console scripts or other prefix-sensitive files. It does not special-case easy_tdx and does not modify imported project source.
+
+Current development version: `0.8.0-alpha43-r46.3`, versionCode `179`.
