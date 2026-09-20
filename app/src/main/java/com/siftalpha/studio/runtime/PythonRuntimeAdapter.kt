@@ -828,6 +828,11 @@ SIFTALPHA_RUNNER
      * Requires project, venv and ready shell variables. Sets env_ready (0/1), env_reason,
      * dependency_source and dependency_hash without mutating the environment.
      */
+    /**
+     * Requires project, venv and ready shell variables. Sets env_ready (0/1), env_reason,
+     * dependency_source and dependency_hash. Legacy r45 markers are upgraded in place only
+     * after dependency, venv creation-version and current-runtime compatibility are proven.
+     */
     private fun environmentReadyCheckShell(project: RuntimeProjectSpec): String = """
         ${dependencyFingerprintShell()}
         required_python=${sh(project.pythonRequiresVersion.orEmpty())}
@@ -844,17 +849,38 @@ SIFTALPHA_RUNNER
               saved_hash="${'$'}(awk -F= '/^HASH=/{print substr(${ '$' }0,6); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_python="${'$'}(awk -F= '/^PYTHON_VERSION=/{print substr(${ '$' }0,16); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_requires="${'$'}(awk -F= '/^REQUIRES_PYTHON=/{print substr(${ '$' }0,17); exit}' "${'$'}ready" 2>/dev/null || true)"
-              if [ -z "${'$'}saved_python" ]; then
-                env_reason='PYTHON_RUNTIME_VERSION_UNKNOWN'
+              if [ "${'$'}saved_source" != "${'$'}dependency_source" ] || [ "${'$'}saved_hash" != "${'$'}dependency_hash" ]; then
+                env_reason='DEPENDENCY_MANIFEST_CHANGED'
+              elif [ -z "${'$'}saved_python" ]; then
+                if grep -q '^PYTHON_VERSION=' "${'$'}ready" 2>/dev/null || grep -q '^REQUIRES_PYTHON=' "${'$'}ready" 2>/dev/null; then
+                  env_reason='PYTHON_RUNTIME_VERSION_UNKNOWN'
+                else
+                  legacy_created_python="${'$'}(sed -n -E 's/^(version_info|version)[[:space:]]*=[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\2/p' "${'$'}venv/pyvenv.cfg" 2>/dev/null | head -n 1)"
+                  legacy_requirement_ok=1
+                  if [ -z "${'$'}legacy_created_python" ] || [ "${'$'}legacy_created_python" != "${'$'}current_python_version" ]; then
+                    legacy_requirement_ok=0
+                  elif [ -n "${'$'}required_python" ]; then
+                    "${'$'}venv/bin/python" -c 'import sys; from pip._vendor.packaging.specifiers import SpecifierSet; from pip._vendor.packaging.version import Version; current=Version(".".join(str(v) for v in sys.version_info[:3])); raise SystemExit(0 if current in SpecifierSet(sys.argv[1]) else 1)' "${'$'}required_python" >/dev/null 2>&1 || legacy_requirement_ok=0
+                  fi
+                  if [ "${'$'}legacy_requirement_ok" -eq 1 ]; then
+                    umask 077
+                    migrated_ready="${'$'}ready.migrate-${'$'}${'$'}"
+                    printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\n' \
+                      "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" >"${'$'}migrated_ready"
+                    mv -f -- "${'$'}migrated_ready" "${'$'}ready"
+                    env_ready=1
+                    env_reason='READY_MIGRATED'
+                  else
+                    env_reason='PYTHON_RUNTIME_VERSION_UNKNOWN'
+                  fi
+                fi
               elif [ "${'$'}saved_python" != "${'$'}current_python_version" ]; then
                 env_reason='PYTHON_RUNTIME_VERSION_CHANGED'
               elif [ "${'$'}saved_requires" != "${'$'}required_python" ]; then
                 env_reason='PYTHON_REQUIREMENT_CHANGED'
-              elif [ "${'$'}saved_source" = "${'$'}dependency_source" ] && [ "${'$'}saved_hash" = "${'$'}dependency_hash" ]; then
+              else
                 env_ready=1
                 env_reason='READY'
-              else
-                env_reason='DEPENDENCY_MANIFEST_CHANGED'
               fi
             fi
           fi
