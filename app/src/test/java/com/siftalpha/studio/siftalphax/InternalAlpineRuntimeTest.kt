@@ -71,6 +71,32 @@ class InternalAlpineRuntimeTest {
     }
 
     @Test
+    fun projectRequiresPythonParticipatesInAlpineEnvironmentIdentity() {
+        val modern = InternalAlpineDependencySource.fromProjectFiles(
+            requirementsText = "requests\n",
+            pyprojectText = "[project]\nrequires-python=\">=3.10\"\n",
+        )
+        val legacy = InternalAlpineDependencySource.fromProjectFiles(
+            requirementsText = "requests\n",
+            pyprojectText = "[project]\nrequires-python=\"<3\"\n",
+        )
+
+        assertEquals(">=3.10", modern.projectRequiresPython)
+        assertEquals("<3", legacy.projectRequiresPython)
+        assertTrue(modern.sourceFingerprint != legacy.sourceFingerprint)
+    }
+
+    @Test
+    fun alpineRuntimeIdentityChangesWithPythonVersion() {
+        val first = InternalAlpineFiles.pythonRuntimeIdentity("3.12.11")
+        val second = InternalAlpineFiles.pythonRuntimeIdentity("3.13.1")
+
+        assertTrue(first.contains("alpine:3.21.8"))
+        assertTrue(first.contains("python:3.12.11"))
+        assertTrue(first != second)
+    }
+
+    @Test
     fun pythonRuntimeBootstrapRetriesBoundedApkFailures() {
         val command = InternalAlpinePythonRuntimeBootstrap.installCommand(maxAttempts = 4)
 
