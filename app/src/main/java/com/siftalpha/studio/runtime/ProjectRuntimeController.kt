@@ -4,6 +4,7 @@ import com.siftalpha.studio.project.EmbeddedPythonProjectStager
 import com.siftalpha.studio.project.V04ProjectGateway
 import com.siftalpha.studio.project.PythonCliRequirement
 import com.siftalpha.studio.siftalphax.EmbeddedPythonDependencyInputV1
+import com.siftalpha.studio.siftalphax.EmbeddedPythonDependencyPlanV1
 import com.siftalpha.studio.siftalphax.EmbeddedPythonEnvironmentManager
 import com.siftalpha.studio.siftalphax.EmbeddedPythonRequirementParserV1
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
@@ -122,11 +123,18 @@ class ProjectRuntimeController(
         val plan: ProjectEnvironmentPlan,
     )
 
+    private data class CachedEmbeddedDependencyResolution(
+        val basePlanId: String,
+        val dependencyPlan: EmbeddedPythonDependencyPlanV1,
+    )
+
     private val host: RuntimeCommandHost = TermuxProotRuntimeHost(gateway)
     private val pythonAdapter: ExecutableRuntimeAdapter = PythonRuntimeAdapter(host)
     private val nodeExecutableAdapter: ExecutableRuntimeAdapter = ExecutableNodeJsRuntimeAdapter(host)
     private val supplementalNodeAdapter = NodeJsRuntimeAdapter(host)
     private val embeddedStagingRoots = mutableMapOf<String, File>()
+    private val embeddedDependencyResolutionCache =
+        mutableMapOf<String, CachedEmbeddedDependencyResolution>()
 
     fun runtimeSupported(): Boolean = host.runtimeSupported()
 
@@ -139,6 +147,102 @@ class ProjectRuntimeController(
      */
     fun environmentPlan(project: V04ProjectGateway.RuntimeProject): ProjectEnvironmentPlan =
         environmentPlanningContext(project).plan
+
+    /**
+     * Explicit/deep detection may query package metadata, but never installs or mutates source.
+     * A successful Embedded CPython resolution is cached only against this immutable snapshot's
+     * base Plan ID so PREPARE can consume the exact resolved wheel graph without resolving again.
+     */
+    fun detectEnvironment(
+        project: V04ProjectGateway.RuntimeProject,
+        resolveCompatibility: Boolean = true,
+    ): ProjectEnvironmentResolution {
+        val plan = environmentPlan(project)
+        if (
+            !resolveCompatibility ||
+            !plan.readyToPrepare ||
+            !plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON)
+        ) {
+            return ProjectEnvironmentResolutionPlanner.static(plan)
+        }
+
+        val projectId = project.summary.documentId
+        cachedEmbeddedDependencyPlan(projectId, plan.planId)?.let { cached ->
+            return ProjectEnvironmentResolutionPlanner.embeddedResolved(
+                plan = plan,
+                resolvedFingerprint = cached.resolvedFingerprint,
+                packageCount = cached.packages.size,
+            )
+        }
+
+        val manager = embeddedPythonEnvironmentManager
+            ?: return ProjectEnvironmentResolutionPlanner.static(plan)
+        val files = internalDependencyFiles(projectId, requiresNodeVite = false)
+        val input = try {
+            EmbeddedPythonRequirementParserV1.fromProjectFiles(
+                files.requirementsText,
+                files.pyprojectText,
+            )
+        } catch (error: Throwable) {
+            return if (
+                InternalPythonPreparationFallbackPolicy.backendFor(error) ==
+                InternalPythonBackend.ALPINE
+            ) {
+                ProjectEnvironmentResolutionPlanner.embeddedIncompatible(
+                    plan = plan,
+                    detail = error.message.orEmpty(),
+                )
+            } else {
+                ProjectEnvironmentResolutionPlanner.lookupDeferred(
+                    plan = plan,
+                    detail = error.message.orEmpty(),
+                )
+            }
+        }
+
+        return try {
+            val resolved = manager.resolveDependencyPlan(input)
+            synchronized(embeddedDependencyResolutionCache) {
+                embeddedDependencyResolutionCache[projectId] =
+                    CachedEmbeddedDependencyResolution(
+                        basePlanId = plan.planId,
+                        dependencyPlan = resolved,
+                    )
+            }
+            ProjectEnvironmentResolutionPlanner.embeddedResolved(
+                plan = plan,
+                resolvedFingerprint = resolved.resolvedFingerprint,
+                packageCount = resolved.packages.size,
+            )
+        } catch (error: Throwable) {
+            synchronized(embeddedDependencyResolutionCache) {
+                embeddedDependencyResolutionCache.remove(projectId)
+            }
+            if (
+                InternalPythonPreparationFallbackPolicy.backendFor(error) ==
+                InternalPythonBackend.ALPINE
+            ) {
+                ProjectEnvironmentResolutionPlanner.embeddedIncompatible(
+                    plan = plan,
+                    detail = error.message.orEmpty(),
+                )
+            } else {
+                ProjectEnvironmentResolutionPlanner.lookupDeferred(
+                    plan = plan,
+                    detail = error.message.orEmpty(),
+                )
+            }
+        }
+    }
+
+    private fun cachedEmbeddedDependencyPlan(
+        projectId: String,
+        basePlanId: String,
+    ): EmbeddedPythonDependencyPlanV1? = synchronized(embeddedDependencyResolutionCache) {
+        embeddedDependencyResolutionCache[projectId]
+            ?.takeIf { it.basePlanId == basePlanId }
+            ?.dependencyPlan
+    }
 
     private fun environmentPlanningContext(
         project: V04ProjectGateway.RuntimeProject,
@@ -365,16 +469,17 @@ class ProjectRuntimeController(
         project: V04ProjectGateway.RuntimeProject,
         progress: ((String) -> Unit)? = null,
     ): InternalEnvironmentPreparationResult {
-        val plan = environmentPlan(project)
+        val resolution = detectEnvironment(project, resolveCompatibility = true)
+        val plan = resolution.plan
         check(plan.readyToPrepare) { blockedEnvironmentPlanMessage(plan) }
         check(plan.detection.primaryRuntime == RuntimeKind.PYTHON) {
             "Environment Plan does not describe a Python project"
         }
         check(
-            plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON) ||
-                plan.supports(EnvironmentBackend.INTERNAL_ALPINE)
+            resolution.selectedBackend == EnvironmentBackend.EMBEDDED_CPYTHON ||
+                resolution.selectedBackend == EnvironmentBackend.INTERNAL_ALPINE
         ) {
-            "Environment Plan has no Internal R preparation backend"
+            "Resolved Environment Plan has no Internal R preparation backend"
         }
 
         val route = resolveControlPath(
@@ -394,7 +499,7 @@ class ProjectRuntimeController(
                 add("SIFTALPHA_X_RUNTIME_PROVIDER=EMBEDDED_R")
                 add("SIFTALPHA_X_PROJECT_ID=" + projectId)
                 add("SIFTALPHA_X_ENVIRONMENT_STAGE=PREPARING")
-                addAll(plan.diagnosticLines())
+                addAll(resolution.diagnosticLines())
             }.joinToString("\n"),
         )
 
@@ -403,7 +508,7 @@ class ProjectRuntimeController(
         var cpythonError: Throwable? = null
 
         if (
-            plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON) &&
+            resolution.selectedBackend == EnvironmentBackend.EMBEDDED_CPYTHON &&
             !requiresNodeVite &&
             cpythonSession != null &&
             cpythonManager != null
@@ -426,6 +531,7 @@ class ProjectRuntimeController(
                 val prepared = cpythonManager.prepare(
                     projectIdentity = projectId,
                     dependencyInput = input,
+                    resolvedPlan = cachedEmbeddedDependencyPlan(projectId, plan.planId),
                 )
                 return InternalEnvironmentPreparationResult(
                     ready = prepared.ready,
@@ -462,8 +568,14 @@ class ProjectRuntimeController(
             }
         }
 
-        check(plan.supports(EnvironmentBackend.INTERNAL_ALPINE)) {
-            cpythonError?.message ?: "Environment Plan does not allow Internal Alpine"
+        check(
+            resolution.selectedBackend == EnvironmentBackend.INTERNAL_ALPINE ||
+                (
+                    cpythonError != null &&
+                        plan.supports(EnvironmentBackend.INTERNAL_ALPINE)
+                )
+        ) {
+            cpythonError?.message ?: "Resolved Environment Plan does not select Internal Alpine"
         }
         val alpineManager = internalAlpineEnvironmentManager
             ?: throw cpythonError ?: error("Internal Alpine environment manager is unavailable")
