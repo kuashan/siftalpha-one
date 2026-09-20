@@ -496,6 +496,7 @@ class InternalAlpineSession private constructor(context: Context) {
         val generation: Long,
         val stdout: File,
         val stderr: File,
+        val backgroundTelemetry: File,
         val startedAt: Long,
         val foregroundReadyAtEpochMs: Long,
         val foregroundServicePid: Int?,
@@ -550,6 +551,7 @@ class InternalAlpineSession private constructor(context: Context) {
         val sessionRoot = InternalAlpineFiles.sessionRoot(appContext, sessionId)
         val stdout = File(sessionRoot, "stdout.log")
         val stderr = File(sessionRoot, "stderr.log")
+        val backgroundTelemetry = File(sessionRoot, "background-continuity.log")
         val generation = nextGeneration.incrementAndGet()
         val safeEntrypoint = entrypoint.replace("'", "'\"'\"'")
         val shell = "exec /siftalpha-env/venv/bin/python '/workspace/" + safeEntrypoint + "'"
@@ -575,6 +577,7 @@ class InternalAlpineSession private constructor(context: Context) {
                         runtimePid = managed.hostPid(),
                         stdoutFile = stdout,
                         stderrFile = stderr,
+                        telemetryFile = backgroundTelemetry,
                         terminate = { InternalAlpineProcessControl.terminate(managed) },
                         cleanup = { managed.cleanup() },
                     )
@@ -589,6 +592,7 @@ class InternalAlpineSession private constructor(context: Context) {
                         generation = generation,
                         stdout = stdout,
                         stderr = stderr,
+                        backgroundTelemetry = backgroundTelemetry,
                         startedAt = System.currentTimeMillis(),
                         foregroundReadyAtEpochMs = owned.foreground.readyAtEpochMs,
                         foregroundServicePid = owned.foreground.servicePid,
@@ -655,8 +659,20 @@ class InternalAlpineSession private constructor(context: Context) {
             exitCode = record.exitCode,
             stdout = buildString {
                 appendLine(backgroundDiagnostics(record))
+                val continuity = InternalAlpineEnvironmentManager.readTail(
+                    record.backgroundTelemetry,
+                    256 * 1024,
+                )
+                if (continuity.isNotBlank()) {
+                    appendLine()
+                    appendLine("=== SiftAlpha Background Continuity History ===")
+                    appendLine(continuity.trimEnd())
+                }
                 val projectStdout = InternalAlpineEnvironmentManager.readTail(record.stdout, 512 * 1024)
-                if (projectStdout.isNotBlank()) append(projectStdout)
+                if (projectStdout.isNotBlank()) {
+                    appendLine()
+                    append(projectStdout)
+                }
             }.trimEnd(),
             stderr = InternalAlpineEnvironmentManager.readTail(record.stderr, 512 * 1024),
         )

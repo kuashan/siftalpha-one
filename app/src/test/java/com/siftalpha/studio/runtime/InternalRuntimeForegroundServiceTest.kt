@@ -103,6 +103,35 @@ class InternalRuntimeForegroundServiceTest {
     }
 
     @Test
+    fun backgroundTelemetryParsesProcStateAndCpuTicks() {
+        val stat = "321 (python worker) S 1 2 3 4 5 6 7 8 9 10 12 7 0 0"
+        val parsed = InternalRuntimeBackgroundTelemetry.parseProcStat(stat)
+
+        assertEquals("S", parsed.first)
+        assertEquals(19L, parsed.second)
+    }
+
+    @Test
+    fun backgroundTelemetryUsesLatestValidatedLoopbackUrl() {
+        val text = """
+            SIFTALPHA_WEB_URL=http://127.0.0.1:8080/
+            noise
+            SIFTALPHA_WEB_URL=http://127.0.0.1:9090/
+        """.trimIndent()
+
+        assertEquals(
+            "http://127.0.0.1:9090/",
+            InternalRuntimeBackgroundTelemetry.latestLoopbackUrl(text),
+        )
+        assertEquals(
+            null,
+            InternalRuntimeBackgroundTelemetry.latestLoopbackUrl(
+                "SIFTALPHA_WEB_URL=https://example.com/",
+            ),
+        )
+    }
+
+    @Test
     fun failedLeaseCanBeRolledBackAndReacquired() {
         val leases = InternalRuntimeProjectSet()
 

@@ -544,3 +544,25 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Real-device OCI: keep a large live log active for at least 5 minutes, interact with the output scrollbar and exercise STATUS/Refresh Logs/STOP. No first-tap loss, repeated card flicker or sustained UI freeze is acceptable.
 - r31 Runtime ownership diagnostics and the separate 10-15 minute background-continuity acceptance remain required; r32 CI success is not REAL_DEVICE_PASS.
 
+### alpha43-r33 Background Web Continuity telemetry acceptance
+
+- Foreground Service telemetry sampling must continue independently of Runtime Center Activity lifecycle, on the existing 15-second service heartbeat cadence.
+- Each active Internal Alpine session must persist bounded background samples containing:
+  - BACKGROUND_SAMPLE_EPOCH_MS
+  - BACKGROUND_SERVICE_IMPORTANCE / SERVICE_PROC_STATE / SERVICE_CGROUP
+  - BACKGROUND_RUNTIME_PID / PID_ALIVE / PROC_STATE / RUNTIME_CGROUP
+  - BACKGROUND_RUNTIME_CPU_TICKS / CPU_TICKS_DELTA
+  - BACKGROUND_STDOUT_BYTES / STDOUT_MTIME_MS
+  - BACKGROUND_WEB_URL / WEB_LOOPBACK_REACHABLE
+  - BACKGROUND_WAKE_LOCK_HELD
+  - BACKGROUND_POWER_SAVE_MODE / DEVICE_IDLE_MODE / BATTERY_OPTIMIZATION_IGNORED
+- Only validated loopback SIFTALPHA_WEB_URL values may be probed; arbitrary external URLs must not be probed.
+- Telemetry must be diagnostic-only: no process restart/supervision, Worker, new execution layer, widened STOP, WifiLock, Web four-stage state or HTTP readiness-state restoration.
+- Unit tests must cover proc-state/CPU-tick parsing and latest validated loopback URL selection.
+- Real-device same-phone test: keep browser on the Runtime localhost page, put SiftAlpha in background for 5-10 minutes, observe the page stall, return to SiftAlpha without rerunning, refresh logs and copy the Background Continuity History.
+- Interpretation:
+  - CPU tick delta ~0 + stdout unchanged + Web unreachable while service samples continue => Runtime child scheduling/freeze path.
+  - CPU ticks/stdout continue + Web unreachable => HTTP listener/Web-server path.
+  - CPU ticks/stdout continue + Web reachable while browser UI appears stale => browser/frontend refresh path.
+  - Battery optimization/idle evidence is supporting context, not by itself proof of root cause.
+

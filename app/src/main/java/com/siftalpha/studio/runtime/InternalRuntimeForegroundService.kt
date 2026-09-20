@@ -2,6 +2,7 @@ package com.siftalpha.studio.runtime
 
 import android.app.Notification
 import android.app.NotificationChannel
+import android.app.ActivityManager
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -17,6 +18,8 @@ import android.os.Process
 import android.os.SystemClock
 import com.siftalpha.studio.MainActivity
 import com.siftalpha.studio.R
+import java.io.File
+import java.io.RandomAccessFile
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
@@ -48,8 +51,9 @@ data class InternalRuntimeForegroundDiagnostics(
 data class InternalRuntimeOwnedProcess(
     val process: java.lang.Process,
     val runtimePid: Int?,
-    val stdoutFile: java.io.File?,
-    val stderrFile: java.io.File?,
+    val stdoutFile: File?,
+    val stderrFile: File?,
+    val telemetryFile: File? = null,
     val terminate: () -> Unit,
     val cleanup: () -> Unit,
 )
@@ -87,6 +91,71 @@ internal object InternalRuntimeOwnershipPolicy {
             ownedSessionLeaseId == requestedSessionLeaseId
 }
 
+internal object InternalRuntimeBackgroundTelemetry {
+    data class ProcSample(
+        val state: String?,
+        val cpuTicks: Long?,
+        val cgroup: String?,
+    )
+
+    fun parseProcStat(stat: String): Pair<String?, Long?> {
+        val close = stat.lastIndexOf(')')
+        if (close < 0 || close + 2 >= stat.length) return null to null
+        val fields = stat.substring(close + 2).trim().split(Regex("\\s+"))
+        val state = fields.getOrNull(0)?.takeIf(String::isNotBlank)
+        val userTicks = fields.getOrNull(11)?.toLongOrNull()
+        val systemTicks = fields.getOrNull(12)?.toLongOrNull()
+        val cpuTicks = if (userTicks != null && systemTicks != null) userTicks + systemTicks else null
+        return state to cpuTicks
+    }
+
+    fun latestLoopbackUrl(text: String): String? =
+        text.lineSequence()
+            .filter { it.contains("SIFTALPHA_WEB_URL=") }
+            .mapNotNull { RuntimeWebUrl.extractLocalHttpUrl(it) }
+            .lastOrNull()
+
+    fun readProc(pid: Int?): ProcSample {
+        if (pid == null || pid <= 0) return ProcSample(null, null, null)
+        val proc = File("/proc/${pid}")
+        if (!proc.exists()) return ProcSample(null, null, null)
+        val stat = runCatching { File(proc, "stat").readText() }.getOrNull().orEmpty()
+        val (state, ticks) = parseProcStat(stat)
+        val cgroup = runCatching { File(proc, "cgroup").readLines() }
+            .getOrNull()
+            ?.joinToString(";") { it.trim() }
+            ?.replace(Regex("\\s+"), "_")
+            ?.take(768)
+        return ProcSample(state, ticks, cgroup)
+    }
+
+    fun readTail(file: File?, maxBytes: Int = 64 * 1024): String {
+        if (file == null || !file.isFile || maxBytes <= 0) return ""
+        return runCatching {
+            RandomAccessFile(file, "r").use { input ->
+                val length = input.length()
+                val count = minOf(length, maxBytes.toLong()).toInt()
+                input.seek((length - count).coerceAtLeast(0L))
+                val bytes = ByteArray(count)
+                input.readFully(bytes)
+                bytes.toString(Charsets.UTF_8)
+            }
+        }.getOrDefault("")
+    }
+
+    fun appendBounded(file: File?, text: String, maxBytes: Int = 256 * 1024) {
+        if (file == null || text.isBlank() || maxBytes <= 0) return
+        runCatching {
+            file.parentFile?.mkdirs()
+            if (file.isFile && file.length() > maxBytes) {
+                val tail = readTail(file, maxBytes / 2)
+                file.writeText(tail)
+            }
+            file.appendText(text)
+        }
+    }
+}
+
 class InternalRuntimeForegroundService : Service() {
 
     private class OwnedSession(
@@ -95,17 +164,22 @@ class InternalRuntimeForegroundService : Service() {
         val ownedProcess: InternalRuntimeOwnedProcess,
         @Volatile var stopRequested: Boolean = false,
         @Volatile var monitorActive: Boolean = true,
+        @Volatile var lastSampleCpuTicks: Long? = null,
     )
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var foregroundActive = false
     private val ownedSessions = ConcurrentHashMap<String, OwnedSession>()
     private val ownershipExecutor = Executors.newCachedThreadPool()
+
+    @Volatile
+    private var telemetrySamplingInFlight = false
     private val heartbeatHandler = Handler(Looper.getMainLooper())
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
             if (projects.isEmpty()) return
             lastHeartbeatAtEpochMs = System.currentTimeMillis()
+            scheduleBackgroundTelemetrySample()
             signalReadyChanged()
             heartbeatHandler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
         }
@@ -226,6 +300,96 @@ class InternalRuntimeForegroundService : Service() {
             .build()
     }
 
+    private fun scheduleBackgroundTelemetrySample() {
+        if (telemetrySamplingInFlight || ownedSessions.isEmpty()) return
+        telemetrySamplingInFlight = true
+        ownershipExecutor.execute {
+            try {
+                sampleOwnedSessions()
+            } finally {
+                telemetrySamplingInFlight = false
+            }
+        }
+    }
+
+    private fun sampleOwnedSessions() {
+        val now = System.currentTimeMillis()
+        val powerManager = getSystemService(PowerManager::class.java)
+        val importanceInfo = ActivityManager.RunningAppProcessInfo()
+        ActivityManager.getMyMemoryState(importanceInfo)
+        val serviceProc = InternalRuntimeBackgroundTelemetry.readProc(Process.myPid())
+
+        ownedSessions.values.forEach { owned ->
+            val runtimePid = owned.ownedProcess.runtimePid
+            val runtimeProc = InternalRuntimeBackgroundTelemetry.readProc(runtimePid)
+            val previousTicks = owned.lastSampleCpuTicks
+            val cpuDelta = if (
+                previousTicks != null &&
+                runtimeProc.cpuTicks != null &&
+                runtimeProc.cpuTicks >= previousTicks
+            ) {
+                runtimeProc.cpuTicks - previousTicks
+            } else {
+                null
+            }
+            owned.lastSampleCpuTicks = runtimeProc.cpuTicks
+
+            val stdout = owned.ownedProcess.stdoutFile
+            val stdoutTail = InternalRuntimeBackgroundTelemetry.readTail(stdout)
+            val webUrl = InternalRuntimeBackgroundTelemetry.latestLoopbackUrl(stdoutTail)
+            val webReachable = webUrl?.let {
+                RuntimeWebEndpointProbe.isListening(it, BACKGROUND_WEB_PROBE_TIMEOUT_MS)
+            }
+            val batteryIgnored = runCatching {
+                powerManager.isIgnoringBatteryOptimizations(packageName)
+            }.getOrNull()
+
+            val sample = buildString {
+                appendLine("=== SiftAlpha Background Continuity Sample ===")
+                appendLine("SIFTALPHA_X_BACKGROUND_SAMPLE_EPOCH_MS=${now}")
+                appendLine("SIFTALPHA_X_BACKGROUND_PROJECT_ID=${owned.projectIdentity}")
+                appendLine("SIFTALPHA_X_BACKGROUND_SESSION_ID=${owned.sessionLeaseId}")
+                appendLine("SIFTALPHA_X_BACKGROUND_SERVICE_PID=${Process.myPid()}")
+                appendLine("SIFTALPHA_X_BACKGROUND_SERVICE_IMPORTANCE=${importanceInfo.importance}")
+                appendLine("SIFTALPHA_X_BACKGROUND_SERVICE_PROC_STATE=${serviceProc.state ?: "UNKNOWN"}")
+                appendLine("SIFTALPHA_X_BACKGROUND_SERVICE_CGROUP=${serviceProc.cgroup ?: "UNKNOWN"}")
+                appendLine("SIFTALPHA_X_BACKGROUND_RUNTIME_PID=${runtimePid ?: -1}")
+                appendLine("SIFTALPHA_X_BACKGROUND_RUNTIME_PID_ALIVE=${yesNo(runtimePid != null && File("/proc/${runtimePid}").exists())}")
+                appendLine("SIFTALPHA_X_BACKGROUND_RUNTIME_PROC_STATE=${runtimeProc.state ?: "UNKNOWN"}")
+                appendLine("SIFTALPHA_X_BACKGROUND_RUNTIME_CPU_TICKS=${runtimeProc.cpuTicks ?: -1L}")
+                appendLine("SIFTALPHA_X_BACKGROUND_RUNTIME_CPU_TICKS_DELTA=${cpuDelta ?: -1L}")
+                appendLine("SIFTALPHA_X_BACKGROUND_RUNTIME_CGROUP=${runtimeProc.cgroup ?: "UNKNOWN"}")
+                appendLine("SIFTALPHA_X_BACKGROUND_STDOUT_BYTES=${stdout?.length() ?: -1L}")
+                appendLine("SIFTALPHA_X_BACKGROUND_STDOUT_MTIME_MS=${stdout?.lastModified() ?: -1L}")
+                appendLine("SIFTALPHA_X_BACKGROUND_WEB_URL=${webUrl ?: "NONE"}")
+                appendLine(
+                    "SIFTALPHA_X_BACKGROUND_WEB_LOOPBACK_REACHABLE=" + when (webReachable) {
+                        true -> "YES"
+                        false -> "NO"
+                        null -> "UNKNOWN"
+                    },
+                )
+                appendLine("SIFTALPHA_X_BACKGROUND_WAKE_LOCK_HELD=${yesNo(wakeLock?.isHeld == true)}")
+                appendLine("SIFTALPHA_X_BACKGROUND_POWER_SAVE_MODE=${yesNo(powerManager.isPowerSaveMode)}")
+                appendLine("SIFTALPHA_X_BACKGROUND_DEVICE_IDLE_MODE=${yesNo(powerManager.isDeviceIdleMode)}")
+                appendLine(
+                    "SIFTALPHA_X_BACKGROUND_BATTERY_OPTIMIZATION_IGNORED=" + when (batteryIgnored) {
+                        true -> "YES"
+                        false -> "NO"
+                        null -> "UNKNOWN"
+                    },
+                )
+                appendLine("=== End Background Continuity Sample ===")
+            }
+            InternalRuntimeBackgroundTelemetry.appendBounded(
+                owned.ownedProcess.telemetryFile,
+                sample,
+            )
+        }
+    }
+
+    private fun yesNo(value: Boolean): String = if (value) "YES" else "NO"
+
     private fun launchOwnedSession(
         sessionLeaseId: String,
         projectIdentity: String,
@@ -286,6 +450,7 @@ class InternalRuntimeForegroundService : Service() {
         )
         try {
             onStarted(started)
+            scheduleBackgroundTelemetrySample()
             ownershipExecutor.execute {
                 val exitCode = runCatching { launched.process.waitFor() }.getOrElse { -1 }
                 runCatching { launched.cleanup() }
@@ -356,6 +521,7 @@ class InternalRuntimeForegroundService : Service() {
         private const val WAKE_LOCK_TAG = "SiftAlpha:InternalRuntime"
         private const val READY_TIMEOUT_MS = 5_000L
         private const val HEARTBEAT_INTERVAL_MS = 15_000L
+        private const val BACKGROUND_WEB_PROBE_TIMEOUT_MS = 350
         const val OWNER_FOREGROUND_SERVICE = "FOREGROUND_SERVICE"
         private val projects = InternalRuntimeProjectSet()
         private val readyMonitor = Object()

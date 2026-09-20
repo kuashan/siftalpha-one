@@ -523,3 +523,11 @@ Internal live output is an in-place surface. Its update cadence is intentionally
 
 STOP remains project-scoped. r32 only changes dispatch threading so the UI does not wait for snapshot lookup or process-tree termination. It does not widen STOP scope, add Worker/supervisor/runtime gate, alter External Runtime behavior, restore the removed four-stage Web state, or add network/Wifi locks.
 
+## alpha43-r33 Background Web Continuity telemetry (2026-09-20)
+
+The current unresolved background issue is same-device localhost continuity, not Wi-Fi reachability. The external browser runs on the same phone and accesses the Internal Runtime through 127.0.0.1/localhost. r33 therefore avoids WifiLock and does not assume a network-radio sleep problem.
+
+The foreground service now owns a diagnostic continuity sampler in addition to the r31 Process lifecycle ownership. Every 15 seconds it records the service and child Runtime process scheduling facts, CPU progress, stdout progress and loopback listener reachability into a session-private bounded history file. This sampler is observation only and is not a Worker/supervisor or keepalive mechanism.
+
+The purpose of r33 is to establish a time series while the Activity is absent. A single post-return PID-alive snapshot cannot distinguish a frozen child from a running process whose HTTP listener stalled. The persisted sample history can. Once real-device evidence identifies which dimension stops first, the next repair must remain isolated to that layer.
+

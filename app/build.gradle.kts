@@ -66,10 +66,10 @@ android {
         // alpha43-r24 closes Web continuity gaps: bounded Internal discovery retries, stable
         // foreground Web presentation, CPython foreground-runtime leases, and learned endpoints.
         // Rich Result, External execution semantics and Worker freeze remain unchanged.
-        // alpha43-r32 preserves r31 Runtime ownership and fixes Runtime Center live-output
-        // churn: background snapshot reads, throttled in-place logs, stable scrolling and controls.
-        versionCode = 158
-        versionName = "0.8.0-alpha43-r32"
+        // alpha43-r33 preserves r31 ownership and r32 UI stability, then records
+        // service-owned background Runtime/Web continuity telemetry for real-device diagnosis.
+        versionCode = 159
+        versionName = "0.8.0-alpha43-r33"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

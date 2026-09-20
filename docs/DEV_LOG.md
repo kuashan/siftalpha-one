@@ -1032,3 +1032,16 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - versionCode 158 / versionName 0.8.0-alpha43-r32.
 - Cloud CI + signed APK are required before real-device acceptance. CI success must not be labeled REAL_DEVICE_PASS.
 
+## 2026-09-20 · alpha43-r33 Background Web Continuity telemetry
+
+- Starting source baseline: `e8bac8defc822b7cb2195aa34d5119c642ac6548`, version `0.8.0-alpha43-r32` / `158`.
+- Real-device observation: on the same Android phone, SiftAlpha remains in a running state while backgrounded, but the external browser page backed by the Internal Runtime localhost endpoint stops progressing; returning SiftAlpha to foreground causes the page to resume and refresh to current state.
+- Same-device loopback access removes Wifi/WLAN continuity as the primary hypothesis. r33 therefore does not add WifiLock.
+- r33 adds service-owned background continuity telemetry. The foreground service samples active owned Internal Alpine sessions every 15 seconds even while the Runtime Center Activity is stopped.
+- Each sample records service process importance/state/cgroup, Runtime PID alive/state/cgroup, Runtime CPU ticks and per-sample tick delta, stdout byte count/mtime, the latest validated SIFTALPHA_WEB_URL, loopback TCP reachability, wake-lock state, power-save/device-idle state and battery-optimization exemption state.
+- Telemetry is written into the current session's app-private `background-continuity.log`, bounded in size, and is included in the next Internal Alpine snapshot/log refresh so real-device evidence survives the Activity background interval.
+- The service monitor is diagnostic only: it does not restart, supervise, poll application semantics, widen STOP scope, create a Worker, or alter Runtime ownership.
+- r31 foreground ownership, r32 UI responsiveness fixes, r24 Web presentation baseline and External Runtime behavior remain unchanged.
+- versionCode 159 / versionName 0.8.0-alpha43-r33.
+- Real-device acceptance is diagnostic: background SiftAlpha while the same-device browser remains on the localhost page for 5-10 minutes, then return without restarting and refresh logs. The sample history must identify whether CPU ticks/stdout/Web reachability stop together or diverge.
+
