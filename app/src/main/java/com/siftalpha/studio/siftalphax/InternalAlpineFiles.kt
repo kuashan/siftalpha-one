@@ -134,6 +134,18 @@ object InternalAlpineFiles {
     fun provenance(context: Context): String =
         context.assets.open(ASSET_PROVENANCE).bufferedReader().use { it.readText() }
 
+    internal fun rootfsDirectory(context: Context): File =
+        File(context.applicationContext.filesDir, "$PRIVATE_ROOT/rootfs")
+
+    internal fun pythonRuntimeIdentity(pythonFullVersion: String): String {
+        require(pythonFullVersion.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+"))) {
+            "Invalid Python runtime version: $pythonFullVersion"
+        }
+        return "alpine:$EXPECTED_ALPINE_VERSION:" +
+            "rootfs-sha256:$EXPECTED_ROOTFS_SHA256:" +
+            "python:$pythonFullVersion:arm64-v8a"
+    }
+
     fun projectEnvironmentRoot(context: Context, projectIdentity: String): File {
         require(projectIdentity.isNotBlank()) { "projectIdentity must not be blank" }
         val environments = File(context.filesDir, "$PRIVATE_ROOT/environments")
