@@ -112,7 +112,7 @@ data class ProjectEnvironmentPlan(
             val safeDetail = issue.detail.replace('\n', ' ').replace('\r', ' ').take(240)
             add(
                 "SIFTALPHA_ENV_ISSUE_" + (index + 1) + "=" +
-                    issue.kind.name + ":" + if (issue.blocking) "BLOCKING" else "INFO" +
+                    issue.kind.name + ":" + (if (issue.blocking) "BLOCKING" else "INFO") +
                     ":" + safeDetail,
             )
         }
