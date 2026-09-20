@@ -81,6 +81,7 @@ class EmbeddedPythonWheelInstallerV1(
         projectIdentity: String,
         environmentRoot: File,
         sourceFingerprint: String,
+        runtimeIdentity: String,
     ): InstalledEnvironment? {
         val marker = File(environmentRoot, READY_MARKER)
         val manifestFile = File(environmentRoot, MANIFEST_FILE)
@@ -92,6 +93,7 @@ class EmbeddedPythonWheelInstallerV1(
         if (manifest["schema"]?.jsonPrimitive?.content != SCHEMA) return null
         if (manifest["projectIdentity"]?.jsonPrimitive?.content != projectIdentity) return null
         if (manifest["sourceFingerprint"]?.jsonPrimitive?.content != sourceFingerprint) return null
+        if (manifest["runtimeIdentity"]?.jsonPrimitive?.content != runtimeIdentity) return null
         val environmentKey = manifest["environmentKey"]?.jsonPrimitive?.content ?: return null
         if (!environmentKey.matches(Regex("sha256:[0-9a-f]{64}"))) return null
         return InstalledEnvironment(sitePackages.canonicalFile, environmentKey)
@@ -277,6 +279,7 @@ class EmbeddedPythonWheelInstallerV1(
             put("projectIdentity", projectIdentity)
             put("sourceFingerprint", plan.sourceFingerprint)
             put("resolvedFingerprint", plan.resolvedFingerprint)
+            put("runtimeIdentity", EmbeddedPythonRuntimeIdentityV1.ID)
             put("environmentKey", environmentKey)
             put("packages", packages)
         }
@@ -290,10 +293,10 @@ class EmbeddedPythonWheelInstallerV1(
     }
 
     companion object {
-        const val SCHEMA = "siftalpha.internal-python-environment.v2"
+        const val SCHEMA = "siftalpha.internal-python-environment.v3"
         const val READY_MARKER = ".siftalpha_internal_environment_ready"
         const val STATE_FILE = "state-v1.txt"
-        const val MANIFEST_FILE = "manifest-v2.json"
+        const val MANIFEST_FILE = "manifest-v3.json"
         const val SITE_PACKAGES = "site-packages"
         private const val MAX_REDIRECTS = 5
         private const val MAX_WHEEL_BYTES = 96L * 1024L * 1024L
