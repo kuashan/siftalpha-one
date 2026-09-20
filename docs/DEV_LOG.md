@@ -1190,3 +1190,10 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Child `SIFTALPHA_ENV` markers from both preparation steps are filtered so the composed command emits one authoritative project-level READY/NOT_READY result while retaining `SIFTALPHA_NODE_ENV` diagnostics.
 - Runtime START/STOP ownership, Web discovery, r38 Result Web, r39 system-bar insets, CLI argv semantics and the frozen r34 baseline are unchanged.
 - versionCode 166 / versionName 0.8.0-alpha43-r40.
+
+
+### r40 pre-release source-replacement correction
+
+- W0 Run #255 failed during Kotlin compilation before tests because the remote edit path interpreted JavaScript replacement-string dollar tokens while applying the shell template, duplicating suffix content in RuntimeEnvironmentComposer.kt.
+- Restored RuntimeEnvironmentComposer.kt from the clean r39 parent and reapplied only the intended r40 prepare-order change with literal-safe source construction.
+- No APK was released from Run #255; versionCode remains 166 / versionName 0.8.0-alpha43-r40.
