@@ -45,12 +45,17 @@ object NodeWebProjectDetector {
             declaredRun = declaredRun,
         )
         if (fastSignature != null) {
-            val explicitPort = extractCommandPort(effectiveRun)
-                ?: extractSourcePort(sourceText)
-            val port = explicitPort ?: fastSignature.defaultPort
+            val commandPort = extractCommandPort(effectiveRun)
+            val sourcePort = extractSourcePort(sourceText)
+            val port = commandPort ?: sourcePort ?: fastSignature.defaultPort
+            val source = when {
+                commandPort != null -> "run-command"
+                sourcePort != null -> "source"
+                else -> "signature-" + fastSignature.evidence.joinToString("+")
+            }
             return Detection(
                 framework = fastSignature.framework,
-                source = "signature-" + fastSignature.evidence.joinToString("+"),
+                source = source,
                 host = port?.let { "127.0.0.1" },
                 port = port,
             )
