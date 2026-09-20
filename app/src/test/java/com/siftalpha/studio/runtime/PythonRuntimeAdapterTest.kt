@@ -137,6 +137,23 @@ class PythonRuntimeAdapterTest {
     }
 
     @Test
+    fun `environment plan identity is written validated and legacy migrated`() {
+        val planned = project.copy(environmentPlanId = "sha256:plan-a")
+        val prepare = adapter.prepare(planned).shellScript
+        val status = adapter.status(planned).shellScript
+
+        assertTrue(prepare.contains("required_plan='sha256:plan-a'"))
+        assertTrue(prepare.contains("PLAN_ID=%s"))
+        assertTrue(status.contains("saved_plan="))
+        assertTrue(status.contains("READY_PLAN_MIGRATED"))
+        assertTrue(status.contains("ENVIRONMENT_PLAN_CHANGED"))
+        assertTrue(
+            "plan migration must happen only after the existing Python requirement check",
+            status.indexOf("READY_PLAN_MIGRATED") > status.indexOf("PYTHON_REQUIREMENT_CHANGED"),
+        )
+    }
+
+    @Test
     fun `legacy external readiness marker migrates only with venv version evidence`() {
         val script = adapter.status(
             project.copy(pythonRequiresVersion = ">=3.10"),
