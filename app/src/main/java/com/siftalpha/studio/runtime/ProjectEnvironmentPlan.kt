@@ -124,6 +124,84 @@ data class ProjectEnvironmentPlan(
     }
 }
 
+enum class EnvironmentCompatibilityResolutionState(val wireValue: String) {
+    STATIC_ONLY("static_only"),
+    EMBEDDED_CPYTHON_RESOLVED("embedded_cpython_resolved"),
+    EMBEDDED_CPYTHON_INCOMPATIBLE("embedded_cpython_incompatible"),
+    LOOKUP_DEFERRED("lookup_deferred"),
+}
+
+data class ProjectEnvironmentResolution(
+    val plan: ProjectEnvironmentPlan,
+    val state: EnvironmentCompatibilityResolutionState,
+    val selectedBackend: EnvironmentBackend?,
+    val embeddedDependencyFingerprint: String? = null,
+    val embeddedDependencyCount: Int? = null,
+    val detail: String? = null,
+) {
+    fun diagnosticLines(): List<String> = buildList {
+        addAll(plan.diagnosticLines())
+        add("SIFTALPHA_ENV_COMPATIBILITY_RESOLUTION=" + state.wireValue)
+        add("SIFTALPHA_ENV_SELECTED_BACKEND=" + (selectedBackend?.wireValue ?: "none"))
+        embeddedDependencyFingerprint?.let {
+            add("SIFTALPHA_ENV_EMBEDDED_DEPENDENCY_FINGERPRINT=" + it)
+        }
+        embeddedDependencyCount?.let {
+            add("SIFTALPHA_ENV_EMBEDDED_DEPENDENCY_COUNT=" + it)
+        }
+        detail?.takeIf { it.isNotBlank() }?.let {
+            add(
+                "SIFTALPHA_ENV_COMPATIBILITY_DETAIL=" +
+                    it.replace('\n', ' ').replace('\r', ' ').take(240),
+            )
+        }
+    }
+}
+
+object ProjectEnvironmentResolutionPlanner {
+    fun static(plan: ProjectEnvironmentPlan): ProjectEnvironmentResolution =
+        ProjectEnvironmentResolution(
+            plan = plan,
+            state = EnvironmentCompatibilityResolutionState.STATIC_ONLY,
+            selectedBackend = plan.preferredBackend,
+        )
+
+    fun embeddedResolved(
+        plan: ProjectEnvironmentPlan,
+        resolvedFingerprint: String,
+        packageCount: Int,
+    ): ProjectEnvironmentResolution = ProjectEnvironmentResolution(
+        plan = plan,
+        state = EnvironmentCompatibilityResolutionState.EMBEDDED_CPYTHON_RESOLVED,
+        selectedBackend = EnvironmentBackend.EMBEDDED_CPYTHON
+            .takeIf { plan.supports(it) },
+        embeddedDependencyFingerprint = resolvedFingerprint,
+        embeddedDependencyCount = packageCount,
+    )
+
+    fun embeddedIncompatible(
+        plan: ProjectEnvironmentPlan,
+        detail: String,
+    ): ProjectEnvironmentResolution = ProjectEnvironmentResolution(
+        plan = plan,
+        state = EnvironmentCompatibilityResolutionState.EMBEDDED_CPYTHON_INCOMPATIBLE,
+        selectedBackend = plan.backendCandidates.firstOrNull {
+            it != EnvironmentBackend.EMBEDDED_CPYTHON
+        },
+        detail = detail,
+    )
+
+    fun lookupDeferred(
+        plan: ProjectEnvironmentPlan,
+        detail: String,
+    ): ProjectEnvironmentResolution = ProjectEnvironmentResolution(
+        plan = plan,
+        state = EnvironmentCompatibilityResolutionState.LOOKUP_DEFERRED,
+        selectedBackend = plan.preferredBackend,
+        detail = detail,
+    )
+}
+
 data class ProjectEnvironmentDetectionInput(
     val relativePaths: Collection<String>,
     val declaredType: String? = null,
