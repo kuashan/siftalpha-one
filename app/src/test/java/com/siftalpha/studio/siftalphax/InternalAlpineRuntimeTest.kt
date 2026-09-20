@@ -182,15 +182,35 @@ class InternalAlpineRuntimeTest {
     }
 
     @Test
-    fun pyprojectBootstrapInstallsDeclaredWebExtraWhenRequested() {
+    fun pyprojectBootstrapExecutesPlannedWebExtraWithoutRediscovery() {
         val command = InternalAlpineDependencyBootstrap.installCommand(
             kind = InternalAlpineDependencySource.Kind.PYPROJECT_TOML,
-            installWebExtra = true,
+            installExtras = listOf("web"),
         )
 
         assertTrue(command.contains("SIFTALPHA_PYPROJECT_EXTRAS=web"))
         assertTrue(command.contains("'/workspace[web]'"))
-        assertTrue(command.contains("tomllib"))
+        assertFalse(command.contains("tomllib"))
+        assertFalse(command.contains("optional-dependencies"))
+    }
+
+    @Test
+    fun plannedExtrasParticipateInAlpineEnvironmentIdentity() {
+        val plain = InternalAlpineDependencySource.fromProjectFiles(
+            requirementsText = null,
+            pyprojectText = "[project]\nname='demo'\n",
+            requiresNodeVite = true,
+        )
+        val web = InternalAlpineDependencySource.fromProjectFiles(
+            requirementsText = null,
+            pyprojectText = "[project]\nname='demo'\n",
+            requiresNodeVite = true,
+            pythonInstallExtras = listOf("web"),
+        )
+
+        assertTrue(plain.sourceFingerprint != web.sourceFingerprint)
+        assertEquals(emptyList<String>(), plain.pythonInstallExtras)
+        assertEquals(listOf("web"), web.pythonInstallExtras)
     }
 
     @Test
