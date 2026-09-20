@@ -745,3 +745,22 @@ Current migration release: `0.8.0-alpha43-r46.1`, versionCode `176`.
 Code verification: W0 #302 PASS at `28a1bde86d9b144646b9608c3cd69d9eb08c90db`.
 Real-device acceptance remains pending.
 
+
+
+## alpha43-r46.2 Web recognition contract
+
+SiftAlpha treats an imported project as an immutable project snapshot. It is a Project Runtime Manager, not an IDE, so normal operation does not continuously monitor or rewrite project source. A changed project is imported again.
+
+Web recognition now follows this order:
+1. VERIFIED learned launch contract, when one exists for the imported project;
+2. high-confidence Common Web Signature fast path;
+3. existing bounded deep project inspection / native Web launch discovery;
+4. normal CLI fallback when Web cannot be proven.
+
+The fast path uses combined project-owned evidence rather than framework names alone. Python+Vite hybrid evidence outranks backend-only framework evidence. During PREPARE, a forced Web profile rediscovery runs concurrently so the environment can finish while SiftAlpha learns the project.
+
+Static recognition can produce only a launch candidate. Runtime Identity -> project-scoped Web Discovery -> Endpoint Probe remains the authoritative verification chain. A previously learned URL is never treated as current reachability evidence.
+
+A launch contract is persisted first as DISCOVERED and promoted to VERIFIED only after a current Runtime-owned endpoint is reachable. Only VERIFIED launch contracts are eligible for fast reuse on later runs. Uninstalling SiftAlpha removes these app-private learned records; a fresh install must still rediscover Web capability from the project itself.
+
+Current development version: `0.8.0-alpha43-r46.2`, versionCode `178`. R46.1 remains the parent functional baseline; abandoned R47 storage consolidation is not part of this release.
