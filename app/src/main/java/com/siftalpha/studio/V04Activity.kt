@@ -80,6 +80,7 @@ import com.siftalpha.studio.runtime.RuntimeWebDiscoveryScopePolicy
 import com.siftalpha.studio.runtime.RuntimeWebHintPolicy
 import com.siftalpha.studio.runtime.RuntimeWebLearnedEndpointPolicy
 import com.siftalpha.studio.runtime.RuntimeWebLearnedEndpointStore
+import com.siftalpha.studio.runtime.RuntimeWebLearnedLaunchStore
 import com.siftalpha.studio.runtime.RuntimeWebStateStore
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
 import com.siftalpha.studio.runtime.RuntimeWebUrl
@@ -184,6 +185,7 @@ open class V04Activity : StudioActivity() {
     private lateinit var webInspector: WebProjectInspector
     private lateinit var webStateStore: RuntimeWebStateStore
     private lateinit var webLearnedEndpointStore: RuntimeWebLearnedEndpointStore
+    private lateinit var webLearnedLaunchStore: RuntimeWebLearnedLaunchStore
     private lateinit var webAvailability: RuntimeWebAvailabilityTracker
     private lateinit var projectOutputs: ProjectOutputPanelController
     private lateinit var prepareLiveProgress: PrepareLiveProgressController
@@ -200,6 +202,8 @@ open class V04Activity : StudioActivity() {
     private val resultWebSuppressedProjects = mutableSetOf<String>()
     private val refreshHandler = Handler(Looper.getMainLooper())
     private val refreshExecutor = Executors.newSingleThreadExecutor()
+    private val webRecognitionExecutor = Executors.newSingleThreadExecutor()
+    private val webRecognitionInFlight = mutableSetOf<String>()
     private var refreshScheduled = false
     private var refreshInFlight = false
     private var refreshGeneration = 0L
@@ -353,6 +357,7 @@ open class V04Activity : StudioActivity() {
         webInspector = WebProjectInspector(this)
         webStateStore = RuntimeWebStateStore(this)
         webLearnedEndpointStore = RuntimeWebLearnedEndpointStore(this)
+        webLearnedLaunchStore = RuntimeWebLearnedLaunchStore(this)
         webAvailability = RuntimeWebAvailabilityTracker {
             if (!isFinishing && !isDestroyed && ::projectList.isInitialized) {
                 refresh()
@@ -429,6 +434,8 @@ open class V04Activity : StudioActivity() {
         embeddedStartExecutor.shutdownNow()
         embeddedObservationExecutor.shutdownNow()
         internalWebObservationExecutor.shutdownNow()
+        webRecognitionInFlight.clear()
+        webRecognitionExecutor.shutdownNow()
         refreshExecutor.shutdownNow()
         super.onDestroy()
     }
@@ -736,6 +743,9 @@ open class V04Activity : StudioActivity() {
                 RuntimeWebLearnedEndpointPolicy.canLearn(webSnapshot.source, reachableWebUrl)
             ) {
                 webLearnedEndpointStore.rememberOwnedVerified(stateKey, reachableWebUrl)
+            }
+            if (::webLearnedLaunchStore.isInitialized) {
+                webLearnedLaunchStore.markVerified(stateKey)
             }
         }
         val lastKnownWebUrl = if (::webAvailability.isInitialized) {
@@ -1815,6 +1825,26 @@ open class V04Activity : StudioActivity() {
         dialog.show()
     }
 
+    private fun scheduleWebRecognition(project: V04ProjectGateway.RuntimeProject) {
+        if (!::webInspector.isInitialized) return
+        val projectKey = project.summary.documentId
+        if (!webRecognitionInFlight.add(projectKey)) return
+        webRecognitionExecutor.submit {
+            val profile = runCatching {
+                webInspector.inspect(projectKey, forceRefresh = true)
+            }.getOrNull()
+            runOnUiThread {
+                webRecognitionInFlight.remove(projectKey)
+                if (profile != null) {
+                    webProfileCache[projectKey] = profile
+                }
+                if (!isFinishing && !isDestroyed && ::projectList.isInitialized) {
+                    refresh()
+                }
+            }
+        }
+    }
+
     private fun confirmPrepare(project: V04ProjectGateway.RuntimeProject) {
         val controlRequest = selectedRuntimeControlRequest(project)
         if (controlRequest == RuntimeControlRequest.EXTERNAL_PROVIDER && !ensureRuntime()) return
@@ -1891,11 +1921,20 @@ open class V04Activity : StudioActivity() {
         )
         val requiredCli = configurationSnapshot.cliRequirements.filter { it.required }
         val nativeWebProfile = webProfile?.takeIf { it.enabled }
+        val learnedNativeWebLaunch = if (
+            nativeWebProfile != null &&
+            resolvedSelection?.primary == RuntimeKind.PYTHON &&
+            ::webLearnedLaunchStore.isInitialized
+        ) {
+            webLearnedLaunchStore.readVerified(project.summary.documentId)
+        } else {
+            null
+        }
         val nativeWebLaunch = if (
             nativeWebProfile != null &&
             resolvedSelection?.primary == RuntimeKind.PYTHON
         ) {
-            runCatching {
+            learnedNativeWebLaunch ?: runCatching {
                 runtime.resolvePythonNativeWebLaunch(
                     project = project,
                     webProjectEnabled = true,
@@ -2008,6 +2047,12 @@ open class V04Activity : StudioActivity() {
             )
             .setNegativeButton(getString(R.string.common_cancel), null)
             .setPositiveButton(getString(R.string.runtime_button_run)) { _, _ ->
+                if (::webLearnedLaunchStore.isInitialized) {
+                    webLearnedLaunchStore.rememberDiscovered(
+                        project.summary.documentId,
+                        candidate,
+                    )
+                }
                 startProject(
                     project = project,
                     webProfile = webProfile,
@@ -3292,6 +3337,9 @@ open class V04Activity : StudioActivity() {
             return false
         }
         if (!canDispatch(project, action, route.path)) return false
+        if (action == ProjectRuntimeController.Action.PREPARE && !automaticObservation) {
+            scheduleWebRecognition(project)
+        }
         if (action == ProjectRuntimeController.Action.START ||
             action == ProjectRuntimeController.Action.STOP ||
             action == ProjectRuntimeController.Action.CLEAN
