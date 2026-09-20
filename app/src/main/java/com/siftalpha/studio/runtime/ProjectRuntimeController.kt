@@ -984,6 +984,11 @@ class ProjectRuntimeController(
         webHintPorts: List<Int> = emptyList(),
     ): RuntimeCommand {
         val context = executionContext(project, webLogDiscoveryAllowed, webHintPorts)
+        val plan = context.environmentPlan
+        if (!plan.readyToPrepare) return environmentPlanError(project, plan)
+        if (!plan.supports(EnvironmentBackend.EXTERNAL_PROVIDER)) {
+            return environmentBackendUnavailable(project, plan, EnvironmentBackend.EXTERNAL_PROVIDER)
+        }
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
             ?: return selectionError(project, context.selection)
         if (pythonLaunchInvocation != null && resolved.primary != RuntimeKind.PYTHON) {
@@ -1031,8 +1036,11 @@ class ProjectRuntimeController(
     ): RuntimeCommand {
         val context = executionContext(project, webLogDiscoveryAllowed, webHintPorts)
         val resolved = context.selection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
-            ?: return unresolvedStatus(context)
-        return when (resolved.primary) {
+            ?: return withEnvironmentPlanDiagnostics(
+                unresolvedStatus(context),
+                context.environmentPlan,
+            )
+        val status = when (resolved.primary) {
             RuntimeKind.PYTHON -> {
                 val python = pythonAdapter.status(context.spec)
                 if (requiresSupplementalNodePrepare(context.environmentPlan)) {
@@ -1049,6 +1057,7 @@ class ProjectRuntimeController(
             RuntimeKind.NODE_JS -> nodeExecutableAdapter.status(context.spec)
             else -> executableUnavailable(project, resolved.primary)
         }
+        return withEnvironmentPlanDiagnostics(status, context.environmentPlan)
     }
 
     fun logs(
