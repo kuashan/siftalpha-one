@@ -3,6 +3,7 @@ package com.siftalpha.studio.siftalphax
 import android.content.Context
 import android.system.Os
 import com.siftalpha.studio.runtime.InternalRuntimeForegroundService
+import com.siftalpha.studio.runtime.InternalRuntimeOwnedProcess
 import com.siftalpha.studio.runtime.InterruptibleProjectTreeDelete
 import com.siftalpha.studio.runtime.RuntimeOperationContract
 import android.system.OsConstants
@@ -12,7 +13,6 @@ import java.nio.file.LinkOption
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
@@ -487,7 +487,6 @@ class InternalAlpineSession private constructor(context: Context) {
     private val appContext = context.applicationContext
     private val nextGeneration = AtomicLong(0L)
     private val records = ConcurrentHashMap<String, Record>()
-    private val monitor = Executors.newCachedThreadPool()
 
     private class Record(
         val sessionId: String,
@@ -503,7 +502,6 @@ class InternalAlpineSession private constructor(context: Context) {
         val runtimeHostPid: Int?,
         val runtimeCpuTicksAtLaunch: Long?,
         @Volatile var state: EmbeddedPythonState,
-        @Volatile var process: InternalAlpineManagedProcess?,
         @Volatile var finishedAt: Long? = null,
         @Volatile var exitCode: Int? = null,
         @Volatile var stopRequested: Boolean = false,
@@ -517,10 +515,6 @@ class InternalAlpineSession private constructor(context: Context) {
     fun snapshot(projectIdentity: String): EmbeddedPythonSnapshot? =
         records[projectIdentity]?.let(::snapshotOf)
 
-    /**
-     * Returns listener facts only for the still-active execution identified by the snapshot.
-     * A delayed observation from an older session/generation is rejected before procfs access.
-     */
     fun webObservation(
         projectIdentity: String,
         expectedSessionId: String,
@@ -534,12 +528,9 @@ class InternalAlpineSession private constructor(context: Context) {
                 currentSessionId = record.sessionId,
                 currentGeneration = record.generation,
             )
-        ) {
-            return null
-        }
+        ) return null
         if (!EmbeddedPythonStatePolicy.canStop(record.state)) return null
-        val managed = record.process ?: return InternalAlpineWebObservation.empty()
-        val hostPid = managed.hostPid() ?: return InternalAlpineWebObservation.empty()
+        val hostPid = record.runtimeHostPid ?: return InternalAlpineWebObservation.empty()
         return InternalAlpineWebDiscovery.observe(
             procRoot = File("/proc"),
             rootPid = hostPid,
@@ -571,66 +562,75 @@ class InternalAlpineSession private constructor(context: Context) {
         )
         command.redirectOutput(stdout).redirectError(stderr)
 
-        val foreground = try {
-            InternalRuntimeForegroundService.acquireAndAwaitReady(appContext, sessionId)
+        var startedRecord: Record? = null
+        try {
+            InternalRuntimeForegroundService.launchAndOwn(
+                context = appContext,
+                sessionLeaseId = sessionId,
+                projectIdentity = projectIdentity,
+                launcher = {
+                    val managed = command.start()
+                    InternalRuntimeOwnedProcess(
+                        process = managed.process,
+                        runtimePid = managed.hostPid(),
+                        stdoutFile = stdout,
+                        stderrFile = stderr,
+                        terminate = { InternalAlpineProcessControl.terminate(managed) },
+                        cleanup = { managed.cleanup() },
+                    )
+                },
+                onStarted = { owned ->
+                    val runtimeHostPid = owned.runtimePid
+                    val record = Record(
+                        sessionId = sessionId,
+                        projectIdentity = projectIdentity,
+                        executionRoot = executionRoot,
+                        entrypoint = entrypoint,
+                        generation = generation,
+                        stdout = stdout,
+                        stderr = stderr,
+                        startedAt = System.currentTimeMillis(),
+                        foregroundReadyAtEpochMs = owned.foreground.readyAtEpochMs,
+                        foregroundServicePid = owned.foreground.servicePid,
+                        runtimeHostPid = runtimeHostPid,
+                        runtimeCpuTicksAtLaunch = runtimeHostPid?.let(InternalRuntimeProcDiagnostics::cpuTicks),
+                        state = EmbeddedPythonState.RUNNING,
+                    )
+                    records[projectIdentity] = record
+                    startedRecord = record
+                },
+                onFinished = { code, stopRequested, finishedAtEpochMs ->
+                    val current = records[projectIdentity]
+                    if (current?.sessionId == sessionId) {
+                        current.exitCode = code
+                        current.finishedAt = finishedAtEpochMs
+                        current.stopRequested = current.stopRequested || stopRequested
+                        current.state = if (current.stopRequested) {
+                            EmbeddedPythonState.STOPPED
+                        } else if (code == 0) {
+                            EmbeddedPythonState.SUCCEEDED
+                        } else {
+                            EmbeddedPythonState.FAILED
+                        }
+                    }
+                },
+            )
         } catch (error: Throwable) {
-            throw IllegalStateException("INTERNAL_RUNTIME_FOREGROUND_SERVICE_FAILED", error)
-        }
-
-        val managed = try {
-            command.start()
-        } catch (error: Throwable) {
-            InternalRuntimeForegroundService.release(appContext, sessionId)
+            startedRecord?.let { records.remove(projectIdentity, it) }
             throw error
         }
-        val process = managed.process
-        val runtimeHostPid = managed.hostPid()
-        val runtimeCpuTicksAtLaunch = runtimeHostPid?.let(InternalRuntimeProcDiagnostics::cpuTicks)
-        val record = Record(
-            sessionId = sessionId,
-            projectIdentity = projectIdentity,
-            executionRoot = executionRoot,
-            entrypoint = entrypoint,
-            generation = generation,
-            stdout = stdout,
-            stderr = stderr,
-            startedAt = System.currentTimeMillis(),
-            foregroundReadyAtEpochMs = foreground.readyAtEpochMs,
-            foregroundServicePid = foreground.servicePid,
-            runtimeHostPid = runtimeHostPid,
-            runtimeCpuTicksAtLaunch = runtimeCpuTicksAtLaunch,
-            state = EmbeddedPythonState.RUNNING,
-            process = managed,
-        )
-        records[projectIdentity] = record
-        monitor.execute {
-            try {
-                val code = runCatching { process.waitFor() }.getOrElse { -1 }
-                managed.cleanup()
-                record.exitCode = code
-                record.finishedAt = System.currentTimeMillis()
-                record.state = if (record.stopRequested) {
-                    EmbeddedPythonState.STOPPED
-                } else if (code == 0) {
-                    EmbeddedPythonState.SUCCEEDED
-                } else {
-                    EmbeddedPythonState.FAILED
-                }
-                record.process = null
-            } finally {
-                InternalRuntimeForegroundService.release(appContext, sessionId)
-            }
-        }
-        return snapshotOf(record)
+        return snapshotOf(checkNotNull(startedRecord))
     }
 
     fun requestStop(projectIdentity: String): Boolean {
         val record = records[projectIdentity] ?: return false
         if (!EmbeddedPythonStatePolicy.canStop(record.state)) return false
-        record.stopRequested = true
-        val managed = record.process ?: return false
-        InternalAlpineProcessControl.terminate(managed)
-        return true
+        val accepted = InternalRuntimeForegroundService.requestStopOwnedSession(
+            projectIdentity = projectIdentity,
+            sessionLeaseId = record.sessionId,
+        )
+        if (accepted) record.stopRequested = true
+        return accepted
     }
 
     private fun snapshotOf(record: Record): EmbeddedPythonSnapshot =
@@ -663,23 +663,41 @@ class InternalAlpineSession private constructor(context: Context) {
 
     private fun backgroundDiagnostics(record: Record): String {
         val foreground = InternalRuntimeForegroundService.diagnostics(record.sessionId)
+        val ownership = InternalRuntimeForegroundService.ownershipDiagnostics(record.sessionId)
         val runtimePid = record.runtimeHostPid
         val runtimeAlive = runtimePid?.let { File("/proc/$it").exists() } == true
         val cpuTicksNow = runtimePid?.let(InternalRuntimeProcDiagnostics::cpuTicks)
+        val cpuTicksDelta = if (
+            record.runtimeCpuTicksAtLaunch != null &&
+            cpuTicksNow != null &&
+            cpuTicksNow >= record.runtimeCpuTicksAtLaunch
+        ) {
+            cpuTicksNow - record.runtimeCpuTicksAtLaunch
+        } else null
         val heartbeatAgeMs = foreground.heartbeatAtEpochMs
             .takeIf { it > 0L }
             ?.let { (System.currentTimeMillis() - it).coerceAtLeast(0L) }
+
         return listOf(
             "SIFTALPHA_X_FGS_REQUESTED=YES",
             "SIFTALPHA_X_FGS_ACTIVE=" + yesNo(foreground.foregroundActive),
             "SIFTALPHA_X_WAKE_LOCK_HELD=" + yesNo(foreground.wakeLockHeld),
             "SIFTALPHA_X_RUNTIME_LAUNCH_AFTER_FGS=YES",
+            "SIFTALPHA_X_RUNTIME_OWNER=" + (
+                ownership.owner ?: InternalRuntimeForegroundService.OWNER_FOREGROUND_SERVICE
+            ),
+            "SIFTALPHA_X_SESSION_OWNER_SERVICE_PID=" + (
+                ownership.sessionOwnerServicePid ?: record.foregroundServicePid ?: -1
+            ),
+            "SIFTALPHA_X_RUNTIME_PROCESS_HELD=" + yesNo(ownership.processHeld),
+            "SIFTALPHA_X_RUNTIME_MONITOR_ACTIVE=" + yesNo(ownership.monitorActive),
             "SIFTALPHA_X_FGS_READY_AT_EPOCH_MS=" + record.foregroundReadyAtEpochMs,
             "SIFTALPHA_X_SERVICE_PID=" + (record.foregroundServicePid ?: -1),
             "SIFTALPHA_X_RUNTIME_PID=" + (runtimePid ?: -1),
             "SIFTALPHA_X_RUNTIME_PID_ALIVE=" + yesNo(runtimeAlive),
             "SIFTALPHA_X_RUNTIME_CPU_TICKS_START=" + (record.runtimeCpuTicksAtLaunch ?: -1L),
             "SIFTALPHA_X_RUNTIME_CPU_TICKS_NOW=" + (cpuTicksNow ?: -1L),
+            "SIFTALPHA_X_RUNTIME_CPU_TICKS_DELTA=" + (cpuTicksDelta ?: -1L),
             "SIFTALPHA_X_FGS_HEARTBEAT_EPOCH_MS=" + foreground.heartbeatAtEpochMs,
             "SIFTALPHA_X_FGS_HEARTBEAT_AGE_MS=" + (heartbeatAgeMs ?: -1L),
         ).joinToString("\n")
@@ -691,7 +709,6 @@ class InternalAlpineSession private constructor(context: Context) {
         @Volatile
         private var sharedInstance: InternalAlpineSession? = null
 
-        /** Keep Internal Alpine session records and generations alive for the app process. */
         fun shared(context: Context): InternalAlpineSession =
             sharedInstance ?: synchronized(this) {
                 sharedInstance ?: InternalAlpineSession(context).also { sharedInstance = it }

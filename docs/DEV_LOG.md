@@ -1004,3 +1004,15 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - No four-stage Web presentation is restored. No port-range scan, global socket scan, Worker, External Runtime, STOP-scope, or Rich Result behavior is changed.
 - versionCode 156 / versionName 0.8.0-alpha43-r30.
 - Cloud CI and real-device verification pending.
+
+## 2026-09-20 · alpha43-r31 Internal Runtime Foreground Ownership
+
+- Starting source baseline: d1a4127adb9954711fdefa91ff662e95a3783373, version 0.8.0-alpha43-r30 / 156.
+- r24 remains the immutable known-good functional/Web baseline. r31 does not restore the removed four-stage Web presentation or RuntimeWebHttpReadinessProbe and does not change the r30 project-index cache/Web URL wiring.
+- Internal Alpine launch ownership moves into InternalRuntimeForegroundService: the service-owned executor launches the child process, keeps the Process plus stdout/stderr file handles, and owns waitFor() monitoring until terminal completion.
+- InternalAlpineSession remains the session-state facade; it no longer owns the managed Process or monitor executor.
+- STOP remains project scoped. Termination requires both project identity and session lease ID to match the owned session; sibling Internal Runtime sessions are not touched.
+- Existing foreground-service, wake-lock, PID, CPU-tick and heartbeat diagnostics remain. Added RUNTIME_OWNER, SESSION_OWNER_SERVICE_PID, RUNTIME_PROCESS_HELD, RUNTIME_MONITOR_ACTIVE and RUNTIME_CPU_TICKS_DELTA.
+- Embedded CPython keeps the existing in-process foreground lease path. No Worker, supervisor, runtime gate, External Runtime behavior change, WifiLock or network-policy change is introduced.
+- versionCode 157 / versionName 0.8.0-alpha43-r31.
+- Cloud CI, Internal Alpine Probe, signed APK evidence and real-device 10-15 minute OCI background acceptance remain required; CI success is not REAL_DEVICE_PASS.

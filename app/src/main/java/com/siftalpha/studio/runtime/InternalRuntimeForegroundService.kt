@@ -17,13 +17,17 @@ import android.os.Process
 import android.os.SystemClock
 import com.siftalpha.studio.MainActivity
 import com.siftalpha.studio.R
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
 
 /**
- * Android process-liveness lease for user-started app-private Runtime sessions.
+ * Android foreground owner for user-started app-private Runtime sessions.
  *
- * This service does not execute projects, own PIDs, stop sessions, or supervise Runtime state.
- * Internal Runtime implementations keep their existing lifecycle; a unique session lease only
- * keeps the hosting app process out of the cached/frozen state while that session is active.
+ * Embedded CPython can continue to use a foreground lease because its interpreter lives inside
+ * the app process. Internal Alpine transfers its child Process lifecycle to this service: the
+ * service-owned executor launches the child, the service holds Process/stdout/stderr handles,
+ * monitors waitFor(), and routes project-scoped STOP requests.
  */
 data class InternalRuntimeForegroundDiagnostics(
     val leaseActive: Boolean,
@@ -41,6 +45,29 @@ data class InternalRuntimeForegroundDiagnostics(
         )
 }
 
+data class InternalRuntimeOwnedProcess(
+    val process: java.lang.Process,
+    val runtimePid: Int?,
+    val stdoutFile: java.io.File?,
+    val stderrFile: java.io.File?,
+    val terminate: () -> Unit,
+    val cleanup: () -> Unit,
+)
+
+data class InternalRuntimeOwnedStart(
+    val foreground: InternalRuntimeForegroundDiagnostics,
+    val runtimePid: Int?,
+)
+
+data class InternalRuntimeOwnershipDiagnostics(
+    val owner: String?,
+    val sessionOwnerServicePid: Int?,
+    val processHeld: Boolean,
+    val monitorActive: Boolean,
+    val runtimePid: Int?,
+    val stopRequested: Boolean,
+)
+
 internal object InternalRuntimeForegroundReadyPolicy {
     fun isReady(
         leaseActive: Boolean,
@@ -49,10 +76,31 @@ internal object InternalRuntimeForegroundReadyPolicy {
     ): Boolean = leaseActive && foregroundActive && wakeLockHeld
 }
 
+internal object InternalRuntimeOwnershipPolicy {
+    fun matches(
+        ownedProjectIdentity: String,
+        ownedSessionLeaseId: String,
+        requestedProjectIdentity: String,
+        requestedSessionLeaseId: String,
+    ): Boolean =
+        ownedProjectIdentity == requestedProjectIdentity &&
+            ownedSessionLeaseId == requestedSessionLeaseId
+}
+
 class InternalRuntimeForegroundService : Service() {
+
+    private class OwnedSession(
+        val sessionLeaseId: String,
+        val projectIdentity: String,
+        val ownedProcess: InternalRuntimeOwnedProcess,
+        @Volatile var stopRequested: Boolean = false,
+        @Volatile var monitorActive: Boolean = true,
+    )
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var foregroundActive = false
+    private val ownedSessions = ConcurrentHashMap<String, OwnedSession>()
+    private val ownershipExecutor = Executors.newCachedThreadPool()
     private val heartbeatHandler = Handler(Looper.getMainLooper())
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
@@ -83,6 +131,7 @@ class InternalRuntimeForegroundService : Service() {
         heartbeatHandler.removeCallbacks(heartbeatRunnable)
         foregroundActive = false
         releaseWakeLock()
+        ownershipExecutor.shutdown()
         if (runningService === this) runningService = null
         signalReadyChanged()
         super.onDestroy()
@@ -109,8 +158,6 @@ class InternalRuntimeForegroundService : Service() {
             signalReadyChanged()
             return
         }
-        // Establish the Android foreground-service state before holding the CPU awake.
-        // Runtime launchers wait for both facts before creating the actual Runtime process.
         promote(count)
         foregroundActive = true
         syncWakeLock()
@@ -179,12 +226,137 @@ class InternalRuntimeForegroundService : Service() {
             .build()
     }
 
+    private fun launchOwnedSession(
+        sessionLeaseId: String,
+        projectIdentity: String,
+        foreground: InternalRuntimeForegroundDiagnostics,
+        launcher: () -> InternalRuntimeOwnedProcess,
+        onStarted: (InternalRuntimeOwnedStart) -> Unit,
+        onFinished: (exitCode: Int, stopRequested: Boolean, finishedAtEpochMs: Long) -> Unit,
+    ): InternalRuntimeOwnedStart {
+        val future = ownershipExecutor.submit<InternalRuntimeOwnedStart> {
+            launchOwnedSessionOnServiceExecutor(
+                sessionLeaseId = sessionLeaseId,
+                projectIdentity = projectIdentity,
+                foreground = foreground,
+                launcher = launcher,
+                onStarted = onStarted,
+                onFinished = onFinished,
+            )
+        }
+        return try {
+            future.get()
+        } catch (interrupted: InterruptedException) {
+            future.cancel(true)
+            Thread.currentThread().interrupt()
+            throw IllegalStateException("INTERNAL_RUNTIME_FOREGROUND_OWNERSHIP_INTERRUPTED", interrupted)
+        } catch (wrapped: ExecutionException) {
+            throw (wrapped.cause ?: wrapped)
+        }
+    }
+
+    private fun launchOwnedSessionOnServiceExecutor(
+        sessionLeaseId: String,
+        projectIdentity: String,
+        foreground: InternalRuntimeForegroundDiagnostics,
+        launcher: () -> InternalRuntimeOwnedProcess,
+        onStarted: (InternalRuntimeOwnedStart) -> Unit,
+        onFinished: (exitCode: Int, stopRequested: Boolean, finishedAtEpochMs: Long) -> Unit,
+    ): InternalRuntimeOwnedStart {
+        require(sessionLeaseId.isNotBlank())
+        require(projectIdentity.isNotBlank())
+        check(projects.contains(sessionLeaseId)) { "INTERNAL_RUNTIME_FOREGROUND_LEASE_MISSING" }
+
+        val launched = launcher()
+        val owned = OwnedSession(
+            sessionLeaseId = sessionLeaseId,
+            projectIdentity = projectIdentity,
+            ownedProcess = launched,
+        )
+        val previous = ownedSessions.putIfAbsent(sessionLeaseId, owned)
+        if (previous != null) {
+            runCatching { launched.terminate() }
+            runCatching { launched.cleanup() }
+            error("INTERNAL_RUNTIME_FOREGROUND_SESSION_ALREADY_OWNED")
+        }
+
+        val started = InternalRuntimeOwnedStart(
+            foreground = foreground,
+            runtimePid = launched.runtimePid,
+        )
+        try {
+            onStarted(started)
+            ownershipExecutor.execute {
+                val exitCode = runCatching { launched.process.waitFor() }.getOrElse { -1 }
+                runCatching { launched.cleanup() }
+                owned.monitorActive = false
+                ownedSessions.remove(sessionLeaseId, owned)
+                try {
+                    onFinished(exitCode, owned.stopRequested, System.currentTimeMillis())
+                } finally {
+                    release(applicationContext, sessionLeaseId)
+                }
+            }
+        } catch (error: Throwable) {
+            owned.monitorActive = false
+            owned.stopRequested = true
+            ownedSessions.remove(sessionLeaseId, owned)
+            runCatching { launched.terminate() }
+            runCatching { launched.cleanup() }
+            throw error
+        }
+        return started
+    }
+
+    private fun requestStopOwnedSession(
+        projectIdentity: String,
+        sessionLeaseId: String,
+    ): Boolean {
+        val owned = ownedSessions[sessionLeaseId] ?: return false
+        if (!InternalRuntimeOwnershipPolicy.matches(
+                ownedProjectIdentity = owned.projectIdentity,
+                ownedSessionLeaseId = owned.sessionLeaseId,
+                requestedProjectIdentity = projectIdentity,
+                requestedSessionLeaseId = sessionLeaseId,
+            )
+        ) {
+            return false
+        }
+
+        val shouldTerminate = synchronized(owned) {
+            if (owned.stopRequested) {
+                false
+            } else {
+                owned.stopRequested = true
+                true
+            }
+        }
+        if (!shouldTerminate) return true
+        return runCatching {
+            owned.ownedProcess.terminate()
+            true
+        }.getOrDefault(false)
+    }
+
+    private fun ownershipDiagnostics(sessionLeaseId: String): InternalRuntimeOwnershipDiagnostics {
+        val owned = ownedSessions[sessionLeaseId]
+        return InternalRuntimeOwnershipDiagnostics(
+            owner = owned?.let { OWNER_FOREGROUND_SERVICE },
+            sessionOwnerServicePid = owned?.let { Process.myPid() },
+            processHeld = owned != null,
+            monitorActive = owned?.monitorActive == true,
+            runtimePid = owned?.ownedProcess?.runtimePid,
+            stopRequested = owned?.stopRequested == true,
+        )
+    }
+
     companion object {
         private const val CHANNEL_ID = "siftalpha_internal_runtime"
         private const val NOTIFICATION_ID = 0x5341
         private const val WAKE_LOCK_TAG = "SiftAlpha:InternalRuntime"
         private const val READY_TIMEOUT_MS = 5_000L
         private const val HEARTBEAT_INTERVAL_MS = 15_000L
+        const val OWNER_FOREGROUND_SERVICE = "FOREGROUND_SERVICE"
         private val projects = InternalRuntimeProjectSet()
         private val readyMonitor = Object()
 
@@ -252,6 +424,38 @@ class InternalRuntimeForegroundService : Service() {
             }
         }
 
+        fun launchAndOwn(
+            context: Context,
+            sessionLeaseId: String,
+            projectIdentity: String,
+            launcher: () -> InternalRuntimeOwnedProcess,
+            onStarted: (InternalRuntimeOwnedStart) -> Unit,
+            onFinished: (exitCode: Int, stopRequested: Boolean, finishedAtEpochMs: Long) -> Unit,
+        ): InternalRuntimeOwnedStart {
+            val foreground = acquireAndAwaitReady(context, sessionLeaseId)
+            try {
+                val service = runningService
+                    ?: error("INTERNAL_RUNTIME_FOREGROUND_SERVICE_NOT_ACTIVE")
+                return service.launchOwnedSession(
+                    sessionLeaseId = sessionLeaseId,
+                    projectIdentity = projectIdentity,
+                    foreground = foreground,
+                    launcher = launcher,
+                    onStarted = onStarted,
+                    onFinished = onFinished,
+                )
+            } catch (error: Throwable) {
+                release(context, sessionLeaseId)
+                throw error
+            }
+        }
+
+        fun requestStopOwnedSession(
+            projectIdentity: String,
+            sessionLeaseId: String,
+        ): Boolean =
+            runningService?.requestStopOwnedSession(projectIdentity, sessionLeaseId) == true
+
         fun diagnostics(sessionLeaseId: String): InternalRuntimeForegroundDiagnostics {
             val service = runningService
             return InternalRuntimeForegroundDiagnostics(
@@ -263,6 +467,17 @@ class InternalRuntimeForegroundService : Service() {
                 heartbeatAtEpochMs = lastHeartbeatAtEpochMs,
             )
         }
+
+        fun ownershipDiagnostics(sessionLeaseId: String): InternalRuntimeOwnershipDiagnostics =
+            runningService?.ownershipDiagnostics(sessionLeaseId)
+                ?: InternalRuntimeOwnershipDiagnostics(
+                    owner = null,
+                    sessionOwnerServicePid = null,
+                    processHeld = false,
+                    monitorActive = false,
+                    runtimePid = null,
+                    stopRequested = false,
+                )
 
         private fun signalReadyChanged() {
             synchronized(readyMonitor) {
@@ -304,7 +519,6 @@ internal class InternalRuntimeProjectSet {
     @Synchronized
     fun contains(id: String): Boolean = ids.contains(id)
 }
-
 
 internal object InternalRuntimePowerPolicy {
     fun shouldHoldWakeLock(activeLeaseCount: Int): Boolean {

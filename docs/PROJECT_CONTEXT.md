@@ -506,3 +506,11 @@ r24 remains the known usable functional baseline. r29 does not alter Web behavio
 ## alpha43-r30 current test line
 
 r24 remains the known usable baseline. r29 added the first-layer foreground-ready launch ordering and diagnostics. r30 builds only on r29: it adds persisted Runtime Center inspection caches to avoid repeated SAF scans and repairs the Internal Runtime log-URL wiring so a current-session SIFTALPHA_WEB_URL reaches the existing endpoint verification path before snapshot presentation can early-return. Runtime execution facts remain live/action-time reads, and the four-stage Web experiment remains removed.
+
+## alpha43-r31 Internal Runtime Foreground Ownership (2026-09-20)
+
+r31 is the second-layer background-continuity experiment. It does not add a Worker or a second execution system. Internal Alpine still uses the existing R implementation, but Android lifecycle ownership changes: InternalRuntimeForegroundService now launches and holds the child Process, stdout/stderr file handles, a service-scoped ownership registry, the project-scoped STOP route, and the process-completion monitor. InternalAlpineSession keeps session/generation/status/log presentation state but no longer owns the child process monitor.
+
+The ownership key is session-specific and project-specific. STOP must match both identities before the service invokes the existing Internal Alpine process-tree termination path, so a STOP for one project cannot terminate sibling sessions. Embedded CPython remains in-process and continues using the existing foreground lease rather than being wrapped in a fake child-process owner.
+
+r31 deliberately does not add WifiLock or broader network-policy changes. The real-device success criterion is application progress, not mere process survival: OCI must keep producing CATCHER_HEARTBEAT / LAUNCH_ATTEMPT activity for at least 10-15 minutes while SiftAlpha is backgrounded. If the service-owned process remains alive and CPU ticks continue while OCI network work stalls, the next isolated layer is Network Background Continuity.

@@ -520,3 +520,14 @@ alpha30 的 instrumentation tests 已加入源码；Run #83 CI 成功，Run #90 
 - Browser/Open remains disabled until the existing Android Endpoint Probe verifies the loopback listener.
 - No SEARCHING/LISTENER_FOUND/STARTING_WEB/AVAILABLE four-stage presentation is reintroduced.
 - Real-device OCI test: with OCI RUNNING and logging SIFTALPHA_WEB_URL, Web should progress from detection to the normal r24 available/open state once 127.0.0.1 listener verification succeeds.
+
+### alpha43-r31 Internal Runtime Foreground Ownership acceptance
+
+- r24 Web/product behavior and r30 cache/Web wiring remain unchanged.
+- Internal Alpine launch occurs through the active InternalRuntimeForegroundService ownership executor after the r29 foreground-ready + PARTIAL_WAKE_LOCK barrier.
+- Active Internal Alpine diagnostics must report RUNTIME_OWNER=FOREGROUND_SERVICE, matching SESSION_OWNER_SERVICE_PID, RUNTIME_PROCESS_HELD=YES, RUNTIME_MONITOR_ACTIVE=YES, RUNTIME_PID_ALIVE=YES and a non-negative RUNTIME_CPU_TICKS_DELTA.
+- Service-owned waitFor() publishes SUCCEEDED/FAILED/STOPPED back into the existing session record and releases only that session lease.
+- STOP routing requires exact project identity + session ID and cannot stop sibling Internal Alpine/CPython sessions or External Runtime.
+- No Worker, supervisor, runtime gate, WifiLock, four-stage Web state, unified Project Start Contract, global PID scan or port-range scan is introduced.
+- Real-device OCI: confirm CATCHER_HEARTBEAT/LAUNCH_ATTEMPT progress, background SiftAlpha for at least 10-15 minutes, return without restarting, refresh logs, and verify attempts continued throughout.
+- If ownership/PID/CPU remain healthy but network attempts stop, classify r31 as PARTIAL/FAIL and isolate the next investigation to Network Background Continuity.

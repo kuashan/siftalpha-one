@@ -75,6 +75,34 @@ class InternalRuntimeForegroundServiceTest {
     }
 
     @Test
+    fun ownershipStopRoutingRequiresExactProjectAndSession() {
+        assertTrue(
+            InternalRuntimeOwnershipPolicy.matches(
+                ownedProjectIdentity = "primary:AcodeProjects/OCI",
+                ownedSessionLeaseId = "session-oci",
+                requestedProjectIdentity = "primary:AcodeProjects/OCI",
+                requestedSessionLeaseId = "session-oci",
+            ),
+        )
+        assertFalse(
+            InternalRuntimeOwnershipPolicy.matches(
+                ownedProjectIdentity = "primary:AcodeProjects/OCI",
+                ownedSessionLeaseId = "session-oci",
+                requestedProjectIdentity = "primary:AcodeProjects/OTHER",
+                requestedSessionLeaseId = "session-oci",
+            ),
+        )
+        assertFalse(
+            InternalRuntimeOwnershipPolicy.matches(
+                ownedProjectIdentity = "primary:AcodeProjects/OCI",
+                ownedSessionLeaseId = "session-oci",
+                requestedProjectIdentity = "primary:AcodeProjects/OCI",
+                requestedSessionLeaseId = "session-other",
+            ),
+        )
+    }
+
+    @Test
     fun failedLeaseCanBeRolledBackAndReacquired() {
         val leases = InternalRuntimeProjectSet()
 
