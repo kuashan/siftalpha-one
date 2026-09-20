@@ -35,6 +35,19 @@ class PythonRuntimeAdapterTest {
         """.trimIndent()
     }
 
+    private class ScopedHost : RuntimeCommandHost {
+        override fun runtimeSupported(): Boolean = true
+        override fun runtimeUnsupportedReason(): String = "unsupported"
+        override fun sharedRoot(): String = "/storage/emulated/0/AcodeProjects"
+        override fun runtimeId(folderName: String): String = "id-" + folderName
+        override fun sh(value: String): String =
+            "'" + value.replace("'", "'\"'\"'") + "'"
+        override fun wrapUbuntu(inner: String): String = inner
+        override fun hostPreamble(): String =
+            "set -e\nROOT='/storage/emulated/0/AcodeProjects'\nruntime_dir=\"\$HOME/.siftalpha/runtime\"\nmkdir -p \"\$runtime_dir\""
+        override fun hostProcessHelpers(): String =
+            "siftalpha_pid_alive() { return 1; }\nsiftalpha_group_alive() { return 1; }\nsiftalpha_stop_tree() { return 0; }"
+    }
     private val host = FakeHost()
     private val adapter = PythonRuntimeAdapter(host)
     private val project = RuntimeProjectSpec(
@@ -169,6 +182,25 @@ class PythonRuntimeAdapterTest {
         assertTrue(clean.contains("SIFTALPHA_ENV=CLEANED"))
     }
 
+    @Test
+    fun `project stop scripts remain strictly runtime id scoped`() {
+        val scoped = PythonRuntimeAdapter(ScopedHost())
+        val projectA = project.copy(name = "A", folderName = "project-a")
+        val projectB = project.copy(name = "B", folderName = "project-b")
+
+        val stopA = scoped.stop(projectA).shellScript
+        val stopB = scoped.stop(projectB).shellScript
+
+        assertTrue(stopA.contains("id-project-a.pid"))
+        assertTrue(stopA.contains("id-project-a.pgid"))
+        assertTrue(stopA.contains("id-project-a.prepare.pid"))
+        assertFalse("A STOP must never reference B runtime ownership", stopA.contains("id-project-b"))
+
+        assertTrue(stopB.contains("id-project-b.pid"))
+        assertTrue(stopB.contains("id-project-b.pgid"))
+        assertTrue(stopB.contains("id-project-b.prepare.pid"))
+        assertFalse("B STOP must never reference A runtime ownership", stopB.contains("id-project-a"))
+    }
     @Test
     fun `logs pass runtime identity context before web discovery`() {
         val logs = adapter.logs(project).shellScript

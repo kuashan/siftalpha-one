@@ -1355,3 +1355,18 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - r44 development is now closed. This accepted source is the temporary/current regression baseline for subsequent work.
 - Frozen reference branch: baseline/alpha43-r44-final-known-good.
 - The earlier baseline/alpha43-r44-known-good remains preserved as historical evidence and must not be moved.
+
+
+## 2026-09-20 · r45-A External Multi-Project Concurrency Proof
+
+- r45 starts from the frozen r44 final baseline `baseline/alpha43-r44-final-known-good`.
+- External Provider already stores automatic observations, generations, delayed runnables, pending execution ids, project activity tokens and Runtime ownership per project. No global single-project observation pointer was found on this path.
+- Python/Termux STOP remains scoped by the selected project's runtimeId and reads only that project's run/prepare PID and PGID files.
+- r45-A therefore avoids rewriting the working External Provider implementation. Instead it freezes the existing behavior with executable regression tests before Embedded R is changed.
+- New regression coverage:
+  - one External Provider project can keep a STATUS activity live while a second project runs the same STATUS operation successfully;
+  - project B completion does not remove project A activity ownership;
+  - Python STOP scripts for A and B reference only their own runtimeId PID/PGID and prepare PID/PGID files.
+- Same-project concurrent-operation rejection remains covered by the existing activity contract tests.
+- versionCode 172 / versionName 0.8.0-alpha43-r45a1.
+- Next gate: cloud verification, then real-device External Provider dual-project acceptance before r45-B Embedded R observation changes.

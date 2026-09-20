@@ -119,6 +119,64 @@ class TermuxProjectActivityContractTest {
     }
 
     @Test
+    fun differentProjectsCanOwnTheSameOperationConcurrently() {
+        val home = Files.createTempDirectory("siftalpha-activity-multi-project").toFile()
+        try {
+            val readyA = File(home, "project-a.ready")
+            val releaseA = File(home, "project-a.release")
+            val scriptA = TermuxProjectActivityContract.wrap(
+                runtimeId = "project-a",
+                operation = "status",
+                shellScript = """
+                    touch '${readyA.absolutePath}'
+                    while [ ! -f '${releaseA.absolutePath}' ]; do
+                      sleep 0.05
+                    done
+                    printf 'PROJECT_A_DONE=YES\\n'
+                """.trimIndent(),
+            )
+            val processA = ProcessBuilder("bash", "-lc", scriptA).apply {
+                environment()["HOME"] = home.absolutePath
+            }.start()
+
+            val deadline = System.nanoTime() + 5_000_000_000L
+            while (!readyA.isFile && processA.isAlive && System.nanoTime() < deadline) {
+                Thread.sleep(20)
+            }
+            assertTrue("project A must own its status activity before B starts", readyA.isFile)
+            assertTrue("project A must still be active", processA.isAlive)
+
+            val resultB = execute(
+                TermuxProjectActivityContract.wrap(
+                    runtimeId = "project-b",
+                    operation = "status",
+                    shellScript = "printf 'PROJECT_B_OK=YES\\n'",
+                ),
+                home,
+            )
+
+            assertEquals(0, resultB.exitCode)
+            assertTrue(resultB.stdout.contains("PROJECT_B_OK=YES"))
+            assertFalse(resultB.stdout.contains("SIFTALPHA_ERROR=PROJECT_OPERATION_ALREADY_ACTIVE"))
+            assertTrue(
+                "project A ownership file must remain while project B completes",
+                File(home, ".siftalpha/runtime/project-a.activity.status.pid").isFile,
+            )
+            assertFalse(
+                "project B ownership file must be cleaned independently",
+                File(home, ".siftalpha/runtime/project-b.activity.status.pid").exists(),
+            )
+
+            releaseA.writeText("release")
+            assertEquals(0, processA.waitFor())
+            assertFalse(File(home, ".siftalpha/runtime/project-a.activity.status.pid").exists())
+        } finally {
+            runCatching { File(home, "project-a.release").writeText("release") }
+            home.deleteRecursively()
+        }
+    }
+
+    @Test
     fun liveOwnershipRejectsNewOperationBeforePayload() {
         val home = Files.createTempDirectory("siftalpha-activity-live").toFile()
         try {

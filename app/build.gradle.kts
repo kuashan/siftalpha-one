@@ -76,8 +76,10 @@ android {
         // alpha43-r44 scales bounded Internal R source staging for modern multi-file projects.
         // alpha43-r44-storage1 unifies Internal R storage inspection/cleanup with the existing
         // External Provider storage manager without making Termux a prerequisite for Internal R.
-        versionCode = 171
-        versionName = "0.8.0-alpha43-r44-storage1"
+        // alpha43-r45a1 freezes the External Provider multi-project concurrency contract before
+        // the shared per-project observation model is applied to Embedded R.
+        versionCode = 172
+        versionName = "0.8.0-alpha43-r45a1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

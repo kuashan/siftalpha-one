@@ -838,3 +838,32 @@ Real-device acceptance:
 - External Provider storage path regression check: PASS per user acceptance.
 - Result: r44 is closed and becomes the temporary/current Known Good Functional Baseline.
 - Frozen branch: baseline/alpha43-r44-final-known-good.
+
+
+### r45-A External Multi-Project Concurrency Proof
+
+Automated contract:
+- Different External Provider projects may own the same operation type concurrently.
+- Activity ownership paths are project-scoped by runtimeId.
+- Completing project B must not clear project A's live activity ownership.
+- A STOP shell must not reference B runtime ownership files, and vice versa.
+- Same-project duplicate operation protection remains fail-closed.
+- Existing Web Discovery / Endpoint Probe / project-scoped STOP behavior must remain unchanged.
+
+Cloud gate:
+- repository validators PASS;
+- testDebugUnitTest PASS;
+- assembleDebug PASS;
+- stable v2 signing unchanged.
+
+Real-device External Provider gate:
+- prepare and start project A;
+- while A remains RUNNING, start project B;
+- confirm A remains RUNNING after B starts;
+- confirm STATUS and LOGS stay associated with their own project cards;
+- if both expose Web endpoints, verify each project retains its own endpoint observation;
+- STOP A and verify B continues running and remains observable;
+- STOP B independently;
+- separately exercise a same-port conflict when two Web projects request the same fixed port and confirm failure is isolated to the conflicting project rather than stopping the already-running project.
+
+Only after this gate passes should r45-B replace the Embedded R single-project poll pointer with per-project observation state.

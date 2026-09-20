@@ -675,3 +675,14 @@ This baseline includes the previously accepted r44 Internal R modern-project Web
 The earlier baseline/alpha43-r44-known-good branch at 0285db2c26565e1aa2a47624d2cad8fa9c19e89f remains a historical frozen baseline and must not be moved.
 
 All subsequent r45+ work should use baseline/alpha43-r44-final-known-good as the primary regression reference until a later baseline is explicitly promoted.
+
+
+## r45 Multi-Project Concurrent Runtime
+
+r45 is split into two provider-aware acceptance stages.
+
+r45-A freezes and proves the existing External Provider multi-project contract. External observation state is already keyed per project; Runtime process ownership and STOP are keyed by each project's runtimeId. The implementation is not rewritten merely to satisfy the new milestone. Regression tests and real-device dual-project evidence are the acceptance mechanism.
+
+r45-B will address the remaining Embedded R management-layer gap: V04Activity still uses a single `embeddedPollProject` / `embeddedPollInFlight` pair even though InternalAlpineSession and the foreground service can own multiple project sessions. The target is one shared per-project observation contract across providers, while keeping provider-specific process/runtime adapters separate.
+
+The r44 final baseline remains `baseline/alpha43-r44-final-known-good` until r45 is explicitly accepted.
