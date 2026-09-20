@@ -15,6 +15,7 @@ import com.siftalpha.studio.siftalphax.InternalAlpineSession
 import com.siftalpha.studio.siftalphax.InternalAlpineWebObservation
 import com.siftalpha.studio.siftalphax.InternalPythonBackend
 import java.io.File
+import org.tomlj.Toml
 
 internal object ExternalProjectActivityContract {
     fun operationFor(action: ProjectRuntimeController.Action): String? = when (action) {
@@ -917,6 +918,15 @@ class ProjectRuntimeController(
             }.orEmpty()
             else -> project.summary.run
         }
+        val pythonRequiresVersion = if (
+            resolvedPrimary == RuntimeKind.PYTHON &&
+            facts.relativePaths.any { it == "pyproject.toml" }
+        ) {
+            gateway.readProjectRootText(project.summary.documentId, "pyproject.toml")
+                ?.let(::pythonRequiresVersion)
+        } else {
+            null
+        }
         return ExecutionContext(
             spec = RuntimeProjectSpec(
                 name = project.summary.name,
@@ -927,11 +937,21 @@ class ProjectRuntimeController(
                 declaredEntry = facts.declaredEntry,
                 declaredRun = facts.declaredRun,
                 relativePaths = facts.relativePaths,
+                pythonRequiresVersion = pythonRequiresVersion,
                 webLogDiscoveryAllowed = webLogDiscoveryAllowed,
                 webHintPorts = webHintPorts.filter { it in 1..65535 }.distinct(),
             ),
             selection = selection,
         )
+    }
+
+    private fun pythonRequiresVersion(pyprojectText: String): String? {
+        val parsed = Toml.parse(pyprojectText)
+        if (parsed.hasErrors()) return null
+        return parsed.getTable("project")
+            ?.getString("requires-python")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
     }
 
     private fun basicSpec(project: V04ProjectGateway.RuntimeProject): RuntimeProjectSpec = RuntimeProjectSpec(
