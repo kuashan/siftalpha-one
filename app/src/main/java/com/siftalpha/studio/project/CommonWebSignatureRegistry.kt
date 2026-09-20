@@ -47,6 +47,32 @@ object CommonWebSignatureRegistry {
         fun runMatches(regex: String): Boolean = Regex(regex).containsMatchIn(run)
         fun hasName(name: String): Boolean = paths.any { it.substringAfterLast('/').equals(name, true) }
 
+        val hasViteHybrid = paths.any {
+            it.substringAfterLast('/').lowercase() in setOf(
+                "vite.config.ts", "vite.config.js", "vite.config.mts",
+                "vite.config.mjs", "vite.config.cjs",
+            )
+        }
+        val hasProjectScriptsHybrid = pyproject.orEmpty().contains("[project.scripts]")
+        val hasWebExtraHybrid = Regex("""(?is)\[project\.optional-dependencies]\s*[\s\S]*?\bweb\s*=""")
+            .containsMatchIn(pyproject.orEmpty())
+        val hasWebSubcommandHybrid = Regex(
+            """(?is)(?:@\s*[A-Za-z_][A-Za-z0-9_.]*\.command\s*\(\s*["'](?:serve|web|ui|dashboard)["']|add_parser\s*\(\s*["'](?:serve|web|ui|dashboard)["'])""",
+        ).containsMatchIn(sources)
+        if (
+            hasViteHybrid &&
+            hasProjectScriptsHybrid &&
+            hasWebExtraHybrid &&
+            hasWebSubcommandHybrid
+        ) {
+            return Match(
+                "python-vite-web",
+                Confidence.HIGH,
+                null,
+                listOf("project-script", "web-extra", "vite", "web-subcommand"),
+            )
+        }
+
         val matches = buildList {
             if (
                 dep("streamlit") &&
@@ -130,28 +156,6 @@ object CommonWebSignatureRegistry {
                 add(Match("tornado", Confidence.HIGH, 8888, listOf("dependency", "listen")))
             }
 
-            val hasVite = paths.any {
-                it.substringAfterLast('/').lowercase() in setOf(
-                    "vite.config.ts", "vite.config.js", "vite.config.mts",
-                    "vite.config.mjs", "vite.config.cjs",
-                )
-            }
-            val hasProjectScripts = pyproject.orEmpty().contains("[project.scripts]")
-            val hasWebExtra = Regex("""(?is)\[project\.optional-dependencies]\s*[\s\S]*?\bweb\s*=""")
-                .containsMatchIn(pyproject.orEmpty())
-            val serveEvidence = source(
-                """(?is)(?:@\s*[A-Za-z_][A-Za-z0-9_.]*\.command\s*\(\s*["'](?:serve|web|ui|dashboard)["']|add_parser\s*\(\s*["'](?:serve|web|ui|dashboard)["'])""",
-            )
-            if (hasVite && hasProjectScripts && hasWebExtra && serveEvidence) {
-                add(
-                    Match(
-                        "python-vite-web",
-                        Confidence.HIGH,
-                        null,
-                        listOf("project-script", "web-extra", "vite", "web-subcommand"),
-                    ),
-                )
-            }
         }
 
         return matches.firstOrNull()
