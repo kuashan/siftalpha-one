@@ -146,7 +146,7 @@ class ResultWebActivity : StudioActivity() {
     override fun onDestroy() {
         if (::webView.isInitialized) {
             webView.stopLoading()
-            webView.webViewClient = null
+            webView.webViewClient = WebViewClient()
             webView.removeAllViews()
             webView.destroy()
         }

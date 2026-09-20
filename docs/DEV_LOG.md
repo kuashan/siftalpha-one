@@ -1157,3 +1157,9 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - Restored the exact r37 launch-kind/executable/argument-count block and inserted the new entrypoint marker as one additional guarded line only.
 - No r38 APK was released from the broken commit, so versionCode remains 164 / versionName 0.8.0-alpha43-r38.
 - r37 CLI execution behavior and the frozen r34 baseline remain unchanged.
+
+### r38 pre-release WebViewClient nullability correction
+
+- W0 Run #251 passed repository validators and reached Kotlin compilation.
+- Android WebView's `webViewClient` property is non-null in the current SDK stubs, so assigning `null` during ResultWebActivity teardown failed compilation.
+- Teardown now replaces the client with a fresh inert `WebViewClient` before destroy. No released APK existed from the failed build, so r38 remains versionCode 164.
