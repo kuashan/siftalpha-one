@@ -122,11 +122,11 @@ class PythonRuntimeAdapterTest {
 
         assertTrue(script.contains("planned_extras='web'"))
         assertTrue(script.contains("SIFTALPHA_PYPROJECT_EXTRAS=%s"))
-        assertTrue(script.contains("install_target="$project[$planned_extras]""))
+        assertTrue(script.contains("install_target=\"${'$'}project[${'$'}planned_extras]\""))
         assertFalse(script.contains("tomllib"))
         assertFalse(script.contains("optional-dependencies"))
         assertFalse(script.contains("vite.config"))
-        assertFalse(script.contains("find "$project" -maxdepth"))
+        assertFalse(script.contains("find \"${'$'}project\" -maxdepth"))
     }
 
     @Test
