@@ -1150,3 +1150,10 @@ Unified Open 正常进入 App 内 Rich Result Viewer；Viewer 提供明确可见
 - r34 remains the frozen Known Good Functional Baseline. r38 does not change Worker freeze, project-scoped STOP, Runtime ownership, Web discovery truth gates, or External/Internal argv semantics.
 - versionCode 164 / versionName 0.8.0-alpha43-r38.
 
+### r38 pre-release Python launch marker correction
+
+- W0 Run #249 reached Kotlin compilation after repository validators passed and exposed a malformed string splice in the new `SIFTALPHA_LAUNCH_ENTRYPOINT` marker.
+- The malformed line truncated the existing r37 launch-marker block, causing the remaining embedded shell script to be parsed as Kotlin and producing a large cascade of unrelated syntax errors.
+- Restored the exact r37 launch-kind/executable/argument-count block and inserted the new entrypoint marker as one additional guarded line only.
+- No r38 APK was released from the broken commit, so versionCode remains 164 / versionName 0.8.0-alpha43-r38.
+- r37 CLI execution behavior and the frozen r34 baseline remain unchanged.

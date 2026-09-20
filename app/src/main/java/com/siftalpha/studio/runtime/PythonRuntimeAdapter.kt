@@ -323,7 +323,12 @@ $launchArgumentAssignments
             export VIRTUAL_ENV="${'$'}venv"
             export PATH="${'$'}venv/bin:${'$'}PATH"
             if [ "${'$'}launch_mode" = "1" ]; then
-              printf 'SIFTALPHA_LAUNCH_KIND=%s\n' "${'
+              printf 'SIFTALPHA_LAUNCH_KIND=%s\n' "${'$'}launch_kind"
+              printf 'SIFTALPHA_LAUNCH_EXECUTABLE=%s\n' "${'$'}launch_display"
+              if [ -n "${'$'}launch_entrypoint" ]; then
+                printf 'SIFTALPHA_LAUNCH_ENTRYPOINT=%s\n' "${'$'}launch_entrypoint"
+              fi
+              printf 'SIFTALPHA_LAUNCH_ARGUMENT_COUNT=%s\n' "${'$'}{#launch_args[@]}"
               if [ ! -x "${'$'}launch_executable" ]; then
                 if [ "${'$'}launch_kind" = "CONSOLE_SCRIPT" ]; then
                   echo 'SIFTALPHA_ERROR=PYTHON_CONSOLE_SCRIPT_MISSING'
