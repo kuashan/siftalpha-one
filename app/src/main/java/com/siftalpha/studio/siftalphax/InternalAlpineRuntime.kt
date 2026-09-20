@@ -27,6 +27,7 @@ data class InternalAlpineDependencySource(
     val sourceFingerprint: String,
     val legacySourceFingerprint: String = sourceFingerprint,
     val requiresNodeVite: Boolean = false,
+    val pythonInstallExtras: List<String> = emptyList(),
     val projectRequiresPython: String? = null,
 ) {
     enum class Kind { REQUIREMENTS_TXT, PYPROJECT_TOML, NONE }
@@ -36,6 +37,7 @@ data class InternalAlpineDependencySource(
             requirementsText: String?,
             pyprojectText: String?,
             requiresNodeVite: Boolean = false,
+            pythonInstallExtras: List<String> = emptyList(),
         ): InternalAlpineDependencySource {
             val kind: Kind
             val source: String
@@ -60,8 +62,17 @@ data class InternalAlpineDependencySource(
             }
             val legacyFingerprintSource = source +
                 "\nNODE_VITE=" + (if (requiresNodeVite) "1" else "0")
+            val normalizedExtras = pythonInstallExtras
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .sorted()
+            require(normalizedExtras.all { PYTHON_EXTRA_NAME.matches(it) }) {
+                "Invalid Python install extra in Environment Plan"
+            }
             val fingerprintSource = legacyFingerprintSource +
-                "\nREQUIRES_PYTHON=" + projectRequiresPython.orEmpty()
+                "\nREQUIRES_PYTHON=" + projectRequiresPython.orEmpty() +
+                "\nPYTHON_INSTALL_EXTRAS=" + normalizedExtras.joinToString(",")
             fun fingerprint(value: String): String =
                 "sha256:" + MessageDigest.getInstance("SHA-256")
                     .digest(value.toByteArray(Charsets.UTF_8))
@@ -71,9 +82,12 @@ data class InternalAlpineDependencySource(
                 sourceFingerprint = fingerprint(fingerprintSource),
                 legacySourceFingerprint = fingerprint(legacyFingerprintSource),
                 requiresNodeVite = requiresNodeVite,
+                pythonInstallExtras = normalizedExtras,
                 projectRequiresPython = projectRequiresPython,
             )
         }
+
+        private val PYTHON_EXTRA_NAME = Regex("^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
         private fun extractRequiresPython(pyprojectText: String): String? {
             val parsed = Toml.parse(pyprojectText)
@@ -203,8 +217,16 @@ internal object InternalAlpineDependencyBootstrap {
 
     fun installCommand(
         kind: InternalAlpineDependencySource.Kind,
-        installWebExtra: Boolean = false,
+        installExtras: List<String> = emptyList(),
     ): String = buildString {
+        val normalizedExtras = installExtras
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .sorted()
+        require(normalizedExtras.all { EXTRA_NAME.matches(it) }) {
+            "Invalid Python install extra in Environment Plan"
+        }
         append("set -eu\n")
         append("printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=CREATE_VENV\\n'\n")
         append("virtualenv /siftalpha-env/venv\n")
@@ -221,25 +243,16 @@ internal object InternalAlpineDependencyBootstrap {
             }
             InternalAlpineDependencySource.Kind.PYPROJECT_TOML -> {
                 append("printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=INSTALL_DEPENDENCIES\\n'\n")
-                if (installWebExtra) {
-                    append("if /siftalpha-env/venv/bin/python - /workspace/pyproject.toml <<'SIFTALPHA_INTERNAL_WEB_EXTRA'\n")
-                    append("import sys, tomllib\n")
-                    append("with open(sys.argv[1], 'rb') as handle:\n")
-                    append("    data = tomllib.load(handle)\n")
-                    append("optional = data.get('project', {}).get('optional-dependencies', {})\n")
-                    append("raise SystemExit(0 if isinstance(optional, dict) and 'web' in optional else 1)\n")
-                    append("SIFTALPHA_INTERNAL_WEB_EXTRA\n")
-                    append("then\n")
-                    append("  echo 'SIFTALPHA_PYPROJECT_EXTRAS=web'\n")
-                    append("  /siftalpha-env/venv/bin/python -m pip install ")
+                val extras = normalizedExtras.joinToString(",")
+                if (extras.isNotEmpty()) {
+                    append("echo 'SIFTALPHA_PYPROJECT_EXTRAS=")
+                    append(extras)
+                    append("'\n")
+                    append("/siftalpha-env/venv/bin/python -m pip install ")
                     append(PIP_COMMON)
-                    append(" '/workspace[web]'\n")
-                    append("else\n")
-                    append("  echo 'SIFTALPHA_PYPROJECT_EXTRAS=none'\n")
-                    append("  /siftalpha-env/venv/bin/python -m pip install ")
-                    append(PIP_COMMON)
-                    append(" /workspace\n")
-                    append("fi\n")
+                    append(" '/workspace[")
+                    append(extras)
+                    append("]'\n")
                 } else {
                     append("echo 'SIFTALPHA_PYPROJECT_EXTRAS=none'\n")
                     append("/siftalpha-env/venv/bin/python -m pip install ")
@@ -254,6 +267,8 @@ internal object InternalAlpineDependencyBootstrap {
         append("printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=VERIFY_PYTHON\\n'\n")
         append("/siftalpha-env/venv/bin/python -c 'import sys; print(sys.version)'\n")
     }
+
+    private val EXTRA_NAME = Regex("^[A-Za-z0-9][A-Za-z0-9._-]*$")
 }
 
 internal object InternalAlpinePrepareWatchdog {
@@ -411,7 +426,7 @@ class InternalAlpineEnvironmentManager(context: Context) {
             }
             val command = InternalAlpineDependencyBootstrap.installCommand(
                 kind = source.kind,
-                installWebExtra = source.requiresNodeVite,
+                installExtras = source.pythonInstallExtras,
             )
             runCommand(
                 builder = InternalAlpineFiles.buildCommand(
