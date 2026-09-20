@@ -182,6 +182,54 @@ class ProjectEnvironmentPlanTest {
     }
 
     @Test
+    fun viteWebOptionalGroupBecomesExplicitPythonInstallExtra() {
+        val detection = detect(
+            paths = listOf(
+                "pyproject.toml",
+                "web-ui/package.json",
+                "web-ui/package-lock.json",
+                "web-ui/vite.config.ts",
+            ),
+            pyproject = """
+                [project]
+                name = "demo"
+
+                [project.optional-dependencies]
+                web = ["fastapi", "uvicorn"]
+                dev = ["pytest"]
+            """.trimIndent(),
+        )
+        val plan = ProjectEnvironmentPlanner.plan(detection, allCapabilities)
+
+        assertTrue(plan.readyToPrepare)
+        assertEquals(listOf("dev", "web"), detection.pythonOptionalDependencyGroups)
+        assertEquals(listOf("web"), plan.pythonInstallExtras)
+        assertTrue(
+            plan.diagnosticLines().contains(
+                "SIFTALPHA_ENV_PYTHON_INSTALL_EXTRAS=web",
+            ),
+        )
+    }
+
+    @Test
+    fun webOptionalGroupWithoutViteIsDetectedButNotInstalledAutomatically() {
+        val detection = detect(
+            paths = listOf("pyproject.toml", "main.py"),
+            pyproject = """
+                [project]
+                name = "demo"
+
+                [project.optional-dependencies]
+                web = ["fastapi"]
+            """.trimIndent(),
+        )
+        val plan = ProjectEnvironmentPlanner.plan(detection, allCapabilities)
+
+        assertEquals(listOf("web"), detection.pythonOptionalDependencyGroups)
+        assertTrue(plan.pythonInstallExtras.isEmpty())
+    }
+
+    @Test
     fun nestedPnpmViteComponentIsRejectedBeforePrepare() {
         val detection = detect(
             paths = listOf(
