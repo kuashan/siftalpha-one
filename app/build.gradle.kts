@@ -85,8 +85,10 @@ android {
         // External Python re-prepare replace the prior venv only after a clean prepare succeeds.
         // alpha43-r46.2 adds fast common-Web recognition, PREPARE-time background rediscovery,
         // and verified launch-contract learning before the existing deep Web discovery fallback.
-        versionCode = 178
-        versionName = "0.8.0-alpha43-r46.2"
+        // alpha43-r46.3 fixes generic External Python venv relocation so pip-generated console
+        // scripts keep a stable interpreter prefix while failed prepares still roll back cleanly.
+        versionCode = 179
+        versionName = "0.8.0-alpha43-r46.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
