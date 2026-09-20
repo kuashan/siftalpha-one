@@ -196,37 +196,37 @@ class V04ProjectGateway(private val context: Context) {
             if (root.optInt("version", 0) != PROJECT_INDEX_VERSION) return@runCatching null
             if (root.optString("rootUri") != tree.toString()) return@runCatching null
             val values = root.optJSONArray("projects") ?: return@runCatching null
-            buildList {
-                for (index in 0 until values.length()) {
-                    val value = values.optJSONObject(index) ?: continue
-                    val documentId = value.optString("documentId")
-                    val folderName = value.optString("folderName")
-                    val name = value.optString("name")
-                    if (documentId.isBlank() || folderName.isBlank() || name.isBlank()) continue
-                    val rootNamesJson = value.optJSONArray("rootNames") ?: JSONArray()
-                    val rootNames = buildList {
-                        for (item in 0 until rootNamesJson.length()) {
-                            rootNamesJson.optString(item).takeIf { it.isNotBlank() }?.let(::add)
-                        }
-                    }
-                    add(
-                        ProjectIndexEntry(
-                            summary = ProjectStore.ProjectSummary(
-                                name = name,
-                                description = value.optString("description"),
-                                entry = value.optString("entry"),
-                                run = value.optString("run"),
-                                source = value.optString("source").ifBlank { "本地项目" },
-                                documentId = documentId,
-                            ),
-                            folderName = folderName,
-                            sourceUrl = value.optString("sourceUrl").takeIf { it.isNotBlank() },
-                            rootNames = rootNames,
-                            declaredType = value.optString("declaredType").takeIf { it.isNotBlank() },
-                        ),
-                    )
+            val projects = mutableListOf<ProjectIndexEntry>()
+            for (index in 0 until values.length()) {
+                val value = values.optJSONObject(index) ?: continue
+                val documentId: String = value.optString("documentId")
+                val folderName: String = value.optString("folderName")
+                val name: String = value.optString("name")
+                if (documentId.isBlank() || folderName.isBlank() || name.isBlank()) continue
+
+                val rootNamesJson = value.optJSONArray("rootNames") ?: JSONArray()
+                val rootNames = mutableListOf<String>()
+                for (item in 0 until rootNamesJson.length()) {
+                    val rootName: String = rootNamesJson.optString(item)
+                    if (rootName.isNotBlank()) rootNames += rootName
                 }
+
+                projects += ProjectIndexEntry(
+                    summary = ProjectStore.ProjectSummary(
+                        name = name,
+                        description = value.optString("description"),
+                        entry = value.optString("entry"),
+                        run = value.optString("run"),
+                        source = value.optString("source").ifBlank { "本地项目" },
+                        documentId = documentId,
+                    ),
+                    folderName = folderName,
+                    sourceUrl = value.optString("sourceUrl").takeIf { it.isNotBlank() },
+                    rootNames = rootNames,
+                    declaredType = value.optString("declaredType").takeIf { it.isNotBlank() },
+                )
             }
+            projects
         }.getOrNull()
     }
 
