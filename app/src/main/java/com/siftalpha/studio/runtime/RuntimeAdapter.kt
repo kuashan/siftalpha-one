@@ -35,6 +35,8 @@ data class RuntimeProjectSpec(
     val relativePaths: List<String> = emptyList(),
     /** Explicit project-level Python compatibility requirement from pyproject.toml, when declared. */
     val pythonRequiresVersion: String? = null,
+    /** Detection-owned Environment Plan identity consumed by PREPARE/STATUS/START. */
+    val environmentPlanId: String? = null,
     /** Optional one-shot argv-based Python launch selected at action time. */
     val pythonLaunchInvocation: PythonLaunchInvocation? = null,
     /** M-owned Web capability gate for weak Runtime log URL discovery. */
