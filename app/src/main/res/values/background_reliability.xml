@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="background_reliability_title">建议允许 SiftAlpha X 持续后台运行</string>
+    <string name="background_reliability_message">Python 脚本、本地 Web 服务和长期运行项目可能会被 Android 的省电策略暂停或回收。建议在系统电池设置中将 SiftAlpha X 设为“不受限制 / 无限制”（不同手机名称可能略有不同）。
+
+SiftAlpha X 不会自动修改这项系统设置。</string>
+    <string name="background_reliability_open_settings">前往设置</string>
+    <string name="background_reliability_later">以后提醒</string>
+    <string name="background_reliability_settings_unavailable">无法直接打开电池设置，请在系统设置中找到 SiftAlpha X 的电池使用选项。</string>
+</resources>
