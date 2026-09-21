@@ -1269,3 +1269,27 @@ R48-0C is cloud-verified but not yet an accepted/frozen baseline.
 | APK（安装包） | 0.8.0-alpha43-r48b2 / 189 | PASS — cloud artifact |
 | Real-device acceptance（真机验收） | 3-second fallback + open/recheck + return retry | PENDING |
 
+### R48-C — Prepare Productization + Unified Import（准备产品化 + 统一导入）
+
+| Area | Verification | Result |
+| --- | --- | --- |
+| Prepare facts（准备事实） | existing Detection / Plan / Compatibility / Prepare / Verification reused | PASS — source/cloud |
+| Presentation-only policy（仅展示策略） | `PrepareWorkflowPresentationPolicy` does not mutate Runtime facts | PASS — unit/cloud |
+| Detection summary（检测摘要） | runtime + direct dependency count surfaced | PASS — source/cloud |
+| Compatibility（兼容性） | resolved / Internal Alpine fallback surfaced | PASS — source/cloud |
+| Live prepare phase（实时准备阶段） | existing read-only PrepareProgressProbe mapped to human phases | PASS — source/cloud |
+| Verification（验证） | READY / FAILED / STOPPED / timeout presentation | PASS — source/cloud |
+| Configuration guidance（配置引导） | prepared environment + missing REQUIRED config count | PASS — source/cloud |
+| Unified Import（统一导入） | one Normal Home entry | PASS — source/cloud |
+| ZIP import（ZIP 导入） | existing V04ProjectGateway importer reused | PASS — source/cloud |
+| Python file import（Python 文件导入） | existing V04ProjectGateway importer reused | PASS — source/cloud |
+| Import policy（导入策略） | .zip / .py / unsupported classification | PASS — unit/cloud |
+| Project Location（项目位置） | current root + AcodeProjects + other root | PASS — source/cloud |
+| More（更多） | normal management actions moved to compact menu | PASS — source/cloud |
+| Developer Tools（开发者工具） | advanced tools only when Developer Mode enabled | PASS — source/cloud |
+| Runtime protection（运行时保护） | no second Runtime / Environment orchestration | PASS — source review |
+| Internal Alpine Probe（内部 Alpine 探针） | #80 | PASS |
+| W0 Cloud Build（云端构建） | #533 | PASS |
+| APK（安装包） | r48c1 / versionCode 190 | PASS — cloud artifact |
+| Real-device acceptance（真机验收） | prepare phases + import + location + More | PENDING |
+
