@@ -37,4 +37,9 @@
     <string name="normal_external_provider_check_required">The external provider check is required.</string>
     <string name="normal_external_provider_checking">Checking the external provider…</string>
     <string name="normal_external_provider_unavailable">The external provider is currently unavailable.</string>
+    <string name="normal_project_refresh_action">Refresh</string>
+    <string name="normal_project_refreshing">Refreshing project status…</string>
+    <string name="normal_project_refresh_complete">Status updated.</string>
+    <string name="normal_project_open_action">Open</string>
+    <string name="normal_project_open_unavailable">There is no Web page or result available to open yet.</string>
 </resources>
