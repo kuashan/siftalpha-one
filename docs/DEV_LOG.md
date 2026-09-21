@@ -2237,3 +2237,120 @@ REAL DEVICE ACCEPTANCE（真机验收）= PENDING（待测试）。
 4. Termux 正常时恢复 READY（就绪），并可继续 Prepare（准备）。
 5. 旧超时回调不能污染新的探测结果。
 
+## 2026-09-21 · R48-C Prepare Productization + Unified Project Management（准备产品化 + 统一项目管理）
+
+### Scope（范围）
+
+本轮只做 Normal Mode（普通模式）产品化，不重写已经验收过的 Runtime / Environment（运行时 / 环境）核心。
+
+完成两组能力：
+
+1. Prepare Project Workflow（准备项目工作流）产品化：
+   `Detection -> Plan -> Compatibility -> Prepare -> Verification`
+   继续使用现有事实链，只把结果翻译成普通用户可理解的阶段。
+2. Home（首页）项目管理产品化：
+   Unified Import（统一导入）、Project Location（项目位置）、More / Developer Tools（更多 / 开发者工具）。
+
+### Prepare productization（准备产品化）
+
+新增 presentation-only（仅展示）策略：
+`PrepareWorkflowPresentationPolicy`
+
+Normal Mode 继续调用现有：
+- `ProjectRuntimeController.detectEnvironment()`
+- `ProjectEnvironmentPlan`
+- `ProjectEnvironmentResolution`
+- `ProjectControlHub.prepare()`
+- `PrepareLiveProgressController`
+- Shared lifecycle / operation facts（共享生命周期 / 操作事实）
+
+没有复制第二套 Detection / Plan / Compatibility / Prepare / Verification。
+
+普通用户现在看到的阶段包括：
+- 正在检测项目
+- 检测完成
+- 兼容性检查完成
+- 正在准备运行环境
+- 正在安装项目依赖
+- 正在验证环境
+- 准备完成
+- 需要完成必要配置
+- 暂时无法准备 / 准备失败 / 准备已停止
+
+Raw diagnostics（原始诊断）仍由 Developer Workspace（开发者工作区）和共享 Runtime logs（运行日志）保留。
+
+### Unified Import（统一导入）
+
+Normal Home（普通首页）新增统一“导入项目”入口。
+
+当前产品入口支持：
+- ZIP project（ZIP 项目）
+- single Python file（单个 Python 文件）
+- Create empty project（新建空项目）
+
+导入实现继续复用既有 `V04ProjectGateway.importZip()` / `importPython()`，没有创建第二套 importer（导入器）。
+
+导入成功后刷新项目列表，并直接打开 Normal Project Workspace（普通项目工作区）。
+
+GitHub clone（GitHub 克隆）暂未加入普通模式统一导入，因为现有成熟 GitHub clone 仍绑定 External Provider / Developer Workspace；本轮不通过隐藏 V04Activity 或模拟按钮绕路。
+
+### Project Location（项目位置）
+
+首页将项目目录独立为用户可理解的 Project Location（项目位置）：
+- 显示当前位置
+- 连接现有 AcodeProjects
+- 选择其他项目目录
+- 明确更换位置不会改写项目源码
+
+底层仍复用现有 SAF / ProjectStore（存储访问框架 / 项目存储）。
+
+### More / Developer Tools（更多 / 开发者工具）
+
+首页顶部新增 More（更多）。
+
+普通模式：
+- 刷新项目列表
+- 新建项目
+
+Developer Mode（开发者模式）开启后，More 内额外提供：
+- Runtime Center（运行中心）
+- Runtime Storage / Environment（运行存储 / 环境）
+- Terminal（终端）
+- Embedded Python Test（内置 Python 测试）
+
+原来占据首页主体的 Developer bridge diagnostics（开发者桥接诊断）和高级快捷区已从普通主流程移走。
+
+### Version（版本）
+
+- versionName: `0.8.0-alpha43-r48c1`
+- versionCode: `190`
+- applicationId: `com.siftalpha.studio`
+
+### Functional / CI source（功能 / CI 源码）
+
+Latest source validated by cloud:
+`feab394d7e8daa7516946f8f782e549ee4038fcc`
+
+其中最后一项 CI-only（仅云端构建）修复增强固定 SHA-256 第三方源码下载重试，不改变 Runtime 行为。
+
+### Cloud verification（云端验证）
+
+- Internal Alpine Probe（内部 Alpine 探针） #80: **PASS（通过）**
+- W0 Cloud Build（W0 云端构建） #533: **PASS（通过）**
+- repository validators（仓库校验）: PASS
+- `testDebugUnitTest`: PASS
+- `assembleDebug`: PASS
+- artifact: `siftalpha-w0-533`
+- artifact ID: `10645641261`
+- artifact ZIP digest: `sha256:1affb7a5a1d3555fdd7cb7f32901cbeb145d853b6eb2821d160c8082173f2c4e`
+- APK SHA-256: `a8e581fa7aca5d11d67c9f0c7f56cde0746a2f3db082dead2a7071aea3b8da28`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- APK Signature Scheme v2: verified
+
+### Acceptance（验收）
+
+CODE/CLOUD COMPLETE（代码 / 云端完成）。
+REAL DEVICE ACCEPTANCE（真机验收）= PENDING（待测试）。
+
+不自动 merge（合并），不移动 baseline（基线）。
+
