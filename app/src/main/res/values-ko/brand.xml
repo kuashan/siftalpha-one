@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="brand_tagline_primary">복잡한 기술을, 단순한 가능성으로</string>
+    <string name="brand_tagline_secondary">스마트 필터링 · 간단한 실행 · 결과 확인</string>
+    <string name="brand_normal_intro">아이디어를 보이는 결과로</string>
+    <string name="brand_new_project_title">새 프로젝트</string>
+    <string name="brand_new_project_hint">하나의 아이디어에서 시작</string>
+    <string name="brand_empty_project_hint">기존 프로젝트를 가져오거나 새 프로젝트를 시작하세요.</string>
+    <string name="brand_result_ready_title">결과가 준비되었습니다</string>
+    <string name="brand_result_ready_detail">SiftAlpha 처리가 완료되었습니다. 결과를 바로 열 수 있습니다.</string>
+    <string name="brand_mark_content_description">SiftAlpha 브랜드 마크</string>
+    <string name="brand_no_projects_title">아직 프로젝트가 없습니다</string>
+    <string name="brand_project_ready">설정 완료</string>
+    <string name="brand_project_needs_setup">설정 필요</string>
+</resources>

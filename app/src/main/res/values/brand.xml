@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="brand_tagline_primary">让复杂的技术，变成简单的可能</string>
+    <string name="brand_tagline_secondary">智能筛选 · 简化执行 · 看见结果</string>
+    <string name="brand_normal_intro">让想法变成看得见的结果</string>
+    <string name="brand_new_project_title">新建项目</string>
+    <string name="brand_new_project_hint">从一个想法开始</string>
+    <string name="brand_empty_project_hint">导入现有项目，或从一个新项目开始。</string>
+    <string name="brand_result_ready_title">结果已准备好</string>
+    <string name="brand_result_ready_detail">SiftAlpha 已完成处理，你可以直接查看结果。</string>
+    <string name="brand_mark_content_description">SiftAlpha 品牌标志</string>
+    <string name="brand_no_projects_title">还没有项目</string>
+    <string name="brand_project_ready">已配置</string>
+    <string name="brand_project_needs_setup">需要配置</string>
+</resources>

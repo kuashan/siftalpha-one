@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="brand_tagline_primary">Turn complex technology into simple possibilities</string>
+    <string name="brand_tagline_secondary">Smart filtering · Simple execution · See results</string>
+    <string name="brand_normal_intro">Turn ideas into visible results</string>
+    <string name="brand_new_project_title">New project</string>
+    <string name="brand_new_project_hint">Start from an idea</string>
+    <string name="brand_empty_project_hint">Import an existing project or start a new one.</string>
+    <string name="brand_result_ready_title">Your result is ready</string>
+    <string name="brand_result_ready_detail">SiftAlpha has finished processing. Open the result when you are ready.</string>
+    <string name="brand_mark_content_description">SiftAlpha brand mark</string>
+    <string name="brand_no_projects_title">No projects yet</string>
+    <string name="brand_project_ready">Configured</string>
+    <string name="brand_project_needs_setup">Needs configuration</string>
+</resources>

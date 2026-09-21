@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="brand_tagline_primary">複雑な技術を、シンプルな可能性へ</string>
+    <string name="brand_tagline_secondary">スマートに選別 · シンプルに実行 · 結果を見る</string>
+    <string name="brand_normal_intro">アイデアを見える結果へ</string>
+    <string name="brand_new_project_title">新しいプロジェクト</string>
+    <string name="brand_new_project_hint">ひとつのアイデアから始める</string>
+    <string name="brand_empty_project_hint">既存のプロジェクトを読み込むか、新しく始めましょう。</string>
+    <string name="brand_result_ready_title">結果の準備ができました</string>
+    <string name="brand_result_ready_detail">SiftAlpha の処理が完了しました。結果を直接開けます。</string>
+    <string name="brand_mark_content_description">SiftAlpha ブランドマーク</string>
+    <string name="brand_no_projects_title">プロジェクトはまだありません</string>
+    <string name="brand_project_ready">設定済み</string>
+    <string name="brand_project_needs_setup">設定が必要</string>
+</resources>

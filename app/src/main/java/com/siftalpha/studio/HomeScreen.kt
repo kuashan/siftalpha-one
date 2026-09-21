@@ -351,6 +351,19 @@ fun HomeScreen(
         )
     }
 
+    if (!state.developerModeEnabled) {
+        SiftAlphaNormalHomeScreen(
+            state = state,
+            versionName = versionName,
+            onImport = { importOpen = true },
+            onNewProject = onNewProject,
+            onProjectLocation = { projectManagementOpen = true },
+            onOpenProject = onOpenProject,
+            onMore = { moreOpen = true },
+        )
+        return
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {

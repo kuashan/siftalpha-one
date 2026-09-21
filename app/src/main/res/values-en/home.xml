@@ -100,7 +100,7 @@
     <string name="home_project_entry_title">Projects</string>
     <string name="home_import_title">Import project</string>
     <string name="home_import_summary">Add an existing project to SiftAlpha from one entry point.</string>
-    <string name="home_import_supported">ZIP projects and single Python files are currently supported. Imported projects open directly in Normal Mode.</string>
+    <string name="home_import_supported">Supports Python files, ZIP projects, and GitHub links.</string>
     <string name="home_import_choose_file">Choose project file</string>
     <string name="home_import_new_project">Create empty project</string>
     <string name="home_more_title">More</string>

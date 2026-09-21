@@ -17,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import com.siftalpha.studio.project.ProjectStore
 import com.siftalpha.studio.project.SharedGitHubImportService
@@ -98,9 +99,10 @@ class MainActivity : StudioComposeActivity() {
         projectGateway = V04ProjectGateway(this)
         projectRuntime = ProjectRuntimeController(projectGateway)
         externalPreflight = ExternalProviderProbeCoordinator.shared(this)
+        refreshDeveloperMode()
         enableEdgeToEdge()
         setContent {
-            StudioTheme {
+            val homeContent: @Composable () -> Unit = {
                 HomeScreen(
                     state = homeState.value,
                     versionName = appVersionName(),
@@ -148,8 +150,14 @@ class MainActivity : StudioComposeActivity() {
                     onCopyOutput = { copyOutput() },
                 )
             }
+            if (homeState.value.developerModeEnabled) {
+                StudioTheme { homeContent() }
+            } else {
+                SiftAlphaNormalTheme {
+                    SiftAlphaBrandTransition { homeContent() }
+                }
+            }
         }
-        refreshDeveloperMode()
         refreshTermuxState()
         refreshProjects()
     }
