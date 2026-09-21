@@ -71,4 +71,5 @@
     <string name="normal_prepare_runtime_python">Python 프로젝트</string>
     <string name="normal_prepare_runtime_node">Node.js 프로젝트</string>
     <string name="normal_prepare_runtime_unknown">프로젝트</string>
+    <string name="normal_prepare_config_required_detail">환경 준비가 완료되었습니다. 실행 전에 필수 구성 %1$d개를 완료하세요.</string>
 </resources>
