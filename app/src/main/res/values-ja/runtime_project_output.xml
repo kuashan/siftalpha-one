@@ -7,5 +7,5 @@
     <string name="runtime_center_section_system_output">インポート / システム出力</string>
     <string name="runtime_button_refresh_logs">ログを更新</string>
     <string name="runtime_web_not_listening_title">Web ポートはまだ準備できていません</string>
-    <string name="runtime_web_not_listening_message">Studio はローカル Web アドレスを認識していますが、現在 %1$s では接続を受け付けていません。ブラウザー入口は無効のまま、Studio が自動検出を続けます。</string>
+    <string name="runtime_web_not_listening_message">SiftAlpha X はローカル Web アドレスを認識していますが、現在 %1$s では接続を受け付けていません。ブラウザー入口は無効のまま、SiftAlpha X が自動検出を続けます。</string>
 </resources>
