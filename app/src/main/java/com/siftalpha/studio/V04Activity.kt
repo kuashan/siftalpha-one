@@ -30,6 +30,8 @@ import com.siftalpha.studio.project.WebProjectInspector
 import com.siftalpha.studio.presentation.ProjectActionPolicy
 import com.siftalpha.studio.presentation.ProjectUiSnapshot
 import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
+import com.siftalpha.studio.runtime.ExternalProviderPreflight
+import com.siftalpha.studio.runtime.ExternalProviderReadinessStatus
 import com.siftalpha.studio.runtime.EmbeddedPythonObservationPolicy
 import com.siftalpha.studio.runtime.EmbeddedProjectPollRegistry
 import com.siftalpha.studio.runtime.ProjectActivityRegistry
@@ -176,6 +178,7 @@ open class V04Activity : StudioActivity() {
     )
 
     private lateinit var backend: TermuxBackend
+    private lateinit var externalProviderPreflight: ExternalProviderPreflight
     private lateinit var gateway: V04ProjectGateway
     private lateinit var runtime: ProjectRuntimeController
     private lateinit var secretStore: ProjectSecretStore
@@ -339,6 +342,7 @@ open class V04Activity : StudioActivity() {
         super.onCreate(savedInstanceState)
         clearLocalizedStateCacheIfNeeded()
         backend = TermuxBackend(this)
+        externalProviderPreflight = ExternalProviderPreflight(this, backend)
         gateway = V04ProjectGateway(this)
         projectRuntimeSelectionStore = ProjectRuntimeSelectionStore(this)
         runtime = ProjectRuntimeController(
@@ -4792,21 +4796,27 @@ open class V04Activity : StudioActivity() {
             )
             return false
         }
-        if (!backend.isTermuxInstalled()) {
-            errorDialog(
-                getString(R.string.runtime_termux_missing_title),
-                getString(R.string.runtime_termux_missing_message),
-            )
-            return false
+        return when (externalProviderPreflight.inspect().status) {
+            ExternalProviderReadinessStatus.TERMUX_NOT_INSTALLED -> {
+                errorDialog(
+                    getString(R.string.runtime_termux_missing_title),
+                    getString(R.string.runtime_termux_missing_message),
+                )
+                false
+            }
+            ExternalProviderReadinessStatus.RUN_COMMAND_PERMISSION_REQUIRED -> {
+                errorDialog(
+                    getString(R.string.runtime_permission_missing_title),
+                    getString(R.string.runtime_permission_missing_message),
+                )
+                false
+            }
+            ExternalProviderReadinessStatus.BRIDGE_PROBE_REQUIRED,
+            ExternalProviderReadinessStatus.TERMUX_CONFIGURATION_REQUIRED,
+            ExternalProviderReadinessStatus.BRIDGE_UNAVAILABLE,
+            ExternalProviderReadinessStatus.READY,
+            -> true
         }
-        if (!backend.hasRunCommandPermission()) {
-            errorDialog(
-                getString(R.string.runtime_permission_missing_title),
-                getString(R.string.runtime_permission_missing_message),
-            )
-            return false
-        }
-        return true
     }
 
     private fun displayName(uri: Uri): String? {
