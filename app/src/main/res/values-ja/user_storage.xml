@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="user_storage_title">実行用ストレージ</string>
+    <string name="user_storage_summary">SiftAlpha X と各プロジェクト環境が使用する実行用ストレージを確認します。実行環境データだけを管理し、プロジェクトのソースは削除しません。</string>
+    <string name="user_storage_refresh">容量を更新</string>
+    <string name="user_storage_scanning">実行用ストレージを集計しています…</string>
+    <string name="user_storage_scanning_internal">アプリ内の実行用ストレージを集計しています…</string>
+    <string name="user_storage_internal_title">アプリ内実行用ストレージ</string>
+    <string name="user_storage_external_title">Termux 実行用ストレージ</string>
+    <string name="user_storage_total">合計：%1$s</string>
+    <string name="user_storage_project_total">プロジェクト環境合計：%1$s</string>
+    <string name="user_storage_project_row">%1$s · %2$s</string>
+    <string name="user_storage_no_project_space">準備済みのプロジェクト実行環境はありません。</string>
+    <string name="user_storage_external_not_ready">Termux 実行環境はまだインストールまたは準備されていません。</string>
+    <string name="user_storage_external_unavailable">現在 Termux の実行用ストレージを読み取れません。Termux を開いてから再度更新してください。アプリ内実行環境には影響しません。</string>
+    <string name="user_storage_clean_project">このプロジェクトの実行用ストレージを削除</string>
+    <string name="user_storage_clean_title">%1$s の実行用ストレージを削除しますか？</string>
+    <string name="user_storage_clean_message">このプロジェクトの準備済み環境、依存関係、実行データだけを削除します。プロジェクトのソースは残ります。次回実行前に再度準備が必要です。</string>
+    <string name="user_storage_clean_confirm">削除</string>
+    <string name="user_storage_cleaning">実行用ストレージを削除しています…</string>
+    <string name="user_storage_clean_done">プロジェクトの実行用ストレージを削除しました。</string>
+    <string name="user_storage_clean_failed">実行用ストレージの削除に失敗しました。</string>
+    <string name="user_storage_scan_failed">実行用ストレージの集計に失敗しました。後でもう一度お試しください。</string>
+    <string name="user_storage_ready">容量情報を更新しました。</string>
+    <string name="user_storage_error">実行用ストレージ操作に失敗しました</string>
+</resources>
