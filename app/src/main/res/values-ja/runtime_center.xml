@@ -60,14 +60,14 @@
     <string name="runtime_policy_pending_operation">現在の操作が完了するまで待機しています。</string>
     <string name="runtime_policy_runtime_host_unavailable">この端末ではランタイムを実行できません。プロジェクトファイルは引き続き管理できます。</string>
     <string name="runtime_policy_runtime_selection_required">プロジェクトのランタイムを安全に特定できません。先に状態を確認するか、実行環境をクリーンアップしてください。</string>
-    <string name="runtime_policy_runtime_active">プロジェクトのプロセスはまだ Studio が管理しています。停止または状態確認ができます。</string>
+    <string name="runtime_policy_runtime_active">プロジェクトのプロセスはまだ SiftAlpha X が管理しています。停止または状態確認ができます。</string>
     <string name="runtime_policy_environment_preparing">実行環境を準備しています。いつでもこのプロジェクトを停止できます。</string>
     <string name="runtime_policy_web_endpoint_pending">プロジェクトのプロセスは起動しましたが、Web エンドポイントはまだ確認できていません。</string>
     <string name="runtime_policy_configuration_required">プロジェクトに必須設定がありません。先に設定を開いてください。</string>
     <string name="runtime_policy_environment_prepare_required">実行環境が準備されていません。先に準備してください。</string>
     <string name="runtime_policy_environment_status_required">実行環境の状態が不明です。先に状態を確認してください。</string>
     <string name="runtime_policy_runtime_status_required">ランタイムの状態が不明です。先に状態を確認してください。</string>
-    <string name="runtime_policy_ready_to_run">実行環境の準備が完了し、プロジェクトを起動できます。設定が必要な場合は起動後に Studio が案内します。</string>
+    <string name="runtime_policy_ready_to_run">実行環境の準備が完了し、プロジェクトを起動できます。設定が必要な場合は起動後に SiftAlpha X が案内します。</string>
     <string name="runtime_policy_reason_pending_operation">別の操作が実行中です</string>
     <string name="runtime_policy_reason_runtime_host_unavailable">この端末ではランタイムを実行できません</string>
     <string name="runtime_policy_reason_runtime_selection_required">プロジェクトのランタイムを一意に特定できません</string>
@@ -129,7 +129,7 @@
     <string name="runtime_run_secret_not_required">\n\nAPI キー：このプロジェクトは Binance API 認証情報が不要と宣言しています。</string>
     <string name="runtime_run_secret_configured">\n\nAPI キー：設定済み。安全な stdin を通じて環境変数へ注入されます。</string>
     <string name="runtime_run_secret_missing">\n\nAPI キー：未設定。通常のプロジェクトには影響しません。認証が必要なプロジェクトは認証情報不足を自ら報告します。</string>
-    <string name="runtime_run_web_detected">\n\nWeb：検出済み。実行後、Studio がローカルダッシュボードのアドレスを登録します。</string>
+    <string name="runtime_run_web_detected">\n\nWeb：検出済み。実行後、SiftAlpha X がローカルダッシュボードのアドレスを登録します。</string>
     <string name="runtime_native_web_run_title">%1$s のネイティブ Web アプリを実行しますか？</string>
     <string name="runtime_native_web_run_message">プロジェクト固有の Web 起動エントリを高い確度で検出しました：\n\n%1$s\n\nSiftAlpha がプロジェクトのローカル Web サービスを起動します。プロジェクト側の自動ブラウザ起動は無効化し、エンドポイント確認後に SiftAlpha がネイティブ Web 画面を開きます。</string>
     <string name="runtime_run_title">%1$s を実行しますか？</string>
@@ -155,10 +155,10 @@
     <string name="runtime_web_not_running_title">Web アプリは実行されていません</string>
     <string name="runtime_web_not_running_message">現在のプロジェクトは実行中ではありません。先にプロジェクトを実行してから「ブラウザ」をタップしてください。</string>
     <string name="runtime_web_not_found_title">Web アプリを検出できません</string>
-    <string name="runtime_web_not_found_running">プロジェクトは実行中ですが、Studio はまだローカル Web アドレスを取得していません。正常起動後にプロジェクト範囲内の制限付き検出を1回だけ行います。ブラウザボタン自体はポートをスキャンしません。</string>
-    <string name="runtime_web_not_found_logs">プロジェクトは実行中ですが、Studio はまだローカル Web アドレスを見つけていません。\n\nプロジェクトから次を出力できます：\nSIFTALPHA_WEB_URL=http://127.0.0.1:&lt;port&gt;\n\n.project.json で web.host / web.port を設定することもできます。</string>
+    <string name="runtime_web_not_found_running">プロジェクトは実行中ですが、SiftAlpha X はまだローカル Web アドレスを取得していません。正常起動後にプロジェクト範囲内の制限付き検出を1回だけ行います。ブラウザボタン自体はポートをスキャンしません。</string>
+    <string name="runtime_web_not_found_logs">プロジェクトは実行中ですが、SiftAlpha X はまだローカル Web アドレスを見つけていません。\n\nプロジェクトから次を出力できます：\nSIFTALPHA_WEB_URL=http://127.0.0.1:&lt;port&gt;\n\n.project.json で web.host / web.port を設定することもできます。</string>
     <string name="runtime_web_invalid_title">無効な Web アドレス</string>
-    <string name="runtime_web_invalid_message">Studio はローカル以外の HTTP/HTTPS Web アドレスを開きません。\n\n%1$s</string>
+    <string name="runtime_web_invalid_message">SiftAlpha X はローカル以外の HTTP/HTTPS Web アドレスを開きません。\n\n%1$s</string>
     <string name="runtime_no_browser_title">利用可能なブラウザがありません</string>
     <string name="runtime_no_browser_message">HTTP/HTTPS ページを開けるインストール済みブラウザが見つかりません。\n\n%1$s</string>
     <string name="runtime_choose_browser">ブラウザを選択</string>
