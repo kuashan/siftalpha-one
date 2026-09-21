@@ -126,4 +126,6 @@
     <string name="home_importing">プロジェクトをインポートしています…</string>
     <string name="home_import_complete">プロジェクト %1$s をインポートしました。</string>
     <string name="home_import_failed">インポート失敗</string>
+    <string name="home_import_github">GitHub リンクからインポート</string>
+    <string name="home_user_storage">実行用ストレージ</string>
 </resources>
