@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="user_storage_title">Runtime storage</string>
+    <string name="user_storage_summary">See how much Runtime storage SiftAlpha X and each project environment use. This manages Runtime data only and never deletes project source.</string>
+    <string name="user_storage_refresh">Refresh storage</string>
+    <string name="user_storage_scanning">Scanning Runtime storage…</string>
+    <string name="user_storage_scanning_internal">Scanning app Runtime storage…</string>
+    <string name="user_storage_internal_title">In-app Runtime storage</string>
+    <string name="user_storage_external_title">Termux Runtime storage</string>
+    <string name="user_storage_total">Total: %1$s</string>
+    <string name="user_storage_project_total">Project environments: %1$s</string>
+    <string name="user_storage_project_row">%1$s · %2$s</string>
+    <string name="user_storage_no_project_space">No prepared project Runtime storage was found.</string>
+    <string name="user_storage_external_not_ready">The Termux Runtime environment is not installed or prepared yet.</string>
+    <string name="user_storage_external_unavailable">Termux Runtime storage is not available right now. Open Termux and refresh again. In-app Runtime storage is unaffected.</string>
+    <string name="user_storage_clean_project">Clean this project Runtime storage</string>
+    <string name="user_storage_clean_title">Clean Runtime storage for %1$s?</string>
+    <string name="user_storage_clean_message">This removes the prepared environment, dependencies, and Runtime data for this project only. Project source is preserved. Prepare the project again before its next run.</string>
+    <string name="user_storage_clean_confirm">Clean</string>
+    <string name="user_storage_cleaning">Cleaning Runtime storage…</string>
+    <string name="user_storage_clean_done">Project Runtime storage was cleaned.</string>
+    <string name="user_storage_clean_failed">Failed to clean Runtime storage.</string>
+    <string name="user_storage_scan_failed">Runtime storage scan failed. Try again later.</string>
+    <string name="user_storage_ready">Storage information is up to date.</string>
+    <string name="user_storage_error">Runtime storage action failed</string>
+</resources>
