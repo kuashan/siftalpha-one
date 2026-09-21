@@ -39,6 +39,8 @@ import com.siftalpha.studio.runtime.RuntimeLifecycleOperation
 import com.siftalpha.studio.runtime.RuntimeLifecycleResolver
 import com.siftalpha.studio.runtime.RuntimeLifecycleState
 import com.siftalpha.studio.runtime.RuntimeOperationAction
+import com.siftalpha.studio.runtime.RuntimeOperationProvider
+import com.siftalpha.studio.runtime.RuntimeResult
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
 import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
 import com.siftalpha.studio.runtime.ProjectControlHub
@@ -57,6 +59,7 @@ import com.siftalpha.studio.runtime.ExternalProviderProbeCoordinator
 import com.siftalpha.studio.runtime.ExternalProviderReadiness
 import com.siftalpha.studio.runtime.TermuxContract
 import com.siftalpha.studio.runtime.TermuxBackend
+import com.siftalpha.studio.runtime.TermuxResultBus
 import com.siftalpha.studio.siftalphax.EmbeddedPythonEnvironmentManager
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
 import com.siftalpha.studio.siftalphax.InternalAlpineEnvironmentManager
@@ -101,6 +104,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     private lateinit var sharedLifecycleBridge: SharedRuntimeLifecycleBridge
     private lateinit var externalBackend: TermuxBackend
     private lateinit var externalPreflight: ExternalProviderProbeCoordinator
+    private lateinit var prepareLiveProgress: PrepareLiveProgressController
     private lateinit var configurationUi: ProjectConfigurationUiController
     private val actionExecutor = Executors.newSingleThreadExecutor()
     private val prepareExecutor = Executors.newSingleThreadExecutor()
@@ -113,9 +117,15 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         RUN,
     }
 
-    private val completionListener: (ProjectOperationCoordinator.ExternalCompletion) -> Unit = {
+    private val completionListener: (ProjectOperationCoordinator.ExternalCompletion) -> Unit = { completion ->
         runOnUiThread {
-            if (::project.isInitialized) {
+            if (::project.isInitialized && completion.projectId == project.summary.documentId) {
+                if (
+                    completion.action == RuntimeOperationAction.PREPARE &&
+                    ::prepareLiveProgress.isInitialized
+                ) {
+                    prepareLiveProgress.finish(project.folderName)
+                }
                 screenState.value = screenState.value.copy(busy = false)
                 refreshSharedState()
             }
@@ -125,8 +135,22 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     private val timeoutListener: (ProjectOperationCoordinator.ExternalTimeout) -> Unit = { timeout ->
         runOnUiThread {
             if (::project.isInitialized && timeout.projectId == project.summary.documentId) {
+                if (
+                    timeout.action == RuntimeOperationAction.PREPARE &&
+                    ::prepareLiveProgress.isInitialized
+                ) {
+                    prepareLiveProgress.finish(project.folderName)
+                }
                 screenState.value = screenState.value.copy(busy = false)
                 refreshSharedState(getString(R.string.runtime_operation_timed_out))
+            }
+        }
+    }
+
+    private val progressResultListener: (RuntimeResult) -> Unit = { result ->
+        runOnUiThread {
+            if (::prepareLiveProgress.isInitialized) {
+                prepareLiveProgress.consumeIfProbe(result)
             }
         }
     }
@@ -192,6 +216,18 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             stateBridge = sharedLifecycleBridge,
             externalPreflight = externalPreflight,
         )
+        prepareLiveProgress = PrepareLiveProgressController(
+            context = this,
+            backend = externalBackend,
+            gateway = gateway,
+            runtime = runtime,
+        ) { folderName, liveText ->
+            if (::project.isInitialized && folderName == project.folderName) {
+                runOnUiThread {
+                    screenState.value = screenState.value.copy(message = liveText)
+                }
+            }
+        }
 
         enableEdgeToEdge()
         refreshSharedState()
@@ -218,8 +254,11 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         operationCoordinator.addCompletionListener(completionListener)
         operationCoordinator.addTimeoutListener(timeoutListener)
         externalPreflight.addListener(preflightListener)
+        TermuxResultBus.addListener(progressResultListener)
+        if (::prepareLiveProgress.isInitialized) prepareLiveProgress.resume()
         if (::project.isInitialized) {
             refreshExternalPreflight(retryIfNeeded = false)
+            reconcileExternalPrepareProgress()
         }
     }
 
@@ -232,6 +271,8 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     }
 
     override fun onStop() {
+        if (::prepareLiveProgress.isInitialized) prepareLiveProgress.pause()
+        TermuxResultBus.removeListener(progressResultListener)
         if (::operationCoordinator.isInitialized) {
             operationCoordinator.removeCompletionListener(completionListener)
             operationCoordinator.removeTimeoutListener(timeoutListener)
@@ -428,6 +469,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             runOnUiThread {
                 internalPrepareFuture = null
                 screenState.value = screenState.value.copy(busy = false)
+                attachExternalPrepareProgress(result)
                 handleActionRequirement(result, PendingUserIntent.PREPARE)
                 refreshSharedState(resultMessage(result))
             }
@@ -486,6 +528,14 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             return
         }
         if (screenState.value.busy) return
+        if (
+            selection == ProjectRuntimeSelection.TERMUX &&
+            operationCoordinator.current(project.summary.documentId, includeHidden = true)?.action ==
+                RuntimeOperationAction.PREPARE &&
+            ::prepareLiveProgress.isInitialized
+        ) {
+            prepareLiveProgress.finish(project.folderName)
+        }
         screenState.value = screenState.value.copy(
             busy = true,
             message = getString(R.string.normal_project_stopping),
@@ -497,6 +547,33 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 handleActionRequirement(result, null)
                 refreshSharedState(resultMessage(result))
             }
+        }
+    }
+
+    private fun attachExternalPrepareProgress(result: ProjectControlHub.Result) {
+        val dispatched = result as? ProjectControlHub.Result.Dispatched ?: return
+        if (
+            dispatched.action == ProjectControlHub.Action.PREPARE &&
+            dispatched.provider == RuntimeOperationProvider.EXTERNAL &&
+            dispatched.executionId != null &&
+            ::prepareLiveProgress.isInitialized
+        ) {
+            prepareLiveProgress.start(project.folderName, dispatched.executionId)
+        }
+    }
+
+    private fun reconcileExternalPrepareProgress() {
+        if (!::prepareLiveProgress.isInitialized || !::project.isInitialized) return
+        val record = operationCoordinator.current(
+            project.summary.documentId,
+            includeHidden = true,
+        ) ?: return
+        if (
+            record.provider == RuntimeOperationProvider.EXTERNAL &&
+            record.action == RuntimeOperationAction.PREPARE &&
+            record.executionId != null
+        ) {
+            prepareLiveProgress.start(project.folderName, record.executionId)
         }
     }
 
