@@ -152,6 +152,7 @@ class ProjectControlHub internal constructor(
 class ProjectRuntimeControlExecutor(
     private val runtime: ProjectRuntimeController,
     private val externalBackend: RuntimeBackend,
+    private val externalProviderPreflight: ExternalProviderPreflight? = null,
 ) : ProjectControlHub.Executor {
 
     override fun prepare(
@@ -216,6 +217,7 @@ class ProjectRuntimeControlExecutor(
             }
 
             RuntimeControlPath.EXTERNAL_PROVIDER -> {
+                externalProviderHardBlock(ProjectControlHub.Action.PREPARE)?.let { return it }
                 if (!externalBackend.isAvailable()) {
                     return rejected(
                         action = ProjectControlHub.Action.PREPARE,
@@ -308,6 +310,7 @@ class ProjectRuntimeControlExecutor(
             }
 
             RuntimeControlPath.EXTERNAL_PROVIDER -> {
+                externalProviderHardBlock(ProjectControlHub.Action.RUN)?.let { return it }
                 if (!externalBackend.isAvailable()) {
                     return rejected(
                         action = ProjectControlHub.Action.RUN,
@@ -412,6 +415,37 @@ class ProjectRuntimeControlExecutor(
             )
         }.getOrElse { error ->
             executionFailure(ProjectControlHub.Action.STOP, error)
+        }
+    }
+
+    private fun externalProviderHardBlock(
+        action: ProjectControlHub.Action,
+    ): ProjectControlHub.Result.Rejected? {
+        val readiness = externalProviderPreflight?.inspect() ?: return null
+        return when (readiness.status) {
+            ExternalProviderReadinessStatus.TERMUX_NOT_INSTALLED -> rejected(
+                action = action,
+                failure = ProjectControlHub.Failure.BACKEND_UNAVAILABLE,
+                detail = "TERMUX_NOT_INSTALLED",
+            )
+            ExternalProviderReadinessStatus.RUN_COMMAND_PERMISSION_REQUIRED -> rejected(
+                action = action,
+                failure = ProjectControlHub.Failure.BACKEND_UNAVAILABLE,
+                detail = "RUN_COMMAND_PERMISSION_REQUIRED",
+            )
+            ExternalProviderReadinessStatus.TERMUX_CONFIGURATION_REQUIRED -> rejected(
+                action = action,
+                failure = ProjectControlHub.Failure.BACKEND_UNAVAILABLE,
+                detail = "TERMUX_CONFIGURATION_REQUIRED",
+            )
+            ExternalProviderReadinessStatus.BRIDGE_UNAVAILABLE -> rejected(
+                action = action,
+                failure = ProjectControlHub.Failure.BACKEND_UNAVAILABLE,
+                detail = "TERMUX_BRIDGE_UNAVAILABLE",
+            )
+            ExternalProviderReadinessStatus.BRIDGE_PROBE_REQUIRED,
+            ExternalProviderReadinessStatus.READY,
+            -> null
         }
     }
 
