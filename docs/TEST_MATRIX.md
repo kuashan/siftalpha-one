@@ -30,8 +30,8 @@
 | R48A6-08 | Environment 分离 | Provider Preflight 不替代 Project Environment Detection / Plan | PASS — source review |
 | R48A6-09 | V04Activity 保护 | 不重写 Web Discovery、Auto Observation、Result Presentation、Recovery | PASS — focused diff |
 | R48A6-10 | Internal R 保护 | Embedded CPython / Internal Alpine 不自动触发 Termux 或 provider 切换 | PASS — source review |
-| R48A6-11 | W0 Cloud Build | validators、unit tests、assembleDebug、APK evidence、stable signing | 待云端 |
-| R48A6-12 | Internal Alpine Probe | R48a6 分支探针通过 | 待云端 |
+| R48A6-11 | W0 Cloud Build | validators、unit tests、assembleDebug、APK evidence、stable signing | PASS — [Run #475](https://github.com/kuashan/siftalpha-one/actions/runs/35592554128), artifact `siftalpha-w0-475`, APK SHA-256 `7c0cdfbaca6c799c92684f3da7f1379c3dad70303a3d98820abb1409b227406e` |
+| R48A6-12 | Internal Alpine Probe | R48a6 分支探针通过 | PASS — [Run #75](https://github.com/kuashan/siftalpha-one/actions/runs/35591474623) |
 | R48A6-13 | 真机验收 | 安装 APK，验证权限、打开 Termux、桥探测、Prepare/Run/STOP 和跨界面一致性 | 待真机 |
 
 ## A. 当前 alpha43 版本信息

@@ -35,7 +35,10 @@ R48a6 将 Normal Mode（普通模式）和 Developer Workspace（开发者工作
 ### Verification（验证）
 
 - 已新增纯事实判断、共享桥探测、ProjectControlHub 阻断路径、operation ownership、STOP project isolation 和跨界面 readiness 测试。
-- GitHub Actions W0 Cloud Build（云端构建）和 Internal Alpine Probe（内部 Alpine 探针）将在该分支提交后运行；真机安装与 Termux 授权/桥接测试仍等待用户验收。
+- GitHub Actions W0 Cloud Build #475 PASS（Run ID `35592554128`）：repository validators、unit tests、`assembleDebug`、APK evidence 和 stable signing 均通过；source HEAD `fd29d294887e7c025d83f7ede356d97f29160c48`。
+- W0 artifact：`siftalpha-w0-475`（artifact ID `10635231112`，digest `sha256:9c8d9113c34e7bec9479382d775f37ebfecdbd0e9c23c411138e130fbf27d47`）；APK SHA-256 `7c0cdfbaca6c799c92684f3da7f1379c3dad70303a3d98820abb1409b227406e`。
+- Internal Alpine Probe #75 PASS（Run ID `35591474623`，source `570026abfe8eb576db00d2b517e2558683e093b0`）；Internal R 行为未改变。
+- APK signer SHA-256 `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`；真机安装与 Termux 授权/桥接测试仍等待用户验收。
 
 ## 2026-09-14 · 项目记录初始化
 

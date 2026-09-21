@@ -3,9 +3,12 @@
 最后更新：2026-09-21（R48a6 Shared Core Realignment + External Provider Preflight）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
 当前文档/验收分支：`codex/r48-shared-core-realignment`
-Current branch/document HEAD：`待 R48a6 功能提交`
+Current functional source HEAD：`fd29d294887e7c025d83f7ede356d97f29160c48`
 R48a5 唯一源码基线：`8c8ede3eff9a8c0cf4dcdea4d2fd67a7d808e8e2`
 R48a6 目标版本：`0.8.0-alpha43-r48a6` / versionCode `186`。
+R48a6 W0 Cloud Build：Run #475 / Run ID `35592554128` / artifact `siftalpha-w0-475` / artifact ID `10635231112` / APK SHA-256 `7c0cdfbaca6c799c92684f3da7f1379c3dad70303a3d98820abb1409b227406e`。
+R48a6 Internal Alpine Probe：Run #75 / Run ID `35591474623` / conclusion `success`。
+R48a6 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
 alpha43 production source baseline：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`  
 `main` 保持历史 production baseline，本轮未修改。  
 alpha30 source / real-device evidence remains historical; current branch continues from the alpha31 version-identity baseline。  
