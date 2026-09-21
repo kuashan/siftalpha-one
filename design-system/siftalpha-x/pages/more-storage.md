@@ -9,7 +9,7 @@
 
 ## Runtime Storage
 只显示：
-- SiftAlpha X 运行空间总占用
+- SiftAlpha 运行空间总占用
 - 项目环境合计
 - 每个项目占用
 - 清理这个项目的运行空间

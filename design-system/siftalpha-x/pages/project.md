@@ -10,12 +10,12 @@
 ## ProjectStatusCard states
 ### Not prepared（未准备）
 标题：项目还没准备好
-说明：SiftAlpha X 会检测环境并安装项目需要的依赖。
+说明：SiftAlpha 会检测环境并安装项目需要的依赖。
 Primary：准备项目
 
 ### Preparing（准备中）
 标题：正在准备项目
-说明：SiftAlpha X 正在准备运行环境和依赖。
+说明：SiftAlpha 正在准备运行环境和依赖。
 Indeterminate bar（循环活动条）
 显示当前真实 phase（阶段）。
 Primary：停止
@@ -53,7 +53,7 @@ Primary：最合理恢复动作，例如重新尝试 / 完成配置。
 
 ## Secondary information
 “运行位置”作为折叠/设置项：
-- SiftAlpha X 内部运行
+- SiftAlpha 内部运行
 - Termux 外部运行
 
 不要把 Internal / External Runtime（内部 / 外部运行时）作为主状态。

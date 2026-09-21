@@ -1,10 +1,11 @@
-# SiftAlpha X — Normal Mode Design System
-Version: 1.0 / Design Phase
+# SiftAlpha — Normal Mode Design System
+Version: 1.1 / S-first Brand Correction
 Scope: Normal Mode（普通用户模式）only
+Brand hierarchy（品牌层级）: **SiftAlpha 是唯一主品牌；X 是内部系统/架构代号，不进入普通用户主品牌视觉。**
 Repository skill: .agents/skills/ui-ux-pro-max/
 
 ## 1. Product Design Thesis
-SiftAlpha X 的普通用户体验围绕：
+SiftAlpha 的普通用户体验围绕：
 
 **Project-first + State-driven + One Primary Action**
 （项目优先 + 状态驱动 + 单一主操作）
@@ -160,7 +161,7 @@ Core semantics:
 
 ## 10. Component System
 ### SiftTopBar
-- Leading: compact SiftAlpha X mark（品牌标志）or back
+- Leading: compact SiftAlpha **S mark（S 标志）** or back
 - Title: page title
 - Trailing: More（更多）only on Normal Home
 

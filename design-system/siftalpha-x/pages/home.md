@@ -8,7 +8,7 @@
 
 ## Layout
 1. SiftTopBar
-   - SiftAlpha X compact mark + wordmark
+   - SiftAlpha S mark（S 标志）+ “SiftAlpha” wordmark（品牌字标）
    - More（更多）
 2. Hero action
    - Primary: 导入项目
