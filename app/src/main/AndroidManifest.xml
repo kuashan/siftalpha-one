@@ -85,6 +85,11 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".NormalRuntimeStorageActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".ProjectEditorActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
