@@ -2354,3 +2354,129 @@ REAL DEVICE ACCEPTANCE（真机验收）= PENDING（待测试）。
 
 不自动 merge（合并），不移动 baseline（基线）。
 
+## 2026-09-21 · R48-D Developer Baseline Restoration + User Management（开发者基线恢复 + 用户管理）
+
+### Boundary（边界）
+
+本轮重新锁定硬规则：
+
+- Developer Mode（开发者模式）是已验收冻结基线。
+- User Mode（用户模式）开发不得删除、移动或重写 Developer Mode 已有 UI / workflow（界面 / 工作流）。
+- 本轮只恢复 R48-C 误删的 Developer Home（开发者首页）内容；开发者 Runtime / Environment / Termux / Storage 工作流不重新设计。
+- 唯一获准的 Developer 内部改动是 GitHub Import（GitHub 导入）参数规范与来源登记改为复用 Shared GitHub Import Service（共享 GitHub 导入服务）；开发者原有 GitHub UI、clone 行为、分支、项目名、HTTPS / SSH 能力保持不变。
+
+### Developer baseline restoration（开发者基线恢复）
+
+以 R48-C 前 `2cc2ee7fcba574c17b539063fcea681635bced45` 为 UI 参考恢复：
+
+- Runtime Bridge（运行时桥）
+- Detect Environment（检测运行环境）
+- Test Termux（检测 Termux）
+- RUN_COMMAND permission（权限）
+- Copy Termux Setup（复制 Termux 初始化命令）
+- Open Termux（打开 Termux）
+- Command Output（命令输出）
+- Copy Output（复制输出）
+- Stage（当前阶段）
+- 原 Quick Actions（快捷入口）
+- Developer bottom navigation：首页 / Runtime / Environment（首页 / 运行中心 / 环境）
+- Developer Settings（开发者设置）继续保留右上角原位置，不移入 More（更多）。
+
+Developer Surface Regression（开发者界面回归）= repaired in source。
+
+### User Mode home（普通用户首页）
+
+- 普通用户取消底部重复“首页”导航。
+- 右上角只保留 More（更多）。
+- Settings（设置）移动到 User Mode 的 More 二级菜单。
+- More 新增简化 Runtime Storage（运行空间）。
+- Developer Mode 不使用 User Mode More 布局。
+
+### Simplified Runtime Storage（简化运行空间）
+
+新增 `NormalRuntimeStorageActivity`，底层复用成熟：
+- `InternalRuntimeStorageController`
+- `RuntimeStorageController`
+- `ProjectRuntimeController.cleanEmbeddedPythonEnvironment()`
+- `ProjectRuntimeController.clean()`
+- `ExternalProviderProbeCoordinator`
+
+普通用户只看到：
+- 应用内运行空间总占用
+- Termux 运行空间总占用
+- 项目环境合计
+- 每个项目占用
+- 清理当前项目运行空间
+
+不向普通用户暴露 RootFS / PRoot / apt / orphan runtime / toolchain 等开发者细节。
+清理只删除运行环境数据，不删除项目源码。
+External Provider（外部执行环境）读取继续遵守已有 bounded provider readiness（有界提供者就绪检查），检测成功后自动读取。
+
+完整 `RuntimeStorageActivity` 继续作为 Developer Mode（开发者模式）的原有运行环境空间管理器。
+
+### Shared GitHub Import（共享 GitHub 导入）
+
+新增 `SharedGitHubImportService`：
+- HTTPS github.com URL normalization（地址规范化）
+- git@github.com SSH 地址保持
+- branch default = main
+- project name normalization / validation
+- cloned project source metadata attachment + retry
+
+Developer Workspace 原 GitHub UI 保持不变，只把 parse / metadata attachment 接到共享服务。
+Normal Mode 的 Unified Import（统一导入）新增“从 GitHub 链接导入”：
+- GitHub URL
+- Branch（分支）
+- Project Name（项目名）
+- 同样支持 HTTPS / 已配置 SSH 的 External Provider
+- 不启动 V04Activity，不模拟开发者按钮
+- clone 仍复用现有 `ProjectRuntimeController.cloneGitHub()`
+- 成功后登记 GitHub 来源、刷新项目列表并直接打开普通项目页。
+
+### Branding（品牌）
+
+所有已检查到的 user-visible resources（用户可见资源）中的：
+- `SiftAlpha Studio`
+- standalone `Studio`
+
+统一显示为：
+`SiftAlpha X`
+
+覆盖 Normal Mode 与 Developer Mode 的可见文案。
+
+技术身份保持不变：
+- applicationId = `com.siftalpha.studio`
+- Kotlin package 不变
+- 数据目录不变
+- 稳定测试签名不变
+
+### Version（版本）
+
+- versionName: `0.8.0-alpha43-r48d1`
+- versionCode: `191`
+- applicationId: `com.siftalpha.studio`
+
+### Functional source / cloud（功能源码 / 云端）
+
+Final functional source:
+`7f9548a5f75a68ed0cec9ba2f7ccdccf01ce4e22`
+
+- W0 Cloud Build #587 / run ID `35620690608`: **PASS（通过）**
+- Internal Alpine Probe #81 / run ID `35620253842`: **PASS（通过）**；其后改动未触及 Internal Alpine runtime source。
+- repository validators: PASS
+- `testDebugUnitTest`: PASS
+- `assembleDebug`: PASS
+- artifact: `siftalpha-w0-587`
+- artifact ID: `10649845758`
+- artifact ZIP digest: `sha256:d4e0c037a7ffced57c2061bc8acddb13c9a76a849a710dfcaeffe5b6943ae183`
+- APK SHA-256: `19ede48b0e3bf556e74804a18d99a0908ef8e67624dc5993980e8a8edc3078b9`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- APK Signature Scheme v2: verified
+
+### Acceptance（验收）
+
+CODE/CLOUD COMPLETE（代码 / 云端完成）。
+REAL DEVICE ACCEPTANCE（真机验收）= PENDING（待测试）。
+
+不自动 merge（合并），不移动 baseline（基线）。
+
