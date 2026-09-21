@@ -1857,3 +1857,89 @@ First real-device acceptance focus:
 6. Developer Workspace observes the same stopped/terminal Runtime state;
 7. project B remains unaffected when project A is stopped.
 
+## 2026-09-21 · R48-0B real-device acceptance + R48-0C Normal Runtime Selection（普通模式运行环境选择）
+
+### R48-0B（第 48 阶段 0B） real-device acceptance
+
+User real-device verification of `0.8.0-alpha43-r48a2` / versionCode `182` completed successfully.
+
+Accepted observations:
+- Normal Mode（普通模式） is the default user surface.
+- Developer Mode（开发者模式） can be enabled from Settings（设置）.
+- Normal Mode（普通模式） and Developer Workspace（开发者工作区） successfully operate/observe the same underlying project Runtime（运行时） for the first RUN / STOP（运行 / 停止） linked-control slice.
+- The R48-0B Dual Surface Architecture（双界面架构） foundation is therefore accepted by real-device test.
+
+R48-0B status: **PASS（通过）**.
+
+### R48-0C（第 48 阶段 0C） product decision
+
+Normal Mode（普通模式） must visibly expose the project's execution-environment choice. The user may explicitly select:
+
+- Internal R（内部执行环境）
+- External Provider / Termux（外部执行环境）
+
+This choice is not hidden behind Developer Mode（开发者模式） because it materially changes where the user's project executes.
+
+### R48-0C implementation
+
+Added a Normal Mode（普通模式） Runtime（运行环境） section that:
+- displays the current per-project Runtime selection;
+- lets the user explicitly choose Internal R（内部执行环境） or External Provider / Termux（外部执行环境）;
+- persists the choice through the existing `ProjectRuntimeSelectionStore`（项目运行环境选择存储） used by Developer Workspace（开发者工作区）;
+- does not create a second provider-selection model;
+- does not modify imported project source;
+- does not modify `V04Activity.kt` or the accepted Developer Workspace（开发者工作区） selection implementation.
+
+Added `ProjectRuntimeSelectionChangePolicy`（项目运行环境切换策略） for Normal Mode safety:
+- PREPARING（准备中） blocks selection changes;
+- STARTING（启动中） blocks selection changes;
+- RUNNING（运行中） blocks selection changes;
+- any non-terminal persisted Runtime operation（运行操作） blocks selection changes;
+- terminal/idle projects may switch;
+- the current selection remains visible while changes are locked.
+
+This intentionally mirrors the safety boundary of the existing Developer Workspace（开发者工作区） without rewriting that workspace.
+
+### R48-0C cloud evidence
+
+Functional source commit:
+`49ce5f0a03d0fd5fac772da8c51ca5d47d2e2ca4`
+
+Version:
+- versionName: `0.8.0-alpha43-r48a3`
+- versionCode: `183`
+- applicationId（应用标识）: `com.siftalpha.studio`
+
+Cloud:
+- W0 Cloud Build（W0 云端构建） #417: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #65: PASS（通过）
+- repository validators（仓库校验）: PASS（通过）
+- localization validators（多语言校验）: PASS（通过）
+- unit tests（单元测试）: PASS（通过）
+- assembleDebug（Debug 构建）: PASS（通过）
+- APK evidence collection（安装包证据收集）: PASS（通过）
+
+Artifact（产物）:
+- `siftalpha-w0-417`
+- artifact id: `10624197870`
+- artifact ZIP digest: `sha256:4b67d3bdc9669b969081d625a23eba966b8b43fa41d2dee5d063b12defff445f`
+
+APK（安装包）:
+- SHA-256: `d4003fa76c0cc7678dab9d4929c3bed241ee68c02d98e593255a5180924f8617`
+- stable signer certificate SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- APK Signature Scheme v2: verified
+
+### Acceptance state
+
+R48-0C source/cloud gate: **PASS（通过）**.
+
+R48-0C real-device acceptance is still required before this slice is treated as accepted.
+
+Recommended real-device checks:
+1. Normal Mode（普通模式） shows the current execution environment.
+2. When idle, switching Internal -> External and External -> Internal persists immediately.
+3. Developer Workspace（开发者工作区） shows the same selection after switching in Normal Mode.
+4. While a project is RUNNING / STARTING / PREPARING（运行中 / 启动中 / 准备中）, Normal Mode prevents environment switching.
+5. STOP（停止） the project, then verify environment switching becomes available again.
+6. Selecting/changing project A does not change project B's Runtime selection.
+
