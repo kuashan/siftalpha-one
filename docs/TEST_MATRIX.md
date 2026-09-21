@@ -1314,3 +1314,22 @@ R48-0C is cloud-verified but not yet an accepted/frozen baseline.
 | APK（安装包） | r48d1 / versionCode 191 | PASS — cloud artifact |
 | Real-device acceptance（真机验收） | developer baseline + user More/storage/GitHub/branding | PENDING |
 
+### R48-D2 — Shared Reliability UX（共享可靠性体验）
+
+| Area | Verification | Result |
+| --- | --- | --- |
+| Battery guidance（电量提醒） | Normal + Developer share one controller/state | PASS — source/cloud |
+| System settings routing（系统设置跳转） | generic Android battery settings with app-details fallback, no OEM table | PASS — source review |
+| Reminder behavior（提醒行为） | first Prepare/Run; later defers current process; settings acknowledgement persists | PASS — source review |
+| Normal activity indicator（普通模式活动条） | indeterminate bar under project status | PASS — source/cloud |
+| Developer activity indicator（开发者模式活动条） | indeterminate bar under existing project state line | PASS — source/cloud |
+| No fake percentage（无虚假百分比） | indicator is indeterminate only | PASS — source review |
+| Timeout integrity（超时完整性） | indicator reads shared state/operation and does not extend Runtime deadlines | PASS — unit/source |
+| Stale STARTING/PREPARING（陈旧活动状态） | no animation without active operation unless confirmed RUNNING | PASS — unit |
+| Immediate Prepare/Run feedback（准备/运行即时反馈） | Normal Mode sets indicator immediately before async control dispatch | PASS — source/cloud |
+| Developer baseline（开发者基线） | only explicitly authorized reminder + indicator added; existing workflow retained | PASS — source review |
+| W0 Cloud Build（云端构建） | #599 | PASS |
+| Internal Alpine Probe（内部 Alpine 探针） | #82 | PASS |
+| APK（安装包） | r48d2 / versionCode 192 | PASS — cloud artifact |
+| Real-device acceptance（真机验收） | reminder routing + indicator lifecycle | PENDING |
+
