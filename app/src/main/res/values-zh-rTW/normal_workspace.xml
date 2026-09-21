@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="normal_project_missing">找不到專案</string>
+    <string name="normal_project_status_title">專案狀態</string>
+    <string name="normal_project_actions_title">操作</string>
+    <string name="normal_project_starting">正在傳送執行請求…</string>
+    <string name="normal_project_stopping">正在傳送停止請求…</string>
+    <string name="normal_project_run_dispatched">執行請求已傳送。</string>
+    <string name="normal_project_stop_dispatched">停止請求已傳送。</string>
+    <string name="normal_project_noop">無需執行：%1$s</string>
+    <string name="normal_project_rejected">目前無法執行：%1$s</string>
+    <string name="normal_project_developer_title">開發者工具</string>
+    <string name="normal_project_developer_summary">開啟完整開發者工作區，查看環境、狀態、日誌與進階執行控制。</string>
+    <string name="normal_project_open_developer">進入開發者工作區</string>
+</resources>
