@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -44,7 +45,6 @@ import com.siftalpha.studio.siftalphax.EmbeddedPythonEnvironmentManager
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
 import com.siftalpha.studio.siftalphax.InternalAlpineEnvironmentManager
 import com.siftalpha.studio.siftalphax.InternalAlpineSession
-import com.siftalpha.studio.ui.components.StudioPrimaryAction
 import com.siftalpha.studio.ui.components.StudioSectionCard
 import com.siftalpha.studio.ui.theme.StudioTheme
 import com.siftalpha.studio.ui.theme.StudioThemeTokens
@@ -59,7 +59,7 @@ import java.util.concurrent.Executors
  */
 class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 
-    private data class ScreenState(
+    data class ScreenState(
         val projectName: String = "",
         val statusLabel: String = "",
         val busy: Boolean = false,
@@ -301,17 +301,21 @@ private fun NormalProjectWorkspaceScreen(
                 )
                 Spacer(modifier = Modifier.height(spacing.medium))
                 if (runtimeActive) {
-                    StudioPrimaryAction(
-                        label = stringResource(R.string.runtime_button_stop),
+                    Button(
                         onClick = onStop,
                         enabled = !state.busy,
-                    )
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = stringResource(R.string.runtime_button_stop))
+                    }
                 } else {
-                    StudioPrimaryAction(
-                        label = stringResource(R.string.runtime_button_run),
+                    Button(
                         onClick = onRun,
                         enabled = !state.busy,
-                    )
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = stringResource(R.string.runtime_button_run))
+                    }
                 }
             }
 
