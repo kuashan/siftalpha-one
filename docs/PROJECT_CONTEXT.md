@@ -801,3 +801,20 @@ R46.3 is promoted to the current Known-Good Functional Baseline after real-devic
 - Future installable builds start at versionCode `180` or higher.
 
 Canonical baseline details are recorded in [BASELINES.md](BASELINES.md).
+
+
+## 2026-09-21 · Current accepted baseline — R47 Environment architecture
+
+The current accepted functional baseline is `0.8.0-alpha43-r47` / versionCode `180`, source commit `d611d18d08cf03b411cc687259e507ca91fcbaa8`, frozen at `baseline/r47-environment-plan`.
+
+R47 establishes one shared environment-management architecture across Internal R（内部运行环境） and External Provider（外部运行环境提供者）:
+
+1. Environment Detection（环境检测） understands the imported immutable project snapshot.
+2. Environment Plan（环境计划） freezes the actionable preparation contract.
+3. Prepare（准备环境） executes that contract instead of rediscovering project meaning.
+4. Compatibility Resolution（兼容性解析） may differ by backend, but it must remain subordinate to the shared Plan.
+5. Internal Alpine（内部 Alpine） and External Python（外部 Python） no longer inspect pyproject at install time to rediscover Python extras; both consume planned extras.
+6. Embedded CPython（内置 CPython） can resolve the dependency graph before installation and pass the exact resolved plan into Prepare.
+7. W0 Cloud Build（云端构建） #365 passed and real-device acceptance is PASS.
+
+This baseline does not change the frozen Worker decision, project-scoped STOP（停止）, Runtime Identity（运行身份）, Session / Generation（会话 / 代际）, Web Discovery（网页发现） or Endpoint Probe（端点探测） contracts.
