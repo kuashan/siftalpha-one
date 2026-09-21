@@ -19,4 +19,8 @@
     <string name="settings_about_summary">ローカルプロジェクト、ランタイム、自動化タスクを管理するモバイルワークスペースです。</string>
     <string name="settings_version">バージョン %1$s</string>
     <string name="settings_application_id">アプリ ID：%1$s</string>
+    <string name="settings_developer_mode_section">開発者モード</string>
+    <string name="settings_developer_mode_summary">有効にすると、通常のプロジェクト画面から完全な開発者ワークスペースを開けます。この設定は表示項目だけを変更し、プロジェクトの実行停止・再起動・実行環境切替は行いません。</string>
+    <string name="settings_developer_mode_on">オン</string>
+    <string name="settings_developer_mode_off">オフ</string>
 </resources>
