@@ -16,11 +16,13 @@ import com.siftalpha.studio.project.V04ProjectGateway
 class ProjectControlHub internal constructor(
     private val selectionReader: (String) -> ProjectRuntimeSelection,
     private val executor: Executor,
+    private val stateBridge: StateBridge = StateBridge.NONE,
 ) {
     constructor(
         selectionStore: ProjectRuntimeSelectionStore,
         executor: Executor,
-    ) : this(selectionStore::read, executor)
+        stateBridge: StateBridge = StateBridge.NONE,
+    ) : this(selectionStore::read, executor, stateBridge)
 
     data class RunRequest(
         val requiredConfiguration: Boolean = false,
@@ -66,6 +68,18 @@ class ProjectControlHub internal constructor(
         ) : Result
     }
 
+    fun interface StateBridge {
+        fun onActionResult(
+            project: V04ProjectGateway.RuntimeProject,
+            selection: ProjectRuntimeSelection,
+            result: Result,
+        )
+
+        companion object {
+            val NONE = StateBridge { _, _, _ -> }
+        }
+    }
+
     interface Executor {
         fun run(
             project: V04ProjectGateway.RuntimeProject,
@@ -84,12 +98,16 @@ class ProjectControlHub internal constructor(
         request: RunRequest = RunRequest(),
     ): Result {
         val selection = selectionReader(project.summary.documentId)
-        return executor.run(project, selection, request)
+        val result = executor.run(project, selection, request)
+        stateBridge.onActionResult(project, selection, result)
+        return result
     }
 
     fun stop(project: V04ProjectGateway.RuntimeProject): Result {
         val selection = selectionReader(project.summary.documentId)
-        return executor.stop(project, selection)
+        val result = executor.stop(project, selection)
+        stateBridge.onActionResult(project, selection, result)
+        return result
     }
 }
 
@@ -288,4 +306,65 @@ class ProjectRuntimeControlExecutor(
             failure = ProjectControlHub.Failure.EXECUTION_FAILED,
             detail = error.message ?: error.javaClass.simpleName,
         )
+}
+
+
+/**
+ * Writes only shared lifecycle facts needed for cross-surface recovery.
+ *
+ * START records an active state so the existing Developer Workspace（开发者工作区） recovery path
+ * knows to reconcile the same Runtime（运行时） when it is opened later. STOP keeps an active
+ * lifecycle until the provider proves a terminal state; this avoids falsely claiming that an
+ * asynchronous stop has completed.
+ */
+class SharedRuntimeLifecycleBridge(
+    private val store: RuntimeLifecycleStore,
+) : ProjectControlHub.StateBridge {
+    override fun onActionResult(
+        project: V04ProjectGateway.RuntimeProject,
+        selection: ProjectRuntimeSelection,
+        result: ProjectControlHub.Result,
+    ) {
+        val projectId = project.summary.documentId
+        val current = store.read(projectId)
+        when (result) {
+            is ProjectControlHub.Result.Dispatched -> when (result.action) {
+                ProjectControlHub.Action.RUN -> store.write(
+                    projectKey = projectId,
+                    environmentReady = current.environmentReadyFor(selection),
+                    runtimeState = if (result.observedState == RuntimeState.UNKNOWN) {
+                        RuntimeState.STARTING
+                    } else {
+                        result.observedState
+                    },
+                    failureReason = null,
+                    runtimeSelection = selection,
+                )
+                ProjectControlHub.Action.STOP -> {
+                    // STOP is asynchronous for both provider families. Keep the last active fact
+                    // until a provider observation proves STOPPED / EXITED.
+                    val state = current.runtimeState.takeIf {
+                        it == RuntimeState.STARTING || it == RuntimeState.RUNNING
+                    } ?: RuntimeState.RUNNING
+                    store.write(
+                        projectKey = projectId,
+                        environmentReady = current.environmentReadyFor(selection),
+                        runtimeState = state,
+                        failureReason = null,
+                        runtimeSelection = selection,
+                    )
+                }
+            }
+            is ProjectControlHub.Result.NoOp -> if (result.action == ProjectControlHub.Action.STOP) {
+                store.write(
+                    projectKey = projectId,
+                    environmentReady = current.environmentReadyFor(selection),
+                    runtimeState = result.observedState,
+                    failureReason = null,
+                    runtimeSelection = selection,
+                )
+            }
+            is ProjectControlHub.Result.Rejected -> Unit
+        }
+    }
 }
