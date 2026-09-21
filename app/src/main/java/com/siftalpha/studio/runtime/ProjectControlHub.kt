@@ -539,8 +539,10 @@ class SharedRuntimeLifecycleBridge(
                     // STOP is asynchronous for both provider families. Keep the last active fact
                     // until a provider observation proves STOPPED / EXITED.
                     val state = current.runtimeState.takeIf {
-                        it == RuntimeState.STARTING || it == RuntimeState.RUNNING
-                    } ?: RuntimeState.RUNNING
+                        it == RuntimeState.PREPARING ||
+                            it == RuntimeState.STARTING ||
+                            it == RuntimeState.RUNNING
+                    } ?: current.runtimeState
                     store.write(
                         projectKey = projectId,
                         environmentReady = current.environmentReadyFor(selection),
