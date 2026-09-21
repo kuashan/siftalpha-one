@@ -1,14 +1,15 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-21（R48a6 Shared Core Realignment + External Provider Preflight）
+最后更新：2026-09-21（R48a6.1 Real Device Failure Repair cloud candidate）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
 当前文档/验收分支：`codex/r48-shared-core-realignment`
-Current functional source HEAD：`fd29d294887e7c025d83f7ede356d97f29160c48`
+Current functional source HEAD：`049e35f8cd32803f13dd33672f059406874b8a9c`
 R48a5 唯一源码基线：`8c8ede3eff9a8c0cf4dcdea4d2fd67a7d808e8e2`
-R48a6 目标版本：`0.8.0-alpha43-r48a6` / versionCode `186`。
-R48a6 W0 Cloud Build：Run #475 / Run ID `35592554128` / artifact `siftalpha-w0-475` / artifact ID `10635231112` / APK SHA-256 `7c0cdfbaca6c799c92684f3da7f1379c3dad70303a3d98820abb1409b227406e`。
-R48a6 Internal Alpine Probe：Run #75 / Run ID `35591474623` / conclusion `success`。
-R48a6 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+当前测试版本：`0.8.0-alpha43-r48a6.1` / versionCode `187`。
+R48a6.1 W0 Cloud Build：Run #487 / Run ID `35601141522` / artifact `siftalpha-w0-487` / artifact ID `10639401416` / APK SHA-256 `ccf988663935e59c238c2805adb8fd6ed613f565e535c25467a2007fc35124af` / conclusion `success`。
+R48a6.1 Internal Alpine Probe：Run #76 / Run ID `35601141621` / conclusion `success`。
+R48a6.1 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+R48a6 original real-device acceptance：FAIL（External PREPARE/STOP indefinite wait + Normal Mode long diagnostic non-scrollable）；R48a6.1 repair candidate awaits fresh real-device acceptance。
 alpha43 production source baseline：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`  
 `main` 保持历史 production baseline，本轮未修改。  
 alpha30 source / real-device evidence remains historical; current branch continues from the alpha31 version-identity baseline。  
@@ -1043,3 +1044,31 @@ Project Management（项目管理） is a first-level category only. Its mainten
 The project list itself remains first-level content because projects are the primary objects users operate.
 
 This hierarchy rule is presentation-only and must not duplicate or alter the underlying project-management callbacks, Runtime（运行时） state, Environment（环境） state, or Developer Workspace（开发者工作区） behavior.
+
+## R48a6.1 当前状态 — Real Device Failure Repair（真机失败修复）
+
+R48a6.1 不增加新的产品功能。它修复 R48a6 真机验收暴露的 Shared External Operation Lifecycle（共享外部操作生命周期）和 Normal Mode（普通模式）展示缺口。
+
+已完成并通过云端：
+- External Provider（外部执行环境）的 PREPARE / START / STATUS / LOGS / STOP / CLEAN 现在都有 action-specific control deadline（动作专属控制截止时间）。
+- External deadline / timeout 由 process-scoped `ProjectOperationCoordinator` watchdog（进程级共享看门狗）统一维护，不依赖 Normal Mode 或 Developer Workspace 的 Activity 生命周期。
+- PREPARE timeout 不伪造 READY；STOP timeout 不伪造 STOPPED_BY_USER；两者都会释放 project operation lock（项目操作锁）并保留可恢复状态。
+- projectId + generation + executionId 的 late callback fencing（迟到回调隔离）阻止旧操作覆盖新代际。
+- Developer Workspace（开发者工作区）只进行最小 Shared Coordinator 接线，不恢复第二套 External watchdog。
+- Normal Mode 根页面现在支持纵向滚动。
+- Normal Mode External PREPARE 重新复用成熟的 `PrepareLiveProgressController` / `PrepareProgressProbe`，仅用于只读进度展示；成功/失败事实仍由共享 operation/result lifecycle 决定。
+- `applicationId = com.siftalpha.studio` 不变，Worker（工作器）仍冻结，STOP 仍保持 project-scoped（项目隔离）。
+- Internal Alpine（内部 Alpine）安装逻辑本轮未修改；已知 `INTERNAL_ALPINE_PYTHON_RUNTIME_PREPARE_FAILED: exit=4` 等待新 APK 上滚动到底后的完整错误尾部再诊断。
+
+Cloud evidence（云端证据）：
+- W0 #487: PASS
+- Internal Alpine Probe #76: PASS
+- artifact: `siftalpha-w0-487` / ID `10639401416`
+- APK SHA-256: `ccf988663935e59c238c2805adb8fd6ed613f565e535c25467a2007fc35124af`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+
+Acceptance（验收）：
+- CODE/CLOUD FIX COMPLETE（代码 / 云端修复完成）。
+- Real-device repair acceptance（真机修复验收）仍为 PENDING（待真机）。
+- 不自动 merge（合并）、不移动 baseline（基线）。
+
