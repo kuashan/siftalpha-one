@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="user_storage_title">실행 공간</string>
+    <string name="user_storage_summary">SiftAlpha X와 각 프로젝트 환경이 사용하는 실행 공간을 확인합니다. 실행 환경 데이터만 관리하며 프로젝트 소스는 삭제하지 않습니다.</string>
+    <string name="user_storage_refresh">공간 새로 고침</string>
+    <string name="user_storage_scanning">실행 공간을 확인하는 중…</string>
+    <string name="user_storage_scanning_internal">앱 내부 실행 공간을 확인하는 중…</string>
+    <string name="user_storage_internal_title">앱 내부 실행 공간</string>
+    <string name="user_storage_external_title">Termux 실행 공간</string>
+    <string name="user_storage_total">전체: %1$s</string>
+    <string name="user_storage_project_total">프로젝트 환경 합계: %1$s</string>
+    <string name="user_storage_project_row">%1$s · %2$s</string>
+    <string name="user_storage_no_project_space">준비된 프로젝트 실행 공간이 없습니다.</string>
+    <string name="user_storage_external_not_ready">Termux 실행 환경이 아직 설치되거나 준비되지 않았습니다.</string>
+    <string name="user_storage_external_unavailable">현재 Termux 실행 공간을 읽을 수 없습니다. Termux를 연 뒤 다시 새로 고치세요. 앱 내부 실행 공간에는 영향이 없습니다.</string>
+    <string name="user_storage_clean_project">이 프로젝트 실행 공간 정리</string>
+    <string name="user_storage_clean_title">%1$s의 실행 공간을 정리할까요?</string>
+    <string name="user_storage_clean_message">이 프로젝트의 준비된 환경, 의존성, 실행 데이터만 삭제합니다. 프로젝트 소스는 보존됩니다. 다음 실행 전에 프로젝트를 다시 준비해야 합니다.</string>
+    <string name="user_storage_clean_confirm">정리</string>
+    <string name="user_storage_cleaning">실행 공간을 정리하는 중…</string>
+    <string name="user_storage_clean_done">프로젝트 실행 공간을 정리했습니다.</string>
+    <string name="user_storage_clean_failed">실행 공간 정리에 실패했습니다.</string>
+    <string name="user_storage_scan_failed">실행 공간 확인에 실패했습니다. 잠시 후 다시 시도하세요.</string>
+    <string name="user_storage_ready">공간 정보가 업데이트되었습니다.</string>
+    <string name="user_storage_error">실행 공간 작업 실패</string>
+</resources>
