@@ -37,4 +37,9 @@
     <string name="normal_external_provider_check_required">외부 실행 환경 확인이 필요합니다.</string>
     <string name="normal_external_provider_checking">외부 실행 환경을 확인하는 중…</string>
     <string name="normal_external_provider_unavailable">외부 실행 환경을 현재 사용할 수 없습니다.</string>
+    <string name="normal_project_refresh_action">새로 고침</string>
+    <string name="normal_project_refreshing">프로젝트 상태를 새로 고치는 중…</string>
+    <string name="normal_project_refresh_complete">상태가 업데이트되었습니다.</string>
+    <string name="normal_project_open_action">열기</string>
+    <string name="normal_project_open_unavailable">현재 열 수 있는 웹 페이지나 결과가 없습니다.</string>
 </resources>
