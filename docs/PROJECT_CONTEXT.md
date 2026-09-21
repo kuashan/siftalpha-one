@@ -965,3 +965,39 @@ Cloud evidence:
 
 R48-0B remains pending real-device linked-control acceptance and is not a frozen baseline.
 
+### R48-0B accepted / R48-0C current — user-visible Runtime selection（用户可见运行环境选择）
+
+R48-0B（第 48 阶段 0B） dual-surface linked-control foundation has passed real-device user acceptance.
+
+Normal Mode（普通模式） is the default project surface and Developer Mode（开发者模式） remains an optional advanced surface. Both surfaces share the same project Runtime（运行时） facts and controls.
+
+R48-0C（第 48 阶段 0C） adds a deliberate exception to the general rule that technical Runtime controls stay developer-only:
+
+> The execution-environment choice is user-visible because it is a meaningful product choice about where the user's project executes.
+
+Normal Mode（普通模式） now exposes the existing per-project selection:
+- Internal R（内部执行环境） -> `ProjectRuntimeSelection.EMBEDDED_R`
+- External Provider / Termux（外部执行环境） -> `ProjectRuntimeSelection.TERMUX`
+
+The choice continues to use the same `ProjectRuntimeSelectionStore`（项目运行环境选择存储） that Developer Workspace（开发者工作区） already reads/writes. No second selection store or provider-routing model is introduced.
+
+Safety rule:
+- switching is allowed only while the project is idle/terminal and no non-terminal persisted Runtime operation（运行操作） exists;
+- PREPARING / STARTING / RUNNING（准备中 / 启动中 / 运行中） lock the selector;
+- the selected Runtime remains visible while locked;
+- Developer Workspace（开发者工作区） implementation remains unchanged.
+
+Current functional source:
+`49ce5f0a03d0fd5fac772da8c51ca5d47d2e2ca4`
+
+Version:
+- `0.8.0-alpha43-r48a3`
+- versionCode `183`
+
+Cloud evidence:
+- W0 Cloud Build（W0 云端构建） #417 PASS
+- Internal Alpine Probe（内部 Alpine 探针） #65 PASS
+- APK SHA-256 `d4003fa76c0cc7678dab9d4929c3bed241ee68c02d98e593255a5180924f8617`
+
+R48-0C remains pending real-device Runtime-selection acceptance.
+
