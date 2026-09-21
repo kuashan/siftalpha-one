@@ -111,6 +111,75 @@ class ProjectControlHubTest {
         assertEquals(true, fake.lastRunRequest?.requiredConfiguration)
     }
 
+    @Test
+    fun `hub publishes shared start before executor and result after executor`() {
+        val project = project("project-a", "alpha")
+        val events = mutableListOf<String>()
+        val stateBridge = object : ProjectControlHub.StateBridge {
+            override fun onActionStarted(
+                project: V04ProjectGateway.RuntimeProject,
+                selection: ProjectRuntimeSelection,
+                action: ProjectControlHub.Action,
+            ) {
+                events += "started:" + action.name
+            }
+
+            override fun onActionResult(
+                project: V04ProjectGateway.RuntimeProject,
+                selection: ProjectRuntimeSelection,
+                result: ProjectControlHub.Result,
+            ) {
+                events += "result:" + result.action.name
+            }
+        }
+        val fake = object : ProjectControlHub.Executor {
+            override fun run(
+                project: V04ProjectGateway.RuntimeProject,
+                selection: ProjectRuntimeSelection,
+                request: ProjectControlHub.RunRequest,
+            ): ProjectControlHub.Result {
+                events += "execute:RUN"
+                return ProjectControlHub.Result.Dispatched(
+                    action = ProjectControlHub.Action.RUN,
+                    provider = RuntimeOperationProvider.INTERNAL,
+                    observedState = RuntimeState.RUNNING,
+                )
+            }
+
+            override fun stop(
+                project: V04ProjectGateway.RuntimeProject,
+                selection: ProjectRuntimeSelection,
+            ): ProjectControlHub.Result {
+                events += "execute:STOP"
+                return ProjectControlHub.Result.Dispatched(
+                    action = ProjectControlHub.Action.STOP,
+                    provider = RuntimeOperationProvider.INTERNAL,
+                    observedState = RuntimeState.RUNNING,
+                )
+            }
+        }
+        val hub = ProjectControlHub(
+            selectionReader = { ProjectRuntimeSelection.EMBEDDED_R },
+            executor = fake,
+            stateBridge = stateBridge,
+        )
+
+        hub.run(project)
+        hub.stop(project)
+
+        assertEquals(
+            listOf(
+                "started:RUN",
+                "execute:RUN",
+                "result:RUN",
+                "started:STOP",
+                "execute:STOP",
+                "result:STOP",
+            ),
+            events,
+        )
+    }
+
     private fun project(documentId: String, folderName: String): V04ProjectGateway.RuntimeProject =
         V04ProjectGateway.RuntimeProject(
             summary = ProjectStore.ProjectSummary(
