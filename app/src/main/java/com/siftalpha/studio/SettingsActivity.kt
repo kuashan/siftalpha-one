@@ -6,6 +6,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.siftalpha.studio.ui.settings.SettingsScreen
 import com.siftalpha.studio.ui.theme.StudioTheme
 
@@ -21,15 +25,23 @@ class SettingsActivity : StudioComposeActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
+            var developerModeEnabled by remember {
+                mutableStateOf(DeveloperModeStore(this@SettingsActivity).isEnabled())
+            }
             StudioTheme {
                 SettingsScreen(
                     currentLanguage = StudioLanguage.current(this@SettingsActivity).selfName,
                     currentBrowser = StudioBrowser.selectedLabel(this@SettingsActivity),
                     versionName = appVersionName(),
                     applicationId = packageName,
+                    developerModeEnabled = developerModeEnabled,
                     onBack = { onBackPressedDispatcher.onBackPressed() },
                     onChangeLanguage = { StudioLanguage.showPicker(this@SettingsActivity) },
                     onChangeBrowser = { showBrowserPicker() },
+                    onDeveloperModeChanged = { enabled ->
+                        DeveloperModeStore(this@SettingsActivity).setEnabled(enabled)
+                        developerModeEnabled = enabled
+                    },
                 )
             }
         }
