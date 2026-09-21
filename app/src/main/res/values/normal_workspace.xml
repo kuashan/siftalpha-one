@@ -37,4 +37,9 @@
     <string name="normal_external_provider_check_required">正在等待外部执行环境检查。</string>
     <string name="normal_external_provider_checking">正在检查外部执行环境…</string>
     <string name="normal_external_provider_unavailable">外部执行环境当前不可用。</string>
+    <string name="normal_project_refresh_action">刷新</string>
+    <string name="normal_project_refreshing">正在刷新项目状态…</string>
+    <string name="normal_project_refresh_complete">状态已更新。</string>
+    <string name="normal_project_open_action">打开</string>
+    <string name="normal_project_open_unavailable">当前没有可打开的网页或结果。</string>
 </resources>
