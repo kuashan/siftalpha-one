@@ -21,4 +21,12 @@
     <string name="normal_runtime_selection_locked">專案正在執行或仍有操作尚未完成，請先停止或等待完成後再切換。</string>
     <string name="normal_runtime_selection_busy">目前專案正在執行或仍有操作尚未完成，暫時不能切換執行環境。</string>
     <string name="normal_runtime_selection_saved">執行環境已切換為：%1$s</string>
+    <string name="normal_project_prepare_action">準備專案</string>
+    <string name="normal_project_configure_action">完成設定</string>
+    <string name="normal_project_preparing">正在偵測並準備專案環境…</string>
+    <string name="normal_project_prepare_ready">專案準備完成，可以執行。</string>
+    <string name="normal_project_prepare_failed">專案準備失敗，請查看狀態說明或進入開發者工作區。</string>
+    <string name="normal_project_prepare_stopped">專案準備已停止。</string>
+    <string name="normal_project_configuration_saved">設定已更新。</string>
+    <string name="normal_project_waiting_action">目前沒有可直接執行的主要操作，請稍後重新整理狀態或進入開發者工作區查看詳情。</string>
 </resources>
