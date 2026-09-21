@@ -93,4 +93,37 @@
     <string name="home_copy_output">复制输出</string>
     <string name="home_output_copied">命令输出已复制</string>
 
+    <string name="home_project_location_title">项目位置</string>
+    <string name="home_project_location_help">这里决定 SiftAlpha 从哪个目录读取和保存项目。更换位置不会改写项目源码。</string>
+    <string name="home_project_location_action">选择项目位置</string>
+    <string name="home_project_location_current">项目位置：%1$s</string>
+    <string name="home_project_entry_title">项目</string>
+    <string name="home_import_title">导入项目</string>
+    <string name="home_import_summary">从一个入口把现有项目加入 SiftAlpha。</string>
+    <string name="home_import_supported">当前支持 ZIP 项目和单个 Python 文件；导入后会直接进入普通项目页面。</string>
+    <string name="home_import_choose_file">选择项目文件</string>
+    <string name="home_import_new_project">新建空项目</string>
+    <string name="home_more_title">更多</string>
+    <string name="home_more_developer_title">更多 / 开发者工具</string>
+    <string name="home_developer_tools_summary">下面是高级诊断和开发入口，不影响普通用户的运行流程。</string>
+    <string name="home_import_select_location_first">请先选择项目位置，再导入项目。</string>
+    <string name="home_import_unknown_file">未命名文件</string>
+    <string name="home_import_unsupported_title">暂不支持这个文件</string>
+    <string name="home_import_unsupported_message">当前统一导入支持 .zip 和 .py 文件。
+
+当前选择：%1$s</string>
+    <string name="home_import_confirm_title">确认导入</string>
+    <string name="home_import_confirm_message">文件：%1$s
+类型：%2$s
+
+请确认项目名称。</string>
+    <string name="home_import_kind_python">Python 文件</string>
+    <string name="home_import_kind_zip">ZIP 项目</string>
+    <string name="home_import_kind_unknown">未知类型</string>
+    <string name="home_import_action">导入</string>
+    <string name="home_import_name_required">请输入项目名称。</string>
+    <string name="home_import_project_exists">项目 %1$s 已存在。</string>
+    <string name="home_importing">正在导入项目…</string>
+    <string name="home_import_complete">项目 %1$s 已导入。</string>
+    <string name="home_import_failed">导入失败</string>
 </resources>
