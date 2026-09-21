@@ -1483,3 +1483,38 @@ Version: `0.8.0-alpha43-r46.3`, versionCode `179`.
 - This branch is an immutable recovery/comparison point. Ordinary development continues on `codex/siftalpha-no-worker-alpha43`.
 - Next installable development version must use versionCode `180` or higher.
 - Canonical baseline registry: `docs/BASELINES.md`.
+
+
+## 2026-09-21 · R47 Environment Detection / Plan / Prepare closure
+
+### 目标
+
+统一 Internal R（内部运行环境）与 External Provider（外部运行环境提供者）的三层环境架构：
+
+- Environment Detection（环境检测）负责理解项目；
+- Environment Plan（环境计划）负责固定机器可执行的准备契约；
+- Prepare（准备环境）负责严格执行计划，不在安装阶段重新猜项目语义。
+
+### 结果
+
+- 新增共享 Project Environment Detection（项目环境检测）与 Environment Plan（环境计划）模型。
+- Python 版本、依赖来源、Vite（前端构建）需求、项目完整性、Backend（后端）候选等统一进入 Detection / Plan。
+- Embedded CPython（内置 CPython）支持安装前 Deep Compatibility Detection（深度兼容性检测），并可把已解析的精确依赖计划直接交给 Prepare。
+- Internal Alpine（内部 Alpine）和 External Python（外部 Python）均改为执行 Plan 提供的 `pythonInstallExtras`，不再在 Prepare 阶段重新读取 pyproject 来判断 `web` extra（额外依赖组）。
+- External Python READY（就绪）标记绑定 Environment Plan ID（环境计划身份），并保留兼容旧环境的安全迁移逻辑。
+- Runtime Identity（运行身份）、Session（会话）、Generation（代际）、Web Discovery（网页发现）、Endpoint Probe（端点探测）、项目级 STOP（停止）和 Worker freeze（Worker 冻结）未改变。
+
+### 云端验证
+
+- 版本：`0.8.0-alpha43-r47` / versionCode `180`。
+- 最终功能提交：`d611d18d08cf03b411cc687259e507ca91fcbaa8`。
+- W0 Cloud Build（云端构建）#365：PASS（通过）。
+- Internal Alpine Probe（内部 Alpine 探针）：PASS（通过）。
+- repository validators（仓库校验）、unit tests（单元测试）、`assembleDebug`（Debug 构建）、APK evidence（安装包证据）和 artifact upload（构建产物上传）均通过。
+- APK SHA-256：`bbdf8d8b13b5b5bfb73f70162b710ff44baae0851ea5b416489f396ff99fe89e`。
+
+### 真机验收
+
+- Real-device acceptance（真机验收）：PASS（通过）。
+- 用户已确认 r47 测试包在真实 Android（安卓）设备上通过。
+- 冻结基线：`baseline/r47-environment-plan` → `d611d18d08cf03b411cc687259e507ca91fcbaa8`。
