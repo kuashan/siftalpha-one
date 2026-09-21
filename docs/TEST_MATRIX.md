@@ -1188,3 +1188,23 @@ R48-0C is cloud-verified but not yet an accepted/frozen baseline.
 | APK SHA-256 | 9a41728e283db380c20fbead54230d3572a24b86e38eb1ba1dd2520a50f06fff | RECORDED |
 | Real-device visual acceptance（真机视觉验收） | hierarchy/dialog appearance | PENDING USER TEST |
 
+### R48-0F — Shared External Provider Preflight（共享外部执行环境前置检查）
+
+| Area | Verification | Result |
+| --- | --- | --- |
+| Shared readiness model（共享就绪模型） | six provider states | PASS — unit/source |
+| Termux installed fact（Termux 安装事实） | shared preflight | PASS |
+| RUN_COMMAND permission fact（权限事实） | shared preflight | PASS |
+| Bridge probe interpretation（命令桥探测解析） | success / unavailable / configuration-required | PASS — unit tests |
+| Freshness（证据新鲜度） | stale READY -> probe required | PASS — unit tests |
+| Normal Mode integration（普通模式接入） | ProjectControlHub external PREPARE/RUN gate | PASS — source/cloud |
+| Developer Workspace integration（开发者工作区接入） | ensureRuntime consumes shared preflight | PASS — source/cloud |
+| Home diagnostics integration（首页诊断接入） | probe result persisted to shared store | PASS — source/cloud |
+| Runtime orchestration preservation（运行编排保护） | no pending/observation/web/result rewrite | PASS — diff review |
+| W0 Cloud Build（W0 云端构建） | #452 / source 3944e298... | PASS |
+| Internal Alpine Probe（内部 Alpine 探针） | #68 | PASS |
+| APK（安装包） | v186 / 0.8.0-alpha43-r48a6 | PASS |
+| APK SHA-256 | 54340d798b5f06a32321f9aeff72cb76d0163a254f41e74e606e233f423dd9b2 | RECORDED |
+| Real-device permission/bridge UX（真机权限/命令桥体验） | permission request + Termux readiness | PENDING USER TEST / THIN UI FOLLOW-UP |
+
+
