@@ -30,6 +30,19 @@ import androidx.compose.ui.res.stringResource
 import com.siftalpha.studio.project.EmbeddedPythonProjectStager
 import com.siftalpha.studio.project.ProjectConfigurationInspector
 import com.siftalpha.studio.project.V04ProjectGateway
+import com.siftalpha.studio.presentation.NormalProjectPrimaryActionPolicy
+import com.siftalpha.studio.presentation.ProjectActionPolicy
+import com.siftalpha.studio.presentation.ProjectUiSnapshot
+import com.siftalpha.studio.runtime.RuntimeLifecycleOperation
+import com.siftalpha.studio.runtime.RuntimeLifecycleResolver
+import com.siftalpha.studio.runtime.RuntimeLifecycleState
+import com.siftalpha.studio.runtime.RuntimeOperationAction
+import com.siftalpha.studio.runtime.RuntimeOperationPhase
+import com.siftalpha.studio.runtime.RuntimeOperationProvider
+import com.siftalpha.studio.runtime.RuntimeOperationRecord
+import com.siftalpha.studio.runtime.RuntimeResult
+import com.siftalpha.studio.runtime.RuntimeWebUiStatus
+import com.siftalpha.studio.runtime.TermuxResultBus
 import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
 import com.siftalpha.studio.runtime.ProjectControlHub
 import com.siftalpha.studio.runtime.ProjectRuntimeControlExecutor
@@ -51,6 +64,7 @@ import com.siftalpha.studio.ui.components.StudioSectionCard
 import com.siftalpha.studio.ui.theme.StudioTheme
 import com.siftalpha.studio.ui.theme.StudioThemeTokens
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 /**
  * R48 Normal Mode（普通模式） single-project shell.
@@ -70,6 +84,8 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         val runtimeState: RuntimeState = RuntimeState.UNKNOWN,
         val runtimeSelection: ProjectRuntimeSelection = ProjectRuntimeSelection.TERMUX,
         val runtimeSelectionCanChange: Boolean = true,
+        val primaryAction: NormalProjectPrimaryActionPolicy.Action =
+            NormalProjectPrimaryActionPolicy.Action.PREPARE_PROJECT,
     )
 
     private lateinit var gateway: V04ProjectGateway
@@ -79,9 +95,26 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     private lateinit var lifecycleStore: RuntimeLifecycleStore
     private lateinit var operationStore: RuntimeOperationStore
     private lateinit var controlHub: ProjectControlHub
+    private lateinit var sharedLifecycleBridge: SharedRuntimeLifecycleBridge
+    private lateinit var externalBackend: TermuxBackend
     private lateinit var configurationUi: ProjectConfigurationUiController
     private val actionExecutor = Executors.newSingleThreadExecutor()
+    private val prepareExecutor = Executors.newSingleThreadExecutor()
+    private var internalPrepareFuture: Future<*>? = null
+    private var externalPrepareExecutionId: Int? = null
+    private var externalStopExecutionId: Int? = null
+    private var externalPrepareCancelRequested: Boolean = false
     private val screenState = mutableStateOf(ScreenState())
+
+    private val resultListener: (RuntimeResult) -> Unit = { result ->
+        runOnUiThread {
+            when (result.executionId) {
+                externalPrepareExecutionId -> handleExternalPrepareResult(result)
+                externalStopExecutionId -> handleExternalStopResult(result)
+                else -> Unit
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -116,13 +149,15 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         ) {
             refreshSharedState()
         }
+        externalBackend = TermuxBackend(this)
+        sharedLifecycleBridge = SharedRuntimeLifecycleBridge(lifecycleStore)
         controlHub = ProjectControlHub(
             selectionStore = selectionStore,
             executor = ProjectRuntimeControlExecutor(
                 runtime = runtime,
-                externalBackend = TermuxBackend(this),
+                externalBackend = externalBackend,
             ),
-            stateBridge = SharedRuntimeLifecycleBridge(lifecycleStore),
+            stateBridge = sharedLifecycleBridge,
         )
 
         enableEdgeToEdge()
@@ -132,6 +167,8 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 NormalProjectWorkspaceScreen(
                     state = screenState.value,
                     onBack = { onBackPressedDispatcher.onBackPressed() },
+                    onPrepare = { prepareProject() },
+                    onConfigure = { configureProject() },
                     onRun = { runProject() },
                     onStop = { stopProject() },
                     onSelectRuntime = { selectRuntime(it) },
@@ -141,12 +178,27 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        TermuxResultBus.addListener(resultListener)
+        if (::project.isInitialized) {
+            reconcileExternalPrepareOperation()
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         if (::project.isInitialized) refreshSharedState()
     }
 
+    override fun onStop() {
+        TermuxResultBus.removeListener(resultListener)
+        super.onStop()
+    }
+
     override fun onDestroy() {
+        internalPrepareFuture?.cancel(true)
+        prepareExecutor.shutdownNow()
         actionExecutor.shutdownNow()
         super.onDestroy()
     }
@@ -172,23 +224,91 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         }
 
         val lifecycle = lifecycleStore.read(projectId)
+        val operation = operationStore.read(projectId)?.takeUnless { it.terminal }
+        val configuration = configurationUi.snapshot(
+            project.summary.documentId,
+            project.folderName,
+        )
+        val environmentReady = lifecycle.environmentReadyFor(selection)
+        val lifecycleState = RuntimeLifecycleResolver.resolve(
+            environmentReady = environmentReady,
+            runtimeState = lifecycle.runtimeState,
+            operation = operation?.action?.toLifecycleOperation() ?: RuntimeLifecycleOperation.NONE,
+            configurationRequired = configuration.preflight.missingRequired.isNotEmpty(),
+            processActive = lifecycle.runtimeState in setOf(
+                RuntimeState.PREPARING,
+                RuntimeState.STARTING,
+                RuntimeState.RUNNING,
+            ),
+        )
+        val snapshot = ProjectUiSnapshot(
+            identity = ProjectUiSnapshot.Identity(
+                documentId = project.summary.documentId,
+                folderName = project.folderName,
+                displayName = project.summary.name,
+                sourceUrl = project.sourceUrl,
+            ),
+            runtime = ProjectUiSnapshot.Runtime.fromPlannerSelection(
+                selection = project.runtimeSelection,
+                supported = selection == ProjectRuntimeSelection.EMBEDDED_R ||
+                    (externalBackend.isAvailable() && runtime.runtimeSupported()),
+                stopCapability = lifecycle.runtimeState in setOf(
+                    RuntimeState.PREPARING,
+                    RuntimeState.STARTING,
+                    RuntimeState.RUNNING,
+                ),
+            ),
+            environment = ProjectUiSnapshot.Environment.from(environmentReady),
+            configuration = ProjectUiSnapshot.Configuration(
+                requiredCount = configuration.preflight.requiredCount,
+                configuredRequiredCount = configuration.preflight.configuredRequiredCount,
+                missingRequiredNames = configuration.preflight.missingRequired.map { it.name },
+                credentialCandidateCount = configuration.preflight.credentialCandidateCount,
+                runtimeConfigurationDiscovered = configuration.runtimeConfigurationDiscovered,
+                optionalMissingCount = configuration.preflight.optionalMissingCount,
+                optionalConfiguredCount = configuration.preflight.optionalConfiguredCount,
+            ),
+            lifecycle = lifecycle.runtimeState,
+            web = ProjectUiSnapshot.Web(
+                expected = false,
+                status = RuntimeWebUiStatus.AUTO_DETECT,
+                endpointReachable = null,
+            ),
+            pending = operation?.action?.toUiOperation()?.let { action ->
+                ProjectUiSnapshot.PendingOperation(action, operation.executionId)
+            },
+            evidence = ProjectUiSnapshot.Evidence(
+                lifecycle = if (lifecycle.runtimeState == RuntimeState.UNKNOWN) {
+                    ProjectUiSnapshot.LifecycleEvidence.NONE
+                } else {
+                    ProjectUiSnapshot.LifecycleEvidence.CACHED
+                },
+                environment = if (environmentReady == null) {
+                    ProjectUiSnapshot.EnvironmentEvidence.NONE
+                } else {
+                    ProjectUiSnapshot.EnvironmentEvidence.CACHED
+                },
+            ),
+            lifecycleState = lifecycleState,
+            failureReason = lifecycle.failureReason,
+        )
+        val policy = ProjectActionPolicy.resolve(snapshot, selection)
+        val primaryAction = NormalProjectPrimaryActionPolicy.resolve(policy)
         val selectionCanChange = ProjectRuntimeSelectionChangePolicy.canChange(
             ProjectRuntimeSelectionChangePolicy.Input(
                 runtimeState = lifecycle.runtimeState,
-                operation = operationStore.read(projectId),
+                operation = operation,
             ),
         )
         screenState.value = screenState.value.copy(
             projectName = project.summary.name,
-            statusLabel = lifecycle.runtimeState.uiLabel(
-                this,
-                lifecycle.environmentReadyFor(selection),
-            ),
+            statusLabel = lifecycleState.uiLabel(this),
             message = message,
             developerModeEnabled = DeveloperModeStore(this).isEnabled(),
             runtimeState = lifecycle.runtimeState,
             runtimeSelection = selection,
             runtimeSelectionCanChange = selectionCanChange,
+            primaryAction = primaryAction,
         )
     }
 
@@ -225,6 +345,57 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         ProjectRuntimeSelection.TERMUX -> getString(R.string.normal_runtime_external)
     }
 
+    private fun prepareProject() {
+        if (screenState.value.busy) return
+        val selection = selectionStore.read(project.summary.documentId)
+        screenState.value = screenState.value.copy(
+            busy = false,
+            message = getString(R.string.normal_project_preparing),
+            runtimeState = RuntimeState.PREPARING,
+            runtimeSelectionCanChange = false,
+            primaryAction = NormalProjectPrimaryActionPolicy.Action.STOP,
+        )
+        internalPrepareFuture = prepareExecutor.submit {
+            val result = controlHub.prepare(project)
+            runOnUiThread {
+                internalPrepareFuture = null
+                when (result) {
+                    is ProjectControlHub.Result.Dispatched -> {
+                        if (
+                            result.action == ProjectControlHub.Action.PREPARE &&
+                            result.provider == RuntimeOperationProvider.EXTERNAL &&
+                            result.executionId != null
+                        ) {
+                            registerExternalPrepare(result.executionId)
+                            screenState.value = screenState.value.copy(busy = false)
+                            refreshSharedState(getString(R.string.normal_project_preparing))
+                            return@runOnUiThread
+                        }
+                    }
+                    else -> Unit
+                }
+                screenState.value = screenState.value.copy(busy = false)
+                refreshSharedState(resultMessage(result))
+            }
+        }
+        if (selection == ProjectRuntimeSelection.EMBEDDED_R) {
+            screenState.value = screenState.value.copy(
+                primaryAction = NormalProjectPrimaryActionPolicy.Action.STOP,
+            )
+        }
+    }
+
+    private fun configureProject() {
+        if (screenState.value.busy) return
+        configurationUi.showConfiguration(
+            projectName = project.summary.name,
+            projectDocumentId = project.summary.documentId,
+            folderName = project.folderName,
+        ) {
+            refreshSharedState(getString(R.string.normal_project_configuration_saved))
+        }
+    }
+
     private fun runProject() {
         if (screenState.value.busy) return
         val configuration = configurationUi.snapshot(
@@ -250,7 +421,22 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     }
 
     private fun stopProject() {
+        val selection = selectionStore.read(project.summary.documentId)
+        if (
+            selection == ProjectRuntimeSelection.EMBEDDED_R &&
+            screenState.value.runtimeState == RuntimeState.PREPARING
+        ) {
+            internalPrepareFuture?.cancel(true)
+            internalPrepareFuture = null
+            sharedLifecycleBridge.cancelPrepare(project, selection)
+            screenState.value = screenState.value.copy(busy = false)
+            refreshSharedState(getString(R.string.normal_project_prepare_stopped))
+            return
+        }
         if (screenState.value.busy) return
+        externalPrepareCancelRequested =
+            selection == ProjectRuntimeSelection.TERMUX &&
+                screenState.value.runtimeState == RuntimeState.PREPARING
         screenState.value = screenState.value.copy(
             busy = true,
             message = getString(R.string.normal_project_stopping),
@@ -258,14 +444,37 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         actionExecutor.execute {
             val result = controlHub.stop(project)
             runOnUiThread {
-                screenState.value = screenState.value.copy(busy = false)
-                refreshSharedState(resultMessage(result))
+                if (
+                    result is ProjectControlHub.Result.Dispatched &&
+                    result.action == ProjectControlHub.Action.STOP &&
+                    result.provider == RuntimeOperationProvider.EXTERNAL &&
+                    result.executionId != null
+                ) {
+                    externalStopExecutionId = result.executionId
+                    TermuxResultBus.consume(result.executionId)?.let(resultListener)
+                    if (externalStopExecutionId != null) {
+                        refreshSharedState(getString(R.string.normal_project_stopping))
+                    }
+                } else {
+                    screenState.value = screenState.value.copy(busy = false)
+                    refreshSharedState(resultMessage(result))
+                }
             }
         }
     }
 
     private fun resultMessage(result: ProjectControlHub.Result): String = when (result) {
+        is ProjectControlHub.Result.Completed -> when (result.action) {
+            ProjectControlHub.Action.PREPARE -> if (result.environmentReady) {
+                getString(R.string.normal_project_prepare_ready)
+            } else {
+                getString(R.string.normal_project_prepare_failed)
+            }
+            ProjectControlHub.Action.RUN -> getString(R.string.normal_project_run_dispatched)
+            ProjectControlHub.Action.STOP -> getString(R.string.normal_project_stop_dispatched)
+        }
         is ProjectControlHub.Result.Dispatched -> when (result.action) {
+            ProjectControlHub.Action.PREPARE -> getString(R.string.normal_project_preparing)
             ProjectControlHub.Action.RUN -> getString(R.string.normal_project_run_dispatched)
             ProjectControlHub.Action.STOP -> getString(R.string.normal_project_stop_dispatched)
         }
@@ -277,6 +486,116 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             R.string.normal_project_rejected,
             result.detail,
         )
+    }
+
+    private fun registerExternalPrepare(executionId: Int) {
+        externalPrepareExecutionId = executionId
+        externalPrepareCancelRequested = false
+        val projectId = project.summary.documentId
+        val now = System.currentTimeMillis()
+        val generation = operationStore.lastGeneration(projectId) + 1L
+        operationStore.write(
+            RuntimeOperationRecord(
+                projectId = projectId,
+                provider = RuntimeOperationProvider.EXTERNAL,
+                action = RuntimeOperationAction.PREPARE,
+                executionId = executionId,
+                generation = generation,
+                startedAtEpochMs = now,
+                deadlineAtEpochMs = null,
+                phase = RuntimeOperationPhase.ACTIVE,
+            ),
+        )
+        TermuxResultBus.consume(executionId)?.let(resultListener)
+    }
+
+    private fun reconcileExternalPrepareOperation() {
+        val record = operationStore.read(project.summary.documentId) ?: return
+        if (
+            !record.terminal &&
+            record.provider == RuntimeOperationProvider.EXTERNAL &&
+            record.action == RuntimeOperationAction.PREPARE &&
+            record.executionId != null
+        ) {
+            externalPrepareExecutionId = record.executionId
+            TermuxResultBus.consume(record.executionId)?.let(resultListener)
+        }
+    }
+
+    private fun handleExternalPrepareResult(result: RuntimeResult) {
+        if (result.executionId != externalPrepareExecutionId) return
+        TermuxResultBus.consume(result.executionId)
+        val prepared = result.exitCode == 0 &&
+            result.internalErrorMessage.isBlank() &&
+            "SIFTALPHA_ENV=READY" in result.stdout
+        val failure = if (prepared) {
+            null
+        } else {
+            result.internalErrorMessage
+                .ifBlank { result.stderr }
+                .ifBlank { "External prepare failed (exitCode=" + result.exitCode + ")" }
+                .trim()
+                .take(240)
+        }
+        sharedLifecycleBridge.completeExternalPrepare(
+            project = project,
+            selection = ProjectRuntimeSelection.TERMUX,
+            prepared = prepared,
+            failureReason = failure,
+        )
+        operationStore.clear(project.summary.documentId)
+        externalPrepareExecutionId = null
+        screenState.value = screenState.value.copy(busy = false)
+        refreshSharedState(
+            if (prepared) {
+                getString(R.string.normal_project_prepare_ready)
+            } else {
+                getString(R.string.normal_project_prepare_failed)
+            },
+        )
+    }
+
+    private fun handleExternalStopResult(result: RuntimeResult) {
+        if (result.executionId != externalStopExecutionId) return
+        TermuxResultBus.consume(result.executionId)
+        val success = result.exitCode == 0 && result.internalErrorMessage.isBlank()
+        externalStopExecutionId = null
+        if (success && externalPrepareCancelRequested) {
+            externalPrepareExecutionId?.let(TermuxResultBus::consume)
+            externalPrepareExecutionId = null
+            operationStore.clear(project.summary.documentId)
+            sharedLifecycleBridge.cancelPrepare(
+                project = project,
+                selection = ProjectRuntimeSelection.TERMUX,
+            )
+        }
+        externalPrepareCancelRequested = false
+        screenState.value = screenState.value.copy(busy = false)
+        refreshSharedState(
+            if (success) {
+                getString(R.string.normal_project_stop_dispatched)
+            } else {
+                getString(R.string.normal_project_rejected, result.internalErrorMessage)
+            },
+        )
+    }
+
+    private fun RuntimeOperationAction.toLifecycleOperation(): RuntimeLifecycleOperation = when (this) {
+        RuntimeOperationAction.PREPARE -> RuntimeLifecycleOperation.PREPARE
+        RuntimeOperationAction.START -> RuntimeLifecycleOperation.START
+        RuntimeOperationAction.STATUS -> RuntimeLifecycleOperation.STATUS
+        RuntimeOperationAction.LOGS -> RuntimeLifecycleOperation.LOGS
+        RuntimeOperationAction.STOP -> RuntimeLifecycleOperation.STOP
+        RuntimeOperationAction.CLEAN -> RuntimeLifecycleOperation.CLEAN
+    }
+
+    private fun RuntimeOperationAction.toUiOperation(): ProjectUiSnapshot.Operation = when (this) {
+        RuntimeOperationAction.PREPARE -> ProjectUiSnapshot.Operation.PREPARE
+        RuntimeOperationAction.START -> ProjectUiSnapshot.Operation.START
+        RuntimeOperationAction.STATUS -> ProjectUiSnapshot.Operation.STATUS
+        RuntimeOperationAction.LOGS -> ProjectUiSnapshot.Operation.LOGS
+        RuntimeOperationAction.STOP -> ProjectUiSnapshot.Operation.STOP
+        RuntimeOperationAction.CLEAN -> ProjectUiSnapshot.Operation.CLEAN
     }
 
     private fun openDeveloperWorkspace() {
@@ -294,15 +613,14 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 private fun NormalProjectWorkspaceScreen(
     state: NormalProjectWorkspaceActivity.ScreenState,
     onBack: () -> Unit,
+    onPrepare: () -> Unit,
+    onConfigure: () -> Unit,
     onRun: () -> Unit,
     onStop: () -> Unit,
     onSelectRuntime: (ProjectRuntimeSelection) -> Unit,
     onOpenDeveloper: () -> Unit,
 ) {
     val spacing = StudioThemeTokens.spacing
-    val runtimeActive = state.runtimeState == RuntimeState.STARTING ||
-        state.runtimeState == RuntimeState.RUNNING
-
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
@@ -401,21 +719,49 @@ private fun NormalProjectWorkspaceScreen(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(modifier = Modifier.height(spacing.medium))
-                if (runtimeActive) {
-                    Button(
-                        onClick = onStop,
-                        enabled = !state.busy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(text = stringResource(R.string.runtime_button_stop))
+                when (state.primaryAction) {
+                    NormalProjectPrimaryActionPolicy.Action.PREPARE_PROJECT -> {
+                        Button(
+                            onClick = onPrepare,
+                            enabled = !state.busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.normal_project_prepare_action))
+                        }
                     }
-                } else {
-                    Button(
-                        onClick = onRun,
-                        enabled = !state.busy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(text = stringResource(R.string.runtime_button_run))
+                    NormalProjectPrimaryActionPolicy.Action.CONFIGURE -> {
+                        Button(
+                            onClick = onConfigure,
+                            enabled = !state.busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.normal_project_configure_action))
+                        }
+                    }
+                    NormalProjectPrimaryActionPolicy.Action.RUN -> {
+                        Button(
+                            onClick = onRun,
+                            enabled = !state.busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.runtime_button_run))
+                        }
+                    }
+                    NormalProjectPrimaryActionPolicy.Action.STOP -> {
+                        Button(
+                            onClick = onStop,
+                            enabled = !state.busy || state.runtimeState == RuntimeState.PREPARING,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.runtime_button_stop))
+                        }
+                    }
+                    NormalProjectPrimaryActionPolicy.Action.NONE -> {
+                        Text(
+                            text = stringResource(R.string.normal_project_waiting_action),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
