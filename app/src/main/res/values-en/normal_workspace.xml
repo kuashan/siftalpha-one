@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="normal_project_missing">Project not found</string>
+    <string name="normal_project_status_title">Project status</string>
+    <string name="normal_project_actions_title">Actions</string>
+    <string name="normal_project_starting">Sending run request…</string>
+    <string name="normal_project_stopping">Sending stop request…</string>
+    <string name="normal_project_run_dispatched">Run request sent.</string>
+    <string name="normal_project_stop_dispatched">Stop request sent.</string>
+    <string name="normal_project_noop">No action needed: %1$s</string>
+    <string name="normal_project_rejected">Cannot perform this action now: %1$s</string>
+    <string name="normal_project_developer_title">Developer tools</string>
+    <string name="normal_project_developer_summary">Open the full developer workspace for environment, status, logs, and advanced runtime controls.</string>
+    <string name="normal_project_open_developer">Open developer workspace</string>
+</resources>
