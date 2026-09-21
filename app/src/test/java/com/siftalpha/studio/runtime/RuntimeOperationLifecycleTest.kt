@@ -127,7 +127,7 @@ class RuntimeOperationLifecycleTest {
     }
 
     @Test
-    fun onlyInternalOperationsReceiveAndroidDeadlines() {
+    fun bothProvidersReceiveActionDeadlines() {
         val startedAt = 4_000L
 
         RuntimeOperationAction.entries.forEach { action ->
@@ -139,7 +139,8 @@ class RuntimeOperationLifecycleTest {
                     startedAtEpochMs = startedAt,
                 ),
             )
-            assertNull(
+            assertEquals(
+                startedAt + RuntimeOperationContract.timeoutMs(action),
                 RuntimeOperationContract.deadlineAtEpochMs(
                     provider = RuntimeOperationProvider.EXTERNAL,
                     action = action,
@@ -150,7 +151,7 @@ class RuntimeOperationLifecycleTest {
     }
 
     @Test
-    fun externalOperationDoesNotExpireWhenClockPassesInternalTimeout() {
+    fun externalOperationExpiresAfterItsControlDeadline() {
         var now = 5_000L
         val tracker = RuntimeOperationTracker { now }
         val externalStatus = tracker.begin(
@@ -159,11 +160,55 @@ class RuntimeOperationLifecycleTest {
             action = RuntimeOperationAction.STATUS,
         )!!
 
-        assertNull(externalStatus.deadlineAtEpochMs)
+        assertEquals(
+            now + RuntimeOperationContract.STATUS_TIMEOUT_MS,
+            externalStatus.deadlineAtEpochMs,
+        )
         now += RuntimeOperationContract.STATUS_TIMEOUT_MS + 1L
 
-        assertTrue(tracker.markExpired(now).isEmpty())
-        assertEquals(RuntimeOperationPhase.ACTIVE, tracker.current("external-project")?.phase)
+        assertEquals(1, tracker.markExpired(now).size)
+        assertEquals(RuntimeOperationPhase.TIMED_OUT, tracker.current("external-project")?.phase)
+    }
+
+    @Test
+    fun externalStopUsesTheShortStopDeadline() {
+        assertEquals(
+            45_000L,
+            RuntimeOperationContract.timeoutMs(RuntimeOperationAction.STOP),
+        )
+        assertEquals(
+            45_000L,
+            RuntimeOperationContract.deadlineAtEpochMs(
+                provider = RuntimeOperationProvider.EXTERNAL,
+                action = RuntimeOperationAction.STOP,
+                startedAtEpochMs = 1_000L,
+            )!! - 1_000L,
+        )
+    }
+
+    @Test
+    fun timeoutOutcomeDoesNotClaimThatStopSucceeded() {
+        val outcome = RuntimeOperationContract.timeoutOutcome(
+            action = RuntimeOperationAction.STOP,
+            currentEnvironmentReady = true,
+        )
+
+        assertEquals(RuntimeState.UNKNOWN, outcome.runtimeState)
+        assertEquals(true, outcome.environmentReady)
+        assertEquals("RUNTIME_OPERATION_TIMED_OUT:STOP", outcome.failureReason)
+    }
+
+    @Test
+    fun prepareTimeoutPreservesAnAlreadyReadyEnvironment() {
+        val outcome = RuntimeOperationContract.timeoutOutcome(
+            action = RuntimeOperationAction.PREPARE,
+            currentEnvironmentReady = true,
+            previousEnvironmentReady = true,
+        )
+
+        assertEquals(RuntimeState.UNKNOWN, outcome.runtimeState)
+        assertEquals(true, outcome.environmentReady)
+        assertEquals("RUNTIME_OPERATION_TIMED_OUT:PREPARE", outcome.failureReason)
     }
 
     @Test
