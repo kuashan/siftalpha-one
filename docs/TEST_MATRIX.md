@@ -1116,3 +1116,28 @@ Implementation-note gate:
 
 R48-0A is a cloud-verified foundation only and is not a frozen baseline.
 
+### R48-0B — Dual Surface first user-visible slice（双界面首个可见版本）
+
+| Area | Verification | Result |
+| --- | --- | --- |
+| Developer Mode default（开发者模式默认值） | unset preference | OFF（关闭） by implementation default |
+| Normal project routing（普通项目路由） | Home project Open（打开） | routes to NormalProjectWorkspaceActivity（普通项目工作区） |
+| Developer unlock（开发者解锁） | Developer Mode ON | Normal Mode remains primary and exposes Developer Workspace entry |
+| Developer home hiding（开发者首页入口隐藏） | Developer Mode OFF | Runtime Center / environment / terminal / bridge diagnostics hidden |
+| Shared RUN linkage（共享运行联动） | Normal RUN -> shared lifecycle | STARTING is published before dispatch; accepted state reuses existing Runtime |
+| Failed RUN rollback（失败运行回滚） | hub rejects RUN | previous shared lifecycle snapshot restored |
+| Shared STOP linkage（共享停止联动） | Normal STOP | same selected project/provider is targeted; terminal state is not fabricated early |
+| Internal provider（内部运行环境） | RUN / STOP source contract | existing Embedded CPython / Internal Alpine controller/session path reused |
+| External provider（外部运行环境） | RUN / STOP source contract | existing ProjectRuntimeController / Termux project-scoped path reused |
+| Hidden UI automation（隐藏 UI 自动化） | source review | no hidden V04Activity launch / no simulated developer button click |
+| Developer Workspace protection（保护开发者工作区） | source comparison | V04Activity.kt unchanged |
+| Localization（多语言） | repository localization validators | PASS |
+| ProjectControlHub unit tests（枢纽单元测试） | shared-state sequencing + project identity/isolation | PASS |
+| W0 Cloud Build（W0 云端构建） | #405 / functional source 9266d5ad... | PASS |
+| Internal Alpine Probe（内部 Alpine 探针） | #64 / r48a2 build configuration | PASS |
+| APK（安装包） | versionCode 182 / 0.8.0-alpha43-r48a2 | PASS |
+| APK SHA-256 | 050fa184165f61a164f3b4051558dd0cfe9a57f145feaecd835176a255400895 | RECORDED |
+| Real-device dual-surface acceptance（双界面真机验收） | RUN/STOP cross-surface + project isolation | PENDING USER TEST |
+
+R48-0B is cloud-verified but not yet an accepted/frozen baseline.
+
