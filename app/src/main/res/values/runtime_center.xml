@@ -60,14 +60,14 @@
     <string name="runtime_policy_pending_operation">正在等待当前操作完成。</string>
     <string name="runtime_policy_runtime_host_unavailable">当前设备暂不支持运行时，仅可管理项目文件。</string>
     <string name="runtime_policy_runtime_selection_required">无法安全确定项目运行时，请先检查状态或清理运行环境。</string>
-    <string name="runtime_policy_runtime_active">项目进程仍由 Studio 管理，可以停止或查看状态。</string>
+    <string name="runtime_policy_runtime_active">项目进程仍由 SiftAlpha X 管理，可以停止或查看状态。</string>
     <string name="runtime_policy_environment_preparing">正在准备运行环境，可以随时停止当前项目。</string>
     <string name="runtime_policy_web_endpoint_pending">项目进程已启动，但 Web 端点尚未确认可访问。</string>
     <string name="runtime_policy_configuration_required">项目缺少必需配置，请先打开配置。</string>
     <string name="runtime_policy_environment_prepare_required">运行环境尚未准备，请先准备环境。</string>
     <string name="runtime_policy_environment_status_required">运行环境状态未知，请先检查状态。</string>
     <string name="runtime_policy_runtime_status_required">运行状态未知，请先检查状态。</string>
-    <string name="runtime_policy_ready_to_run">运行环境已准备，可以启动项目；如需配置，Studio 会在运行后提示。</string>
+    <string name="runtime_policy_ready_to_run">运行环境已准备，可以启动项目；如需配置，SiftAlpha X 会在运行后提示。</string>
     <string name="runtime_policy_reason_pending_operation">已有操作正在执行</string>
     <string name="runtime_policy_reason_runtime_host_unavailable">当前设备不支持运行时</string>
     <string name="runtime_policy_reason_runtime_selection_required">无法唯一确定项目运行时</string>
@@ -129,7 +129,7 @@
     <string name="runtime_run_secret_not_required">\n\nAPI 密钥：此项目声明无需 Binance API 密钥。</string>
     <string name="runtime_run_secret_configured">\n\nAPI 密钥：已配置，将通过安全 stdin 注入环境变量。</string>
     <string name="runtime_run_secret_missing">\n\nAPI 密钥：未配置。普通项目不受影响；需要认证的项目会自行报告缺少凭据。</string>
-    <string name="runtime_run_web_detected">\n\nWeb：已识别；运行后 Studio 会自动登记本地仪表盘地址。</string>
+    <string name="runtime_run_web_detected">\n\nWeb：已识别；运行后 SiftAlpha X 会自动登记本地仪表盘地址。</string>
     <string name="runtime_native_web_run_title">运行 %1$s 的原生网页应用？</string>
     <string name="runtime_native_web_run_message">已高置信度识别项目自带网页启动入口：\n\n%1$s\n\nSiftAlpha 将启动项目自己的本地 Web 服务；项目自身的自动浏览器打开会被关闭，待端点验证通过后由 SiftAlpha 打开原生网页界面。</string>
     <string name="runtime_run_title">运行 %1$s？</string>
@@ -155,12 +155,12 @@
     <string name="runtime_web_not_running_title">网页尚未运行</string>
     <string name="runtime_web_not_running_message">当前项目不是运行状态。请先运行项目，再点击“浏览器”。</string>
     <string name="runtime_web_not_found_title">未检测到网页</string>
-    <string name="runtime_web_not_found_running">项目已在运行，但 Studio 尚未得到本地 Web 地址。运行成功后会自动执行一次受限的项目级发现；浏览器按钮本身不会扫描端口。</string>
-    <string name="runtime_web_not_found_logs">项目已在运行，但 Studio 还没有找到本地 Web 地址。\n\n项目可输出：\nSIFTALPHA_WEB_URL=http://127.0.0.1:&lt;port&gt;\n\n也可以在 .project.json 中配置 web.host / web.port。</string>
+    <string name="runtime_web_not_found_running">项目已在运行，但 SiftAlpha X 尚未得到本地 Web 地址。运行成功后会自动执行一次受限的项目级发现；浏览器按钮本身不会扫描端口。</string>
+    <string name="runtime_web_not_found_logs">项目已在运行，但 SiftAlpha X 还没有找到本地 Web 地址。\n\n项目可输出：\nSIFTALPHA_WEB_URL=http://127.0.0.1:&lt;port&gt;\n\n也可以在 .project.json 中配置 web.host / web.port。</string>
     <string name="runtime_web_invalid_title">Web 地址无效</string>
-    <string name="runtime_web_invalid_message">Studio 拒绝打开非本机 HTTP/HTTPS Web 地址。\n\n%1$s</string>
+    <string name="runtime_web_invalid_message">SiftAlpha X 拒绝打开非本机 HTTP/HTTPS Web 地址。\n\n%1$s</string>
     <string name="runtime_no_browser_title">没有可用浏览器</string>
-    <string name="runtime_no_browser_message">Studio 没有发现能够打开 HTTP/HTTPS 网页的已安装浏览器。\n\n%1$s</string>
+    <string name="runtime_no_browser_message">SiftAlpha X 没有发现能够打开 HTTP/HTTPS 网页的已安装浏览器。\n\n%1$s</string>
     <string name="runtime_choose_browser">选择浏览器</string>
     <string name="runtime_browser_failed_title">浏览器打开失败</string>
     <string name="runtime_browser_failed_message">无法使用 %1$s 打开当前仪表盘。\n\n%2$s\n%3$s</string>
