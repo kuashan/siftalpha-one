@@ -1518,3 +1518,150 @@ Version: `0.8.0-alpha43-r46.3`, versionCode `179`.
 - Real-device acceptance（真机验收）：PASS（通过）。
 - 用户已确认 r47 测试包在真实 Android（安卓）设备上通过。
 - 冻结基线：`baseline/r47-environment-plan` → `d611d18d08cf03b411cc687259e507ca91fcbaa8`。
+
+## 2026-09-21 · R48 planning — Dual Surface Architecture（双界面架构） + Unified User Workflow（统一用户工作流）
+
+### 背景与产品定位
+
+R47（第 47 阶段）完成并通过真机验收后，当前 SiftAlpha（筛选阿尔法）的核心问题不再是缺少 Runtime（运行时）控制能力，而是现有 Runtime Center（运行中心）直接暴露了大量面向开发/诊断的底层控制项。普通用户需要理解 Prepare（准备环境）、STATUS（状态查询）、LOGS（日志查询）、Runtime Selection（运行环境选择）、CLEAN（清理）、Raw Log（原始日志）等概念，才能完成“导入脚本 -> 准备 -> 运行 -> 查看结果”的基本任务。
+
+产品定位再次确认：
+- SiftAlpha 是 script/project Runtime manager（脚本/项目运行管理器），不是 IDE（集成开发环境）。
+- 用户的主要目标是管理和运行已经完成的脚本/项目，不是编写代码或维护底层 Runtime（运行时）。
+- 当前完整 Runtime Center（运行中心）不废弃、不重写，正式作为 Developer Workspace（开发者工作区）保留。
+- 在同一套底层 M/R/X（管理系统/运行系统/最终系统）之上新增 Normal Mode（普通模式），作为默认面向用户的简化前端。
+
+### R48 总体结构
+
+```text
+SiftAlpha Core（核心系统）
+        |
+        +-- Normal Mode（普通模式）
+        |     面向普通用户；展示状态与下一步动作
+        |
+        +-- Developer Mode（开发者模式）
+              保留当前完整控制面板与诊断入口
+```
+
+两种界面必须共享同一个 Single Source of Truth（单一事实源）。Developer Mode（开发者模式）只是 UI capability flag（界面能力开关），绝不能成为另一套 Runtime mode（运行时模式）。
+
+模式切换不得：
+- STOP（停止）项目；
+- 重启 Runtime（运行时）；
+- CLEAN（清理）环境；
+- 修改 Environment Plan（环境计划）；
+- 切换 Internal R（内部运行环境）/ External Provider（外部运行环境提供者）；
+- 清空 Runtime / Web / Result（运行时 / 网页 / 结果）状态。
+
+### 普通模式原则
+
+Normal Mode（普通模式）不重新实现底层能力，只通过上层 Workflow Coordinator（工作流协调器）按现有策略调用：
+- ProjectActionPolicy（项目动作策略）
+- ProjectUiSnapshot（项目界面快照）
+- Environment Detection（环境检测）
+- Environment Plan（环境计划）
+- Prepare（准备环境）
+- RuntimeOperationTracker（运行操作跟踪）
+- RuntimeOwnershipPolicy（运行归属策略）
+- RuntimeAutoObservationPolicy（自动观察策略）
+- ObservationPresentationPolicy（观察呈现策略）
+- PresentationTargetResolver（呈现目标解析器）
+
+普通模式的核心目标是让用户只需要理解：
+1. 当前项目是什么状态；
+2. 下一步应该按什么；
+3. 运行后在哪里打开/停止/查看结果。
+
+### 第一阶段普通项目界面草案
+
+```text
+项目名称
+
+状态：xxxx
+状态说明：xxxx
+
+[主操作]
+
+[打开]   [停止]
+
+[刷新]
+
+[更多]
+```
+
+Primary Action（主操作）继续由现有 ProjectActionPolicy（项目动作策略）决定，例如：
+- 环境未准备 -> 准备项目
+- 缺少必需配置 -> 配置
+- 环境 READY（就绪） -> 运行
+- 正在运行 -> 打开 / 停止
+- 一次性任务完成 -> 查看结果 / 再次运行
+- 运行失败 -> 查看原因 / 再次运行
+
+### 计划中的上层工作流融合
+
+第一阶段只允许低风险、可验证的上层编排：
+
+1. Unified Refresh（统一刷新）
+   - 普通模式只显示“刷新”。
+   - 内部先 STATUS（状态查询），按生命周期决定是否需要 LOGS（日志查询）。
+   - Developer Mode（开发者模式）仍保留独立 STATUS / LOGS。
+
+2. Prepare Project（准备项目）
+   - 一个普通用户入口串联 Detection（检测） -> Plan（计划） -> Compatibility Resolution（兼容性解析） -> Prepare（准备） -> Verification（验证）。
+   - R47 的 Detection / Plan / Prepare 底层边界不合并。
+   - 第一版 Prepare 成功后停在 READY（就绪），不自动 START（运行）。
+
+3. Unified Import（统一导入）
+   - PY / ZIP / GitHub 仅合并为“导入项目”的来源选择；底层导入实现不合并。
+
+4. Unified Project Location（统一项目目录）
+   - AcodeProjects / 其他目录统一由“选择项目目录”入口承载；SAF（存储访问框架）身份与权限逻辑保持不变。
+
+5. Open（打开）
+   - 继续沿用现有 PresentationTargetResolver（呈现目标解析器）：
+     WEB（网页） > RESULT_WEB（结果网页） > RICH_RESULT（富结果） > NONE（无）。
+   - 不重新拆分为多个普通用户按钮。
+
+### 暂不融合 / 必须保持独立的高风险动作
+
+以下动作第一阶段不得自动串联：
+- STOP（停止）
+- CLEAN（清理）
+- Delete Project（删除项目）
+- Runtime Selection（运行环境选择）
+- Uninstall Runtime（卸载共享运行环境）
+- Shared Toolchain Cleanup（共享工具链清理）
+- Terminal（终端）
+- Editor（编辑器）
+
+原因：
+- STOP（停止）具有 project-scoped preemption（项目级抢占）语义，必须能打断当前项目活动但不影响其他项目。
+- CLEAN（清理）与运行/准备存在互斥关系，不能与 STOP 默认捆绑。
+- 删除源码与 Runtime（运行时）环境属于不同存储域，未来若融合必须采用 Transactional Project Removal（事务式项目删除），且源码删除必须最后发生。
+- Runtime Selection（运行环境选择）涉及 Runtime Ownership（运行归属），不能在普通工作流中偷偷切换 Provider（提供者）。
+- 共享缓存/工具链维护需要单独的 Global Maintenance Guard（全局维护保护），不能在当前阶段一键串联。
+
+### R48 分段执行顺序
+
+R48-0：Developer Mode（开发者模式）开关与双界面路由基础  
+R48-A：Normal Project Workspace（普通项目工作区）骨架  
+R48-B：Unified Refresh（统一刷新）  
+R48-C：Prepare Project Workflow（准备项目工作流）  
+R48-D：Unified Import（统一导入）  
+R48-E：Unified Project Location（统一项目目录）  
+R48-F：More / Developer Tools（更多 / 开发者工具）整理
+
+每一段单独实现、单独云端验证；不一次性重做整个 UI（界面）。
+
+### 开工约束
+
+- 当前开发起点：`82f9762336caa7cdd494c8ac4cb8028314c4a538`。
+- R47 冻结基线保持：`baseline/r47-environment-plan` -> `d611d18d08cf03b411cc687259e507ca91fcbaa8`。
+- R48 不移动、不修改 R47 冻结分支。
+- Worker（工作器）继续冻结。
+- 不修改 imported project source（导入项目源码）。
+- 仅使用 GitHub Actions（云端构建）。
+- 每个可安装测试版本必须提高 versionCode（版本代码）；下一可安装版本至少为 181。
+- 每一小段完成后先提供 Trusted Signed Debug APK（稳定签名调试包），真机验收后再决定是否进入下一段。
+- 本条仅固化规划，不包含 R48 业务代码变更。
+
