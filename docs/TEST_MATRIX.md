@@ -1293,3 +1293,24 @@ R48-0C is cloud-verified but not yet an accepted/frozen baseline.
 | APK（安装包） | r48c1 / versionCode 190 | PASS — cloud artifact |
 | Real-device acceptance（真机验收） | prepare phases + import + location + More | PENDING |
 
+### R48-D — Developer Restoration + User Management（开发者恢复 + 用户管理）
+
+| Area | Verification | Result |
+| --- | --- | --- |
+| Developer Runtime Bridge（开发者运行时桥） | pre-R48-C environment probe / Termux test / permission / setup / output entries restored | PASS — source/cloud |
+| Developer Settings（开发者设置） | remains top-right, not moved into User More | PASS — source review |
+| Developer bottom navigation（开发者底部导航） | Home / Runtime / Environment preserved | PASS — source review |
+| User bottom navigation（用户底部导航） | redundant Home entry removed | PASS — source/cloud |
+| User More（用户更多） | Runtime storage + Settings available | PASS — source/cloud |
+| Simplified Runtime Storage（简化运行空间） | same internal/external storage controllers, simplified presentation | PASS — source/cloud |
+| Project cleanup isolation（项目清理隔离） | existing project-scoped internal/external clean APIs reused | PASS — source review |
+| GitHub shared parser（GitHub 共享解析） | HTTPS / SSH / branch / name rules | PASS — unit/cloud |
+| Developer GitHub behavior（开发者 GitHub 行为） | original UI retained; shared parser/metadata only | PASS — source review |
+| User GitHub import（用户 GitHub 导入） | does not open Developer Workspace; shared clone + metadata | PASS — source/cloud |
+| Branding（品牌） | user-visible SiftAlpha Studio / Studio resources migrated to SiftAlpha X | PASS — source/cloud |
+| Application identity（应用身份） | com.siftalpha.studio unchanged | PASS — APK evidence |
+| W0 Cloud Build（云端构建） | #587 | PASS |
+| Internal Alpine Probe（内部 Alpine 探针） | #81 | PASS |
+| APK（安装包） | r48d1 / versionCode 191 | PASS — cloud artifact |
+| Real-device acceptance（真机验收） | developer baseline + user More/storage/GitHub/branding | PENDING |
+
