@@ -12,4 +12,13 @@
     <string name="normal_project_developer_title">開発者ツール</string>
     <string name="normal_project_developer_summary">環境、状態、ログ、高度な実行制御を確認する完全な開発者ワークスペースを開きます。</string>
     <string name="normal_project_open_developer">開発者ワークスペースを開く</string>
+    <string name="normal_runtime_title">実行環境</string>
+    <string name="normal_runtime_current">現在：%1$s</string>
+    <string name="normal_runtime_internal">Internal R（内部実行環境）</string>
+    <string name="normal_runtime_external">External Provider / Termux（外部実行環境）</string>
+    <string name="normal_runtime_internal_short">内部実行</string>
+    <string name="normal_runtime_external_short">外部実行</string>
+    <string name="normal_runtime_selection_locked">プロジェクトが実行中、または操作が完了していません。停止または完了後に実行環境を切り替えてください。</string>
+    <string name="normal_runtime_selection_busy">現在のプロジェクトは実行中、または操作が完了していないため、実行環境を切り替えられません。</string>
+    <string name="normal_runtime_selection_saved">実行環境を変更しました：%1$s</string>
 </resources>
