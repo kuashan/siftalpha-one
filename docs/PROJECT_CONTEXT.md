@@ -1001,3 +1001,13 @@ Cloud evidence:
 
 R48-0C remains pending real-device Runtime-selection acceptance.
 
+### Normal Mode（普通模式） home hierarchy rule
+
+Normal Mode（普通模式） home should expose primary user objects and primary workflows, not every maintenance control.
+
+Project Management（项目管理） is a first-level category only. Its maintenance actions — project-root connection/selection, new project creation, and project-list refresh — belong to a secondary modal surface opened from that category.
+
+The project list itself remains first-level content because projects are the primary objects users operate.
+
+This hierarchy rule is presentation-only and must not duplicate or alter the underlying project-management callbacks, Runtime（运行时） state, Environment（环境） state, or Developer Workspace（开发者工作区） behavior.
+
