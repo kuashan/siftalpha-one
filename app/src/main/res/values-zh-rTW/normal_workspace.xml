@@ -42,4 +42,6 @@
     <string name="normal_project_refresh_complete">狀態已更新。</string>
     <string name="normal_project_open_action">開啟</string>
     <string name="normal_project_open_unavailable">目前沒有可開啟的網頁或結果。</string>
+    <string name="normal_external_provider_no_response">3 秒內未偵測到 Termux 回應。請開啟 Termux 後重新檢測。</string>
+    <string name="normal_external_provider_recheck">重新檢測</string>
 </resources>
