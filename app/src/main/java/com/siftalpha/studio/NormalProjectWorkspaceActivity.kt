@@ -44,6 +44,7 @@ import com.siftalpha.studio.runtime.RuntimeResult
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
 import com.siftalpha.studio.runtime.TermuxResultBus
 import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
+import com.siftalpha.studio.runtime.ExternalProviderPreflight
 import com.siftalpha.studio.runtime.ProjectControlHub
 import com.siftalpha.studio.runtime.ProjectRuntimeControlExecutor
 import com.siftalpha.studio.runtime.ProjectRuntimeController
@@ -97,6 +98,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     private lateinit var controlHub: ProjectControlHub
     private lateinit var sharedLifecycleBridge: SharedRuntimeLifecycleBridge
     private lateinit var externalBackend: TermuxBackend
+    private lateinit var externalProviderPreflight: ExternalProviderPreflight
     private lateinit var configurationUi: ProjectConfigurationUiController
     private val actionExecutor = Executors.newSingleThreadExecutor()
     private val prepareExecutor = Executors.newSingleThreadExecutor()
@@ -150,12 +152,14 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             refreshSharedState()
         }
         externalBackend = TermuxBackend(this)
+        externalProviderPreflight = ExternalProviderPreflight(this, externalBackend)
         sharedLifecycleBridge = SharedRuntimeLifecycleBridge(lifecycleStore)
         controlHub = ProjectControlHub(
             selectionStore = selectionStore,
             executor = ProjectRuntimeControlExecutor(
                 runtime = runtime,
                 externalBackend = externalBackend,
+                externalProviderPreflight = externalProviderPreflight,
             ),
             stateBridge = sharedLifecycleBridge,
         )
