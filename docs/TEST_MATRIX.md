@@ -20,16 +20,26 @@
 
 | ID | 验证项 | 期望 | 状态 |
 |---|---|---|---|
-| R48A6.1-01 | External operation deadline | PREPARE/START/STATUS/LOGS/STOP/CLEAN 都有 action-specific control deadline | 待云端 |
-| R48A6.1-02 | Shared External watchdog | Activity 离开、重建或跨到另一 UI 不丢失 project+generation watchdog | 待云端 |
-| R48A6.1-03 | PREPARE timeout recovery | 释放 operation lock；无旧 READY 时进入 `ENVIRONMENT_ERROR`，不写 READY | 待云端 |
-| R48A6.1-04 | STOP timeout recovery | 释放 operation lock；进入 `UNKNOWN`，failure reason 为 `RUNTIME_OPERATION_TIMED_OUT:STOP`，不写 `STOPPED_BY_USER` | 待云端 |
-| R48A6.1-05 | Late callback fencing | 旧 PREPARE/STOP executionId 不能修改新 generation | 待云端 |
-| R48A6.1-06 | Project isolation | 项目 A timeout/STOP 不影响项目 B | 待云端 |
-| R48A6.1-07 | Normal Mode diagnostics | 根布局可纵向滚动到完整当前 failure reason/页面底部 | 待云端 |
-| R48A6.1-08 | Internal Alpine scope | 不修改 Internal Alpine 安装逻辑；exit=4 保留为完整尾部待诊断 | PASS — scope review |
-| R48A6.1-09 | R48a6 real-device acceptance | External PREPARE indefinite wait、External STOP indefinite wait、Normal non-scrollable diagnostic | FAIL — user-confirmed |
+| R48A6.1-01 | External operation deadline | PREPARE/START/STATUS/LOGS/STOP/CLEAN 都有 action-specific control deadline | PASS — unit + W0 #487 |
+| R48A6.1-02 | Shared External watchdog | Activity 离开、重建或跨到另一 UI 不丢失 project+generation watchdog | PASS — unit/source + W0 #487 |
+| R48A6.1-03 | PREPARE timeout recovery | 释放 operation lock；无旧 READY 时进入 `ENVIRONMENT_ERROR`，不写 READY | PASS — unit + W0 #487 |
+| R48A6.1-04 | STOP timeout recovery | 释放 operation lock；进入 `UNKNOWN`，failure reason 为 `RUNTIME_OPERATION_TIMED_OUT:STOP`，不写 `STOPPED_BY_USER` | PASS — unit + W0 #487 |
+| R48A6.1-05 | Late callback fencing | 旧 PREPARE/STOP executionId 不能修改新 generation | PASS — unit + W0 #487 |
+| R48A6.1-06 | Project isolation | 项目 A timeout/STOP 不影响项目 B | PASS — unit + W0 #487 |
+| R48A6.1-07 | Normal Mode diagnostics | 根布局可纵向滚动到完整当前 failure reason/页面底部 | PASS — source/cloud；待真机 |
+| R48A6.1-08 | Internal Alpine scope | 不修改 Internal Alpine 安装逻辑；exit=4 保留为完整尾部待诊断 | PASS — scope + Alpine Probe #76 |
+| R48A6.1-09 | R48a6 real-device acceptance | External PREPARE indefinite wait、External STOP indefinite wait、Normal non-scrollable diagnostic | FAIL — user-confirmed（旧 r48a6） |
 | R48A6.1-10 | External Provider Preflight | 已确认 Termux、权限、allow-external-apps、bridge、READY 全部通过 | PASS — user-confirmed |
+| R48A6.1-11 | Normal Mode External PREPARE progress | 复用现有 PrepareLiveProgressController，只读显示并可在 Activity 恢复后重挂接 | PASS — source/cloud；待真机 |
+| R48A6.1-12 | Installable version | `0.8.0-alpha43-r48a6.1` / versionCode `187` / applicationId 不变 | PASS — W0 #487 APK badging |
+| R48A6.1-13 | Cloud gate | validators + unit tests + assembleDebug + signing；Internal Alpine Probe | PASS — W0 #487 + Alpine Probe #76 |
+
+R48a6.1 APK evidence（安装包证据）:
+- functional source: `049e35f8cd32803f13dd33672f059406874b8a9c`
+- artifact: `siftalpha-w0-487` / ID `10639401416`
+- APK SHA-256: `ccf988663935e59c238c2805adb8fd6ed613f565e535c25467a2007fc35124af`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- Real-device repair acceptance: **PENDING（待真机）**
 
 ## R48a6 — Shared Core Realignment（共享核心重新对齐） / External Provider Preflight（外部执行环境前置检查）
 
