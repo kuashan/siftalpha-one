@@ -179,6 +179,7 @@ open class V04Activity : StudioActivity() {
 
     private lateinit var backend: TermuxBackend
     private lateinit var externalProviderPreflight: ExternalProviderPreflight
+    private lateinit var externalProviderUi: ExternalProviderPreflightUiCoordinator
     private lateinit var gateway: V04ProjectGateway
     private lateinit var runtime: ProjectRuntimeController
     private lateinit var secretStore: ProjectSecretStore
@@ -343,6 +344,11 @@ open class V04Activity : StudioActivity() {
         clearLocalizedStateCacheIfNeeded()
         backend = TermuxBackend(this)
         externalProviderPreflight = ExternalProviderPreflight(this, backend)
+        externalProviderUi = ExternalProviderPreflightUiCoordinator(
+            activity = this,
+            backend = backend,
+            preflight = externalProviderPreflight,
+        )
         gateway = V04ProjectGateway(this)
         projectRuntimeSelectionStore = ProjectRuntimeSelectionStore(this)
         runtime = ProjectRuntimeController(
@@ -397,6 +403,7 @@ open class V04Activity : StudioActivity() {
         activityStarted = true
         if (::webAvailability.isInitialized) webAvailability.resume()
         TermuxResultBus.addListener(resultListener)
+        externalProviderUi.onStart()
         if (::prepareLiveProgress.isInitialized) prepareLiveProgress.resume()
         pending.keys.toList().forEach { id ->
             TermuxResultBus.consume(id)?.let(resultListener)
@@ -408,9 +415,21 @@ open class V04Activity : StudioActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (::externalProviderUi.isInitialized) externalProviderUi.onResume()
         if (::projectList.isInitialized) refresh()
         resumeEmbeddedPolling()
         resumeExternalObservations()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (::externalProviderUi.isInitialized) {
+            externalProviderUi.onRequestPermissionsResult(requestCode, grantResults)
+        }
     }
 
     override fun onStop() {
@@ -422,6 +441,7 @@ open class V04Activity : StudioActivity() {
         refreshScheduled = false
         if (::webAvailability.isInitialized) webAvailability.pause()
         if (::prepareLiveProgress.isInitialized) prepareLiveProgress.pause()
+        if (::externalProviderUi.isInitialized) externalProviderUi.onStop()
         TermuxResultBus.removeListener(resultListener)
         super.onStop()
     }
@@ -1849,8 +1869,20 @@ open class V04Activity : StudioActivity() {
         }
     }
 
-    private fun confirmPrepare(project: V04ProjectGateway.RuntimeProject) {
+    private fun confirmPrepare(
+        project: V04ProjectGateway.RuntimeProject,
+        externalPreflightPassed: Boolean = false,
+    ) {
         val controlRequest = selectedRuntimeControlRequest(project)
+        if (
+            controlRequest == RuntimeControlRequest.EXTERNAL_PROVIDER &&
+            !externalPreflightPassed
+        ) {
+            externalProviderUi.runWhenReady {
+                confirmPrepare(project, externalPreflightPassed = true)
+            }
+            return
+        }
         if (controlRequest == RuntimeControlRequest.EXTERNAL_PROVIDER && !ensureRuntime()) return
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.runtime_prepare_title, project.summary.name))
@@ -1911,8 +1943,20 @@ open class V04Activity : StudioActivity() {
         )
     }
 
-    private fun confirmRun(project: V04ProjectGateway.RuntimeProject) {
+    private fun confirmRun(
+        project: V04ProjectGateway.RuntimeProject,
+        externalPreflightPassed: Boolean = false,
+    ) {
         val controlRequest = selectedRuntimeControlRequest(project)
+        if (
+            controlRequest == RuntimeControlRequest.EXTERNAL_PROVIDER &&
+            !externalPreflightPassed
+        ) {
+            externalProviderUi.runWhenReady {
+                confirmRun(project, externalPreflightPassed = true)
+            }
+            return
+        }
         if (!ensureRuntime(requireExternalProvider = controlRequest == RuntimeControlRequest.EXTERNAL_PROVIDER)) {
             return
         }

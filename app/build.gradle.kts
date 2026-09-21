@@ -87,8 +87,10 @@ android {
         // and verified launch-contract learning before the existing deep Web discovery fallback.
         // alpha43-r46.3 fixes generic External Python venv relocation so pip-generated console
         // scripts keep a stable interpreter prefix while failed prepares still roll back cleanly.
-        versionCode = 186
-        versionName = "0.8.0-alpha43-r48a6"
+        // alpha43-r48a7 completes the user-action recovery loop around Shared External Provider
+        // Preflight for PREPARE / RUN without duplicating readiness classification in either UI.
+        versionCode = 187
+        versionName = "0.8.0-alpha43-r48a7"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

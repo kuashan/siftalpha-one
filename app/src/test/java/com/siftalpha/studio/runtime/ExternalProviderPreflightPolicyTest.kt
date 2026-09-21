@@ -103,6 +103,34 @@ class ExternalProviderPreflightPolicyTest {
     }
 
     @Test
+    fun `bridge response without allow external apps evidence is not ready`() {
+        val local = ExternalProviderPreflightPolicy.local(
+            termuxInstalled = true,
+            runCommandPermissionGranted = true,
+        )
+        val result = RuntimeResult(
+            executionId = 30,
+            stdout = "SIFTALPHA_TERMUX_BRIDGE_OK\n",
+            stderr = "",
+            exitCode = 0,
+            internalErrorCode = 0,
+            internalErrorMessage = "",
+        )
+
+        val snapshot = ExternalProviderPreflightPolicy.fromProbe(
+            local = local,
+            result = result,
+            checkedAtEpochMs = 25_000L,
+        )
+
+        assertEquals(
+            ExternalProviderReadinessStatus.BRIDGE_UNAVAILABLE,
+            snapshot.status,
+        )
+        assertFalse(snapshot.ready)
+    }
+
+    @Test
     fun `probe transport failure is bridge unavailable`() {
         val local = ExternalProviderPreflightPolicy.local(
             termuxInstalled = true,

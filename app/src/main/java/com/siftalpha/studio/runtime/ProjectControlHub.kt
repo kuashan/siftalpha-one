@@ -443,9 +443,12 @@ class ProjectRuntimeControlExecutor(
                 failure = ProjectControlHub.Failure.BACKEND_UNAVAILABLE,
                 detail = "TERMUX_BRIDGE_UNAVAILABLE",
             )
-            ExternalProviderReadinessStatus.BRIDGE_PROBE_REQUIRED,
-            ExternalProviderReadinessStatus.READY,
-            -> null
+            ExternalProviderReadinessStatus.BRIDGE_PROBE_REQUIRED -> rejected(
+                action = action,
+                failure = ProjectControlHub.Failure.BACKEND_UNAVAILABLE,
+                detail = "TERMUX_BRIDGE_PROBE_REQUIRED",
+            )
+            ExternalProviderReadinessStatus.READY -> null
         }
     }
 

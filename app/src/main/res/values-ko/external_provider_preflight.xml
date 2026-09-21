@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="external_provider_permission_title">RUN_COMMAND 권한 필요</string>
+    <string name="external_provider_permission_message">이 프로젝트를 준비하거나 실행하려면 SiftAlpha에 Termux RUN_COMMAND 권한이 필요합니다. 허용하면 자동으로 다시 확인합니다.</string>
+    <string name="external_provider_allow">허용</string>
+    <string name="external_provider_permission_denied_title">RUN_COMMAND 권한이 허용되지 않음</string>
+    <string name="external_provider_permission_denied_message">권한이 허용되지 않아 현재 작업을 계속하지 않습니다. 준비 또는 실행을 다시 누르면 다시 권한을 요청할 수 있습니다.</string>
+    <string name="external_provider_termux_missing_title">Termux를 찾을 수 없음</string>
+    <string name="external_provider_termux_missing_message">이 프로젝트는 External Provider / Termux(외부 실행 환경)를 사용하지만 이 기기에서 사용 가능한 Termux를 찾지 못했습니다.</string>
+    <string name="external_provider_configuration_title">Termux가 아직 준비되지 않음</string>
+    <string name="external_provider_configuration_message">allow-external-apps가 활성화되지 않았습니다. “Termux 열기”를 누르면 SiftAlpha가 설정 명령을 복사합니다. Termux에서 붙여넣어 실행한 뒤 SiftAlpha로 돌아오면 자동으로 다시 확인하고 원래 작업을 계속합니다.</string>
+    <string name="external_provider_bridge_unavailable_title">Termux 명령 브리지가 아직 준비되지 않음</string>
+    <string name="external_provider_bridge_unavailable_message">RUN_COMMAND 브리지가 실제 응답 확인을 통과하지 못했습니다. Termux를 열어 시작이 완료될 때까지 기다린 뒤 SiftAlpha로 돌아오세요. 자동으로 다시 확인합니다.</string>
+    <string name="external_provider_open_termux">Termux 열기</string>
+    <string name="external_provider_setup_command_label">SiftAlpha Termux 설정 명령</string>
+    <string name="external_provider_setup_copied">Termux 설정 명령을 복사했습니다. 붙여넣어 실행한 뒤 SiftAlpha로 돌아오세요.</string>
+    <string name="external_provider_termux_open_failed">Termux를 열 수 없습니다.</string>
+</resources>

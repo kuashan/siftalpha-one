@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="external_provider_permission_title">RUN_COMMAND permission required</string>
+    <string name="external_provider_permission_message">SiftAlpha needs Termux RUN_COMMAND permission to prepare or run this project. After you allow it, SiftAlpha will check the provider again automatically.</string>
+    <string name="external_provider_allow">Allow</string>
+    <string name="external_provider_permission_denied_title">RUN_COMMAND not granted</string>
+    <string name="external_provider_permission_denied_message">Permission was not granted, so the current action will not continue. Tap Prepare or Run again when you are ready to authorize it.</string>
+    <string name="external_provider_termux_missing_title">Termux not detected</string>
+    <string name="external_provider_termux_missing_message">This project uses External Provider / Termux, but an available Termux installation was not detected on this device.</string>
+    <string name="external_provider_configuration_title">Termux is not ready</string>
+    <string name="external_provider_configuration_message">allow-external-apps is not enabled. Tap “Open Termux”; SiftAlpha will copy the setup command. Paste and run it in Termux, then return to SiftAlpha. The original action will be checked again and resumed automatically.</string>
+    <string name="external_provider_bridge_unavailable_title">Termux command bridge is not ready</string>
+    <string name="external_provider_bridge_unavailable_message">The RUN_COMMAND bridge did not pass a real response check. Open Termux, let it finish starting, then return to SiftAlpha. SiftAlpha will check again automatically.</string>
+    <string name="external_provider_open_termux">Open Termux</string>
+    <string name="external_provider_setup_command_label">SiftAlpha Termux setup command</string>
+    <string name="external_provider_setup_copied">Termux setup command copied. Paste and run it, then return to SiftAlpha.</string>
+    <string name="external_provider_termux_open_failed">Unable to open Termux.</string>
+</resources>

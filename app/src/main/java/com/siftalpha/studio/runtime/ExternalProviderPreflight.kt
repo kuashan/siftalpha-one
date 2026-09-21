@@ -80,7 +80,8 @@ object ExternalProviderPreflightPolicy {
         val transportSucceeded =
             result.exitCode == 0 &&
                 result.internalErrorMessage.isBlank() &&
-                bridgeMarker
+                bridgeMarker &&
+                allowExternalApps != null
 
         return when {
             !transportSucceeded -> ExternalProviderReadiness(

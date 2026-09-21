@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="external_provider_permission_title">需要 RUN_COMMAND 權限</string>
+    <string name="external_provider_permission_message">SiftAlpha 需要 Termux 的 RUN_COMMAND（外部命令執行）權限，才能準備或執行目前專案。允許後會自動重新檢測。</string>
+    <string name="external_provider_allow">允許</string>
+    <string name="external_provider_permission_denied_title">RUN_COMMAND 未授權</string>
+    <string name="external_provider_permission_denied_message">未取得權限，目前操作不會繼續。你可以再次點擊準備或執行後重新授權。</string>
+    <string name="external_provider_termux_missing_title">未檢測到 Termux</string>
+    <string name="external_provider_termux_missing_message">目前專案選擇了 External Provider / Termux（外部執行環境），但裝置上未檢測到可用的 Termux。</string>
+    <string name="external_provider_configuration_title">Termux 尚未就緒</string>
+    <string name="external_provider_configuration_message">檢測到 allow-external-apps（允許外部應用呼叫）尚未啟用。點擊「開啟 Termux」後，SiftAlpha 會複製設定命令；請在 Termux 中貼上執行，然後返回 SiftAlpha，系統會自動重新檢測並繼續原操作。</string>
+    <string name="external_provider_bridge_unavailable_title">Termux 命令橋尚未就緒</string>
+    <string name="external_provider_bridge_unavailable_message">RUN_COMMAND（命令橋）目前沒有通過實際回應檢測。請開啟 Termux，等待其完成啟動後返回 SiftAlpha；系統會自動重新檢測。</string>
+    <string name="external_provider_open_termux">開啟 Termux</string>
+    <string name="external_provider_setup_command_label">SiftAlpha Termux 設定命令</string>
+    <string name="external_provider_setup_copied">Termux 設定命令已複製，請貼上執行後返回 SiftAlpha。</string>
+    <string name="external_provider_termux_open_failed">無法開啟 Termux。</string>
+</resources>

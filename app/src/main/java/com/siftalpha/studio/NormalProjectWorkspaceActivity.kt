@@ -99,6 +99,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     private lateinit var sharedLifecycleBridge: SharedRuntimeLifecycleBridge
     private lateinit var externalBackend: TermuxBackend
     private lateinit var externalProviderPreflight: ExternalProviderPreflight
+    private lateinit var externalProviderUi: ExternalProviderPreflightUiCoordinator
     private lateinit var configurationUi: ProjectConfigurationUiController
     private val actionExecutor = Executors.newSingleThreadExecutor()
     private val prepareExecutor = Executors.newSingleThreadExecutor()
@@ -153,6 +154,11 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         }
         externalBackend = TermuxBackend(this)
         externalProviderPreflight = ExternalProviderPreflight(this, externalBackend)
+        externalProviderUi = ExternalProviderPreflightUiCoordinator(
+            activity = this,
+            backend = externalBackend,
+            preflight = externalProviderPreflight,
+        )
         sharedLifecycleBridge = SharedRuntimeLifecycleBridge(lifecycleStore)
         controlHub = ProjectControlHub(
             selectionStore = selectionStore,
@@ -185,6 +191,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     override fun onStart() {
         super.onStart()
         TermuxResultBus.addListener(resultListener)
+        externalProviderUi.onStart()
         if (::project.isInitialized) {
             reconcileExternalPrepareOperation()
         }
@@ -192,12 +199,25 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (::externalProviderUi.isInitialized) externalProviderUi.onResume()
         if (::project.isInitialized) refreshSharedState()
     }
 
     override fun onStop() {
+        if (::externalProviderUi.isInitialized) externalProviderUi.onStop()
         TermuxResultBus.removeListener(resultListener)
         super.onStop()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (::externalProviderUi.isInitialized) {
+            externalProviderUi.onRequestPermissionsResult(requestCode, grantResults)
+        }
     }
 
     override fun onDestroy() {
@@ -349,9 +369,15 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         ProjectRuntimeSelection.TERMUX -> getString(R.string.normal_runtime_external)
     }
 
-    private fun prepareProject() {
+    private fun prepareProject(externalPreflightPassed: Boolean = false) {
         if (screenState.value.busy) return
         val selection = selectionStore.read(project.summary.documentId)
+        if (selection == ProjectRuntimeSelection.TERMUX && !externalPreflightPassed) {
+            externalProviderUi.runWhenReady {
+                prepareProject(externalPreflightPassed = true)
+            }
+            return
+        }
         screenState.value = screenState.value.copy(
             busy = false,
             message = getString(R.string.normal_project_preparing),
@@ -400,8 +426,15 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         }
     }
 
-    private fun runProject() {
+    private fun runProject(externalPreflightPassed: Boolean = false) {
         if (screenState.value.busy) return
+        val selection = selectionStore.read(project.summary.documentId)
+        if (selection == ProjectRuntimeSelection.TERMUX && !externalPreflightPassed) {
+            externalProviderUi.runWhenReady {
+                runProject(externalPreflightPassed = true)
+            }
+            return
+        }
         val configuration = configurationUi.snapshot(
             project.summary.documentId,
             project.folderName,
