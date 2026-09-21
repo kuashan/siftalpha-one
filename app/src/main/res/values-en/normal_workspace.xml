@@ -53,9 +53,9 @@
     <string name="normal_prepare_compatibility_confirmed_detail">%1$s compatibility is confirmed: %2$d direct dependencies and %3$d resolved packages.</string>
     <string name="normal_prepare_compatibility_fallback_detail">%1$s has %2$d direct dependencies. Embedded CPython is not suitable, so Internal Alpine will be used.</string>
     <string name="normal_prepare_phase_environment">Preparing runtime environment</string>
-    <string name="normal_prepare_environment_detail">Creating or reusing this project's isolated runtime environment.</string>
+    <string name="normal_prepare_environment_detail">Creating or reusing the isolated runtime environment for this project.</string>
     <string name="normal_prepare_phase_installing">Installing project dependencies</string>
-    <string name="normal_prepare_installing_detail">Installing the components declared by the project's own dependency files.</string>
+    <string name="normal_prepare_installing_detail">Installing the components declared by the project dependency files.</string>
     <string name="normal_prepare_phase_verifying">Verifying environment</string>
     <string name="normal_prepare_verifying_detail">Dependency installation is nearly complete. Verifying that the environment can run.</string>
     <string name="normal_prepare_phase_ready">Preparation complete</string>
