@@ -19,4 +19,8 @@
     <string name="settings_about_summary">로컬 프로젝트, 런타임 및 자동화 작업을 관리하는 모바일 작업 공간입니다.</string>
     <string name="settings_version">버전 %1$s</string>
     <string name="settings_application_id">앱 ID: %1$s</string>
+    <string name="settings_developer_mode_section">개발자 모드</string>
+    <string name="settings_developer_mode_summary">켜면 일반 프로젝트 화면에서 전체 개발자 작업 공간을 열 수 있습니다. 이 설정은 표시되는 항목만 바꾸며 프로젝트 실행을 중지, 재시작하거나 실행 환경을 변경하지 않습니다.</string>
+    <string name="settings_developer_mode_on">켜짐</string>
+    <string name="settings_developer_mode_off">꺼짐</string>
 </resources>
