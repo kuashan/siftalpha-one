@@ -24,6 +24,7 @@ class PrepareLiveProgressController(
     private val gateway: V04ProjectGateway,
     private val runtime: ProjectRuntimeController,
     private val render: (folderName: String, text: String) -> Unit,
+    private val renderSnapshot: ((folderName: String, snapshot: PrepareProgressProbe.Snapshot) -> Unit)? = null,
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private val secretStore = ProjectSecretStore(context)
@@ -65,7 +66,10 @@ class PrepareLiveProgressController(
 
         if (activeMainExecutions.containsKey(folderName)) {
             val snapshot = PrepareProgressProbe.parse(redactProbeOutput(folderName, result.stdout))
-            if (snapshot != null) render(folderName, format(folderName, snapshot))
+            if (snapshot != null) {
+                render(folderName, format(folderName, snapshot))
+                renderSnapshot?.invoke(folderName, snapshot)
+            }
             if (resumed) schedule(folderName, POLL_INTERVAL_MS)
         }
         return true
