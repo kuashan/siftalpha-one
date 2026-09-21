@@ -12,4 +12,13 @@
     <string name="normal_project_developer_title">开发者工具</string>
     <string name="normal_project_developer_summary">打开完整开发者工作区，查看环境、状态、日志和高级运行控制。</string>
     <string name="normal_project_open_developer">进入开发者工作区</string>
+    <string name="normal_runtime_title">运行环境</string>
+    <string name="normal_runtime_current">当前：%1$s</string>
+    <string name="normal_runtime_internal">Internal R（内部执行环境）</string>
+    <string name="normal_runtime_external">External Provider / Termux（外部执行环境）</string>
+    <string name="normal_runtime_internal_short">内部执行</string>
+    <string name="normal_runtime_external_short">外部执行</string>
+    <string name="normal_runtime_selection_locked">项目正在运行或有操作尚未结束，请先停止或等待完成后再切换。</string>
+    <string name="normal_runtime_selection_busy">当前项目正在运行或有操作尚未结束，暂时不能切换运行环境。</string>
+    <string name="normal_runtime_selection_saved">运行环境已切换为：%1$s</string>
 </resources>
