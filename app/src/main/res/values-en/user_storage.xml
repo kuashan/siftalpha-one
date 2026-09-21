@@ -23,4 +23,6 @@
     <string name="user_storage_scan_failed">Runtime storage scan failed. Try again later.</string>
     <string name="user_storage_ready">Storage information is up to date.</string>
     <string name="user_storage_error">Runtime storage action failed</string>
+    <string name="user_storage_scanning_external">Reading Termux Runtime storage…</string>
+    <string name="user_storage_external_checking">Checking Termux. Runtime storage will load automatically when the check completes.</string>
 </resources>
