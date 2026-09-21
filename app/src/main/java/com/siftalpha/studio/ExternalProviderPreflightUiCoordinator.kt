@@ -227,7 +227,7 @@ class ExternalProviderPreflightUiCoordinator(
     }
 
     private fun showTermuxConfigurationDialog() {
-        showActionDialog(
+        showRecoveryDialog(
             title = activity.getString(R.string.external_provider_configuration_title),
             message = activity.getString(R.string.external_provider_configuration_message),
             positiveLabel = activity.getString(R.string.external_provider_open_termux),
@@ -252,7 +252,7 @@ class ExternalProviderPreflightUiCoordinator(
     }
 
     private fun showBridgeUnavailableDialog() {
-        showActionDialog(
+        showRecoveryDialog(
             title = activity.getString(R.string.external_provider_bridge_unavailable_title),
             message = activity.getString(R.string.external_provider_bridge_unavailable_message),
             positiveLabel = activity.getString(R.string.external_provider_open_termux),
@@ -264,7 +264,7 @@ class ExternalProviderPreflightUiCoordinator(
     }
 
     private fun showSetupRecoveryDialog() {
-        showActionDialog(
+        showRecoveryDialog(
             title = activity.getString(R.string.external_provider_setup_recovery_title),
             message = activity.getString(R.string.external_provider_setup_recovery_message),
             positiveLabel = activity.getString(R.string.external_provider_open_termux),
@@ -274,6 +274,48 @@ class ExternalProviderPreflightUiCoordinator(
                 openTermuxForRetry()
             },
         )
+    }
+
+    private fun showRecoveryDialog(
+        title: String,
+        message: String,
+        positiveLabel: String,
+        onPositive: () -> Unit,
+    ) {
+        if (dialogShowing || activity.isFinishing || activity.isDestroyed) return
+        dialogShowing = true
+        val dialog = AlertDialog.Builder(activity)
+            .setTitle(title)
+            .setMessage(message)
+            .setNegativeButton(activity.getString(R.string.common_cancel)) { _, _ ->
+                dialogShowing = false
+                clearPendingAction()
+            }
+            .setNeutralButton(activity.getString(R.string.external_provider_recheck)) { _, _ ->
+                dialogShowing = false
+                retryProbeNow()
+            }
+            .setPositiveButton(positiveLabel) { _, _ ->
+                dialogShowing = false
+                onPositive()
+            }
+            .create()
+        dialog.setOnCancelListener {
+            dialogShowing = false
+            clearPendingAction()
+        }
+        dialog.setOnDismissListener { dialogShowing = false }
+        dialog.show()
+    }
+
+    private fun retryProbeNow() {
+        if (pendingAction == null || activity.isFinishing || activity.isDestroyed) return
+        cancelProbeTimeout()
+        probeExecutionId = null
+        retryOnResume = false
+        onStage(ExternalProviderPreflightUiStage.CHECKING_PROVIDER)
+        preflight.invalidateBridgeEvidence()
+        evaluate()
     }
 
     private fun showActionDialog(

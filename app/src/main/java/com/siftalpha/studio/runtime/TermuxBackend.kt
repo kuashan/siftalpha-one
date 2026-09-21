@@ -75,7 +75,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend {
         val FIRST_RUN_SETUP_COMMAND = """
             mkdir -p ~/.termux
             touch ~/.termux/termux.properties
-            if grep -qE '^\\s*allow-external-apps\\s*=\\s*true\\s*$' ~/.termux/termux.properties; then
+            if grep -qE '^[[:space:]]*allow-external-apps[[:space:]]*=[[:space:]]*true[[:space:]]* ~/.termux/termux.properties; then
               echo 'allow-external-apps already enabled'
             else
               printf '\\nallow-external-apps=true\\n' >> ~/.termux/termux.properties
@@ -87,6 +87,123 @@ class TermuxBackend(private val context: Context) : RuntimeBackend {
         val CONNECTION_TEST = RuntimeCommand(
             shellScript = """
                 if grep -qE '^\\s*allow-external-apps\\s*=\\s*true\\s*$' ~/.termux/termux.properties 2>/dev/null; then
+                  echo 'SIFTALPHA_TERMUX_ALLOW_EXTERNAL_APPS=YES'
+                else
+                  echo 'SIFTALPHA_TERMUX_ALLOW_EXTERNAL_APPS=NO'
+                fi
+                printf 'SIFTALPHA_TERMUX_BRIDGE_OK\\n'
+                uname -m
+            """.trimIndent(),
+            label = "SiftAlpha Studio 连接测试",
+            description = "验证 SiftAlpha Studio 是否可以通过官方 RUN_COMMAND 接口调用 Termux，并检查 allow-external-apps 配置。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login ubuntu -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; python3 --version 2>&1 || true
+                  printf "PIP="; python3 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; python3 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+ ~/.termux/termux.properties; then
+              echo 'allow-external-apps already enabled'
+            else
+              printf '\\nallow-external-apps=true\\n' >> ~/.termux/termux.properties
+            fi
+            termux-reload-settings 2>/dev/null || true
+            echo 'SiftAlpha Studio Termux bridge setup complete.'
+        """.trimIndent()
+
+        val CONNECTION_TEST = RuntimeCommand(
+            shellScript = """
+                if grep -qE '^[[:space:]]*allow-external-apps[[:space:]]*=[[:space:]]*true[[:space:]]* ~/.termux/termux.properties 2>/dev/null; then
+                  echo 'SIFTALPHA_TERMUX_ALLOW_EXTERNAL_APPS=YES'
+                else
+                  echo 'SIFTALPHA_TERMUX_ALLOW_EXTERNAL_APPS=NO'
+                fi
+                printf 'SIFTALPHA_TERMUX_BRIDGE_OK\\n'
+                uname -m
+            """.trimIndent(),
+            label = "SiftAlpha Studio 连接测试",
+            description = "验证 SiftAlpha Studio 是否可以通过官方 RUN_COMMAND 接口调用 Termux，并检查 allow-external-apps 配置。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login ubuntu -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; python3 --version 2>&1 || true
+                  printf "PIP="; python3 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; python3 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+ ~/.termux/termux.properties 2>/dev/null; then
                   echo 'SIFTALPHA_TERMUX_ALLOW_EXTERNAL_APPS=YES'
                 else
                   echo 'SIFTALPHA_TERMUX_ALLOW_EXTERNAL_APPS=NO'

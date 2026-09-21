@@ -17,4 +17,5 @@
     <string name="external_provider_termux_open_failed">Unable to open Termux.</string>
     <string name="external_provider_setup_recovery_title">Check Termux external-app setup</string>
     <string name="external_provider_setup_recovery_message">Termux was opened but the RUN_COMMAND bridge still did not respond. SiftAlpha will copy the one-time setup command. Paste and run it in Termux, then return to SiftAlpha; the original action will be checked again automatically.</string>
+    <string name="external_provider_recheck">Check again</string>
 </resources>

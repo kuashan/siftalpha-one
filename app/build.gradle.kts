@@ -93,8 +93,10 @@ android {
         // preflight / dependency-preparation progress without redesigning Developer Workspace.
         // alpha43-r48a9 restores the R48 shared-workflow contract: both surfaces use the same
         // PREPARE kernel, and Termux setup history is kept separate from current bridge liveness.
-        versionCode = 189
-        versionName = "0.8.0-alpha43-r48a9"
+        // alpha43-r48a10 fixes the actual Termux property probe regex and adds an explicit
+        // Re-check action as a fallback when Android lifecycle-driven bridge re-probe is delayed.
+        versionCode = 190
+        versionName = "0.8.0-alpha43-r48a10"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
