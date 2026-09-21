@@ -7,7 +7,7 @@ import com.siftalpha.studio.project.V04ProjectGateway
  *
  * This hub deliberately owns no Runtime implementation, UI state machine, observation loop,
  * Environment Plan or result presentation. It resolves the project's persisted Runtime selection
- * and delegates RUN / STOP to an injected executor that operates the already accepted Runtime
+ * and delegates PREPARE / RUN / STOP to an injected executor that operates the already accepted Runtime
  * controller/backend.
  *
  * Developer Workspace（开发者工作区） and Normal Mode therefore control the same project Runtime
@@ -32,11 +32,13 @@ class ProjectControlHub internal constructor(
     )
 
     enum class Action {
+        PREPARE,
         RUN,
         STOP,
     }
 
     enum class Failure {
+        ENVIRONMENT_PLAN_BLOCKED,
         CONFIGURATION_REQUIRED,
         ROUTE_REJECTED,
         RUNTIME_BUSY,
@@ -53,6 +55,14 @@ class ProjectControlHub internal constructor(
             val provider: RuntimeOperationProvider,
             val executionId: Int? = null,
             val observedState: RuntimeState = RuntimeState.UNKNOWN,
+        ) : Result
+
+        data class Completed(
+            override val action: Action,
+            val provider: RuntimeOperationProvider,
+            val environmentReady: Boolean,
+            val observedState: RuntimeState = RuntimeState.UNKNOWN,
+            val detail: String? = null,
         ) : Result
 
         data class NoOp(
@@ -87,6 +97,11 @@ class ProjectControlHub internal constructor(
     }
 
     interface Executor {
+        fun prepare(
+            project: V04ProjectGateway.RuntimeProject,
+            selection: ProjectRuntimeSelection,
+        ): Result
+
         fun run(
             project: V04ProjectGateway.RuntimeProject,
             selection: ProjectRuntimeSelection,
@@ -97,6 +112,14 @@ class ProjectControlHub internal constructor(
             project: V04ProjectGateway.RuntimeProject,
             selection: ProjectRuntimeSelection,
         ): Result
+    }
+
+    fun prepare(project: V04ProjectGateway.RuntimeProject): Result {
+        val selection = selectionReader(project.summary.documentId)
+        stateBridge.onActionStarted(project, selection, Action.PREPARE)
+        val result = executor.prepare(project, selection)
+        stateBridge.onActionResult(project, selection, result)
+        return result
     }
 
     fun run(
@@ -120,7 +143,7 @@ class ProjectControlHub internal constructor(
 }
 
 /**
- * Production RUN / STOP executor for ProjectControlHub（项目控制枢纽）.
+ * Production PREPARE / RUN / STOP executor for ProjectControlHub（项目控制枢纽）.
  *
  * The implementation delegates directly to the existing ProjectRuntimeController（项目运行控制器）
  * and RuntimeBackend（运行后端）. It does not depend on V04Activity（开发者运行中心页面） and never
@@ -130,6 +153,104 @@ class ProjectRuntimeControlExecutor(
     private val runtime: ProjectRuntimeController,
     private val externalBackend: RuntimeBackend,
 ) : ProjectControlHub.Executor {
+
+    override fun prepare(
+        project: V04ProjectGateway.RuntimeProject,
+        selection: ProjectRuntimeSelection,
+    ): ProjectControlHub.Result {
+        val resolution = runCatching {
+            runtime.detectEnvironment(
+                project = project,
+                resolveCompatibility = selection == ProjectRuntimeSelection.EMBEDDED_R,
+            )
+        }.getOrElse { error ->
+            return executionFailure(ProjectControlHub.Action.PREPARE, error)
+        }
+        val plan = resolution.plan
+        if (!plan.readyToPrepare) {
+            return rejected(
+                action = ProjectControlHub.Action.PREPARE,
+                failure = ProjectControlHub.Failure.ENVIRONMENT_PLAN_BLOCKED,
+                detail = plan.diagnosticLines().joinToString("\n"),
+            )
+        }
+
+        val route = runCatching {
+            runtime.resolveControlPath(
+                project = project,
+                action = ProjectRuntimeController.Action.PREPARE,
+                request = selection.controlRequest,
+            )
+        }.getOrElse { error ->
+            return executionFailure(ProjectControlHub.Action.PREPARE, error)
+        }
+        if (route.path == RuntimeControlPath.REJECTED) {
+            return rejected(
+                action = ProjectControlHub.Action.PREPARE,
+                failure = ProjectControlHub.Failure.ROUTE_REJECTED,
+                detail = route.reason.name,
+            )
+        }
+
+        return when (route.path) {
+            RuntimeControlPath.EMBEDDED_R -> runCatching {
+                val prepared = runtime.prepareEmbeddedPythonEnvironment(project)
+                val verified = prepared.ready && runtime.embeddedPythonEnvironmentReady(project)
+                if (!verified) {
+                    rejected(
+                        action = ProjectControlHub.Action.PREPARE,
+                        failure = ProjectControlHub.Failure.EXECUTION_FAILED,
+                        detail = "Internal R environment verification failed",
+                    )
+                } else {
+                    ProjectControlHub.Result.Completed(
+                        action = ProjectControlHub.Action.PREPARE,
+                        provider = RuntimeOperationProvider.INTERNAL,
+                        environmentReady = true,
+                        observedState = RuntimeState.UNKNOWN,
+                        detail = prepared.backend.name + ":" + prepared.outcome.name,
+                    )
+                }
+            }.getOrElse { error ->
+                executionFailure(ProjectControlHub.Action.PREPARE, error)
+            }
+
+            RuntimeControlPath.EXTERNAL_PROVIDER -> {
+                if (!externalBackend.isAvailable()) {
+                    return rejected(
+                        action = ProjectControlHub.Action.PREPARE,
+                        failure = ProjectControlHub.Failure.BACKEND_UNAVAILABLE,
+                        detail = runtime.runtimeUnsupportedReason(),
+                    )
+                }
+                if (!plan.supports(EnvironmentBackend.EXTERNAL_PROVIDER)) {
+                    return rejected(
+                        action = ProjectControlHub.Action.PREPARE,
+                        failure = ProjectControlHub.Failure.ENVIRONMENT_PLAN_BLOCKED,
+                        detail = "Environment Plan does not allow External Provider preparation",
+                    )
+                }
+                runCatching {
+                    val command = runtime.prepare(project)
+                    val managed = runtime.wrapCancelableExternalActivity(
+                        project = project,
+                        action = ProjectRuntimeController.Action.PREPARE,
+                        command = command,
+                    )
+                    ProjectControlHub.Result.Dispatched(
+                        action = ProjectControlHub.Action.PREPARE,
+                        provider = RuntimeOperationProvider.EXTERNAL,
+                        executionId = externalBackend.execute(managed),
+                        observedState = RuntimeState.PREPARING,
+                    )
+                }.getOrElse { error ->
+                    executionFailure(ProjectControlHub.Action.PREPARE, error)
+                }
+            }
+
+            RuntimeControlPath.REJECTED -> error("handled above")
+        }
+    }
 
     override fun run(
         project: V04ProjectGateway.RuntimeProject,
@@ -329,25 +450,42 @@ class SharedRuntimeLifecycleBridge(
     private val store: RuntimeLifecycleStore,
 ) : ProjectControlHub.StateBridge {
     private val previousRunState = linkedMapOf<String, RuntimeLifecycleStore.Snapshot>()
+    private val previousPrepareState = linkedMapOf<String, RuntimeLifecycleStore.Snapshot>()
 
     override fun onActionStarted(
         project: V04ProjectGateway.RuntimeProject,
         selection: ProjectRuntimeSelection,
         action: ProjectControlHub.Action,
     ) {
-        if (action != ProjectControlHub.Action.RUN) return
         val projectId = project.summary.documentId
         val current = store.read(projectId)
-        synchronized(previousRunState) {
-            previousRunState[projectId] = current
+        when (action) {
+            ProjectControlHub.Action.PREPARE -> {
+                synchronized(previousPrepareState) {
+                    previousPrepareState[projectId] = current
+                }
+                store.write(
+                    projectKey = projectId,
+                    environmentReady = current.environmentReadyFor(selection),
+                    runtimeState = RuntimeState.PREPARING,
+                    failureReason = null,
+                    runtimeSelection = selection,
+                )
+            }
+            ProjectControlHub.Action.RUN -> {
+                synchronized(previousRunState) {
+                    previousRunState[projectId] = current
+                }
+                store.write(
+                    projectKey = projectId,
+                    environmentReady = current.environmentReadyFor(selection),
+                    runtimeState = RuntimeState.STARTING,
+                    failureReason = null,
+                    runtimeSelection = selection,
+                )
+            }
+            ProjectControlHub.Action.STOP -> Unit
         }
-        store.write(
-            projectKey = projectId,
-            environmentReady = current.environmentReadyFor(selection),
-            runtimeState = RuntimeState.STARTING,
-            failureReason = null,
-            runtimeSelection = selection,
-        )
     }
 
     override fun onActionResult(
@@ -358,7 +496,29 @@ class SharedRuntimeLifecycleBridge(
         val projectId = project.summary.documentId
         val current = store.read(projectId)
         when (result) {
+            is ProjectControlHub.Result.Completed -> when (result.action) {
+                ProjectControlHub.Action.PREPARE -> {
+                    synchronized(previousPrepareState) {
+                        previousPrepareState.remove(projectId)
+                    }
+                    store.write(
+                        projectKey = projectId,
+                        environmentReady = result.environmentReady,
+                        runtimeState = if (result.environmentReady) {
+                            result.observedState
+                        } else {
+                            RuntimeState.ENVIRONMENT_ERROR
+                        },
+                        failureReason = if (result.environmentReady) null else result.detail,
+                        runtimeSelection = selection,
+                    )
+                }
+                ProjectControlHub.Action.RUN,
+                ProjectControlHub.Action.STOP,
+                -> Unit
+            }
             is ProjectControlHub.Result.Dispatched -> when (result.action) {
+                ProjectControlHub.Action.PREPARE -> Unit
                 ProjectControlHub.Action.RUN -> {
                     synchronized(previousRunState) {
                         previousRunState.remove(projectId)
@@ -400,21 +560,71 @@ class SharedRuntimeLifecycleBridge(
                 )
             }
             is ProjectControlHub.Result.Rejected -> {
-                if (result.action == ProjectControlHub.Action.RUN) {
-                    val previous = synchronized(previousRunState) {
+                val previous = when (result.action) {
+                    ProjectControlHub.Action.PREPARE -> synchronized(previousPrepareState) {
+                        previousPrepareState.remove(projectId)
+                    }
+                    ProjectControlHub.Action.RUN -> synchronized(previousRunState) {
                         previousRunState.remove(projectId)
                     }
-                    if (previous != null) {
-                        store.write(
-                            projectKey = projectId,
-                            environmentReady = previous.environmentReadyFor(selection),
-                            runtimeState = previous.runtimeState,
-                            failureReason = previous.failureReason,
-                            runtimeSelection = selection,
-                        )
-                    }
+                    ProjectControlHub.Action.STOP -> null
+                }
+                if (previous != null) {
+                    store.write(
+                        projectKey = projectId,
+                        environmentReady = previous.environmentReadyFor(selection),
+                        runtimeState = previous.runtimeState,
+                        failureReason = previous.failureReason,
+                        runtimeSelection = selection,
+                    )
                 }
             }
         }
+    }
+
+    fun completeExternalPrepare(
+        project: V04ProjectGateway.RuntimeProject,
+        selection: ProjectRuntimeSelection,
+        prepared: Boolean,
+        failureReason: String? = null,
+    ) {
+        val projectId = project.summary.documentId
+        val previous = synchronized(previousPrepareState) {
+            previousPrepareState.remove(projectId)
+        }
+        val current = store.read(projectId)
+        val previousReady = previous?.environmentReadyFor(selection)
+            ?: current.environmentReadyFor(selection)
+        store.write(
+            projectKey = projectId,
+            environmentReady = if (prepared) true else previousReady,
+            runtimeState = when {
+                prepared -> RuntimeState.UNKNOWN
+                previousReady == true -> RuntimeState.UNKNOWN
+                else -> RuntimeState.ENVIRONMENT_ERROR
+            },
+            failureReason = if (prepared) null else failureReason,
+            runtimeSelection = selection,
+        )
+    }
+
+    fun cancelPrepare(
+        project: V04ProjectGateway.RuntimeProject,
+        selection: ProjectRuntimeSelection,
+    ) {
+        val projectId = project.summary.documentId
+        val previous = synchronized(previousPrepareState) {
+            previousPrepareState.remove(projectId)
+        }
+        val current = store.read(projectId)
+        val ready = previous?.environmentReadyFor(selection)
+            ?: current.environmentReadyFor(selection)
+        store.write(
+            projectKey = projectId,
+            environmentReady = ready,
+            runtimeState = RuntimeState.STOPPED_BY_USER,
+            failureReason = null,
+            runtimeSelection = selection,
+        )
     }
 }
