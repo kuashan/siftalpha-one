@@ -68,15 +68,21 @@ class ProjectControlHub internal constructor(
         ) : Result
     }
 
-    fun interface StateBridge {
+    interface StateBridge {
+        fun onActionStarted(
+            project: V04ProjectGateway.RuntimeProject,
+            selection: ProjectRuntimeSelection,
+            action: Action,
+        ) = Unit
+
         fun onActionResult(
             project: V04ProjectGateway.RuntimeProject,
             selection: ProjectRuntimeSelection,
             result: Result,
-        )
+        ) = Unit
 
         companion object {
-            val NONE = StateBridge { _, _, _ -> }
+            val NONE = object : StateBridge {}
         }
     }
 
@@ -98,6 +104,7 @@ class ProjectControlHub internal constructor(
         request: RunRequest = RunRequest(),
     ): Result {
         val selection = selectionReader(project.summary.documentId)
+        stateBridge.onActionStarted(project, selection, Action.RUN)
         val result = executor.run(project, selection, request)
         stateBridge.onActionResult(project, selection, result)
         return result
@@ -105,6 +112,7 @@ class ProjectControlHub internal constructor(
 
     fun stop(project: V04ProjectGateway.RuntimeProject): Result {
         val selection = selectionReader(project.summary.documentId)
+        stateBridge.onActionStarted(project, selection, Action.STOP)
         val result = executor.stop(project, selection)
         stateBridge.onActionResult(project, selection, result)
         return result
@@ -320,6 +328,23 @@ class ProjectRuntimeControlExecutor(
 class SharedRuntimeLifecycleBridge(
     private val store: RuntimeLifecycleStore,
 ) : ProjectControlHub.StateBridge {
+    override fun onActionStarted(
+        project: V04ProjectGateway.RuntimeProject,
+        selection: ProjectRuntimeSelection,
+        action: ProjectControlHub.Action,
+    ) {
+        if (action != ProjectControlHub.Action.RUN) return
+        val projectId = project.summary.documentId
+        val current = store.read(projectId)
+        store.write(
+            projectKey = projectId,
+            environmentReady = current.environmentReadyFor(selection),
+            runtimeState = RuntimeState.STARTING,
+            failureReason = null,
+            runtimeSelection = selection,
+        )
+    }
+
     override fun onActionResult(
         project: V04ProjectGateway.RuntimeProject,
         selection: ProjectRuntimeSelection,
