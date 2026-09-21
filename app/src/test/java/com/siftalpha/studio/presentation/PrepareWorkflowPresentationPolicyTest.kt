@@ -63,9 +63,8 @@ class PrepareWorkflowPresentationPolicyTest {
         planId = "plan",
         detection = ProjectEnvironmentDetection(
             projectFingerprint = "fingerprint",
-            selection = ProjectRuntimeExecutionPlanner.Selection.Resolved(
-                primary = RuntimeKind.PYTHON,
-                supplemental = emptyList(),
+            selection = ProjectRuntimeExecutionPlanner.select(
+                relativePaths = listOf("requirements.txt", "main.py"),
             ),
             primaryRuntime = RuntimeKind.PYTHON,
             supplementalRuntimes = emptyList(),
