@@ -19,4 +19,8 @@
     <string name="settings_about_summary">A mobile workspace for local projects, runtimes, and automation tasks.</string>
     <string name="settings_version">Version %1$s</string>
     <string name="settings_application_id">App ID: %1$s</string>
+    <string name="settings_developer_mode_section">Developer mode</string>
+    <string name="settings_developer_mode_summary">When enabled, the full developer workspace can be opened from the normal project screen. This only changes visible controls and does not stop, restart, or switch a project runtime.</string>
+    <string name="settings_developer_mode_on">On</string>
+    <string name="settings_developer_mode_off">Off</string>
 </resources>
