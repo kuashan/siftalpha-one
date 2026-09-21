@@ -1195,3 +1195,58 @@ Source/cloud gate（源码 / 云端门禁）= PASS（通过）。
 Real-device acceptance（真机验收）= PENDING（待测试）。
 不自动 merge（合并），不移动 baseline（基线）。
 
+## 2026-09-21 · R48-D current state — frozen Developer baseline + product User management（冻结开发者基线 + 用户管理产品化）
+
+Hard boundary（硬边界）：
+
+```text
+Developer Mode = frozen accepted reference surface
+User Mode      = separate product presentation over shared core
+```
+
+User Mode 开发不得以“简化”为理由删除或重排 Developer Mode 已验收功能。
+
+R48-D 已修复 R48-C 对 Developer Home 的回归，恢复原：
+- Termux / Environment probes
+- permission/setup/open controls
+- command output
+- quick actions
+- stage info
+- Home / Runtime / Environment bottom navigation
+- top-right Settings
+
+User Mode 当前首页：
+- 无冗余底部 Home
+- top-right More
+  - Refresh
+  - New project
+  - Runtime storage（简化运行空间）
+  - Settings
+- Project Location 仍在项目主入口区域
+- Unified Import 支持 local PY / ZIP + GitHub link
+- GitHub 不调用 Developer Activity；Normal / Developer 共享 `SharedGitHubImportService` 和现有 clone Runtime command。
+
+Brand display（品牌显示）统一为：
+`SiftAlpha X`
+
+但 technical identity（技术身份）仍保持：
+`com.siftalpha.studio`
+
+Current functional source：
+`7f9548a5f75a68ed0cec9ba2f7ccdccf01ce4e22`
+
+Version：
+- `0.8.0-alpha43-r48d1`
+- versionCode `191`
+
+Cloud evidence：
+- W0 #587: PASS
+- Internal Alpine Probe #81: PASS
+- artifact `siftalpha-w0-587` / ID `10649845758`
+- APK SHA-256 `19ede48b0e3bf556e74804a18d99a0908ef8e67624dc5993980e8a8edc3078b9`
+- signer SHA-256 `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+
+Source/cloud gate（源码 / 云端门禁）= PASS（通过）。
+Real-device acceptance（真机验收）= PENDING（待测试）。
+不自动 merge（合并），不移动 baseline（基线）。
+
