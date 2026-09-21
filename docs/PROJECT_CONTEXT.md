@@ -1029,3 +1029,33 @@ Version: `0.8.0-alpha43-r48a6` / versionCode `186`
 W0 Cloud Build（W0 云端构建） #452 PASS
 APK SHA-256: `54340d798b5f06a32321f9aeff72cb76d0163a254f41e74e606e233f423dd9b2`
 
+
+
+### R48-0G current state — Shared Preflight facts + one shared recovery UI（共享前置检查事实 + 单一共享恢复界面）
+
+External Provider / Termux（外部执行环境） PREPARE（准备） and RUN（运行） now use two shared layers:
+
+1. `ExternalProviderPreflight`（外部执行环境前置检查） owns readiness truth:
+   - Termux installation;
+   - RUN_COMMAND permission;
+   - real bridge response;
+   - explicit `allow-external-apps` evidence;
+   - READY（就绪）.
+2. `ExternalProviderPreflightUiCoordinator`（外部执行环境前置检查界面协调器） owns the common user-recovery orchestration:
+   - request Android RUN_COMMAND permission;
+   - open Termux when configuration/bridge recovery is required;
+   - re-probe after permission or after returning from Termux;
+   - resume the exact interrupted PREPARE / RUN callback only after READY.
+
+Normal Mode（普通模式） and Developer Workspace（开发者工作区） both consume these same two shared layers. Neither surface owns an independent External Provider readiness classifier.
+
+Current installable test version:
+- `0.8.0-alpha43-r48a7`
+- versionCode `187`
+- functional source `78b49fe17d849667603ec31d22f541b9eb50a702`
+- W0 Cloud Build（W0 云端构建） #456 PASS
+- Internal Alpine Probe（内部 Alpine 探针） #69 PASS
+- APK SHA-256 `856b393732ea3d69de0125cf425cca14d4a03f59e313c231d45ab34b3144b51d`
+- real-device acceptance: PENDING（待验收）.
+
+Worker（工作器） remains frozen. STOP（停止） remains project-scoped. Imported project source remains untouched. `applicationId = com.siftalpha.studio` remains unchanged.

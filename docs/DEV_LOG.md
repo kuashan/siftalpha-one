@@ -2105,3 +2105,50 @@ Shared Core source/cloud gate: **PASS（通过）**.
 
 Real-device External Provider permission/bridge behavior remains pending user acceptance.
 
+
+
+## 2026-09-21 · R48-0G — Actionable External Provider Preflight Recovery（可操作的外部执行环境前置检查恢复闭环）
+
+### Trigger（触发原因）
+
+Real-device testing of r48a5 showed that Normal Mode（普通模式） correctly detected `RUN_COMMAND_PERMISSION_REQUIRED`, but only rendered the technical rejection text. The user could not authorize the permission in place and the interrupted PREPARE（准备） action could not automatically continue.
+
+The branch already contained r48a6 Shared External Provider Preflight（共享外部执行环境前置检查） facts and cloud verification. This slice therefore does not rebuild readiness classification. It adds the thin shared presentation/recovery loop required by both UI surfaces.
+
+### Implementation（实现）
+
+- Added one reusable `ExternalProviderPreflightUiCoordinator`（外部执行环境前置检查界面协调器） used by both Normal Mode（普通模式） and Developer Workspace（开发者工作区）.
+- External PREPARE（外部准备） and RUN（外部运行） now require a fresh real bridge response for each user action:
+  1. Termux installed;
+  2. RUN_COMMAND permission granted;
+  3. bridge probe actually responds;
+  4. `allow-external-apps` evidence is explicitly present and enabled;
+  5. only then may the original PREPARE / RUN callback continue.
+- Missing RUN_COMMAND permission now opens an actionable dialog with Cancel / Allow. After Android grants the permission, SiftAlpha automatically invalidates old bridge evidence, performs a fresh probe and resumes the exact original action when READY（就绪）.
+- If `allow-external-apps` is disabled, the shared UI coordinator offers Open Termux（打开 Termux）, copies the existing generic Termux setup command, and keeps the original action pending. Returning to SiftAlpha triggers a fresh probe and automatic continuation only after readiness is proven.
+- If the RUN_COMMAND bridge does not respond, SiftAlpha offers Open Termux（打开 Termux） and rechecks on return.
+- `ExternalProviderPreflightPolicy.fromProbe()` no longer accepts a bridge marker without explicit `allow-external-apps=YES|NO` evidence as READY.
+- `ProjectRuntimeControlExecutor` now hard-blocks `BRIDGE_PROBE_REQUIRED` for External PREPARE / RUN; only shared READY evidence passes.
+- STOP（停止） semantics are unchanged and remain project-scoped; no Worker（工作器）, OCI special case, imported-source rewrite, Runtime provider auto-switch, or applicationId change was introduced.
+
+### Version / cloud evidence（版本 / 云端证据）
+
+- functional source: `78b49fe17d849667603ec31d22f541b9eb50a702`
+- versionName: `0.8.0-alpha43-r48a7`
+- versionCode: `187`
+- applicationId: `com.siftalpha.studio`
+- W0 Cloud Build（W0 云端构建） #456 / run `35574644275`: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #69 / run `35574644266`: PASS（通过）
+- repository validators（仓库校验）: PASS（通过）
+- localization validators（多语言校验）: PASS（通过，840 keys x 5 locales）
+- unit tests（单元测试） + assembleDebug（调试构建）: PASS（通过）
+- stable signer certificate SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- APK SHA-256: `856b393732ea3d69de0125cf425cca14d4a03f59e313c231d45ab34b3144b51d`
+- artifact: `siftalpha-w0-456`, artifact id `10627670368`
+- artifact ZIP digest: `sha256:c90b6ed74b1f828c43c20d01c54ccb88a7bee8362b1bce53e371318a0fc9c979`
+
+### Acceptance state（验收状态）
+
+Source/cloud gate: **PASS（通过）**.
+
+Real-device acceptance remains **PENDING（待验收）**. This version specifically needs verification of permission dialog -> grant -> bridge probe -> automatic PREPARE/RUN continuation, plus the Open Termux recovery path.

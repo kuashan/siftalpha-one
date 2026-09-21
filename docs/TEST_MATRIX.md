@@ -1208,3 +1208,33 @@ R48-0C is cloud-verified but not yet an accepted/frozen baseline.
 | Real-device permission/bridge UX（真机权限/命令桥体验） | permission request + Termux readiness | PENDING USER TEST / THIN UI FOLLOW-UP |
 
 
+
+
+## 2026-09-21 · R48-0G Shared External Provider Preflight Recovery（共享外部执行环境前置检查恢复）
+
+Cloud gate for `0.8.0-alpha43-r48a7` / versionCode `187` / source `78b49fe17d849667603ec31d22f541b9eb50a702`:
+
+- W0 Cloud Build（W0 云端构建） #456: PASS（通过）.
+- Internal Alpine Probe（内部 Alpine 探针） #69: PASS（通过）.
+- repository validators（仓库校验）: PASS（通过）.
+- localization validators（多语言校验）: PASS（通过） — 840 keys x 5 locales.
+- unit tests（单元测试） + assembleDebug（调试构建）: PASS（通过）.
+- APK SHA-256: `856b393732ea3d69de0125cf425cca14d4a03f59e313c231d45ab34b3144b51d`.
+
+Real-device matrix — PENDING（待真机验收）:
+
+1. Select External Provider / Termux（外部执行环境）, revoke SiftAlpha RUN_COMMAND permission, then tap Prepare Project（准备项目）.
+   - Expected: actionable RUN_COMMAND dialog appears with Cancel / Allow; raw `RUN_COMMAND_PERMISSION_REQUIRED` is not the normal recovery path.
+2. Tap Allow（允许） and grant Android permission.
+   - Expected: SiftAlpha automatically performs a fresh RUN_COMMAND bridge probe; the user does not need to return to Home（首页） or manually press a diagnostic button.
+3. With `allow-external-apps=true` already valid:
+   - Expected: bridge becomes READY（就绪） and the original PREPARE（准备） automatically resumes.
+4. With `allow-external-apps` disabled:
+   - Expected: Termux-not-ready dialog appears; Open Termux（打开 Termux） copies the generic setup command. After the command is executed in Termux and the user returns, SiftAlpha re-probes and resumes the original action only after READY.
+5. PREPARE success must stop at READY（就绪） and must not auto-RUN（自动运行）.
+6. Tap RUN（运行） with External Provider selected.
+   - Expected: the same fresh shared preflight runs before start; READY resumes the run, missing permission/config/bridge produces the same recovery loop.
+7. Enable Developer Mode（开发者模式） and repeat External PREPARE / RUN from Developer Workspace（开发者工作区）.
+   - Expected: same shared readiness facts and same recovery coordinator; no second permission/readiness implementation.
+8. STOP（停止） regression:
+   - Expected: STOP still stops all activity owned by the current project only; other projects remain unaffected.
