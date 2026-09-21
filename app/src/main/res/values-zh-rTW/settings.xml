@@ -19,4 +19,8 @@
     <string name="settings_about_summary">用於管理本機專案、執行環境與自動化任務的行動工作區。</string>
     <string name="settings_version">版本 %1$s</string>
     <string name="settings_application_id">應用程式 ID：%1$s</string>
+    <string name="settings_developer_mode_section">開發者模式</string>
+    <string name="settings_developer_mode_summary">開啟後可從一般專案頁面進入完整開發者工作區。此開關只改變可見入口，不會停止、重新啟動或切換專案執行環境。</string>
+    <string name="settings_developer_mode_on">已開啟</string>
+    <string name="settings_developer_mode_off">已關閉</string>
 </resources>
