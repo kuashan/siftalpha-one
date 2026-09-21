@@ -1074,3 +1074,23 @@ Every installable R48 test build must:
 - keep Internal Alpine Probe（内部 Alpine 探针） PASS;
 - receive real-device acceptance before the next R48 slice is treated as accepted.
 
+### R48-0 linked-control hard gates（联动控制硬门禁）
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Normal default（普通模式默认） | fresh launch / Developer Mode（开发者模式） preference unset | Normal Mode（普通模式） is shown; Developer Mode（开发者模式） is OFF（关闭） |
+| Developer unlock（开发者解锁） | enable Developer Mode（开发者模式） | Normal Mode（普通模式） remains primary; an additional Developer Workspace（开发者工作区） entry becomes available |
+| Normal Run linkage（普通运行联动） | press Run（运行） in Normal Mode（普通模式）, then inspect Developer Workspace（开发者工作区） | Developer Workspace observes the same project as RUNNING（运行中）; no second Runtime（运行时） is created |
+| Normal Stop linkage（普通停止联动） | press Stop（停止） in Normal Mode（普通模式）, then inspect Developer Workspace（开发者工作区） | the same project Runtime reaches STOPPED（已停止）; other projects remain unaffected |
+| Developer-to-normal linkage（开发者到普通联动） | start/stop from existing Developer Workspace（开发者工作区）, then return to Normal Mode（普通模式） | Normal Mode reflects the same authoritative state |
+| No hidden UI automation（禁止隐藏界面自动化） | review control path | Normal Mode does not start a hidden V04Activity（运行中心页面）, does not invoke UI button callbacks, and does not simulate clicks |
+| Protected developer surface（保护开发者界面） | source diff for first R48 slice | existing Developer Workspace（开发者工作区） control behavior is unchanged; new Normal Mode（普通模式） integration is additive |
+| Single backend（单一后端） | Run/Stop/Prepare/Refresh path review | Normal Mode delegates through Project Control Hub（项目控制枢纽） to existing shared controller/policy/state contracts |
+| Mode neutrality（模式中立） | toggle Developer Mode（开发者模式） while RUNNING（运行中） | no Runtime restart/stop/clean/provider switch/environment mutation occurs |
+| Project isolation（项目隔离） | project A and B active; control A from Normal Mode | B lifecycle, observation, Web and result state remain unchanged |
+
+Implementation-note gate:
+- “Do not modify Developer Mode（开发者模式）” means the accepted Developer Workspace（开发者工作区） runtime/business-control path is not rewritten for R48-0.
+- Additive shell/routing/settings code may be introduced to expose Normal Mode（普通模式） and the Developer Mode（开发者模式） preference.
+- Any edit to an existing Developer Workspace（开发者工作区） control file requires explicit justification as an unavoidable integration fix and must be called out separately before acceptance.
+
