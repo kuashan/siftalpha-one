@@ -93,4 +93,37 @@
     <string name="home_copy_output">출력 복사</string>
     <string name="home_output_copied">명령 출력이 복사되었습니다</string>
 
+    <string name="home_project_location_title">프로젝트 위치</string>
+    <string name="home_project_location_help">SiftAlpha가 프로젝트를 읽고 저장하는 위치입니다. 위치를 바꿔도 프로젝트 소스는 수정하지 않습니다.</string>
+    <string name="home_project_location_action">프로젝트 위치 선택</string>
+    <string name="home_project_location_current">프로젝트 위치: %1$s</string>
+    <string name="home_project_entry_title">프로젝트</string>
+    <string name="home_import_title">프로젝트 가져오기</string>
+    <string name="home_import_summary">하나의 입구에서 기존 프로젝트를 SiftAlpha에 추가합니다.</string>
+    <string name="home_import_supported">현재 ZIP 프로젝트와 단일 Python 파일을 지원합니다. 가져온 뒤 일반 모드에서 바로 엽니다.</string>
+    <string name="home_import_choose_file">프로젝트 파일 선택</string>
+    <string name="home_import_new_project">빈 프로젝트 만들기</string>
+    <string name="home_more_title">더보기</string>
+    <string name="home_more_developer_title">더보기 / 개발자 도구</string>
+    <string name="home_developer_tools_summary">고급 진단 및 개발용 항목이며 일반 사용자 실행 흐름에는 영향을 주지 않습니다.</string>
+    <string name="home_import_select_location_first">프로젝트를 가져오기 전에 프로젝트 위치를 먼저 선택하세요.</string>
+    <string name="home_import_unknown_file">이름 없는 파일</string>
+    <string name="home_import_unsupported_title">지원하지 않는 파일</string>
+    <string name="home_import_unsupported_message">통합 가져오기는 현재 .zip 및 .py 파일을 지원합니다.
+
+선택: %1$s</string>
+    <string name="home_import_confirm_title">가져오기 확인</string>
+    <string name="home_import_confirm_message">파일: %1$s
+유형: %2$s
+
+프로젝트 이름을 확인하세요.</string>
+    <string name="home_import_kind_python">Python 파일</string>
+    <string name="home_import_kind_zip">ZIP 프로젝트</string>
+    <string name="home_import_kind_unknown">알 수 없는 유형</string>
+    <string name="home_import_action">가져오기</string>
+    <string name="home_import_name_required">프로젝트 이름을 입력하세요.</string>
+    <string name="home_import_project_exists">프로젝트 %1$s가 이미 존재합니다.</string>
+    <string name="home_importing">프로젝트를 가져오는 중…</string>
+    <string name="home_import_complete">프로젝트 %1$s를 가져왔습니다.</string>
+    <string name="home_import_failed">가져오기 실패</string>
 </resources>
