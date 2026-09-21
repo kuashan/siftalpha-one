@@ -209,6 +209,8 @@
     <string name="runtime_source_metadata_failed">소스는 복제되었지만 출처 메타데이터 저장에 실패했습니다: %1$s</string>
     <string name="runtime_current_directory_unsupported">현재 디렉터리에서는 프로젝트를 실행할 수 없습니다</string>
     <string name="runtime_current_directory_unsupported_message">현재 런타임 기능은 프로젝트 루트가 Android 내부 공유 저장소에 있어야 합니다. AcodeProjects 또는 내부 저장소의 다른 디렉터리를 사용하세요.</string>
+    <string name="runtime_external_provider_diagnostics_title">외부 제공자 사전 점검</string>
+    <string name="runtime_external_provider_diagnostics_format">TERMUX_INSTALLED=%1$s\nRUN_COMMAND_PERMISSION=%2$s\nALLOW_EXTERNAL_APPS=%3$s\nBRIDGE_PROBE=%4$s\nEXTERNAL_PROVIDER_READY=%5$s</string>
     <string name="runtime_termux_missing_title">Termux를 찾을 수 없습니다</string>
     <string name="runtime_termux_missing_message">프로젝트 실행은 검증된 Termux 런타임 브리지를 계속 사용합니다.</string>
     <string name="runtime_permission_missing_title">RUN_COMMAND 권한 없음</string>

@@ -29,4 +29,12 @@
     <string name="normal_project_prepare_stopped">프로젝트 준비가 중지되었습니다.</string>
     <string name="normal_project_configuration_saved">구성이 업데이트되었습니다.</string>
     <string name="normal_project_waiting_action">현재 바로 실행할 수 있는 기본 작업이 없습니다. 나중에 상태를 새로 고치거나 개발자 작업 공간에서 세부 정보를 확인하세요.</string>
+    <string name="normal_external_provider_title">외부 실행 환경</string>
+    <string name="normal_external_provider_permission_required">RUN_COMMAND를 통해 Termux를 호출하도록 SiftAlpha를 허용하세요.</string>
+    <string name="normal_external_provider_allow">접근 허용</string>
+    <string name="normal_external_provider_open_termux">Termux를 열고 외부 앱 설정을 완료한 다음 SiftAlpha로 돌아오세요.</string>
+    <string name="normal_external_provider_open_termux_action">Termux 열기</string>
+    <string name="normal_external_provider_check_required">외부 실행 환경 확인이 필요합니다.</string>
+    <string name="normal_external_provider_checking">외부 실행 환경을 확인하는 중…</string>
+    <string name="normal_external_provider_unavailable">외부 실행 환경을 현재 사용할 수 없습니다.</string>
 </resources>
