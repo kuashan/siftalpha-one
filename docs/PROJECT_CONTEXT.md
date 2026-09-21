@@ -940,3 +940,28 @@ Normal Mode（普通模式）
 
 This preserves one backend and two surfaces while allowing the accepted Developer Workspace（开发者工作区） to remain unchanged during the initial R48 slices.
 
+### R48-0B implementation state — first real Normal Mode（普通模式） surface
+
+Implemented functional source: `9266d5ad6272dab6c0616c0cabd3dd44de6419a5`.
+
+R48-0B（第 48 阶段 0B） now provides:
+- Developer Mode（开发者模式） preference in Settings（设置）, default OFF（关闭）;
+- Normal Mode（普通模式） as the default project-opening path;
+- a minimal Normal Project Workspace（普通项目工作区） with shared project status and RUN / STOP（运行 / 停止）;
+- Developer Workspace（开发者工作区） access only when Developer Mode is enabled;
+- developer-only home navigation/diagnostic surfaces hidden while Developer Mode is disabled;
+- Project Control Hub（项目控制枢纽） lifecycle bridging so Normal Mode and the unchanged Developer Workspace can reconcile the same Runtime（运行时） state.
+
+Important current limitation:
+- this first user-visible slice proves the dual-surface control foundation only;
+- Prepare Project（准备项目）, Unified Refresh（统一刷新）, CLI argument UX（命令行参数交互）, native Web launch orchestration（原生网页启动编排）, Open / Result integration（打开 / 结果集成） and configuration editing are not yet Normal Mode workflows;
+- complex projects requiring those flows should continue to use Developer Workspace until the corresponding R48 slices are implemented and accepted.
+
+Cloud evidence:
+- W0 Cloud Build（W0 云端构建） #405 PASS;
+- Internal Alpine Probe（内部 Alpine 探针） #64 PASS for the r48a2 Runtime/build configuration;
+- APK versionCode 182 / versionName 0.8.0-alpha43-r48a2;
+- APK SHA-256 `050fa184165f61a164f3b4051558dd0cfe9a57f145feaecd835176a255400895`.
+
+R48-0B remains pending real-device linked-control acceptance and is not a frozen baseline.
+
