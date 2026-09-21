@@ -1238,3 +1238,33 @@ Real-device matrix — PENDING（待真机验收）:
    - Expected: same shared readiness facts and same recovery coordinator; no second permission/readiness implementation.
 8. STOP（停止） regression:
    - Expected: STOP still stops all activity owned by the current project only; other projects remain unaffected.
+
+
+## 2026-09-21 · R48-0H External Provider Timeout + Normal Mode Prepare Progress（外部环境超时 + 用户模式准备进度）
+
+Cloud gate for `0.8.0-alpha43-r48a8` / versionCode `188` / source `74a0b02cbaa269e61c21927f95663da35421dd66`:
+
+- W0 Cloud Build（W0 云端构建） #457: PASS（通过）.
+- Internal Alpine Probe（内部 Alpine 探针） #70: PASS（通过）.
+- localization validation（多语言校验）: PASS（通过） — 845 keys x 5 locales.
+- unit tests（单元测试） + assembleDebug（调试构建）: PASS（通过）.
+- APK SHA-256: `735a38511b4bda07a440541428b00bb8dbef983a01c8a85e350327fa0a982e60`.
+
+Real-device matrix — PENDING（待真机验收）:
+
+1. External Provider / Termux（外部执行环境）, RUN_COMMAND 未授权, Termux 未打开 -> tap Prepare Project（准备项目）.
+   - Expected: Normal Mode（普通模式） shows waiting-for-authorization state and permission dialog.
+2. Grant RUN_COMMAND while Termux remains unopened.
+   - Expected: status changes to checking Termux; Bridge Probe（命令桥探测） is bounded and cannot wait forever.
+3. If no bridge callback arrives within the bounded timeout.
+   - Expected: Termux-not-ready recovery dialog appears with Open Termux（打开 Termux）.
+4. Open Termux, then return to SiftAlpha.
+   - Expected: preflight automatically re-runs; only READY（就绪） may resume the original PREPARE.
+5. During External PREPARE.
+   - Expected: user-mode status updates from generic preparing to concrete read-only progress stages (venv / requirements / pyproject / finalizing when applicable).
+6. PREPARE completion.
+   - Expected: stops at READY（就绪）; no automatic RUN（运行）.
+7. Developer Workspace（开发者工作区） regression.
+   - Expected: existing page/layout remains unchanged; shared Bridge Probe timeout prevents indefinite waiting.
+8. STOP（停止） regression.
+   - Expected: only the current project is stopped.

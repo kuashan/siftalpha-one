@@ -2152,3 +2152,45 @@ The branch already contained r48a6 Shared External Provider Preflight（共享�
 Source/cloud gate: **PASS（通过）**.
 
 Real-device acceptance remains **PENDING（待验收）**. This version specifically needs verification of permission dialog -> grant -> bridge probe -> automatic PREPARE/RUN continuation, plus the Open Termux recovery path.
+
+
+## 2026-09-21 · R48-0H — Bounded External Provider Probe + Normal Mode Prepare Progress（外部执行环境探测超时 + 用户模式准备进度）
+
+### Trigger（触发原因）
+
+Real-device testing of r48a7 showed that after granting RUN_COMMAND（外部命令执行） permission, Normal Mode（普通模式） could appear frozen when Termux（外部执行环境） had not been opened. The root cause was an unbounded Bridge Probe（命令桥探测） wait before PREPARE（准备） began. During that wait the user-facing project state still looked like “environment not prepared”, so there was no clear distinction between waiting, failure and actual preparation.
+
+### Implementation（实现）
+
+- Added a bounded 5-second Bridge Probe（命令桥探测） timeout to the existing shared External Provider recovery coordinator.
+- Added shared preflight timeout evidence through `ExternalProviderPreflightPolicy.fromTimeout()` / `recordProbeTimeout()`; timeout resolves to `BRIDGE_UNAVAILABLE` instead of waiting forever.
+- Timeout recovery now offers the existing Open Termux（打开 Termux） path; returning to SiftAlpha re-runs the same preflight before the original PREPARE / RUN operation can continue.
+- Normal Mode（普通模式） now shows transient project-status stages for:
+  - checking External Provider（外部执行环境）;
+  - waiting for RUN_COMMAND authorization;
+  - checking Termux readiness;
+  - waiting for Termux/configuration recovery.
+- Normal Mode（普通模式） now reuses the existing read-only `PrepareLiveProgressController` / `PrepareProgressProbe` and shows live environment-preparation stages such as venv creation, requirements installation, pyproject installation and final verification.
+- Developer Workspace（开发者工作区） page/layout code was not changed in this round. It receives the shared timeout fix through the already-shared coordinator only.
+- STOP（停止） remains project-scoped. Worker（工作器） remains frozen. Imported project source is untouched.
+
+### Version / cloud evidence（版本 / 云端证据）
+
+- functional source: `74a0b02cbaa269e61c21927f95663da35421dd66`
+- versionName: `0.8.0-alpha43-r48a8`
+- versionCode: `188`
+- applicationId: `com.siftalpha.studio`
+- W0 Cloud Build（W0 云端构建） #457 / run `35576770836`: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #70 / run `35576770708`: PASS（通过）
+- localization validators（多语言校验）: PASS（通过，845 keys x 5 locales）
+- unit tests（单元测试） + assembleDebug（调试构建）: PASS（通过）
+- stable signer certificate SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- APK SHA-256: `735a38511b4bda07a440541428b00bb8dbef983a01c8a85e350327fa0a982e60`
+- artifact: `siftalpha-w0-457`, artifact id `10628162544`
+- artifact ZIP digest: `sha256:83ee9c5ed97cf522264317c189492c1612e4d0e79004038e026a44600dacb482`
+
+### Acceptance state（验收状态）
+
+Source/cloud gate: **PASS（通过）**.
+
+Real-device acceptance remains **PENDING（待验收）**. Priority test: revoke RUN_COMMAND, tap Prepare Project, grant permission while Termux is not open, verify that “checking Termux” does not hang indefinitely and that the Open Termux recovery appears after the bounded probe timeout. Then verify live Prepare stage updates until READY（就绪）.

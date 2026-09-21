@@ -1059,3 +1059,21 @@ Current installable test version:
 - real-device acceptance: PENDING（待验收）.
 
 Worker（工作器） remains frozen. STOP（停止） remains project-scoped. Imported project source remains untouched. `applicationId = com.siftalpha.studio` remains unchanged.
+
+
+### R48-0H current state — bounded External preflight + visible Normal Mode preparation（外部前置检查有界等待 + 用户模式可见准备进度）
+
+Current installable test version:
+- `0.8.0-alpha43-r48a8`
+- versionCode `188`
+- functional source `74a0b02cbaa269e61c21927f95663da35421dd66`
+- W0 Cloud Build（W0 云端构建） #457 PASS
+- Internal Alpine Probe（内部 Alpine 探针） #70 PASS
+- APK SHA-256 `735a38511b4bda07a440541428b00bb8dbef983a01c8a85e350327fa0a982e60`
+- real-device acceptance: PENDING（待验收）
+
+Architecture boundary:
+- Shared External Provider Preflight（共享外部执行环境前置检查） now has bounded Bridge Probe behavior; no infinite wait is allowed before PREPARE / RUN.
+- Normal Mode（普通模式） exposes preflight and dependency-preparation progress in its project-status card.
+- Developer Workspace（开发者工作区） page/layout remains frozen; this round did not modify `V04Activity.kt`.
+- Shared Core（共享核心） remains the source of readiness truth; Normal Mode only adds user-facing presentation.
