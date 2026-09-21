@@ -85,9 +85,18 @@ class TermuxBackend(private val context: Context) : RuntimeBackend {
         """.trimIndent()
 
         val CONNECTION_TEST = RuntimeCommand(
-            shellScript = "printf 'SIFTALPHA_TERMUX_BRIDGE_OK\\n'; printf 'TERMUX_PREFIX=%s\\n' \"${'$'}PREFIX\"; uname -m",
+            shellScript = """
+                if grep -qE '^\\s*allow-external-apps\\s*=\\s*true\\s*$' "$HOME/.termux/termux.properties" 2>/dev/null; then
+                  echo 'SIFTALPHA_TERMUX_ALLOW_EXTERNAL_APPS=YES'
+                else
+                  echo 'SIFTALPHA_TERMUX_ALLOW_EXTERNAL_APPS=NO'
+                fi
+                printf 'SIFTALPHA_TERMUX_BRIDGE_OK\\n'
+                printf 'TERMUX_PREFIX=%s\\n' "$PREFIX"
+                uname -m
+            """.trimIndent(),
             label = "SiftAlpha Studio 连接测试",
-            description = "验证 SiftAlpha Studio 是否可以通过官方 RUN_COMMAND 接口调用 Termux。",
+            description = "验证 SiftAlpha Studio 是否可以通过官方 RUN_COMMAND 接口调用 Termux，并检查 allow-external-apps 配置。",
         )
 
         val ENVIRONMENT_PROBE = RuntimeCommand(
