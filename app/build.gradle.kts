@@ -89,10 +89,10 @@ android {
         // scripts keep a stable interpreter prefix while failed prepares still roll back cleanly.
         // alpha43-r48a6 realigns Normal Mode and Developer Workspace on the Shared Core and adds
         // the shared External Provider preflight/bridge readiness contract.
-        // R48-D restores the frozen Developer surface, adds Normal Mode Runtime storage
-        // and shared GitHub import, and standardizes user-visible branding as SiftAlpha X.
-        versionCode = 191
-        versionName = "0.8.0-alpha43-r48d1"
+        // R48-D2 adds the explicitly authorized shared background-reliability reminder
+        // and indeterminate Runtime activity indicator without changing Runtime deadlines.
+        versionCode = 192
+        versionName = "0.8.0-alpha43-r48d2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
