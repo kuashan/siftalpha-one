@@ -19,9 +19,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
 import com.siftalpha.studio.project.ProjectStore
+import com.siftalpha.studio.project.SharedGitHubImportService
 import com.siftalpha.studio.project.UnifiedImportKind
 import com.siftalpha.studio.project.UnifiedImportPolicy
 import com.siftalpha.studio.project.V04ProjectGateway
+import com.siftalpha.studio.runtime.ExternalProviderProbeCoordinator
+import com.siftalpha.studio.runtime.ExternalProviderReadiness
+import com.siftalpha.studio.runtime.ProjectRuntimeController
 import com.siftalpha.studio.runtime.RuntimeCommand
 import com.siftalpha.studio.runtime.RuntimeResult
 import com.siftalpha.studio.runtime.TermuxBackend
@@ -41,11 +45,16 @@ class MainActivity : StudioComposeActivity() {
     private lateinit var backend: TermuxBackend
     private lateinit var projectStore: ProjectStore
     private lateinit var projectGateway: V04ProjectGateway
+    private lateinit var projectRuntime: ProjectRuntimeController
+    private lateinit var externalPreflight: ExternalProviderProbeCoordinator
     private val homeState = mutableStateOf(HomeState())
     private var autoBridgeProbeStarted = false
+    private val pendingGitHubImports =
+        mutableMapOf<Int, ProjectRuntimeController.GitHubCloneSpec>()
 
     private val resultListener: (RuntimeResult) -> Unit = { result ->
         runOnUiThread {
+            val githubSpec = pendingGitHubImports.remove(result.executionId)
             val output = buildString {
                 appendLine("executionId = " + result.executionId)
                 appendLine("exitCode = " + result.exitCode)
@@ -76,6 +85,9 @@ class MainActivity : StudioComposeActivity() {
                 },
             )
             refreshTermuxState()
+            if (githubSpec != null) {
+                handleGitHubImportResult(githubSpec, result)
+            }
         }
     }
 
@@ -84,6 +96,8 @@ class MainActivity : StudioComposeActivity() {
         backend = TermuxBackend(this)
         projectStore = ProjectStore(this)
         projectGateway = V04ProjectGateway(this)
+        projectRuntime = ProjectRuntimeController(projectGateway)
+        externalPreflight = ExternalProviderProbeCoordinator.shared(this)
         enableEdgeToEdge()
         setContent {
             StudioTheme {
@@ -97,6 +111,10 @@ class MainActivity : StudioComposeActivity() {
                     onChooseRoot = { chooseProjectRoot(preferAcodeProjects = false) },
                     onNewProject = { showCreateProjectDialog() },
                     onImportProject = { chooseUnifiedImportFile() },
+                    onImportGitHub = { showGitHubImportDialog() },
+                    onUserStorage = {
+                        startActivity(Intent(this, NormalRuntimeStorageActivity::class.java))
+                    },
                     onRefreshProjects = { refreshProjects() },
                     onOpenProject = { openProject(it) },
                     onShowDetails = { showProjectDetails(it) },
@@ -229,6 +247,171 @@ class MainActivity : StudioComposeActivity() {
             }
             REQUEST_UNIFIED_IMPORT -> handleUnifiedImportResult(data)
         }
+    }
+
+    private fun showGitHubImportDialog() {
+        if (projectStore.rootUri() == null) {
+            toast(getString(R.string.home_import_select_location_first))
+            return
+        }
+        if (!ensureGitHubExternalProviderReady()) return
+
+        val url = EditText(this).apply {
+            hint = "https://github.com/owner/repository"
+            setSingleLine(true)
+        }
+        val branch = EditText(this).apply {
+            setText("main")
+            hint = getString(R.string.runtime_github_branch_hint)
+            setSingleLine(true)
+        }
+        val name = EditText(this).apply {
+            hint = getString(R.string.runtime_github_name_hint)
+            setSingleLine(true)
+        }
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(4), dp(18), 0)
+            addView(url)
+            addView(branch)
+            addView(name)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.runtime_github_title))
+            .setMessage(getString(R.string.runtime_github_message))
+            .setView(layout)
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .setPositiveButton(getString(R.string.runtime_github_start)) { _, _ ->
+                val spec = runCatching {
+                    SharedGitHubImportService.parse(
+                        raw = url.text.toString(),
+                        rawBranch = branch.text.toString(),
+                        rawName = name.text.toString(),
+                    ) { reason ->
+                        when (reason) {
+                            SharedGitHubImportService.ParseError.ENTER_ADDRESS ->
+                                getString(R.string.runtime_github_enter_address)
+                            SharedGitHubImportService.ParseError.ONLY_GITHUB_SUPPORTED ->
+                                getString(R.string.runtime_github_only_supported)
+                            SharedGitHubImportService.ParseError.ADDRESS_RULE ->
+                                getString(R.string.runtime_github_address_rule)
+                            SharedGitHubImportService.ParseError.PROJECT_NAME_RULE ->
+                                getString(R.string.runtime_project_name_rule)
+                        }
+                    }
+                }.getOrElse { error ->
+                    AlertDialog.Builder(this)
+                        .setTitle(getString(R.string.runtime_github_parameters_invalid))
+                        .setMessage(error.message ?: getString(R.string.runtime_github_cannot_import))
+                        .setPositiveButton(getString(R.string.common_confirm), null)
+                        .show()
+                    return@setPositiveButton
+                }
+
+                if (projectGateway.folderExists(spec.projectName)) {
+                    toast(getString(R.string.runtime_github_project_exists, spec.projectName))
+                    return@setPositiveButton
+                }
+
+                runCatching {
+                    val id = backend.execute(projectRuntime.cloneGitHub(spec))
+                    pendingGitHubImports[id] = spec
+                    homeState.value = homeState.value.copy(
+                        commandOutput = getString(
+                            R.string.runtime_github_importing_detail,
+                            spec.sourceUrl,
+                            spec.branch,
+                        ),
+                        bridgeState = HomeBridgeState.RUNNING,
+                    )
+                    TermuxResultBus.consume(id)?.let(resultListener)
+                }.onFailure { error ->
+                    AlertDialog.Builder(this)
+                        .setTitle(getString(R.string.runtime_github_import_failed))
+                        .setMessage(error.message ?: getString(R.string.runtime_github_cannot_import))
+                        .setPositiveButton(getString(R.string.common_confirm), null)
+                        .show()
+                }
+            }
+            .show()
+    }
+
+    private fun ensureGitHubExternalProviderReady(): Boolean {
+        val result = externalPreflight.ensureReady()
+        if (result.ready) return true
+        when (result.readiness) {
+            ExternalProviderReadiness.TERMUX_NOT_INSTALLED,
+            ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED,
+            -> AlertDialog.Builder(this)
+                .setTitle(getString(R.string.runtime_termux_missing_title))
+                .setMessage(result.detail ?: getString(R.string.runtime_termux_missing_message))
+                .setNegativeButton(getString(R.string.common_cancel), null)
+                .setPositiveButton(getString(R.string.home_open_termux)) { _, _ -> openTermux() }
+                .show()
+
+            ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED ->
+                requestRunCommandPermission()
+
+            ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED,
+            ExternalProviderReadiness.BRIDGE_CHECKING,
+            -> toast(getString(R.string.normal_external_provider_checking))
+
+            ExternalProviderReadiness.BRIDGE_UNRESPONSIVE -> AlertDialog.Builder(this)
+                .setTitle(getString(R.string.runtime_termux_missing_title))
+                .setMessage(getString(R.string.normal_external_provider_no_response))
+                .setNegativeButton(getString(R.string.common_cancel), null)
+                .setPositiveButton(getString(R.string.home_open_termux)) { _, _ -> openTermux() }
+                .show()
+
+            ExternalProviderReadiness.UNAVAILABLE ->
+                toast(result.detail ?: getString(R.string.normal_external_provider_unavailable))
+
+            ExternalProviderReadiness.READY -> Unit
+        }
+        return false
+    }
+
+    private fun handleGitHubImportResult(
+        spec: ProjectRuntimeController.GitHubCloneSpec,
+        result: RuntimeResult,
+    ) {
+        val cloned = result.successful && "SIFTALPHA_CLONE=OK" in result.stdout
+        if (!cloned) {
+            AlertDialog.Builder(this)
+                .setTitle(getString(R.string.runtime_github_import_failed))
+                .setMessage(
+                    result.stderr
+                        .ifBlank { result.stdout }
+                        .ifBlank { getString(R.string.runtime_github_cannot_import) }
+                        .takeLast(1200),
+                )
+                .setPositiveButton(getString(R.string.common_confirm), null)
+                .show()
+            return
+        }
+
+        Thread {
+            val attached = runCatching {
+                SharedGitHubImportService.attachMetadata(projectGateway, spec)
+            }
+            runOnUiThread {
+                val project = attached.getOrNull()
+                if (project != null) {
+                    refreshProjects()
+                    toast(getString(R.string.runtime_project_imported, spec.projectName))
+                    openProject(project.summary)
+                } else {
+                    AlertDialog.Builder(this)
+                        .setTitle(getString(R.string.runtime_github_import_failed))
+                        .setMessage(
+                            attached.exceptionOrNull()?.message
+                                ?: getString(R.string.runtime_unknown_error),
+                        )
+                        .setPositiveButton(getString(R.string.common_confirm), null)
+                        .show()
+                }
+            }
+        }.start()
     }
 
     private fun chooseUnifiedImportFile() {
