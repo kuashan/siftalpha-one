@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -113,7 +114,7 @@ fun HomeScreen(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var filterIndex by rememberSaveable { mutableIntStateOf(ProjectFilter.ALL.ordinal) }
-    var projectManagementExpanded by rememberSaveable { mutableStateOf(false) }
+    var projectManagementOpen by rememberSaveable { mutableStateOf(false) }
     val selectedFilter = ProjectFilter.entries.getOrElse(filterIndex) { ProjectFilter.ALL }
     val visibleProjects = state.projects.filter { project ->
         matchesProject(project, selectedFilter, query)
@@ -133,6 +134,88 @@ fun HomeScreen(
         HomeBridgeState.SEND_FAILED,
         -> StudioStatusTone.Warning
         else -> StudioStatusTone.Neutral
+    }
+
+    if (projectManagementOpen) {
+        val rootLabel = when {
+            !state.rootSelected -> stringResource(R.string.home_project_root_unselected)
+            state.projectError != null -> stringResource(R.string.home_root_access_failed)
+            else -> stringResource(
+                R.string.home_root_selected,
+                state.rootName ?: stringResource(R.string.home_none),
+            )
+        }
+        AlertDialog(
+            onDismissRequest = { projectManagementOpen = false },
+            title = {
+                Text(text = stringResource(R.string.home_section_project_management))
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(spacing.small),
+                ) {
+                    Text(
+                        text = rootLabel,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    if (state.projectError != null) {
+                        Text(
+                            text = stringResource(
+                                R.string.home_root_read_failed,
+                                state.projectError,
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    StudioPrimaryAction(
+                        label = stringResource(R.string.home_connect_acode),
+                        onClick = {
+                            projectManagementOpen = false
+                            onConnectAcode()
+                        },
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            projectManagementOpen = false
+                            onChooseRoot()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = stringResource(R.string.home_choose_other_root))
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            projectManagementOpen = false
+                            onNewProject()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = stringResource(R.string.home_new_python_project))
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            projectManagementOpen = false
+                            onRefreshProjects()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = stringResource(R.string.home_refresh_projects))
+                    }
+                    Text(
+                        text = stringResource(R.string.home_root_help),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { projectManagementOpen = false }) {
+                    Text(text = stringResource(R.string.common_cancel))
+                }
+            },
+        )
     }
 
     Scaffold(
@@ -240,63 +323,8 @@ fun HomeScreen(
                 StudioSectionCard {
                     StudioPrimaryAction(
                         label = stringResource(R.string.home_section_project_management),
-                        onClick = { projectManagementExpanded = !projectManagementExpanded },
+                        onClick = { projectManagementOpen = true },
                     )
-                    if (projectManagementExpanded) {
-                        Spacer(modifier = Modifier.height(spacing.medium))
-                        val rootLabel = when {
-                            !state.rootSelected -> stringResource(R.string.home_project_root_unselected)
-                            state.projectError != null -> stringResource(R.string.home_root_access_failed)
-                            else -> stringResource(
-                                R.string.home_root_selected,
-                                state.rootName ?: stringResource(R.string.home_none),
-                            )
-                        }
-                        Text(
-                            text = rootLabel,
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        if (state.projectError != null) {
-                            Spacer(modifier = Modifier.height(spacing.small))
-                            Text(
-                                text = stringResource(
-                                    R.string.home_root_read_failed,
-                                    state.projectError,
-                                ),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(spacing.medium))
-                        StudioPrimaryAction(
-                            label = stringResource(R.string.home_connect_acode),
-                            onClick = onConnectAcode,
-                        )
-                        OutlinedButton(
-                            onClick = onChooseRoot,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(text = stringResource(R.string.home_choose_other_root))
-                        }
-                        OutlinedButton(
-                            onClick = onNewProject,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(text = stringResource(R.string.home_new_python_project))
-                        }
-                        OutlinedButton(
-                            onClick = onRefreshProjects,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(text = stringResource(R.string.home_refresh_projects))
-                        }
-                        Spacer(modifier = Modifier.height(spacing.small))
-                        Text(
-                            text = stringResource(R.string.home_root_help),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
 
