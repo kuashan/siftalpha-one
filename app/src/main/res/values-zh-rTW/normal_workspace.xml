@@ -37,4 +37,9 @@
     <string name="normal_external_provider_check_required">需要檢查外部執行環境。</string>
     <string name="normal_external_provider_checking">正在檢查外部執行環境…</string>
     <string name="normal_external_provider_unavailable">外部執行環境目前無法使用。</string>
+    <string name="normal_project_refresh_action">重新整理</string>
+    <string name="normal_project_refreshing">正在重新整理專案狀態…</string>
+    <string name="normal_project_refresh_complete">狀態已更新。</string>
+    <string name="normal_project_open_action">開啟</string>
+    <string name="normal_project_open_unavailable">目前沒有可開啟的網頁或結果。</string>
 </resources>
