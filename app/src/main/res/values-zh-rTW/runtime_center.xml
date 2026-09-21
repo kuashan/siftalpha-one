@@ -209,6 +209,8 @@
     <string name="runtime_source_metadata_failed">原始碼已複製，但來源中繼資料寫入失敗：%1$s</string>
     <string name="runtime_current_directory_unsupported">目前目錄暫時無法執行</string>
     <string name="runtime_current_directory_unsupported_message">目前執行功能要求專案根目錄位於 Android 內部共享儲存空間。建議使用 AcodeProjects 或內部儲存空間中的其他目錄。</string>
+    <string name="runtime_external_provider_diagnostics_title">外部執行環境前置檢查</string>
+    <string name="runtime_external_provider_diagnostics_format">TERMUX_INSTALLED=%1$s\nRUN_COMMAND_PERMISSION=%2$s\nALLOW_EXTERNAL_APPS=%3$s\nBRIDGE_PROBE=%4$s\nEXTERNAL_PROVIDER_READY=%5$s</string>
     <string name="runtime_termux_missing_title">未檢測到 Termux</string>
     <string name="runtime_termux_missing_message">專案執行繼續使用已驗證的 Termux 執行時橋接。</string>
     <string name="runtime_permission_missing_title">RUN_COMMAND 未授權</string>
