@@ -21,4 +21,12 @@
     <string name="normal_runtime_selection_locked">The project is running or an operation is still active. Stop it or wait for completion before switching runtimes.</string>
     <string name="normal_runtime_selection_busy">The project is running or an operation is still active, so the runtime cannot be changed yet.</string>
     <string name="normal_runtime_selection_saved">Runtime changed to: %1$s</string>
+    <string name="normal_project_prepare_action">Prepare project</string>
+    <string name="normal_project_configure_action">Complete configuration</string>
+    <string name="normal_project_preparing">Detecting and preparing the project environment…</string>
+    <string name="normal_project_prepare_ready">Project preparation is complete and the project is ready to run.</string>
+    <string name="normal_project_prepare_failed">Project preparation failed. Review the status details or open the developer workspace.</string>
+    <string name="normal_project_prepare_stopped">Project preparation was stopped.</string>
+    <string name="normal_project_configuration_saved">Configuration updated.</string>
+    <string name="normal_project_waiting_action">No direct primary action is available right now. Refresh later or open the developer workspace for details.</string>
 </resources>
