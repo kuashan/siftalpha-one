@@ -33,7 +33,7 @@ class ProjectPrepareWorkflow(
     fun prepareInternal(
         project: V04ProjectGateway.RuntimeProject,
         progress: ((String) -> Unit)? = null,
-    ): InternalEnvironmentPreparationResult =
+    ): ProjectRuntimeController.InternalEnvironmentPreparationResult =
         runtime.prepareEmbeddedPythonEnvironment(project, progress)
 
     fun externalCommand(
