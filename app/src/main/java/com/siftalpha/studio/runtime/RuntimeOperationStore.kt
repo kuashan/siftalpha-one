@@ -41,9 +41,10 @@ class RuntimeOperationStore internal constructor(
         } else {
             null
         }
-        // r14 persisted External deadlines, but those deadlines were never part of the
-        // backend-owned External contract. Ignore such legacy values during reconciliation.
-        val deadline = if (provider == RuntimeOperationProvider.EXTERNAL) null else persistedDeadline
+        // External deadlines are Android control-operation deadlines. They do not claim that the
+        // provider process stopped, but they must survive Activity recreation so the shared
+        // coordinator can release the project operation lock and require recovery.
+        val deadline = persistedDeadline
         if (generation <= 0L || started <= 0L) return null
         if (deadline != null && deadline < started) return null
         return RuntimeOperationRecord(
