@@ -65,7 +65,12 @@ mkdir -p "$JNI_DIR" "$ASSET_DIR"
 
 download_verified() {
   local url="$1" expected="$2" destination="$3"
-  curl --fail --location --silent --show-error "$url" --output "$destination"
+  # Cloud builders occasionally see transient CDN 504 / connection-reset failures. Retry the exact
+  # immutable source URL, then keep the pinned SHA-256 as the authority for reproducibility.
+  curl --fail --location --silent --show-error \
+    --retry 12 --retry-delay 2 --retry-max-time 360 --retry-all-errors \
+    --connect-timeout 20 \
+    "$url" --output "$destination"
   printf '%s  %s\n' "$expected" "$destination" | sha256sum --check --status
 }
 
