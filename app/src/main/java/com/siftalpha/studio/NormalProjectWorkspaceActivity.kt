@@ -36,6 +36,8 @@ import com.siftalpha.studio.runtime.ProjectRuntimeControlExecutor
 import com.siftalpha.studio.runtime.ProjectRuntimeController
 import com.siftalpha.studio.runtime.ProjectRuntimeSelection
 import com.siftalpha.studio.runtime.ProjectRuntimeSelectionStore
+import com.siftalpha.studio.runtime.ProjectRuntimeSelectionChangePolicy
+import com.siftalpha.studio.runtime.RuntimeOperationStore
 import com.siftalpha.studio.runtime.ProjectSecretStore
 import com.siftalpha.studio.runtime.RuntimeLifecycleStore
 import com.siftalpha.studio.runtime.RuntimeState
@@ -66,6 +68,8 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         val message: String? = null,
         val developerModeEnabled: Boolean = false,
         val runtimeState: RuntimeState = RuntimeState.UNKNOWN,
+        val runtimeSelection: ProjectRuntimeSelection = ProjectRuntimeSelection.TERMUX,
+        val runtimeSelectionCanChange: Boolean = true,
     )
 
     private lateinit var gateway: V04ProjectGateway
@@ -73,6 +77,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     private lateinit var runtime: ProjectRuntimeController
     private lateinit var selectionStore: ProjectRuntimeSelectionStore
     private lateinit var lifecycleStore: RuntimeLifecycleStore
+    private lateinit var operationStore: RuntimeOperationStore
     private lateinit var controlHub: ProjectControlHub
     private lateinit var configurationUi: ProjectConfigurationUiController
     private val actionExecutor = Executors.newSingleThreadExecutor()
@@ -95,6 +100,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             }
         selectionStore = ProjectRuntimeSelectionStore(this)
         lifecycleStore = RuntimeLifecycleStore(this)
+        operationStore = RuntimeOperationStore(this)
         runtime = ProjectRuntimeController(
             gateway = gateway,
             embeddedPythonSession = EmbeddedPythonSession.shared(this),
@@ -128,6 +134,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                     onBack = { onBackPressedDispatcher.onBackPressed() },
                     onRun = { runProject() },
                     onStop = { stopProject() },
+                    onSelectRuntime = { selectRuntime(it) },
                     onOpenDeveloper = { openDeveloperWorkspace() },
                 )
             }
@@ -165,6 +172,12 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         }
 
         val lifecycle = lifecycleStore.read(projectId)
+        val selectionCanChange = ProjectRuntimeSelectionChangePolicy.canChange(
+            ProjectRuntimeSelectionChangePolicy.Input(
+                runtimeState = lifecycle.runtimeState,
+                operation = operationStore.read(projectId),
+            ),
+        )
         screenState.value = screenState.value.copy(
             projectName = project.summary.name,
             statusLabel = lifecycle.runtimeState.uiLabel(
@@ -174,7 +187,42 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             message = message,
             developerModeEnabled = DeveloperModeStore(this).isEnabled(),
             runtimeState = lifecycle.runtimeState,
+            runtimeSelection = selection,
+            runtimeSelectionCanChange = selectionCanChange,
         )
+    }
+
+    private fun selectRuntime(selection: ProjectRuntimeSelection) {
+        if (screenState.value.busy) return
+        val projectId = project.summary.documentId
+        val current = selectionStore.read(projectId)
+        if (current == selection) return
+
+        refreshSharedState()
+        val lifecycle = lifecycleStore.read(projectId)
+        val canChange = ProjectRuntimeSelectionChangePolicy.canChange(
+            ProjectRuntimeSelectionChangePolicy.Input(
+                runtimeState = lifecycle.runtimeState,
+                operation = operationStore.read(projectId),
+            ),
+        )
+        if (!canChange) {
+            refreshSharedState(getString(R.string.normal_runtime_selection_busy))
+            return
+        }
+
+        selectionStore.write(projectId, selection)
+        refreshSharedState(
+            getString(
+                R.string.normal_runtime_selection_saved,
+                runtimeSelectionLabel(selection),
+            ),
+        )
+    }
+
+    private fun runtimeSelectionLabel(selection: ProjectRuntimeSelection): String = when (selection) {
+        ProjectRuntimeSelection.EMBEDDED_R -> getString(R.string.normal_runtime_internal)
+        ProjectRuntimeSelection.TERMUX -> getString(R.string.normal_runtime_external)
     }
 
     private fun runProject() {
@@ -248,6 +296,7 @@ private fun NormalProjectWorkspaceScreen(
     onBack: () -> Unit,
     onRun: () -> Unit,
     onStop: () -> Unit,
+    onSelectRuntime: (ProjectRuntimeSelection) -> Unit,
     onOpenDeveloper: () -> Unit,
 ) {
     val spacing = StudioThemeTokens.spacing
@@ -288,6 +337,58 @@ private fun NormalProjectWorkspaceScreen(
                     Spacer(modifier = Modifier.height(spacing.small))
                     Text(
                         text = message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            StudioSectionCard {
+                Text(
+                    text = stringResource(R.string.normal_runtime_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(modifier = Modifier.height(spacing.small))
+                Text(
+                    text = stringResource(
+                        R.string.normal_runtime_current,
+                        when (state.runtimeSelection) {
+                            ProjectRuntimeSelection.EMBEDDED_R ->
+                                stringResource(R.string.normal_runtime_internal)
+                            ProjectRuntimeSelection.TERMUX ->
+                                stringResource(R.string.normal_runtime_external)
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Spacer(modifier = Modifier.height(spacing.medium))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.small),
+                ) {
+                    OutlinedButton(
+                        onClick = { onSelectRuntime(ProjectRuntimeSelection.EMBEDDED_R) },
+                        enabled = state.runtimeSelectionCanChange &&
+                            state.runtimeSelection != ProjectRuntimeSelection.EMBEDDED_R &&
+                            !state.busy,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(text = stringResource(R.string.normal_runtime_internal_short))
+                    }
+                    OutlinedButton(
+                        onClick = { onSelectRuntime(ProjectRuntimeSelection.TERMUX) },
+                        enabled = state.runtimeSelectionCanChange &&
+                            state.runtimeSelection != ProjectRuntimeSelection.TERMUX &&
+                            !state.busy,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(text = stringResource(R.string.normal_runtime_external_short))
+                    }
+                }
+                if (!state.runtimeSelectionCanChange) {
+                    Spacer(modifier = Modifier.height(spacing.small))
+                    Text(
+                        text = stringResource(R.string.normal_runtime_selection_locked),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
