@@ -2181,3 +2181,59 @@ REAL DEVICE ACCEPTANCE（真机验收）仍为 PENDING（待测试）。
 5. 改变 Browser（浏览器）选择不得改变 Prepare / Environment Plan。
 6. Developer Workspace 与 Normal Mode 继续观察同一 Runtime / Environment / Web / Result 事实。
 
+## 2026-09-21 · R48-B2 Termux Probe Soft Timeout（Termux 探测软超时）
+
+### Real-device finding（真机发现）
+
+在 Normal Mode（普通模式）选择 External Provider / Termux（外部执行环境）且 Termux 未打开时，Shared External Provider Probe（共享外部执行环境探测）会进入 `BRIDGE_CHECKING`（正在检查）并无限等待回调。
+
+### Repair（修复）
+
+Functional source（功能源码）：
+`10af831cf725e5b01a090b84e526e6339bbc6d33`
+
+- `ExternalProviderProbeCoordinator`（外部执行环境探测协调器）新增 3 秒 response soft timeout（响应软超时）。
+- 3 秒未收到当前 executionId（执行编号）的回调时：
+  - 不再永久停留在 `BRIDGE_CHECKING`；
+  - 写入 `BRIDGE_UNRESPONSIVE`（桥接无响应）事实；
+  - 不把“未响应”误判为 Termux 配置失败；
+  - UI 显示“3 秒内未检测到 Termux 响应”，并提供“打开 Termux / 重新检测”。
+- 用户从 Termux 返回 SiftAlpha 后，Normal Mode（普通模式）现有 `onResume`（恢复）路径会对 `BRIDGE_UNRESPONSIVE` 自动重新探测。
+- Probe timeout（探测超时）后迟到的旧 callback（回调）会被 executionId fencing（执行编号隔离）忽略，不能把新状态改回 READY（就绪）。
+- Developer Workspace（开发者工作区）只补最小 `BRIDGE_UNRESPONSIVE` 展示分支；Runtime / Environment（运行时 / 环境）核心没有重写。
+- Browser（浏览器）、Prepare（准备）、Environment Plan（环境计划）语义不变。
+
+### Version（版本）
+
+- versionName: `0.8.0-alpha43-r48b2`
+- versionCode: `189`
+- applicationId: `com.siftalpha.studio`
+
+### Cloud verification（云端验证）
+
+- Internal Alpine Probe（内部 Alpine 探针） #78: PASS（通过）。
+- W0 #503: FAIL（失败）— 编译发现 Developer Workspace 缺少新增 `BRIDGE_UNRESPONSIVE` 的 exhaustive when（完整分支），已修复。
+- W0 #504 attempt 1: FAIL（失败）— `curl 504` 下载故障，属于云端网络瞬时错误，不是源码失败。
+- W0 #504 attempt 2: PASS（通过）。
+- repository validators（仓库校验）: PASS。
+- unit tests + assembleDebug（单元测试 + 调试构建）: PASS。
+- artifact: `siftalpha-w0-504`
+- artifact ID: `10644261286`
+- artifact ZIP digest: `sha256:067bde4cf73fe7984dac12e373a7e2837fd44ab92cece072aeb008b574454147`
+- APK SHA-256: `1bbeea37e632a0c3a61d5746ba0c32b443b2db834a00bca7bee3560ac5caee34`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- APK Signature Scheme v2: verified。
+
+### Acceptance（验收）
+
+CODE/CLOUD COMPLETE（代码 / 云端完成）。
+
+REAL DEVICE ACCEPTANCE（真机验收）= PENDING（待测试）。
+
+重点真机验收：
+1. Termux 未打开时，最多约 3 秒结束“正在检查”。
+2. 显示“打开 Termux / 重新检测”。
+3. 打开 Termux 后返回 SiftAlpha，自动重新检测。
+4. Termux 正常时恢复 READY（就绪），并可继续 Prepare（准备）。
+5. 旧超时回调不能污染新的探测结果。
+
