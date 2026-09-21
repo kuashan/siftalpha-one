@@ -12,4 +12,13 @@
     <string name="normal_project_developer_title">Developer tools</string>
     <string name="normal_project_developer_summary">Open the full developer workspace for environment, status, logs, and advanced runtime controls.</string>
     <string name="normal_project_open_developer">Open developer workspace</string>
+    <string name="normal_runtime_title">Runtime</string>
+    <string name="normal_runtime_current">Current: %1$s</string>
+    <string name="normal_runtime_internal">Internal R</string>
+    <string name="normal_runtime_external">External Provider / Termux</string>
+    <string name="normal_runtime_internal_short">Internal</string>
+    <string name="normal_runtime_external_short">External</string>
+    <string name="normal_runtime_selection_locked">The project is running or an operation is still active. Stop it or wait for completion before switching runtimes.</string>
+    <string name="normal_runtime_selection_busy">The project is running or an operation is still active, so the runtime cannot be changed yet.</string>
+    <string name="normal_runtime_selection_saved">Runtime changed to: %1$s</string>
 </resources>
