@@ -23,8 +23,8 @@ class PrepareLiveProgressController(
     private val backend: TermuxBackend,
     private val gateway: V04ProjectGateway,
     private val runtime: ProjectRuntimeController,
-    private val render: (folderName: String, text: String) -> Unit,
     private val renderSnapshot: ((folderName: String, snapshot: PrepareProgressProbe.Snapshot) -> Unit)? = null,
+    private val render: (folderName: String, text: String) -> Unit,
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private val secretStore = ProjectSecretStore(context)
