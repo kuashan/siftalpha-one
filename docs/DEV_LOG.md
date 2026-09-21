@@ -2117,3 +2117,67 @@ REAL DEVICE FIX COMPLETE（真机修复完成）**尚不能声明**。
 - STOP 仍只影响当前项目；
 - Internal CPython / Internal Alpine（内部运行环境）无回归。
 
+## 2026-09-21 · R48-B Normal Mode Observation + Open Closure（普通模式观察 + 打开闭环）
+
+### Goal（目标）
+
+在不复制 Developer Workspace（开发者工作区） Runtime orchestration（运行编排）的前提下，补齐 Normal Mode（普通模式）第一版用户闭环：
+
+- Unified Refresh（统一刷新）
+- Open（打开）
+- shared Web / Result evidence（共享网页 / 结果事实）
+- browser selection separation（浏览器选择与环境/运行解耦）
+
+### Implementation（实现）
+
+Functional source（功能源码）：
+`36d610baf89fa0af0380119b476901db51b7399b`
+
+- Normal Mode 新增 Refresh（刷新）和 Open（打开）用户操作。
+- Internal R（内部执行环境）刷新直接读取既有 embedded session snapshot（内部会话快照），不创建第二套 Runtime。
+- External Provider（外部执行环境）刷新复用既有 `RuntimeAutoObservationPolicy`（运行自动观察策略）：
+  - active/unknown -> STATUS（状态查询）
+  - terminal -> final LOGS（最终日志）
+  - STATUS 发现 terminal 后同一次用户刷新自动接续 final LOGS。
+- STATUS / LOGS 仍由 `ProjectOperationCoordinator`（项目操作协调器）统一拥有 generation / executionId / deadline，不建立第二套 operation owner（操作所有者）。
+- Web capability（网页能力）由 `WebProjectInspector`（网页项目检查器）从项目事实识别；Run（运行）将 webLogDiscoveryAllowed / webHintPorts 传入既有 Runtime controller（运行控制器）。
+- Browser selection（浏览器选择）只在 Open（打开）真实网页时读取 `StudioBrowser`；它不参与 Environment Detection / Environment Plan / Prepare / Runtime backend selection（环境检测 / 环境计划 / 准备 / 运行后端选择）。
+- Web candidate（网页候选）继续进入既有 `RuntimeWebStateStore`，Android endpoint probe（端点探测）继续由 `RuntimeWebAvailabilityTracker` 验证。
+- Result Web（结果网页）继续复用 `RuntimeProgramOutputExtractor`、`AdaptiveResultAnalyzer`、`AdaptiveResultHtmlRenderer`、`ResultWebStore`。
+- Rich Result（富结果）继续复用 `RichResultParser` / `RichResultLifecyclePolicy`。
+- Open（打开）继续按 `PresentationTargetResolver` 优先级：WEB -> RESULT_WEB -> RICH_RESULT -> NONE。
+- Developer Workspace（开发者工作区）的成熟 Runtime / Environment 核心未重写。
+
+### Version（版本）
+
+- versionName: `0.8.0-alpha43-r48b1`
+- versionCode: `188`
+- applicationId: `com.siftalpha.studio`
+
+### Cloud verification（云端验证）
+
+- W0 Cloud Build（W0 云端构建） #494 / run ID `35607290953`: **PASS（通过）**
+- Internal Alpine Probe（内部 Alpine 探针） #77 / run ID `35607290951`: **PASS（通过）**
+- repository validators（仓库校验）: PASS
+- unit tests（单元测试） + assembleDebug（调试构建）: PASS
+- artifact: `siftalpha-w0-494`
+- artifact ID: `10642481822`
+- artifact ZIP digest: `sha256:c304bf71e5ea774d237d52814c114a7951d2177373de6977b511ec902d92bbdb`
+- APK SHA-256: `6893879eeeddb4354f19882b11e6ff38fa40e91d274604be064228bbb932d640`
+- signer certificate SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- APK Signature Scheme v2: verified
+
+### Acceptance state（验收状态）
+
+CODE/CLOUD COMPLETE（代码 / 云端完成）。
+
+REAL DEVICE ACCEPTANCE（真机验收）仍为 PENDING（待测试）。
+
+重点真机检查：
+1. Internal R 与 External Provider 均可在 Normal Mode 点击 Refresh 得到真实状态。
+2. External Runtime 退出后，一次 Refresh 会自动完成 STATUS -> final LOGS，而不要求用户理解两个命令。
+3. 一次性任务成功后 Open 能打开 Result Web / Rich Result。
+4. Web 项目运行中，Open 仅在 Endpoint Probe 证实可达后打开网页。
+5. 改变 Browser（浏览器）选择不得改变 Prepare / Environment Plan。
+6. Developer Workspace 与 Normal Mode 继续观察同一 Runtime / Environment / Web / Result 事实。
+
