@@ -1711,3 +1711,65 @@ For R48-0 / R48-A（第 48 阶段 0 / A）:
 - prefer adding new files/classes for Normal Mode（普通模式）, Developer Mode（开发者模式） preference, routing, and Project Control Hub（项目控制枢纽）;
 - any unavoidable change to existing Developer Workspace（开发者工作区） must be isolated, justified, regression-tested, and explicitly reported before acceptance.
 
+## 2026-09-21 · R48-0A implementation — Project Control Hub（项目控制枢纽） RUN / STOP foundation
+
+### Scope
+
+The first R48（第 48 阶段） code slice implements only the shared RUN（运行） / STOP（停止） control boundary required by Normal Mode（普通模式）.
+
+No Normal Mode UI（普通模式界面） is wired yet.
+
+### Added
+
+- New `ProjectControlHub`（项目控制枢纽）:
+  - resolves the project's persisted `ProjectRuntimeSelection`（项目运行环境选择） on every action;
+  - exposes only RUN（运行） and STOP（停止） in this first slice;
+  - owns no second Runtime（运行时） state machine;
+  - owns no Environment Detection / Plan / Prepare（环境检测 / 计划 / 准备） implementation;
+  - owns no observation, Web, result or raw-log presentation logic.
+
+- New `ProjectRuntimeControlExecutor`（项目运行控制执行器）:
+  - delegates Internal RUN to existing `ProjectRuntimeController.startEmbeddedPython()`;
+  - delegates Internal STOP to existing `ProjectRuntimeController.requestEmbeddedPythonStop()`;
+  - delegates External RUN to existing `ProjectRuntimeController.start()` plus the existing project-scoped external activity wrapper and existing `RuntimeBackend.execute()`;
+  - delegates External STOP to existing `ProjectRuntimeController.stop()` and existing `RuntimeBackend.execute()`;
+  - does not start a hidden `V04Activity`（开发者运行中心页面） and does not simulate Developer Workspace（开发者工作区） button clicks;
+  - preserves the rule that an Embedded R（内部运行环境） project with no active internal session does not accidentally fall through to an unrelated External Provider（外部运行环境提供者） STOP.
+
+- New `ProjectControlHubTest`（项目控制枢纽测试） covers:
+  - current persisted Runtime selection is re-read for each action;
+  - exact project identity is forwarded;
+  - STOP for project A never becomes a STOP for project B;
+  - required-configuration state is forwarded to the executor instead of being independently reinterpreted by the hub;
+  - the hub has no independent RuntimeState（运行状态） store.
+
+### Protected Developer Workspace（开发者工作区）
+
+This implementation does not modify `V04Activity.kt` or any existing Developer Workspace（开发者工作区） control behavior.
+
+Source diff for this slice before documentation contains only:
+- new `ProjectControlHub.kt`;
+- new `ProjectControlHubTest.kt`;
+- version bump in `app/build.gradle.kts`.
+
+### Version / cloud evidence
+
+- versionName: `0.8.0-alpha43-r48a1`
+- versionCode: `181`
+- implementation source commit: `b8933b4ef7812896d4e15b691fd116d140688a34`
+- W0 Cloud Build（W0 云端构建） #378: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #63: PASS（通过）
+- repository validators（仓库校验）: PASS（通过）
+- unit tests（单元测试）: PASS（通过）
+- assembleDebug（Debug 构建）: PASS（通过）
+- APK artifact（安装包产物）: `siftalpha-w0-378`, artifact id `10622608310`
+- artifact ZIP digest: `sha256:44858259e650f45adc0413b3ee6bed61802bf804720d56e1996c2da90163297d`
+- APK SHA-256: `6edaef1d9c8d2008b1123848d0bdcd5bad7712ca75512e34a9760c48cca4e14f`
+- applicationId（应用标识） remains `com.siftalpha.studio`.
+
+### Acceptance state
+
+R48-0A（第 48 阶段 0A） has passed source/cloud verification, but it is not promoted to a frozen baseline.
+
+The hub is intentionally not user-visible yet. The next slice must wire the Developer Mode（开发者模式） preference / routing and a minimal Normal Mode（普通模式） shell to this hub before meaningful real-device linked-control acceptance can be performed.
+
