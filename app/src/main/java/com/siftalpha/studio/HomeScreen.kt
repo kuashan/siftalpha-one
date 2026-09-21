@@ -524,18 +524,20 @@ fun HomeScreen(
     
                 }
 
-            item {
-                StudioSectionCard {
-                    Text(
-                        text = stringResource(R.string.home_section_stage),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Spacer(modifier = Modifier.height(spacing.small))
-                    Text(
-                        text = stringResource(R.string.home_stage_text, versionName),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            if (state.developerModeEnabled) {
+                item {
+                    StudioSectionCard {
+                        Text(
+                            text = stringResource(R.string.home_section_stage),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Spacer(modifier = Modifier.height(spacing.small))
+                        Text(
+                            text = stringResource(R.string.home_stage_text, versionName),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
