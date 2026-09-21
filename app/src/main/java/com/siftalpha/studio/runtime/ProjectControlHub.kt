@@ -610,6 +610,21 @@ class SharedRuntimeLifecycleBridge(
         )
     }
 
+    fun completeExternalStop(
+        project: V04ProjectGateway.RuntimeProject,
+        selection: ProjectRuntimeSelection,
+    ) {
+        val projectId = project.summary.documentId
+        val current = store.read(projectId)
+        store.write(
+            projectKey = projectId,
+            environmentReady = current.environmentReadyFor(selection),
+            runtimeState = RuntimeState.STOPPED_BY_USER,
+            failureReason = null,
+            runtimeSelection = selection,
+        )
+    }
+
     fun cancelPrepare(
         project: V04ProjectGateway.RuntimeProject,
         selection: ProjectRuntimeSelection,
