@@ -915,3 +915,28 @@ STOP（停止） remains an independent project-scoped preemptive control. CLEAN
 
 Each phase must remain independently testable and must preserve the accepted R47（第 47 阶段） Runtime / Environment contracts.
 
+### R48-0 hard requirement update — linked control without modifying the accepted Developer Workspace（开发者工作区）
+
+R48（第 48 阶段） adopts the following hard product and implementation rules:
+
+- Normal Mode（普通模式） is always the default user surface.
+- Developer Mode（开发者模式） defaults OFF（关闭） and, when enabled, only exposes an additional entry to the existing Developer Workspace（开发者工作区）; it does not replace the Normal Mode（普通模式） home/project flow.
+- Normal Mode（普通模式） Run（运行） / Stop（停止） must operate the exact same project Runtime（运行时） that Developer Workspace（开发者工作区） observes and controls.
+- The first R48 implementation treats the current Developer Workspace（开发者工作区） code path as protected. Normal Mode（普通模式） must be added around it, not by rewriting it.
+- A new Project Control Hub（项目控制枢纽） is the required integration boundary for Normal Mode（普通模式）.
+- The hub must delegate to existing shared controller/policy/state contracts and must not reproduce Developer Workspace（开发者工作区） logic.
+- “linked control” does not mean launching Developer Workspace（开发者工作区） invisibly or programmatically clicking its UI controls. Hidden Activity（页面） automation would couple product behavior to UI lifecycle and is prohibited.
+- Developer Mode（开发者模式） remains a presentation/access feature only. Runtime（运行时）, Environment（环境）, Session（会话）, Generation（代际）, Ownership（归属） and project operation state remain independent of the mode setting.
+
+Control topology:
+
+```text
+Normal Mode（普通模式）
+  -> Project Control Hub（项目控制枢纽）
+     -> existing shared policies/controllers
+        -> same Runtime（运行时） / Environment（环境） / Observation（观察） state
+           <- existing Developer Workspace（开发者工作区）
+```
+
+This preserves one backend and two surfaces while allowing the accepted Developer Workspace（开发者工作区） to remain unchanged during the initial R48 slices.
+
