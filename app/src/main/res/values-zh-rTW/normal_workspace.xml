@@ -71,4 +71,5 @@
     <string name="normal_prepare_runtime_python">Python 專案</string>
     <string name="normal_prepare_runtime_node">Node.js 專案</string>
     <string name="normal_prepare_runtime_unknown">目前專案</string>
+    <string name="normal_prepare_config_required_detail">環境已準備完成，還需要完成 %1$d 項必要設定後才能執行。</string>
 </resources>
