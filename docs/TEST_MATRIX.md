@@ -1004,3 +1004,73 @@ Real-device gate:
 
 Accepted functional source: `d611d18d08cf03b411cc687259e507ca91fcbaa8`.
 Frozen reference: `baseline/r47-environment-plan`.
+
+## R48 — Dual Surface Architecture（双界面架构） / Unified User Workflow（统一用户工作流） planned gates
+
+R48（第 48 阶段） starts from the accepted R47（第 47 阶段） environment baseline. These are planned acceptance gates and do not imply implementation has started.
+
+### R48-0 — Developer Mode（开发者模式） / routing foundation
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Default mode（默认模式） | fresh/normal app entry | Developer Mode（开发者模式） defaults OFF and user-facing navigation enters Normal Mode（普通模式） |
+| Developer access（开发者入口） | enable setting | current complete Developer Workspace（开发者工作区） remains reachable |
+| Runtime neutrality（运行中立） | toggle mode while a project is RUNNING（运行中） | mode switch does not STOP/restart/change provider/change Environment Plan（环境计划） |
+| State identity（状态一致） | switch Normal -> Developer -> Normal | both surfaces report the same project lifecycle/operation/environment/Web/result truth |
+| Multi-project（多项目） | A and B active while switching surfaces | switching UI surface does not alter either project's ownership/observation state |
+| Frozen contracts（冻结契约） | regression suite | R47 Environment Detection / Plan / Prepare, project-scoped STOP, Runtime Identity, Session / Generation, Web Discovery and Endpoint Probe remain unchanged |
+
+### R48-A — Normal Project Workspace（普通项目工作区）
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| State source（状态来源） | render normal project card | use existing ProjectUiSnapshot（项目界面快照） / ProjectActionPolicy（项目动作策略） rather than a second state machine |
+| Primary action（主操作） | NOT_READY / CONFIG_REQUIRED / READY / RUNNING / terminal states | primary action matches existing policy decision |
+| Advanced controls（高级控制） | normal surface | low-level STATUS / LOGS / CLEAN / Runtime Selection / raw diagnostics are not primary controls |
+| Developer parity（开发者一致性） | open same project in Developer Workspace | developer surface observes the same underlying state |
+
+### R48-B — Unified Refresh（统一刷新）
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Running project（运行项目） | user presses Refresh（刷新） | STATUS（状态查询） is authoritative; LOGS（日志查询） is requested only when policy/lifecycle requires it |
+| Terminal project（终态项目） | refresh after natural exit | final LOGS may complete Result / Rich Result / Result Web extraction without changing terminal lifecycle incorrectly |
+| Automatic observation（自动观察） | manual refresh races automatic observation | no duplicate conflicting operation; existing observation generation/pending rules win |
+| Raw log presentation（原始日志呈现） | normal refresh | automatic/internal observation does not unexpectedly expand or overwrite developer raw-log presentation |
+| Project scope（项目范围） | refresh project A while B runs | B remains untouched |
+
+### R48-C — Prepare Project Workflow（准备项目工作流）
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Detection（检测） | Prepare Project invoked | existing R47 Environment Detection（环境检测） is used; no duplicate detector |
+| Plan（计划） | valid project | existing deterministic Environment Plan（环境计划） drives preparation |
+| Blocking issue（阻塞问题） | malformed/incomplete/unsupported project | workflow stops before Prepare（准备环境） and exposes the reason |
+| Prepare failure（准备失败） | dependency/runtime preparation fails | workflow stops; START（运行） is not dispatched |
+| Prepare success（准备成功） | environment reaches READY（就绪） | first-stage workflow stops at READY; no automatic START |
+| Provider ownership（运行环境归属） | selected Internal/External provider | workflow respects existing selection/ownership and does not silently switch provider |
+
+### R48-D/E/F — UI consolidation（界面融合） guards
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Import Project（导入项目） | PY / ZIP / GitHub choices | one UI entry may select existing import source; underlying import behavior stays separate |
+| Project Location（项目目录） | AcodeProjects / other SAF root | one UI entry may select source; persisted SAF identity/permission semantics unchanged |
+| Open（打开） | Web / Result Web / Rich Result | continue existing PresentationTargetResolver（呈现目标解析器） priority and current Endpoint Probe truth gate |
+| STOP（停止） | any normal workflow active | STOP remains independent, project-scoped and preemptive |
+| CLEAN（清理） | project active | destructive cleanup remains blocked while active and is not silently chained from STOP |
+| Delete project（删除项目） | source + runtime data exist | no one-tap transactional deletion is introduced in first-stage R48 |
+| Runtime Selection（运行环境选择） | project active | provider switch remains blocked and never occurs invisibly |
+| Developer tools（开发者工具） | Developer Mode enabled | existing advanced controls remain available for diagnosis/regression testing |
+
+### R48 cloud / device rule
+
+Every installable R48 test build must:
+- increment versionCode（版本代码） from the accepted R47 value 180;
+- use the existing stable Debug signature（调试签名） for overwrite installation;
+- pass repository validators（仓库校验）;
+- pass unit tests（单元测试）;
+- pass assembleDebug（Debug 构建）;
+- keep Internal Alpine Probe（内部 Alpine 探针） PASS;
+- receive real-device acceptance before the next R48 slice is treated as accepted.
+
