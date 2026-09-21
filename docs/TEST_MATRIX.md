@@ -16,6 +16,21 @@
 
 本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
 
+## R48a6.1 — Real Device Failure Repair（真机失败修复）
+
+| ID | 验证项 | 期望 | 状态 |
+|---|---|---|---|
+| R48A6.1-01 | External operation deadline | PREPARE/START/STATUS/LOGS/STOP/CLEAN 都有 action-specific control deadline | 待云端 |
+| R48A6.1-02 | Shared External watchdog | Activity 离开、重建或跨到另一 UI 不丢失 project+generation watchdog | 待云端 |
+| R48A6.1-03 | PREPARE timeout recovery | 释放 operation lock；无旧 READY 时进入 `ENVIRONMENT_ERROR`，不写 READY | 待云端 |
+| R48A6.1-04 | STOP timeout recovery | 释放 operation lock；进入 `UNKNOWN`，failure reason 为 `RUNTIME_OPERATION_TIMED_OUT:STOP`，不写 `STOPPED_BY_USER` | 待云端 |
+| R48A6.1-05 | Late callback fencing | 旧 PREPARE/STOP executionId 不能修改新 generation | 待云端 |
+| R48A6.1-06 | Project isolation | 项目 A timeout/STOP 不影响项目 B | 待云端 |
+| R48A6.1-07 | Normal Mode diagnostics | 根布局可纵向滚动到完整当前 failure reason/页面底部 | 待云端 |
+| R48A6.1-08 | Internal Alpine scope | 不修改 Internal Alpine 安装逻辑；exit=4 保留为完整尾部待诊断 | PASS — scope review |
+| R48A6.1-09 | R48a6 real-device acceptance | External PREPARE indefinite wait、External STOP indefinite wait、Normal non-scrollable diagnostic | FAIL — user-confirmed |
+| R48A6.1-10 | External Provider Preflight | 已确认 Termux、权限、allow-external-apps、bridge、READY 全部通过 | PASS — user-confirmed |
+
 ## R48a6 — Shared Core Realignment（共享核心重新对齐） / External Provider Preflight（外部执行环境前置检查）
 
 | ID | 验证项 | 期望 | 状态 |
@@ -32,7 +47,7 @@
 | R48A6-10 | Internal R 保护 | Embedded CPython / Internal Alpine 不自动触发 Termux 或 provider 切换 | PASS — source review |
 | R48A6-11 | W0 Cloud Build | validators、unit tests、assembleDebug、APK evidence、stable signing | PASS — [Run #475](https://github.com/kuashan/siftalpha-one/actions/runs/35592554128), artifact `siftalpha-w0-475`, APK SHA-256 `7c0cdfbaca6c799c92684f3da7f1379c3dad70303a3d98820abb1409b227406e` |
 | R48A6-12 | Internal Alpine Probe | R48a6 分支探针通过 | PASS — [Run #75](https://github.com/kuashan/siftalpha-one/actions/runs/35591474623) |
-| R48A6-13 | 真机验收 | 安装 APK，验证权限、打开 Termux、桥探测、Prepare/Run/STOP 和跨界面一致性 | 待真机 |
+| R48A6-13 | 真机验收 | 安装 APK，验证权限、打开 Termux、桥探测、Prepare/Run/STOP 和跨界面一致性 | FAIL — External PREPARE/STOP indefinite wait；Normal long diagnostic 不可滚动 |
 
 ## A. 当前 alpha43 版本信息
 
