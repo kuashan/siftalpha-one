@@ -1253,3 +1253,19 @@ R48-0C is cloud-verified but not yet an accepted/frozen baseline.
 | APK（安装包） | v188 / 0.8.0-alpha43-r48b1 | PASS — cloud artifact |
 | Real-device acceptance（真机验收） | Refresh/Open + browser separation + cross-surface parity | PENDING |
 
+### R48-B2 — External Provider Probe Soft Timeout（外部执行环境探测软超时）
+
+| Area | Verification | Result |
+| --- | --- | --- |
+| Probe timeout（探测超时） | no callback for 3 seconds -> `BRIDGE_UNRESPONSIVE` | PASS — unit/cloud |
+| Timeout semantics（超时语义） | no-response is not configuration failure | PASS — source/unit |
+| Recovery UI（恢复界面） | Open Termux + Re-check | PASS — source/cloud |
+| Resume retry（返回重试） | `onResume` retries `BRIDGE_UNRESPONSIVE` | PASS — source/cloud |
+| Late callback fencing（迟到回调隔离） | timed-out execution result ignored | PASS — unit/cloud |
+| Shared facts（共享事实） | Normal / Developer read same coordinator/store | PASS — source/unit |
+| Developer protection（开发者模式保护） | only minimal readiness branch added | PASS — source diff |
+| Internal Alpine Probe（内部 Alpine 探针） | #78 | PASS |
+| W0 Cloud Build（云端构建） | #504 attempt 2 | PASS |
+| APK（安装包） | 0.8.0-alpha43-r48b2 / 189 | PASS — cloud artifact |
+| Real-device acceptance（真机验收） | 3-second fallback + open/recheck + return retry | PENDING |
+
