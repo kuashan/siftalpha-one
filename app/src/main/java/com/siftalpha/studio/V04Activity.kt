@@ -60,8 +60,10 @@ import com.siftalpha.studio.runtime.RuntimeOperationAction
 import com.siftalpha.studio.runtime.RuntimeOperationPhase
 import com.siftalpha.studio.runtime.RuntimeOperationProvider
 import com.siftalpha.studio.runtime.RuntimeOperationRecord
-import com.siftalpha.studio.runtime.RuntimeOperationStore
-import com.siftalpha.studio.runtime.RuntimeOperationTracker
+import com.siftalpha.studio.runtime.ProjectOperationCoordinator
+import com.siftalpha.studio.runtime.ExternalProviderPreflightResult
+import com.siftalpha.studio.runtime.ExternalProviderProbeCoordinator
+import com.siftalpha.studio.runtime.ExternalProviderReadiness
 import com.siftalpha.studio.runtime.RuntimeOwnership
 import com.siftalpha.studio.runtime.RuntimeOwnershipPolicy
 import com.siftalpha.studio.runtime.RuntimeResult
@@ -91,6 +93,7 @@ import com.siftalpha.studio.runtime.AdaptiveResultAnalyzer
 import com.siftalpha.studio.runtime.AdaptiveResultHtmlRenderer
 import com.siftalpha.studio.runtime.ResultWebStore
 import com.siftalpha.studio.runtime.RuntimeProgramOutputExtractor
+import com.siftalpha.studio.runtime.TermuxContract
 import com.siftalpha.studio.runtime.TermuxBackend
 import com.siftalpha.studio.siftalphax.EmbeddedPythonEnvironmentManager
 import com.siftalpha.studio.siftalphax.EmbeddedPythonSession
@@ -190,7 +193,8 @@ open class V04Activity : StudioActivity() {
     private lateinit var projectOutputs: ProjectOutputPanelController
     private lateinit var prepareLiveProgress: PrepareLiveProgressController
     private lateinit var lifecycleStore: RuntimeLifecycleStore
-    private lateinit var operationStore: RuntimeOperationStore
+    private lateinit var operationCoordinator: ProjectOperationCoordinator
+    private lateinit var externalPreflight: ExternalProviderProbeCoordinator
     private lateinit var projectRuntimeSelectionStore: ProjectRuntimeSelectionStore
     private val recoveryProjects = mutableSetOf<String>()
     private val failureReasons = mutableMapOf<String, String>()
@@ -222,7 +226,6 @@ open class V04Activity : StudioActivity() {
     private val internalWebObservationCache = mutableMapOf<String, InternalWebObservationRecord>()
     private val internalWebDiscoveryRetries = mutableMapOf<String, InternalWebDiscoveryRetryRecord>()
     private val embeddedStartInFlight = mutableSetOf<String>()
-    private val operationTracker = RuntimeOperationTracker()
     private val operationDeadlineRunnables = mutableMapOf<String, Runnable>()
     private val projectActivities = ProjectActivityRegistry()
     private val externalActivityTokens = mutableMapOf<Int, ProjectActivityRegistry.Token>()
@@ -235,6 +238,7 @@ open class V04Activity : StudioActivity() {
         EmbeddedProjectPollRegistry<V04ProjectGateway.RuntimeProject>()
     private val embeddedPollRunnables = mutableMapOf<String, Runnable>()
     private lateinit var rootState: TextView
+    private lateinit var externalProviderDiagnostics: TextView
     private lateinit var projectList: LinearLayout
     private lateinit var output: TextView
 
@@ -335,6 +339,13 @@ open class V04Activity : StudioActivity() {
         }
     }
 
+    private val externalPreflightListener: (ExternalProviderPreflightResult) -> Unit = {
+        runOnUiThread {
+            updateExternalProviderDiagnostics()
+            if (!isFinishing && !isDestroyed && ::projectList.isInitialized) refresh()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         clearLocalizedStateCacheIfNeeded()
@@ -351,7 +362,8 @@ open class V04Activity : StudioActivity() {
         )
         secretStore = ProjectSecretStore(this)
         lifecycleStore = RuntimeLifecycleStore(this)
-        operationStore = RuntimeOperationStore(this)
+        operationCoordinator = ProjectOperationCoordinator.shared(this)
+        externalPreflight = ExternalProviderProbeCoordinator.shared(this)
         secretPolicyInspector = ProjectSecretPolicyInspector(this)
         configurationInspector = ProjectConfigurationInspector(this)
         webInspector = WebProjectInspector(this)
@@ -393,6 +405,7 @@ open class V04Activity : StudioActivity() {
         activityStarted = true
         if (::webAvailability.isInitialized) webAvailability.resume()
         TermuxResultBus.addListener(resultListener)
+        externalPreflight.addListener(externalPreflightListener)
         if (::prepareLiveProgress.isInitialized) prepareLiveProgress.resume()
         pending.keys.toList().forEach { id ->
             TermuxResultBus.consume(id)?.let(resultListener)
@@ -419,6 +432,9 @@ open class V04Activity : StudioActivity() {
         if (::webAvailability.isInitialized) webAvailability.pause()
         if (::prepareLiveProgress.isInitialized) prepareLiveProgress.pause()
         TermuxResultBus.removeListener(resultListener)
+        if (::externalPreflight.isInitialized) {
+            externalPreflight.removeListener(externalPreflightListener)
+        }
         super.onStop()
     }
 
@@ -468,6 +484,15 @@ open class V04Activity : StudioActivity() {
             setPadding(0, dp(6), 0, dp(8))
         }
         root.addView(rootState)
+
+        root.addView(section(getString(R.string.runtime_external_provider_diagnostics_title)))
+        externalProviderDiagnostics = text("", 12f, false).apply {
+            setTextColor(Color.rgb(190, 194, 204))
+            typeface = Typeface.MONOSPACE
+            setPadding(0, 0, 0, dp(8))
+        }
+        root.addView(externalProviderDiagnostics)
+        updateExternalProviderDiagnostics()
 
         // Import belongs to the collection-level Runtime Center. A single-project workspace
         // keeps attention on the selected project and never offers unrelated import actions.
@@ -599,6 +624,7 @@ open class V04Activity : StudioActivity() {
 
     private fun renderRefreshResult(result: ProjectRefreshResult) {
         projectOutputs.beginRefresh()
+        updateExternalProviderDiagnostics()
         if (!result.rootSelected) {
             projectOutputs.retainOnly(emptySet())
             rootState.text = getString(R.string.runtime_center_root_unselected)
@@ -671,6 +697,26 @@ open class V04Activity : StudioActivity() {
             )
         }
         replaceProjectViews(nextViews)
+    }
+
+    private fun updateExternalProviderDiagnostics() {
+        if (!::externalProviderDiagnostics.isInitialized || !::externalPreflight.isInitialized) return
+        val result = externalPreflight.current()
+        val permission = if (result.runCommandPermissionGranted) "GRANTED" else "REQUIRED"
+        externalProviderDiagnostics.text = getString(
+            R.string.runtime_external_provider_diagnostics_format,
+            if (result.termuxInstalled) "YES" else "NO",
+            permission,
+            diagnosticValue(result.allowExternalApps),
+            diagnosticValue(result.bridgeResponsive),
+            if (result.ready) "YES" else "NO",
+        )
+    }
+
+    private fun diagnosticValue(value: Boolean?): String = when (value) {
+        true -> "YES"
+        false -> "NO"
+        null -> "UNKNOWN"
     }
 
     private fun replaceProjectViews(views: List<android.view.View>) {
@@ -1531,14 +1577,8 @@ open class V04Activity : StudioActivity() {
         projectId: String,
         includeHidden: Boolean = false,
     ): RuntimeOperationRecord? {
-        if (!::operationStore.isInitialized) return null
-        val local = operationTracker.current(projectId)
-        if (local != null) {
-            return local.takeUnless { it.terminal || (!includeHidden && !it.userVisible) }
-        }
-        return operationStore.read(projectId)?.takeUnless {
-            it.terminal || (!includeHidden && !it.userVisible)
-        }
+        if (!::operationCoordinator.isInitialized) return null
+        return operationCoordinator.current(projectId, includeHidden)
     }
 
     private fun beginOperation(
@@ -1548,35 +1588,17 @@ open class V04Activity : StudioActivity() {
         executionId: Int? = null,
         userVisible: Boolean = true,
     ): RuntimeOperationRecord? {
-        val projectId = project.summary.documentId
-        val persisted = operationStore.read(projectId)
-        if (persisted != null) {
-            if (!persisted.terminal) {
-                val deadline = persisted.deadlineAtEpochMs
-                if (deadline == null || deadline > System.currentTimeMillis()) {
-                    return null
-                }
-                expireOperation(project, persisted)
-            }
-            operationStore.clear(projectId)
-        }
-        operationTracker.seed(projectId, operationStore.lastGeneration(projectId))
-        operationTracker.current(projectId)?.let { current ->
-            if (!current.terminal) {
-                val deadline = current.deadlineAtEpochMs
-                if (deadline == null || deadline > System.currentTimeMillis()) return null
-                expireOperation(project, current)
-            }
-            operationTracker.clearTerminal(projectId, current.generation)
-        }
-        val record = operationTracker.begin(
-            projectId = projectId,
+        val record = operationCoordinator.begin(
+            projectId = project.summary.documentId,
             provider = provider,
             action = action,
             executionId = executionId,
             userVisible = userVisible,
+            runtimeSelection = when (provider) {
+                RuntimeOperationProvider.INTERNAL -> ProjectRuntimeSelection.EMBEDDED_R
+                RuntimeOperationProvider.EXTERNAL -> ProjectRuntimeSelection.TERMUX
+            },
         ) ?: return null
-        operationStore.write(record)
         scheduleOperationDeadline(project, record)
         return record
     }
@@ -1587,19 +1609,13 @@ open class V04Activity : StudioActivity() {
         phase: RuntimeOperationPhase,
         executionId: Int? = null,
     ) {
-        if (!::operationStore.isInitialized) return
-        val record = currentOperation(projectId, includeHidden = true)
-            ?: operationTracker.current(projectId)?.takeUnless { it.terminal }
-            ?: operationStore.read(projectId)?.takeUnless { it.terminal }
-        if (record == null || (generation != null && record.generation != generation)) return
-        if (executionId != null && record.executionId != executionId) return
-        if (!record.terminal) {
-            operationTracker.finish(projectId, record.generation, phase)
-        }
-        operationTracker.current(projectId)?.let { terminal ->
-            if (terminal.terminal) operationTracker.clearTerminal(projectId, terminal.generation)
-        }
-        operationStore.clear(projectId)
+        if (!::operationCoordinator.isInitialized) return
+        operationCoordinator.finish(
+            projectId = projectId,
+            generation = generation,
+            phase = phase,
+            executionId = executionId,
+        )
         operationDeadlineRunnables.remove(projectId)?.let(refreshHandler::removeCallbacks)
     }
 
@@ -1609,13 +1625,13 @@ open class V04Activity : StudioActivity() {
      * STATUS probe, while Internal state is read from its app-owned snapshot.
      */
     private fun reconcilePersistedOperations() {
-        if (!::operationStore.isInitialized || !::gateway.isInitialized) return
+        if (!::operationCoordinator.isInitialized || !::gateway.isInitialized) return
         val projects = runCatching { gateway.projects() }.getOrElse { return }
         projects.forEach { project ->
             val key = project.summary.documentId
-            val record = operationStore.read(key) ?: return@forEach
+            val record = operationCoordinator.persisted(key) ?: return@forEach
             if (record.terminal) {
-                operationStore.clear(key)
+                operationCoordinator.clearPersisted(key)
                 return@forEach
             }
             if (record.deadlineAtEpochMs?.let { it <= System.currentTimeMillis() } == true) {
@@ -1624,11 +1640,11 @@ open class V04Activity : StudioActivity() {
             }
             when (record.provider) {
                 RuntimeOperationProvider.EXTERNAL -> {
-                    operationStore.clear(key)
+                    operationCoordinator.clearPersisted(key)
                     recoveryProjects += key
                 }
                 RuntimeOperationProvider.INTERNAL -> {
-                    operationStore.clear(key)
+                    operationCoordinator.clearPersisted(key)
                     refreshEmbeddedProject(project)
                 }
             }
@@ -1636,7 +1652,8 @@ open class V04Activity : StudioActivity() {
     }
 
     private fun cancelOperation(projectId: String) {
-        finishOperation(projectId, generation = null, phase = RuntimeOperationPhase.CANCELLED)
+        operationCoordinator.cancel(projectId)
+        operationDeadlineRunnables.remove(projectId)?.let(refreshHandler::removeCallbacks)
     }
 
     private fun scheduleOperationDeadline(
@@ -3348,6 +3365,14 @@ open class V04Activity : StudioActivity() {
             )
             return false
         }
+        if (
+            route.path == RuntimeControlPath.EXTERNAL_PROVIDER &&
+            (action == ProjectRuntimeController.Action.PREPARE ||
+                action == ProjectRuntimeController.Action.START) &&
+            !ensureExternalProviderReady()
+        ) {
+            return false
+        }
         if (!canDispatch(project, action, route.path)) return false
         if (action == ProjectRuntimeController.Action.PREPARE && !automaticObservation) {
             scheduleWebRecognition(project)
@@ -4779,6 +4804,62 @@ open class V04Activity : StudioActivity() {
         }.start()
     }
 
+    private fun ensureExternalProviderReady(): Boolean {
+        val result = externalPreflight.ensureReady()
+        if (result.ready) return true
+        when (result.readiness) {
+            ExternalProviderReadiness.TERMUX_NOT_INSTALLED,
+            ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED,
+            -> AlertDialog.Builder(this)
+                .setTitle(getString(R.string.runtime_termux_missing_title))
+                .setMessage(
+                    result.detail ?: getString(R.string.runtime_termux_missing_message),
+                )
+                .setNegativeButton(getString(R.string.common_cancel), null)
+                .setPositiveButton(getString(R.string.home_open_termux)) { _, _ -> openTermux() }
+                .show()
+
+            ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED -> requestPermissions(
+                arrayOf(TermuxContract.RUN_COMMAND_PERMISSION),
+                REQUEST_RUN_COMMAND,
+            )
+
+            ExternalProviderReadiness.BRIDGE_CHECKING,
+            ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED,
+            -> toast(getString(R.string.normal_external_provider_checking))
+
+            ExternalProviderReadiness.UNAVAILABLE -> errorDialog(
+                getString(R.string.runtime_termux_missing_title),
+                result.detail ?: getString(R.string.normal_external_provider_unavailable),
+            )
+
+            ExternalProviderReadiness.READY -> Unit
+        }
+        return false
+    }
+
+    private fun openTermux() {
+        val launch = packageManager.getLaunchIntentForPackage(TermuxContract.PACKAGE_NAME)
+        if (launch != null) {
+            startActivity(launch)
+        } else {
+            toast(getString(R.string.home_no_launchable_termux))
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_RUN_COMMAND) {
+            externalPreflight.probe()
+            refresh()
+        }
+    }
+
     private fun ensureRuntime(requireExternalProvider: Boolean = true): Boolean {
         if (gateway.rootUri() == null) {
             toast(getString(R.string.runtime_choose_root_first))
@@ -4913,6 +4994,7 @@ open class V04Activity : StudioActivity() {
         const val EXTRA_PROJECT_DOCUMENT_ID = "project_document_id"
         private const val REQUEST_PY = 801
         private const val REQUEST_ZIP = 802
+        private const val REQUEST_RUN_COMMAND = 803
         private val PROJECT_NAME = Regex("^[A-Za-z0-9._-]+$")
         private val PENDING_TASKS = mutableMapOf<Int, Pending>()
         private val RUNTIME_STATES = mutableMapOf<String, String>()
