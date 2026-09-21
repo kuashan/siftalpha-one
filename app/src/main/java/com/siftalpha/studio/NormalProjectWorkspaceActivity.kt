@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -81,6 +83,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         val message: String? = null,
         val developerModeEnabled: Boolean = false,
         val runtimeState: RuntimeState = RuntimeState.UNKNOWN,
+        val failureReason: String? = null,
         val runtimeSelection: ProjectRuntimeSelection = ProjectRuntimeSelection.TERMUX,
         val runtimeSelectionCanChange: Boolean = true,
         val externalReadiness: ExternalProviderReadiness? = null,
@@ -115,6 +118,15 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             if (::project.isInitialized) {
                 screenState.value = screenState.value.copy(busy = false)
                 refreshSharedState()
+            }
+        }
+    }
+
+    private val timeoutListener: (ProjectOperationCoordinator.ExternalTimeout) -> Unit = { timeout ->
+        runOnUiThread {
+            if (::project.isInitialized && timeout.projectId == project.summary.documentId) {
+                screenState.value = screenState.value.copy(busy = false)
+                refreshSharedState(getString(R.string.runtime_operation_timed_out))
             }
         }
     }
@@ -204,6 +216,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     override fun onStart() {
         super.onStart()
         operationCoordinator.addCompletionListener(completionListener)
+        operationCoordinator.addTimeoutListener(timeoutListener)
         externalPreflight.addListener(preflightListener)
         if (::project.isInitialized) {
             refreshExternalPreflight(retryIfNeeded = false)
@@ -221,6 +234,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     override fun onStop() {
         if (::operationCoordinator.isInitialized) {
             operationCoordinator.removeCompletionListener(completionListener)
+            operationCoordinator.removeTimeoutListener(timeoutListener)
         }
         if (::externalPreflight.isInitialized) externalPreflight.removeListener(preflightListener)
         super.onStop()
@@ -336,6 +350,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             message = message,
             developerModeEnabled = DeveloperModeStore(this).isEnabled(),
             runtimeState = lifecycle.runtimeState,
+            failureReason = lifecycle.failureReason,
             runtimeSelection = selection,
             externalReadiness = if (selection == ProjectRuntimeSelection.TERMUX) {
                 externalPreflight.current().readiness
@@ -653,6 +668,7 @@ private fun NormalProjectWorkspaceScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(spacing.large),
             verticalArrangement = Arrangement.spacedBy(spacing.large),
         ) {
@@ -672,6 +688,14 @@ private fun NormalProjectWorkspaceScreen(
                         text = message,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                state.failureReason?.takeIf { it.isNotBlank() }?.let { failureReason ->
+                    Spacer(modifier = Modifier.height(spacing.small))
+                    Text(
+                        text = stringResource(R.string.runtime_failure_reason, failureReason),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
             }
