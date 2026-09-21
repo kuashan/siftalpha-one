@@ -313,6 +313,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                     onOpenDeveloper = { openDeveloperWorkspace() },
                     onRequestPermission = { requestRunCommandPermission() },
                     onOpenTermux = { openTermux() },
+                    onRecheckExternal = { recheckExternalProvider() },
                 )
             }
         }
@@ -485,6 +486,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             val current = externalPreflight.current()
             if (
                 current.readiness == ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED ||
+                current.readiness == ExternalProviderReadiness.BRIDGE_UNRESPONSIVE ||
                 current.readiness == ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED
             ) {
                 externalPreflight.probe()
@@ -989,6 +991,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             )
             ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED,
             ExternalProviderReadiness.BRIDGE_CHECKING,
+            ExternalProviderReadiness.BRIDGE_UNRESPONSIVE,
             ExternalProviderReadiness.READY,
             ExternalProviderReadiness.UNAVAILABLE,
             null,
@@ -1040,6 +1043,18 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             PendingUserIntent.PREPARE -> prepareProject()
             PendingUserIntent.RUN -> runProject()
         }
+    }
+
+    private fun recheckExternalProvider() {
+        val result = externalPreflight.probe()
+        screenState.value = screenState.value.copy(
+            externalReadiness = result.readiness,
+            message = if (result.readiness == ExternalProviderReadiness.BRIDGE_CHECKING) {
+                getString(R.string.normal_external_provider_checking)
+            } else {
+                screenState.value.message
+            },
+        )
     }
 
     private fun openTermux() {
@@ -1123,6 +1138,7 @@ private fun NormalProjectWorkspaceScreen(
     onOpenDeveloper: () -> Unit,
     onRequestPermission: () -> Unit,
     onOpenTermux: () -> Unit,
+    onRecheckExternal: () -> Unit,
 ) {
     val spacing = StudioThemeTokens.spacing
     Scaffold(
@@ -1212,6 +1228,27 @@ private fun NormalProjectWorkspaceScreen(
                             Text(text = stringResource(R.string.normal_external_provider_check_required))
                         ExternalProviderReadiness.BRIDGE_CHECKING ->
                             Text(text = stringResource(R.string.normal_external_provider_checking))
+                        ExternalProviderReadiness.BRIDGE_UNRESPONSIVE -> {
+                            Text(text = stringResource(R.string.normal_external_provider_no_response))
+                            Spacer(modifier = Modifier.height(spacing.small))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(spacing.small),
+                            ) {
+                                OutlinedButton(
+                                    onClick = onOpenTermux,
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text(text = stringResource(R.string.normal_external_provider_open_termux_action))
+                                }
+                                OutlinedButton(
+                                    onClick = onRecheckExternal,
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text(text = stringResource(R.string.normal_external_provider_recheck))
+                                }
+                            }
+                        }
                         ExternalProviderReadiness.UNAVAILABLE ->
                             Text(text = stringResource(R.string.normal_external_provider_unavailable))
                         ExternalProviderReadiness.READY -> Unit
