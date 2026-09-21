@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import android.provider.Settings
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -18,6 +19,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
 import com.siftalpha.studio.project.ProjectStore
+import com.siftalpha.studio.project.UnifiedImportKind
+import com.siftalpha.studio.project.UnifiedImportPolicy
+import com.siftalpha.studio.project.V04ProjectGateway
 import com.siftalpha.studio.runtime.RuntimeCommand
 import com.siftalpha.studio.runtime.RuntimeResult
 import com.siftalpha.studio.runtime.TermuxBackend
@@ -36,6 +40,7 @@ class MainActivity : StudioComposeActivity() {
 
     private lateinit var backend: TermuxBackend
     private lateinit var projectStore: ProjectStore
+    private lateinit var projectGateway: V04ProjectGateway
     private val homeState = mutableStateOf(HomeState())
     private var autoBridgeProbeStarted = false
 
@@ -78,6 +83,7 @@ class MainActivity : StudioComposeActivity() {
         super.onCreate(savedInstanceState)
         backend = TermuxBackend(this)
         projectStore = ProjectStore(this)
+        projectGateway = V04ProjectGateway(this)
         enableEdgeToEdge()
         setContent {
             StudioTheme {
@@ -90,6 +96,7 @@ class MainActivity : StudioComposeActivity() {
                     onConnectAcode = { chooseProjectRoot(preferAcodeProjects = true) },
                     onChooseRoot = { chooseProjectRoot(preferAcodeProjects = false) },
                     onNewProject = { showCreateProjectDialog() },
+                    onImportProject = { chooseUnifiedImportFile() },
                     onRefreshProjects = { refreshProjects() },
                     onOpenProject = { openProject(it) },
                     onShowDetails = { showProjectDetails(it) },
@@ -200,18 +207,167 @@ class MainActivity : StudioComposeActivity() {
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != REQUEST_PROJECT_ROOT || resultCode != RESULT_OK) return
-        val uri = data?.data ?: return
-        val permissionFlags = data.flags and
-            (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-        try {
-            contentResolver.takePersistableUriPermission(uri, permissionFlags)
-            projectStore.saveRootUri(uri)
-            toast(getString(R.string.home_root_saved))
-            refreshProjects()
-        } catch (error: Throwable) {
-            toast(getString(R.string.home_root_save_failed, error.message ?: error.javaClass.simpleName))
+        if (resultCode != RESULT_OK) return
+        when (requestCode) {
+            REQUEST_PROJECT_ROOT -> {
+                val uri = data?.data ?: return
+                val permissionFlags = data.flags and
+                    (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                try {
+                    contentResolver.takePersistableUriPermission(uri, permissionFlags)
+                    projectStore.saveRootUri(uri)
+                    toast(getString(R.string.home_root_saved))
+                    refreshProjects()
+                } catch (error: Throwable) {
+                    toast(
+                        getString(
+                            R.string.home_root_save_failed,
+                            error.message ?: error.javaClass.simpleName,
+                        ),
+                    )
+                }
+            }
+            REQUEST_UNIFIED_IMPORT -> handleUnifiedImportResult(data)
         }
+    }
+
+    private fun chooseUnifiedImportFile() {
+        if (projectStore.rootUri() == null) {
+            toast(getString(R.string.home_import_select_location_first))
+            return
+        }
+        val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
+            )
+            type = "*/*"
+            putExtra(
+                Intent.EXTRA_MIME_TYPES,
+                arrayOf(
+                    "application/zip",
+                    "application/x-zip-compressed",
+                    "text/x-python",
+                    "text/plain",
+                    "application/octet-stream",
+                ),
+            )
+        }
+        startActivityForResult(picker, REQUEST_UNIFIED_IMPORT)
+    }
+
+    private fun handleUnifiedImportResult(data: Intent?) {
+        val uri = data?.data ?: return
+        val readFlag = data.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
+        if (
+            readFlag != 0 &&
+            (data.flags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) != 0
+        ) {
+            runCatching { contentResolver.takePersistableUriPermission(uri, readFlag) }
+        }
+        val fileName = displayName(uri) ?: getString(R.string.home_import_unknown_file)
+        val kind = UnifiedImportPolicy.classify(fileName)
+        if (kind == UnifiedImportKind.UNSUPPORTED) {
+            AlertDialog.Builder(this)
+                .setTitle(getString(R.string.home_import_unsupported_title))
+                .setMessage(getString(R.string.home_import_unsupported_message, fileName))
+                .setPositiveButton(getString(R.string.common_confirm), null)
+                .show()
+            return
+        }
+        showUnifiedImportNameDialog(uri, fileName, kind)
+    }
+
+    private fun showUnifiedImportNameDialog(
+        uri: Uri,
+        fileName: String,
+        kind: UnifiedImportKind,
+    ) {
+        val nameInput = EditText(this).apply {
+            setText(UnifiedImportPolicy.suggestedProjectName(fileName))
+            setSelection(text.length)
+            setSingleLine(true)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.home_import_confirm_title))
+            .setMessage(
+                getString(
+                    R.string.home_import_confirm_message,
+                    fileName,
+                    when (kind) {
+                        UnifiedImportKind.PYTHON_FILE -> getString(R.string.home_import_kind_python)
+                        UnifiedImportKind.ZIP_PROJECT -> getString(R.string.home_import_kind_zip)
+                        UnifiedImportKind.UNSUPPORTED -> getString(R.string.home_import_kind_unknown)
+                    },
+                ),
+            )
+            .setView(nameInput)
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .setPositiveButton(getString(R.string.home_import_action)) { _, _ ->
+                val projectName = nameInput.text.toString().trim()
+                importProjectFile(uri, fileName, projectName, kind)
+            }
+            .show()
+    }
+
+    private fun importProjectFile(
+        uri: Uri,
+        fileName: String,
+        projectName: String,
+        kind: UnifiedImportKind,
+    ) {
+        if (projectName.isBlank()) {
+            toast(getString(R.string.home_import_name_required))
+            return
+        }
+        if (projectGateway.folderExists(projectName)) {
+            toast(getString(R.string.home_import_project_exists, projectName))
+            return
+        }
+        toast(getString(R.string.home_importing))
+        Thread {
+            runCatching {
+                when (kind) {
+                    UnifiedImportKind.PYTHON_FILE ->
+                        projectGateway.importPython(uri, projectName, fileName)
+                    UnifiedImportKind.ZIP_PROJECT ->
+                        projectGateway.importZip(uri, projectName, fileName)
+                    UnifiedImportKind.UNSUPPORTED ->
+                        error(getString(R.string.home_import_unsupported_title))
+                }
+            }.onSuccess { imported ->
+                runOnUiThread {
+                    refreshProjects()
+                    toast(getString(R.string.home_import_complete, imported.summary.name))
+                    openProject(imported.summary)
+                }
+            }.onFailure { error ->
+                runOnUiThread {
+                    AlertDialog.Builder(this)
+                        .setTitle(getString(R.string.home_import_failed))
+                        .setMessage(error.message ?: error.javaClass.simpleName)
+                        .setPositiveButton(getString(R.string.common_confirm), null)
+                        .show()
+                }
+            }
+        }.start()
+    }
+
+    private fun displayName(uri: Uri): String? {
+        contentResolver.query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index >= 0) return cursor.getString(index)
+            }
+        }
+        return uri.lastPathSegment?.substringAfterLast('/')
     }
 
     private fun refreshProjects() {
@@ -438,6 +594,7 @@ class MainActivity : StudioComposeActivity() {
     companion object {
         private const val REQUEST_RUN_COMMAND = 501
         private const val REQUEST_PROJECT_ROOT = 601
+        private const val REQUEST_UNIFIED_IMPORT = 602
         private const val MAX_OUTPUT_CHARS = 12_000
     }
 }
