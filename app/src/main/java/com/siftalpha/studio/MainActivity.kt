@@ -18,6 +18,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
 import com.siftalpha.studio.project.ProjectStore
+import com.siftalpha.studio.runtime.ExternalProviderPreflight
+import com.siftalpha.studio.runtime.ExternalProviderReadinessStatus
 import com.siftalpha.studio.runtime.RuntimeCommand
 import com.siftalpha.studio.runtime.RuntimeResult
 import com.siftalpha.studio.runtime.TermuxBackend
@@ -35,6 +37,7 @@ import com.siftalpha.studio.ui.theme.StudioTheme
 class MainActivity : StudioComposeActivity() {
 
     private lateinit var backend: TermuxBackend
+    private lateinit var externalProviderPreflight: ExternalProviderPreflight
     private lateinit var projectStore: ProjectStore
     private val homeState = mutableStateOf(HomeState())
     private var autoBridgeProbeStarted = false
@@ -62,6 +65,9 @@ class MainActivity : StudioComposeActivity() {
             }
             val bridgeOk = result.internalErrorMessage.isBlank() &&
                 (result.exitCode == 0 || result.internalErrorCode == Activity.RESULT_OK)
+            if ("SIFTALPHA_TERMUX_BRIDGE_OK" in result.stdout) {
+                externalProviderPreflight.recordProbe(result)
+            }
             homeState.value = homeState.value.copy(
                 commandOutput = output.take(MAX_OUTPUT_CHARS),
                 bridgeState = if (bridgeOk) {
@@ -77,6 +83,7 @@ class MainActivity : StudioComposeActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         backend = TermuxBackend(this)
+        externalProviderPreflight = ExternalProviderPreflight(this, backend)
         projectStore = ProjectStore(this)
         enableEdgeToEdge()
         setContent {
@@ -166,17 +173,29 @@ class MainActivity : StudioComposeActivity() {
 
     private fun maybeAutoProbeBridge() {
         if (autoBridgeProbeStarted) return
-        if (!backend.isTermuxInstalled()) {
-            homeState.value = homeState.value.copy(bridgeState = HomeBridgeState.UNAVAILABLE)
-            return
+        when (externalProviderPreflight.inspect().status) {
+            ExternalProviderReadinessStatus.TERMUX_NOT_INSTALLED -> {
+                homeState.value = homeState.value.copy(bridgeState = HomeBridgeState.UNAVAILABLE)
+            }
+            ExternalProviderReadinessStatus.RUN_COMMAND_PERMISSION_REQUIRED -> {
+                homeState.value = homeState.value.copy(bridgeState = HomeBridgeState.WAITING_PERMISSION)
+            }
+            ExternalProviderReadinessStatus.READY -> {
+                homeState.value = homeState.value.copy(bridgeState = HomeBridgeState.CONNECTED)
+            }
+            ExternalProviderReadinessStatus.TERMUX_CONFIGURATION_REQUIRED,
+            ExternalProviderReadinessStatus.BRIDGE_UNAVAILABLE,
+            -> {
+                autoBridgeProbeStarted = true
+                homeState.value = homeState.value.copy(bridgeState = HomeBridgeState.DETECTING)
+                runCommand(externalProviderPreflight.probeCommand())
+            }
+            ExternalProviderReadinessStatus.BRIDGE_PROBE_REQUIRED -> {
+                autoBridgeProbeStarted = true
+                homeState.value = homeState.value.copy(bridgeState = HomeBridgeState.DETECTING)
+                runCommand(externalProviderPreflight.probeCommand())
+            }
         }
-        if (!backend.hasRunCommandPermission()) {
-            homeState.value = homeState.value.copy(bridgeState = HomeBridgeState.WAITING_PERMISSION)
-            return
-        }
-        autoBridgeProbeStarted = true
-        homeState.value = homeState.value.copy(bridgeState = HomeBridgeState.DETECTING)
-        runCommand(TermuxBackend.CONNECTION_TEST)
     }
 
     private fun chooseProjectRoot(preferAcodeProjects: Boolean) {
@@ -358,13 +377,11 @@ class MainActivity : StudioComposeActivity() {
     }
 
     private fun refreshTermuxState() {
-        if (!::backend.isInitialized) return
-        val installed = runCatching { backend.isTermuxInstalled() }.getOrDefault(false)
-        val permissionGranted = installed &&
-            runCatching { backend.hasRunCommandPermission() }.getOrDefault(false)
+        if (!::externalProviderPreflight.isInitialized) return
+        val readiness = externalProviderPreflight.inspect()
         homeState.value = homeState.value.copy(
-            termuxInstalled = installed,
-            permissionGranted = permissionGranted,
+            termuxInstalled = readiness.termuxInstalled,
+            permissionGranted = readiness.runCommandPermissionGranted,
         )
     }
 
@@ -418,6 +435,7 @@ class MainActivity : StudioComposeActivity() {
         refreshTermuxState()
         if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
             toast(getString(R.string.home_permission_granted_toast))
+            externalProviderPreflight.invalidateBridgeEvidence()
             autoBridgeProbeStarted = false
             maybeAutoProbeBridge()
         } else {
