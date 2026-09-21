@@ -32,7 +32,7 @@ data class RuntimeOperationRecord(
     val executionId: Int?,
     val generation: Long,
     val startedAtEpochMs: Long,
-    /** Internal operations have a local deadline; External completion remains backend-owned. */
+    /** Both providers have a bounded Android control-operation deadline. */
     val deadlineAtEpochMs: Long?,
     val userVisible: Boolean = true,
     val phase: RuntimeOperationPhase = RuntimeOperationPhase.ACCEPTED,
@@ -86,13 +86,48 @@ object RuntimeOperationContract {
         RuntimeOperationAction.CLEAN -> CLEAN_TIMEOUT_MS
     }
 
+    data class TimeoutOutcome(
+        val environmentReady: Boolean?,
+        val runtimeState: RuntimeState,
+        val failureReason: String,
+    )
+
+    /**
+     * Elapsed control time is a recovery fact, not proof that a provider process stopped. PREPARE
+     * preserves an already proven environment; STOP and all other uncertain controls become UNKNOWN.
+     */
+    fun timeoutOutcome(
+        action: RuntimeOperationAction,
+        currentEnvironmentReady: Boolean?,
+        previousEnvironmentReady: Boolean? = currentEnvironmentReady,
+    ): TimeoutOutcome {
+        val environmentReady = if (action == RuntimeOperationAction.PREPARE) {
+            previousEnvironmentReady
+        } else {
+            currentEnvironmentReady
+        }
+        val state = if (
+            action == RuntimeOperationAction.PREPARE && environmentReady != true
+        ) {
+            RuntimeState.ENVIRONMENT_ERROR
+        } else {
+            RuntimeState.UNKNOWN
+        }
+        return TimeoutOutcome(
+            environmentReady = environmentReady,
+            runtimeState = state,
+            failureReason = "RUNTIME_OPERATION_TIMED_OUT:${action.name}",
+        )
+    }
+
     fun deadlineAtEpochMs(
         provider: RuntimeOperationProvider,
         action: RuntimeOperationAction,
         startedAtEpochMs: Long,
     ): Long? = when (provider) {
-        RuntimeOperationProvider.INTERNAL -> startedAtEpochMs + timeoutMs(action)
-        RuntimeOperationProvider.EXTERNAL -> null
+        RuntimeOperationProvider.INTERNAL,
+        RuntimeOperationProvider.EXTERNAL,
+        -> startedAtEpochMs + timeoutMs(action)
     }
 
     fun lifecycleState(action: RuntimeOperationAction): RuntimeLifecycleState = when (action) {
