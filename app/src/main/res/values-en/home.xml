@@ -93,4 +93,37 @@
     <string name="home_copy_output">Copy output</string>
     <string name="home_output_copied">Command output copied</string>
 
+    <string name="home_project_location_title">Project location</string>
+    <string name="home_project_location_help">This is where SiftAlpha reads and stores projects. Changing the location does not rewrite project source.</string>
+    <string name="home_project_location_action">Choose project location</string>
+    <string name="home_project_location_current">Project location: %1$s</string>
+    <string name="home_project_entry_title">Projects</string>
+    <string name="home_import_title">Import project</string>
+    <string name="home_import_summary">Add an existing project to SiftAlpha from one entry point.</string>
+    <string name="home_import_supported">ZIP projects and single Python files are currently supported. Imported projects open directly in Normal Mode.</string>
+    <string name="home_import_choose_file">Choose project file</string>
+    <string name="home_import_new_project">Create empty project</string>
+    <string name="home_more_title">More</string>
+    <string name="home_more_developer_title">More / Developer tools</string>
+    <string name="home_developer_tools_summary">These are advanced diagnostic and development entries and do not change the normal user workflow.</string>
+    <string name="home_import_select_location_first">Choose a project location before importing a project.</string>
+    <string name="home_import_unknown_file">Unnamed file</string>
+    <string name="home_import_unsupported_title">Unsupported file</string>
+    <string name="home_import_unsupported_message">Unified Import currently supports .zip and .py files.
+
+Selected: %1$s</string>
+    <string name="home_import_confirm_title">Confirm import</string>
+    <string name="home_import_confirm_message">File: %1$s
+Type: %2$s
+
+Confirm the project name.</string>
+    <string name="home_import_kind_python">Python file</string>
+    <string name="home_import_kind_zip">ZIP project</string>
+    <string name="home_import_kind_unknown">Unknown type</string>
+    <string name="home_import_action">Import</string>
+    <string name="home_import_name_required">Enter a project name.</string>
+    <string name="home_import_project_exists">Project %1$s already exists.</string>
+    <string name="home_importing">Importing project…</string>
+    <string name="home_import_complete">Project %1$s was imported.</string>
+    <string name="home_import_failed">Import failed</string>
 </resources>
