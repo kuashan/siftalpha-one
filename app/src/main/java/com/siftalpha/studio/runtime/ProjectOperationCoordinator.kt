@@ -136,7 +136,7 @@ class ProjectOperationCoordinator internal constructor(
      * Used by the mature V04 result router after it finds its pending item. A fenced result must
      * be consumed and discarded; an unmanaged result remains on the old observation path.
      */
-    fun consumeExternalResultDisposition(executionId: Int): ExternalResultDisposition =
+    internal fun consumeExternalResultDisposition(executionId: Int): ExternalResultDisposition =
         synchronized(lock) {
             managedExternalResults.remove(executionId) ?: ExternalResultDisposition.UNMANAGED
         }
