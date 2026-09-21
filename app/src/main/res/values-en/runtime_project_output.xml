@@ -7,5 +7,5 @@
     <string name="runtime_center_section_system_output">Import / System Output</string>
     <string name="runtime_button_refresh_logs">Refresh Logs</string>
     <string name="runtime_web_not_listening_title">Web port not ready</string>
-    <string name="runtime_web_not_listening_message">Studio knows the local Web address, but %1$s is not currently accepting connections. The Browser entry will stay disabled while Studio keeps checking.</string>
+    <string name="runtime_web_not_listening_message">SiftAlpha X knows the local Web address, but %1$s is not currently accepting connections. The Browser entry will stay disabled while SiftAlpha X keeps checking.</string>
 </resources>
