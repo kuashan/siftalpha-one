@@ -89,10 +89,10 @@ android {
         // scripts keep a stable interpreter prefix while failed prepares still roll back cleanly.
         // alpha43-r48a6 realigns Normal Mode and Developer Workspace on the Shared Core and adds
         // the shared External Provider preflight/bridge readiness contract.
-        // R48-B2 bounds shared External Provider bridge probing at 3 seconds and exposes
-        // explicit Open Termux / Re-check recovery without changing Runtime preparation semantics.
-        versionCode = 189
-        versionName = "0.8.0-alpha43-r48b2"
+        // R48-C productizes the existing prepare workflow and adds Unified Import,
+        // Project Location and More / Developer Tools without duplicating Runtime logic.
+        versionCode = 190
+        versionName = "0.8.0-alpha43-r48c1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
