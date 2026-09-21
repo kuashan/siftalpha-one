@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="background_reliability_title">SiftAlpha X のバックグラウンド実行を許可することを推奨します</string>
+    <string name="background_reliability_message">Python スクリプト、ローカル Web サービス、長時間実行するプロジェクトは Android の省電力設定によって一時停止または終了される場合があります。システムのバッテリー設定で SiftAlpha X を「制限なし」に設定することを推奨します（端末によって名称は異なります）。
+
+SiftAlpha X がこのシステム設定を自動で変更することはありません。</string>
+    <string name="background_reliability_open_settings">設定を開く</string>
+    <string name="background_reliability_later">後で通知</string>
+    <string name="background_reliability_settings_unavailable">バッテリー設定を直接開けませんでした。システム設定で SiftAlpha X のバッテリー使用設定を開いてください。</string>
+</resources>
