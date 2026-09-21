@@ -11,6 +11,7 @@ on:
       - main
       - codex/siftalpha-x-embedded-cpython-spike
       - codex/siftalpha-no-worker-alpha43
+      - codex/r48-shared-core-realignment
   workflow_dispatch:
 
 permissions:

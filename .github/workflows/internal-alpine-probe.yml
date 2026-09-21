@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/siftalpha-no-worker-alpha43
+      - codex/r48-shared-core-realignment
     paths:
       - .github/workflows/internal-alpine-probe.yml
       - tools/probe_internal_alpine_android.sh
