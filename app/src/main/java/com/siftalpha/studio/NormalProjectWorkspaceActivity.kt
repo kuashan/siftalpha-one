@@ -1,6 +1,7 @@
 package com.siftalpha.studio
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
@@ -32,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import com.siftalpha.studio.project.EmbeddedPythonProjectStager
 import com.siftalpha.studio.project.ProjectConfigurationInspector
 import com.siftalpha.studio.project.V04ProjectGateway
+import com.siftalpha.studio.project.WebProjectInspector
 import com.siftalpha.studio.presentation.NormalProjectPrimaryActionPolicy
 import com.siftalpha.studio.presentation.ProjectActionPolicy
 import com.siftalpha.studio.presentation.ProjectUiSnapshot
@@ -41,6 +43,22 @@ import com.siftalpha.studio.runtime.RuntimeLifecycleState
 import com.siftalpha.studio.runtime.RuntimeOperationAction
 import com.siftalpha.studio.runtime.RuntimeOperationProvider
 import com.siftalpha.studio.runtime.RuntimeResult
+import com.siftalpha.studio.runtime.RuntimeAutoObservationPolicy
+import com.siftalpha.studio.runtime.RuntimeObservationStep
+import com.siftalpha.studio.runtime.PresentationTarget
+import com.siftalpha.studio.runtime.PresentationTargetResolver
+import com.siftalpha.studio.runtime.ResultWebStore
+import com.siftalpha.studio.runtime.RichResultDocument
+import com.siftalpha.studio.runtime.RichResultLifecyclePolicy
+import com.siftalpha.studio.runtime.RichResultParser
+import com.siftalpha.studio.runtime.AdaptiveResultAnalyzer
+import com.siftalpha.studio.runtime.AdaptiveResultHtmlRenderer
+import com.siftalpha.studio.runtime.RuntimeProgramOutputExtractor
+import com.siftalpha.studio.runtime.RuntimeWebAvailabilityTracker
+import com.siftalpha.studio.runtime.RuntimeWebDiscoveryScopePolicy
+import com.siftalpha.studio.runtime.RuntimeWebHintPolicy
+import com.siftalpha.studio.runtime.RuntimeWebLearnedEndpointStore
+import com.siftalpha.studio.runtime.RuntimeWebStateStore
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
 import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
 import com.siftalpha.studio.runtime.ProjectControlHub
@@ -90,6 +108,8 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         val runtimeSelection: ProjectRuntimeSelection = ProjectRuntimeSelection.TERMUX,
         val runtimeSelectionCanChange: Boolean = true,
         val externalReadiness: ExternalProviderReadiness? = null,
+        val presentationTarget: PresentationTarget = PresentationTarget.NONE,
+        val openEnabled: Boolean = false,
         val primaryAction: NormalProjectPrimaryActionPolicy.Action =
             NormalProjectPrimaryActionPolicy.Action.PREPARE_PROJECT,
     )
@@ -106,6 +126,15 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     private lateinit var externalPreflight: ExternalProviderProbeCoordinator
     private lateinit var prepareLiveProgress: PrepareLiveProgressController
     private lateinit var configurationUi: ProjectConfigurationUiController
+    private lateinit var secretStore: ProjectSecretStore
+    private lateinit var webInspector: WebProjectInspector
+    private lateinit var webStateStore: RuntimeWebStateStore
+    private lateinit var webAvailability: RuntimeWebAvailabilityTracker
+    private lateinit var webLearnedEndpointStore: RuntimeWebLearnedEndpointStore
+    private lateinit var resultWebStore: ResultWebStore
+    private var richResult: RichResultDocument? = null
+    private var resultWebRef: ResultWebStore.ResultRef? = null
+    private val manualRefreshExecutions = mutableSetOf<Int>()
     private val actionExecutor = Executors.newSingleThreadExecutor()
     private val prepareExecutor = Executors.newSingleThreadExecutor()
     private var internalPrepareFuture: Future<*>? = null
@@ -119,16 +148,44 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 
     private val completionListener: (ProjectOperationCoordinator.ExternalCompletion) -> Unit = { completion ->
         runOnUiThread {
-            if (::project.isInitialized && completion.projectId == project.summary.documentId) {
-                if (
-                    completion.action == RuntimeOperationAction.PREPARE &&
-                    ::prepareLiveProgress.isInitialized
-                ) {
-                    prepareLiveProgress.finish(project.folderName)
-                }
-                screenState.value = screenState.value.copy(busy = false)
-                refreshSharedState()
+            if (!::project.isInitialized || completion.projectId != project.summary.documentId) {
+                return@runOnUiThread
             }
+            if (
+                completion.action == RuntimeOperationAction.PREPARE &&
+                ::prepareLiveProgress.isInitialized
+            ) {
+                prepareLiveProgress.finish(project.folderName)
+            }
+
+            captureExternalEvidence(completion.action, completion.result)
+
+            val wasManualRefresh = manualRefreshExecutions.remove(completion.result.executionId)
+            if (completion.action == RuntimeOperationAction.STATUS && wasManualRefresh) {
+                val state = lifecycleStore.read(project.summary.documentId).runtimeState
+                val next = RuntimeAutoObservationPolicy.decide(
+                    RuntimeAutoObservationPolicy.Input(
+                        state = state,
+                        hasPendingOperation = false,
+                        finalLogsCompleted = false,
+                    ),
+                )
+                if (
+                    next == RuntimeObservationStep.REQUEST_FINAL_LOGS &&
+                    dispatchExternalObservation(RuntimeOperationAction.LOGS, manual = true)
+                ) {
+                    return@runOnUiThread
+                }
+            }
+
+            screenState.value = screenState.value.copy(busy = false)
+            refreshSharedState(
+                if (wasManualRefresh || completion.action == RuntimeOperationAction.LOGS) {
+                    getString(R.string.normal_project_refresh_complete)
+                } else {
+                    screenState.value.message
+                },
+            )
         }
     }
 
@@ -141,6 +198,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 ) {
                     prepareLiveProgress.finish(project.folderName)
                 }
+                timeout.executionId?.let(manualRefreshExecutions::remove)
                 screenState.value = screenState.value.copy(busy = false)
                 refreshSharedState(getString(R.string.runtime_operation_timed_out))
             }
@@ -193,15 +251,24 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             internalAlpineEnvironmentManager = InternalAlpineEnvironmentManager(this),
             internalAlpineSession = InternalAlpineSession.shared(this),
         )
+        secretStore = ProjectSecretStore(this)
         configurationUi = ProjectConfigurationUiController(
             activity = this,
             inspector = ProjectConfigurationInspector(this),
-            store = ProjectSecretStore(this),
+            store = secretStore,
         ) {
             refreshSharedState()
         }
         externalBackend = TermuxBackend(this)
         externalPreflight = ExternalProviderProbeCoordinator.shared(this)
+        webInspector = WebProjectInspector(this)
+        webStateStore = RuntimeWebStateStore(this)
+        webLearnedEndpointStore = RuntimeWebLearnedEndpointStore(this)
+        resultWebStore = ResultWebStore(this)
+        resultWebRef = resultWebStore.latest(project.summary.documentId)
+        webAvailability = RuntimeWebAvailabilityTracker {
+            if (::project.isInitialized) runOnUiThread { refreshSharedState() }
+        }
         sharedLifecycleBridge = SharedRuntimeLifecycleBridge(lifecycleStore)
         controlHub = ProjectControlHub(
             selectionStore = selectionStore,
@@ -240,6 +307,8 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                     onConfigure = { configureProject() },
                     onRun = { runProject() },
                     onStop = { stopProject() },
+                    onRefresh = { refreshProject() },
+                    onOpen = { openProjectPresentation() },
                     onSelectRuntime = { selectRuntime(it) },
                     onOpenDeveloper = { openDeveloperWorkspace() },
                     onRequestPermission = { requestRunCommandPermission() },
@@ -256,6 +325,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         externalPreflight.addListener(preflightListener)
         TermuxResultBus.addListener(progressResultListener)
         if (::prepareLiveProgress.isInitialized) prepareLiveProgress.resume()
+        if (::webAvailability.isInitialized) webAvailability.resume()
         if (::project.isInitialized) {
             refreshExternalPreflight(retryIfNeeded = false)
             reconcileExternalPrepareProgress()
@@ -271,6 +341,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     }
 
     override fun onStop() {
+        if (::webAvailability.isInitialized) webAvailability.pause()
         if (::prepareLiveProgress.isInitialized) prepareLiveProgress.pause()
         TermuxResultBus.removeListener(progressResultListener)
         if (::operationCoordinator.isInitialized) {
@@ -354,11 +425,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 optionalConfiguredCount = configuration.preflight.optionalConfiguredCount,
             ),
             lifecycle = lifecycle.runtimeState,
-            web = ProjectUiSnapshot.Web(
-                expected = false,
-                status = RuntimeWebUiStatus.AUTO_DETECT,
-                endpointReachable = null,
-            ),
+            web = projectWebSnapshot(projectId, lifecycle.runtimeState),
             pending = operation?.action?.toUiOperation()?.let { action ->
                 ProjectUiSnapshot.PendingOperation(action, operation.executionId)
             },
@@ -385,6 +452,13 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 operation = operation,
             ),
         )
+        resultWebRef = resultWebStore.latest(projectId)
+        val web = projectWebSnapshot(projectId, lifecycle.runtimeState)
+        val presentationTarget = PresentationTargetResolver.resolve(
+            webPresentationKnown = web.reachableUrl != null,
+            richResultAvailable = richResult != null,
+            resultWebAvailable = resultWebRef != null,
+        )
         screenState.value = screenState.value.copy(
             projectName = project.summary.name,
             statusLabel = lifecycleState.uiLabel(this),
@@ -399,6 +473,8 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 null
             },
             runtimeSelectionCanChange = selectionCanChange,
+            presentationTarget = presentationTarget,
+            openEnabled = presentationTarget != PresentationTarget.NONE,
             primaryAction = primaryAction,
         )
     }
@@ -503,6 +579,8 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 project = project,
                 request = ProjectControlHub.RunRequest(
                     requiredConfiguration = configuration.preflight.missingRequired.isNotEmpty(),
+                    webLogDiscoveryAllowed = webInspector.inspect(project.summary.documentId).enabled,
+                    webHintPorts = webHintPorts(),
                 ),
             )
             runOnUiThread {
@@ -574,6 +652,323 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             record.executionId != null
         ) {
             prepareLiveProgress.start(project.folderName, record.executionId)
+        }
+    }
+
+    private fun refreshProject() {
+        if (screenState.value.busy) return
+        val projectId = project.summary.documentId
+        val selection = selectionStore.read(projectId)
+
+        if (selection == ProjectRuntimeSelection.EMBEDDED_R) {
+            screenState.value = screenState.value.copy(
+                busy = true,
+                message = getString(R.string.normal_project_refreshing),
+            )
+            actionExecutor.execute {
+                val snapshot = runCatching { runtime.embeddedPythonSnapshotFor(projectId) }.getOrNull()
+                runOnUiThread {
+                    snapshot?.let {
+                        val current = lifecycleStore.read(projectId)
+                        val state = EmbeddedPythonRuntimeStateMapping.toRuntimeState(it)
+                        lifecycleStore.write(
+                            projectKey = projectId,
+                            environmentReady = current.environmentReadyFor(selection),
+                            runtimeState = state,
+                            failureReason = if (state == RuntimeState.EXITED_ERROR) it.stderr.take(240) else null,
+                            runtimeSelection = selection,
+                        )
+                        captureResultEvidence(
+                            stdout = it.stdout,
+                            stderr = it.stderr,
+                            allowResultWeb = state == RuntimeState.EXITED_SUCCESS,
+                        )
+                    }
+                    screenState.value = screenState.value.copy(busy = false)
+                    refreshSharedState(getString(R.string.normal_project_refresh_complete))
+                }
+            }
+            return
+        }
+
+        val currentOperation = operationCoordinator.current(projectId, includeHidden = true)
+        if (currentOperation != null) {
+            refreshSharedState()
+            return
+        }
+
+        val state = lifecycleStore.read(projectId).runtimeState
+        val step = RuntimeAutoObservationPolicy.decide(
+            RuntimeAutoObservationPolicy.Input(
+                state = state,
+                hasPendingOperation = false,
+                finalLogsCompleted = false,
+            ),
+        )
+        val action = when (step) {
+            RuntimeObservationStep.REQUEST_FINAL_LOGS -> RuntimeOperationAction.LOGS
+            RuntimeObservationStep.REQUEST_STATUS -> RuntimeOperationAction.STATUS
+            RuntimeObservationStep.WAIT_FOR_PENDING,
+            RuntimeObservationStep.STOP,
+            -> null
+        }
+        if (action == null) {
+            refreshSharedState(getString(R.string.normal_project_refresh_complete))
+            return
+        }
+        dispatchExternalObservation(action, manual = true)
+    }
+
+    private fun dispatchExternalObservation(
+        action: RuntimeOperationAction,
+        manual: Boolean,
+    ): Boolean {
+        if (action != RuntimeOperationAction.STATUS && action != RuntimeOperationAction.LOGS) return false
+        if (!externalPreflight.current().ready) {
+            refreshExternalPreflight(retryIfNeeded = true)
+            refreshSharedState()
+            return false
+        }
+
+        val operation = operationCoordinator.begin(
+            projectId = project.summary.documentId,
+            provider = RuntimeOperationProvider.EXTERNAL,
+            action = action,
+            userVisible = manual,
+            runtimeSelection = ProjectRuntimeSelection.TERMUX,
+        ) ?: return false
+
+        return runCatching {
+            val profile = webInspector.inspect(project.summary.documentId)
+            val command = when (action) {
+                RuntimeOperationAction.STATUS -> runtime.status(
+                    project = project,
+                    webLogDiscoveryAllowed = profile.enabled,
+                    webHintPorts = webHintPorts(profile),
+                )
+                RuntimeOperationAction.LOGS -> runtime.logs(
+                    project = project,
+                    webLogDiscoveryAllowed = profile.enabled,
+                    webHintPorts = webHintPorts(profile),
+                )
+                else -> error("Unsupported observation action")
+            }
+            val managed = runtime.wrapCancelableExternalActivity(
+                project = project,
+                action = if (action == RuntimeOperationAction.STATUS) {
+                    ProjectRuntimeController.Action.STATUS
+                } else {
+                    ProjectRuntimeController.Action.LOGS
+                },
+                command = command,
+            )
+            val executionId = externalBackend.execute(managed)
+            operationCoordinator.bindExternalExecution(
+                projectId = project.summary.documentId,
+                generation = operation.generation,
+                executionId = executionId,
+            )
+            if (manual) {
+                manualRefreshExecutions += executionId
+                screenState.value = screenState.value.copy(
+                    busy = true,
+                    message = getString(R.string.normal_project_refreshing),
+                )
+            }
+            true
+        }.getOrElse {
+            operationCoordinator.finish(
+                projectId = project.summary.documentId,
+                generation = operation.generation,
+                phase = com.siftalpha.studio.runtime.RuntimeOperationPhase.FAILED,
+            )
+            if (manual) {
+                screenState.value = screenState.value.copy(busy = false)
+                refreshSharedState(it.message)
+            }
+            false
+        }
+    }
+
+    private fun captureExternalEvidence(
+        action: RuntimeOperationAction,
+        result: RuntimeResult,
+    ) {
+        val profile = webInspector.inspect(project.summary.documentId)
+        RuntimeWebDiscoveryScopePolicy.candidateFromOutput(
+            output = result.stdout,
+            webCapabilityEnabled = profile.enabled,
+        )?.let { candidate ->
+            webStateStore.rememberCandidateUrl(
+                projectKey = project.summary.documentId,
+                url = candidate.url,
+                framework = profile.framework,
+                source = candidate.source,
+            )
+        }
+
+        val state = lifecycleStore.read(project.summary.documentId).runtimeState
+        captureResultEvidence(
+            stdout = result.stdout,
+            stderr = result.stderr,
+            allowResultWeb = action == RuntimeOperationAction.LOGS &&
+                state == RuntimeState.EXITED_SUCCESS,
+        )
+    }
+
+    private fun captureResultEvidence(
+        stdout: String,
+        stderr: String,
+        allowResultWeb: Boolean,
+    ) {
+        val safeStdout = secretStore.redactRuntimeText(project.folderName, stdout)
+        val safeStderr = secretStore.redactRuntimeText(project.folderName, stderr)
+        val detected = RichResultParser.parse(safeStdout)
+        richResult = RichResultLifecyclePolicy.merge(richResult, detected)
+
+        if (!allowResultWeb) return
+        val extracted = RuntimeProgramOutputExtractor.extract(
+            stdout = safeStdout,
+            stderr = safeStderr,
+        )
+        if (extracted.text.isBlank()) return
+
+        val sourcePath = extracted.sourcePath
+            ?: project.summary.entry.takeIf { it.endsWith(".py", ignoreCase = true) }
+            ?: runCatching {
+                gateway.resolveEmbeddedPythonEntrypoint(project.summary.documentId)
+            }.getOrNull()
+        val normalized = if (sourcePath != extracted.sourcePath) {
+            extracted.copy(sourcePath = sourcePath)
+        } else {
+            extracted
+        }
+        val sourceText = sourcePath?.let { path ->
+            runCatching {
+                gateway.readProjectTextFile(project.summary.documentId, path)
+            }.getOrNull()
+        }
+        val document = AdaptiveResultAnalyzer.analyze(
+            projectName = project.summary.name,
+            extracted = normalized,
+            sourceText = sourceText,
+        )
+        val html = AdaptiveResultHtmlRenderer.render(document)
+        resultWebRef = resultWebStore.saveIfChanged(
+            projectKey = project.summary.documentId,
+            projectName = project.summary.name,
+            document = document,
+            html = html,
+        ).ref
+    }
+
+    private fun projectWebSnapshot(
+        projectId: String,
+        runtimeState: RuntimeState,
+    ): ProjectUiSnapshot.Web {
+        val profile = webInspector.inspect(projectId)
+        val stored = webStateStore.snapshot(projectId)
+        val configuredUrl = profile.configuredLocalUrl()
+        val candidates = listOfNotNull(stored.candidateUrl, configuredUrl).distinct()
+        val reachable = webAvailability.endpointReachable(
+            projectKey = projectId,
+            runtimeState = runtimeState,
+            candidateUrls = candidates,
+        )
+        val reachableUrl = if (reachable == true) {
+            webAvailability.reachableUrl(projectId, runtimeState, candidates)
+                ?: webAvailability.lastKnownReachableUrl(projectId, candidates)
+        } else {
+            null
+        }
+        return ProjectUiSnapshot.Web.resolve(
+            profileEnabled = profile.enabled,
+            hasCandidateRuntimeUrl = stored.candidateUrl != null,
+            hasConfiguredLocalUrl = configuredUrl != null,
+            runtimeState = runtimeState,
+            endpointReachable = reachable,
+            reachableUrl = reachableUrl,
+            framework = stored.framework ?: profile.framework,
+        )
+    }
+
+    private fun webHintPorts(
+        profile: WebProjectInspector.Profile = webInspector.inspect(project.summary.documentId),
+    ): List<Int> = RuntimeWebHintPolicy.ports(
+        detectedPort = profile.port,
+        framework = profile.framework,
+        learnedPort = webLearnedEndpointStore.read(project.summary.documentId)?.port,
+    )
+
+    private fun openProjectPresentation() {
+        val projectId = project.summary.documentId
+        val lifecycle = lifecycleStore.read(projectId)
+        resultWebRef = resultWebStore.latest(projectId)
+        val web = projectWebSnapshot(projectId, lifecycle.runtimeState)
+        val target = PresentationTargetResolver.resolve(
+            webPresentationKnown = web.reachableUrl != null,
+            richResultAvailable = richResult != null,
+            resultWebAvailable = resultWebRef != null,
+        )
+        when (target) {
+            PresentationTarget.WEB -> {
+                val url = web.reachableUrl ?: return
+                webAvailability.verifyNow(projectId, url) { listening ->
+                    if (!listening) {
+                        Toast.makeText(
+                            this,
+                            getString(R.string.runtime_web_not_listening_message, url),
+                            Toast.LENGTH_LONG,
+                        ).show()
+                        return@verifyNow
+                    }
+                    val uri = Uri.parse(url)
+                    val browser = StudioBrowser.selectedTarget(this, uri)
+                    if (browser == null) {
+                        Toast.makeText(
+                            this,
+                            R.string.runtime_rich_result_browser_required,
+                            Toast.LENGTH_LONG,
+                        ).show()
+                        startActivity(Intent(this, SettingsActivity::class.java))
+                        return@verifyNow
+                    }
+                    startActivity(
+                        Intent(Intent.ACTION_VIEW, uri).apply {
+                            addCategory(Intent.CATEGORY_BROWSABLE)
+                            setPackage(browser.packageName)
+                        },
+                    )
+                }
+            }
+            PresentationTarget.RESULT_WEB -> resultWebRef?.let { result ->
+                startActivity(
+                    Intent(this, ResultWebActivity::class.java).apply {
+                        putExtra(ResultWebActivity.EXTRA_RESULT_ID, result.id)
+                        putExtra(ResultWebActivity.EXTRA_PROJECT_NAME, project.summary.name)
+                    },
+                )
+            }
+            PresentationTarget.RICH_RESULT -> richResult?.takeUnless { it.isEmpty }?.let { result ->
+                startActivity(
+                    Intent(this, RichResultActivity::class.java).apply {
+                        putExtra(RichResultActivity.EXTRA_PROJECT_NAME, project.summary.name)
+                        putStringArrayListExtra(
+                            RichResultActivity.EXTRA_LABELS,
+                            ArrayList(result.items.map { it.label }),
+                        )
+                        putStringArrayListExtra(
+                            RichResultActivity.EXTRA_URLS,
+                            ArrayList(result.items.map { it.url }),
+                        )
+                    },
+                )
+            }
+            PresentationTarget.NONE -> Toast.makeText(
+                this,
+                R.string.normal_project_open_unavailable,
+                Toast.LENGTH_SHORT,
+            ).show()
         }
     }
 
@@ -722,6 +1117,8 @@ private fun NormalProjectWorkspaceScreen(
     onConfigure: () -> Unit,
     onRun: () -> Unit,
     onStop: () -> Unit,
+    onRefresh: () -> Unit,
+    onOpen: () -> Unit,
     onSelectRuntime: (ProjectRuntimeSelection) -> Unit,
     onOpenDeveloper: () -> Unit,
     onRequestPermission: () -> Unit,
@@ -923,6 +1320,28 @@ private fun NormalProjectWorkspaceScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+            }
+
+            StudioSectionCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.small),
+                ) {
+                    OutlinedButton(
+                        onClick = onOpen,
+                        enabled = state.openEnabled && !state.busy,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(text = stringResource(R.string.normal_project_open_action))
+                    }
+                    OutlinedButton(
+                        onClick = onRefresh,
+                        enabled = !state.busy,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(text = stringResource(R.string.normal_project_refresh_action))
                     }
                 }
             }
