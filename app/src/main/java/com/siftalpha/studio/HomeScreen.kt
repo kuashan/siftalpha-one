@@ -72,6 +72,7 @@ data class HomeState(
     val permissionGranted: Boolean = false,
     val bridgeState: HomeBridgeState = HomeBridgeState.READY,
     val commandOutput: String = "",
+    val developerModeEnabled: Boolean = false,
 )
 
 private enum class ProjectFilter {
@@ -169,26 +170,28 @@ fun HomeScreen(
                         Text(text = stringResource(R.string.home_nav_home))
                     },
                 )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = onRuntimeCenter,
-                    icon = {
-                        Text(text = stringResource(R.string.home_nav_runtime_icon))
-                    },
-                    label = {
-                        Text(text = stringResource(R.string.home_nav_runtime))
-                    },
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = onEnvironment,
-                    icon = {
-                        Text(text = stringResource(R.string.home_nav_environment_icon))
-                    },
-                    label = {
-                        Text(text = stringResource(R.string.home_nav_environment))
-                    },
-                )
+                if (state.developerModeEnabled) {
+                    NavigationBarItem(
+                        selected = false,
+                        onClick = onRuntimeCenter,
+                        icon = {
+                            Text(text = stringResource(R.string.home_nav_runtime_icon))
+                        },
+                        label = {
+                            Text(text = stringResource(R.string.home_nav_runtime))
+                        },
+                    )
+                    NavigationBarItem(
+                        selected = false,
+                        onClick = onEnvironment,
+                        icon = {
+                            Text(text = stringResource(R.string.home_nav_environment_icon))
+                        },
+                        label = {
+                            Text(text = stringResource(R.string.home_nav_environment))
+                        },
+                    )
+                }
             }
         },
     ) { innerPadding ->
@@ -210,22 +213,24 @@ fun HomeScreen(
                         text = stringResource(R.string.home_w1c_summary),
                         style = MaterialTheme.typography.bodyLarge,
                     )
-                    Spacer(modifier = Modifier.height(spacing.medium))
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
-                        StudioStatusBadge(
-                            label = termuxLabel,
-                            tone = if (state.termuxInstalled && state.permissionGranted) {
-                                StudioStatusTone.Success
-                            } else {
-                                StudioStatusTone.Warning
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        StudioStatusBadge(
-                            label = bridgeLabel,
-                            tone = bridgeTone,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                    if (state.developerModeEnabled) {
+                        Spacer(modifier = Modifier.height(spacing.medium))
+                        Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+                            StudioStatusBadge(
+                                label = termuxLabel,
+                                tone = if (state.termuxInstalled && state.permissionGranted) {
+                                    StudioStatusTone.Success
+                                } else {
+                                    StudioStatusTone.Warning
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            StudioStatusBadge(
+                                label = bridgeLabel,
+                                tone = bridgeTone,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
                 }
             }
@@ -292,34 +297,36 @@ fun HomeScreen(
                 }
             }
 
-            item {
-                StudioSectionCard {
-                    Text(
-                        text = stringResource(R.string.home_quick_actions),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Spacer(modifier = Modifier.height(spacing.medium))
-                    StudioPrimaryAction(
-                        label = stringResource(R.string.home_runtime_center),
-                        onClick = onRuntimeCenter,
-                    )
-                    OutlinedButton(
-                        onClick = onEnvironment,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(text = stringResource(R.string.home_runtime_storage_manager))
-                    }
-                    OutlinedButton(
-                        onClick = onTerminal,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(text = stringResource(R.string.home_terminal))
-                    }
-                    OutlinedButton(
-                        onClick = onEmbeddedPython,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(text = stringResource(R.string.home_siftalpha_x_experimental))
+            if (state.developerModeEnabled) {
+                item {
+                    StudioSectionCard {
+                        Text(
+                            text = stringResource(R.string.home_quick_actions),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Spacer(modifier = Modifier.height(spacing.medium))
+                        StudioPrimaryAction(
+                            label = stringResource(R.string.home_runtime_center),
+                            onClick = onRuntimeCenter,
+                        )
+                        OutlinedButton(
+                            onClick = onEnvironment,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.home_runtime_storage_manager))
+                        }
+                        OutlinedButton(
+                            onClick = onTerminal,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.home_terminal))
+                        }
+                        OutlinedButton(
+                            onClick = onEmbeddedPython,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.home_siftalpha_x_experimental))
+                        }
                     }
                 }
             }
@@ -429,90 +436,93 @@ fun HomeScreen(
                 }
             }
 
-            item {
-                StudioSectionCard {
-                    Text(
-                        text = stringResource(R.string.home_section_runtime_bridge),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Spacer(modifier = Modifier.height(spacing.small))
-                    Text(
-                        text = termuxLabel,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(spacing.medium))
-                    StudioPrimaryAction(
-                        label = stringResource(R.string.home_probe_environment),
-                        onClick = onProbeEnvironment,
-                    )
-                    OutlinedButton(
-                        onClick = onTestTermux,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(text = stringResource(R.string.home_test_termux))
-                    }
-                    OutlinedButton(
-                        onClick = onRequestPermission,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
+            if (state.developerModeEnabled) {
+                item {
+                    StudioSectionCard {
                         Text(
-                            text = if (state.permissionGranted) {
-                                stringResource(R.string.home_permission_granted_button)
-                            } else {
-                                stringResource(R.string.home_request_permission)
-                            },
+                            text = stringResource(R.string.home_section_runtime_bridge),
+                            style = MaterialTheme.typography.titleMedium,
                         )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(spacing.small),
-                    ) {
-                        OutlinedButton(
-                            onClick = onCopySetup,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(text = stringResource(R.string.home_copy_termux_setup))
-                        }
-                        OutlinedButton(
-                            onClick = onOpenTermux,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(text = stringResource(R.string.home_open_termux))
-                        }
-                    }
-                }
-            }
-
-            item {
-                StudioSectionCard {
-                    Text(
-                        text = stringResource(R.string.home_section_command_output),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Spacer(modifier = Modifier.height(spacing.small))
-                    Text(
-                        text = state.commandOutput.ifBlank {
-                            stringResource(R.string.home_no_command)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        fontFamily = FontFamily.Monospace,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 24,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (state.commandOutput.isNotBlank()) {
                         Spacer(modifier = Modifier.height(spacing.small))
+                        Text(
+                            text = termuxLabel,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(spacing.medium))
+                        StudioPrimaryAction(
+                            label = stringResource(R.string.home_probe_environment),
+                            onClick = onProbeEnvironment,
+                        )
                         OutlinedButton(
-                            onClick = onCopyOutput,
+                            onClick = onTestTermux,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text(text = stringResource(R.string.home_copy_output))
+                            Text(text = stringResource(R.string.home_test_termux))
+                        }
+                        OutlinedButton(
+                            onClick = onRequestPermission,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = if (state.permissionGranted) {
+                                    stringResource(R.string.home_permission_granted_button)
+                                } else {
+                                    stringResource(R.string.home_request_permission)
+                                },
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(spacing.small),
+                        ) {
+                            OutlinedButton(
+                                onClick = onCopySetup,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(text = stringResource(R.string.home_copy_termux_setup))
+                            }
+                            OutlinedButton(
+                                onClick = onOpenTermux,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(text = stringResource(R.string.home_open_termux))
+                            }
                         }
                     }
                 }
-            }
+    
+                item {
+                    StudioSectionCard {
+                        Text(
+                            text = stringResource(R.string.home_section_command_output),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Spacer(modifier = Modifier.height(spacing.small))
+                        Text(
+                            text = state.commandOutput.ifBlank {
+                                stringResource(R.string.home_no_command)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 24,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (state.commandOutput.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(spacing.small))
+                            OutlinedButton(
+                                onClick = onCopyOutput,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(text = stringResource(R.string.home_copy_output))
+                            }
+                        }
+                    }
+                }
+    
+                }
 
             item {
                 StudioSectionCard {
