@@ -2194,3 +2194,59 @@ Real-device testing of r48a7 showed that after granting RUN_COMMAND（外部命�
 Source/cloud gate: **PASS（通过）**.
 
 Real-device acceptance remains **PENDING（待验收）**. Priority test: revoke RUN_COMMAND, tap Prepare Project, grant permission while Termux is not open, verify that “checking Termux” does not hang indefinitely and that the Open Termux recovery appears after the bounded probe timeout. Then verify live Prepare stage updates until READY（就绪）.
+
+
+## 2026-09-21 · r48a9 — Shared PREPARE workflow correction + Termux setup-history recovery
+
+### Why this correction was required
+
+Real-device testing exposed an R48 integration drift:
+- Normal Mode（普通模式） and Developer Workspace（开发者工作区） were no longer using one complete PREPARE（准备） workflow for Internal R（内部执行环境）.
+- Normal Mode had accumulated its own simplified preparation orchestration around the same low-level Runtime calls.
+- External Provider recovery also treated current bridge liveness and historical Termux setup as the same fact.
+
+This violated the R48 contract that Normal Mode is only a second presentation surface over shared Runtime / Environment workflow state.
+
+### Functional correction
+
+Functional source:
+`d16f976a161bec398cc7c689a923d4ce0e4c1c59`
+
+Version:
+- versionName: `0.8.0-alpha43-r48a9`
+- versionCode: `189`
+
+Shared PREPARE:
+- added `ProjectPrepareWorkflow`（共享项目准备工作流）;
+- both Normal Mode and Developer Workspace now call the same PREPARE kernel;
+- Internal R preparation delegates to the same `prepareEmbeddedPythonEnvironment(...)` contract and the shared result is authoritative;
+- External PREPARE command construction is also routed through the same shared workflow;
+- Developer Workspace layout / interaction design was not redesigned.
+
+External Provider recovery:
+- keeps historical Termux setup evidence separate from current bridge liveness;
+- a previously verified setup + current bridge timeout means “open Termux” rather than “first-time setup”;
+- a fresh first-time authorization path may still copy the setup command for convenience;
+- legacy unknown state first tries a plain Termux open, then offers setup command only if the bridge still cannot respond.
+
+### Cloud verification
+
+- Internal Alpine Probe（内部 Alpine 探针） #71: PASS（通过）
+- W0 Cloud Build（W0 云端构建） #459: PASS（通过）
+- repository validators（仓库校验）: PASS（通过）
+- unit tests（单元测试）: PASS（通过）
+- assembleDebug（Debug 构建）: PASS（通过）
+- APK artifact（安装包产物）: `siftalpha-w0-459`
+- artifact id: `10629409775`
+- artifact ZIP digest: `sha256:a9ff642addd9bc1bbdf49d2c543ca988f63a6b5aafb5d465e9b6e56f104443ed`
+- APK SHA-256: `af348d6947bd09c6e18a9af126e315bf71ad8232936495383f20ab1339a41f59`
+
+### Acceptance state
+
+Source/cloud gate: PASS（通过）.
+
+Real-device acceptance is still required for:
+1. Internal R PREPARE from Normal Mode reaches READY exactly as the Developer Workspace path does.
+2. Previously configured Termux that is merely closed only asks the user to open Termux.
+3. First-time / genuinely unconfigured Termux still gets the convenient copied setup command.
+4. Returning from Termux triggers a fresh bridge probe and resumes the original PREPARE only after readiness is proven.

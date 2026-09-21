@@ -1268,3 +1268,19 @@ Real-device matrix — PENDING（待真机验收）:
    - Expected: existing page/layout remains unchanged; shared Bridge Probe timeout prevents indefinite waiting.
 8. STOP（停止） regression.
    - Expected: only the current project is stopped.
+
+
+## r48a9 real-device acceptance matrix
+
+Build: `0.8.0-alpha43-r48a9` / versionCode `189`
+Functional source: `d16f976a161bec398cc7c689a923d4ce0e4c1c59`
+Cloud gate: W0 #459 PASS / Internal Alpine Probe #71 PASS.
+
+Required real-device checks:
+- [ ] Normal Mode + Internal R + Prepare reaches READY for a project that Developer Workspace can prepare.
+- [ ] Open Developer Workspace after Normal Mode prepare and confirm the same environment is already READY; no duplicate preparation is required.
+- [ ] With Termux previously configured but fully closed, External PREPARE asks only to open Termux and does not immediately copy the setup command.
+- [ ] Return from opening Termux and confirm SiftAlpha automatically re-probes the bridge and resumes the pending PREPARE.
+- [ ] On first-time / genuinely unconfigured Termux, setup recovery copies the one-time command and opens Termux.
+- [ ] PREPARE success stops at READY and does not automatically RUN.
+- [ ] STOP remains project-scoped and does not affect another project.

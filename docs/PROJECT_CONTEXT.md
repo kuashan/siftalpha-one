@@ -1077,3 +1077,23 @@ Architecture boundary:
 - Normal Mode（普通模式） exposes preflight and dependency-preparation progress in its project-status card.
 - Developer Workspace（开发者工作区） page/layout remains frozen; this round did not modify `V04Activity.kt`.
 - Shared Core（共享核心） remains the source of readiness truth; Normal Mode only adds user-facing presentation.
+
+
+## r48a9 current correction state
+
+Current functional source: `d16f976a161bec398cc7c689a923d4ce0e4c1c59`
+Version: `0.8.0-alpha43-r48a9` / versionCode `189`.
+
+R48 architectural rule has been re-aligned:
+- Normal Mode（普通模式） is a presentation surface, not a second Runtime / PREPARE implementation.
+- Developer Workspace（开发者工作区） remains the accepted detailed surface.
+- Both surfaces now route PREPARE through `ProjectPrepareWorkflow` and the existing `ProjectRuntimeController` contracts.
+- Termux historical setup evidence is persistent and separate from current Bridge（命令桥） liveness.
+- Current bridge timeout after prior successful setup means Termux should be opened/re-probed, not treated as first-time configuration.
+
+Cloud status:
+- Internal Alpine Probe #71 PASS.
+- W0 Cloud Build #459 PASS.
+- APK SHA-256: `af348d6947bd09c6e18a9af126e315bf71ad8232936495383f20ab1339a41f59`.
+
+Next step: real-device acceptance only; do not rework either UI unless testing proves another integration defect.
