@@ -1665,3 +1665,49 @@ R48-F：More / Developer Tools（更多 / 开发者工具）整理
 - 每一小段完成后先提供 Trusted Signed Debug APK（稳定签名调试包），真机验收后再决定是否进入下一段。
 - 本条仅固化规划，不包含 R48 业务代码变更。
 
+## 2026-09-21 · R48-0 decision — Normal Mode（普通模式） as default, Developer Mode（开发者模式） as unlocked advanced surface
+
+The user-facing R48（第 48 阶段） mode contract is now fixed:
+
+1. Normal Mode（普通模式） is the default surface on app launch.
+2. Developer Mode（开发者模式） defaults OFF（关闭） in Settings（设置）.
+3. Enabling Developer Mode（开发者模式） does not replace Normal Mode（普通模式）. It only unlocks an entry to the existing Developer Workspace（开发者工作区）.
+4. The existing Developer Workspace（开发者工作区）, including current V04Activity（运行中心页面） behavior and current Runtime（运行时） control implementation, is treated as a protected accepted surface for the first R48 slice and must not be modified merely to implement Normal Mode（普通模式）.
+5. Normal Mode（普通模式） and Developer Mode（开发者模式） must control the same underlying project Runtime（运行时）. A Run（运行） or Stop（停止） action from Normal Mode（普通模式） must be immediately reflected in the same Runtime（运行时） state observed by Developer Mode（开发者模式）.
+6. R48 introduces a new Project Control Hub（项目控制枢纽） as the integration boundary for the new Normal Mode（普通模式）. The hub calls the already accepted underlying controller/policy/state contracts; it must not create a second Runtime implementation.
+7. Normal Mode（普通模式） must not launch a hidden Developer Activity（开发者页面） or simulate Developer Workspace（开发者工作区） button clicks. The two surfaces are linked through the same Runtime（运行时） backend and shared state, not through hidden UI automation.
+8. Developer Mode（开发者模式） ON/OFF remains a UI capability switch only. It must not restart, stop, clean, migrate, or switch the active Runtime Provider（运行环境提供者）.
+
+### R48-0 control topology
+
+```text
+Normal Mode（普通模式）
+        |
+        v
+Project Control Hub（项目控制枢纽）
+        |
+        +--> existing ProjectActionPolicy（项目动作策略）
+        +--> existing ProjectRuntimeController（项目运行控制器）
+        +--> existing Runtime / Environment / Observation contracts（运行时 / 环境 / 观察契约）
+        |
+        v
+Shared Runtime State（共享运行状态）
+        ^
+        |
+Developer Workspace（开发者工作区，现有代码）
+```
+
+The intended meaning of “Normal Mode directly links to Developer Mode” is therefore:
+- both surfaces operate the same project identity;
+- both surfaces operate the same Runtime（运行时） instance/state;
+- Run（运行） from Normal Mode causes Developer Workspace（开发者工作区） to observe RUNNING（运行中）;
+- Stop（停止） from Normal Mode causes Developer Workspace（开发者工作区） to observe STOPPED（已停止）;
+- no duplicate action/state implementation exists in Normal Mode（普通模式）.
+
+### Protected first-slice rule
+
+For R48-0 / R48-A（第 48 阶段 0 / A）:
+- do not modify current Developer Workspace（开发者工作区） behavior unless an actual integration defect proves a minimal shared-interface change is unavoidable;
+- prefer adding new files/classes for Normal Mode（普通模式）, Developer Mode（开发者模式） preference, routing, and Project Control Hub（项目控制枢纽）;
+- any unavoidable change to existing Developer Workspace（开发者工作区） must be isolated, justified, regression-tested, and explicitly reported before acceptance.
+
