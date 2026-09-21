@@ -89,10 +89,10 @@ android {
         // scripts keep a stable interpreter prefix while failed prepares still roll back cleanly.
         // alpha43-r48a6 realigns Normal Mode and Developer Workspace on the Shared Core and adds
         // the shared External Provider preflight/bridge readiness contract.
-        // R48-C productizes the existing prepare workflow and adds Unified Import,
-        // Project Location and More / Developer Tools without duplicating Runtime logic.
-        versionCode = 190
-        versionName = "0.8.0-alpha43-r48c1"
+        // R48-D restores the frozen Developer surface, adds Normal Mode Runtime storage
+        // and shared GitHub import, and standardizes user-visible branding as SiftAlpha X.
+        versionCode = 191
+        versionName = "0.8.0-alpha43-r48d1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
