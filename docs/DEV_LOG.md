@@ -2014,3 +2014,94 @@ Source/cloud gate: **PASS（通过）**.
 
 The Project Management（项目管理） hierarchy refinement remains pending user real-device visual acceptance.
 
+## 2026-09-21 · R48-0F — Shared External Provider Preflight（共享外部执行环境前置检查）
+
+### Product decision
+
+External Provider（外部执行环境） readiness is not a Normal Mode（普通模式）-specific or Developer Workspace（开发者工作区）-specific feature.
+
+The following facts are now owned by Shared Core（共享核心）:
+- Termux installed state（Termux 安装状态）
+- RUN_COMMAND permission state（RUN_COMMAND 权限状态）
+- Termux bridge probe requirement / result（Termux 命令桥探测要求 / 结果）
+- allow-external-apps configuration evidence（外部应用调用配置证据）
+- bridge evidence freshness（命令桥证据新鲜度）
+
+Presentation surfaces may decide how to request permission, open Termux or explain a failure, but they must not independently reimplement readiness classification.
+
+### Shared Core implementation
+
+Added:
+- `ExternalProviderPreflight`
+- `ExternalProviderPreflightPolicy`
+- `ExternalProviderReadiness`
+- `ExternalProviderReadinessStatus`
+- `ExternalProviderReadinessStore`
+
+Readiness states:
+- `TERMUX_NOT_INSTALLED`
+- `RUN_COMMAND_PERMISSION_REQUIRED`
+- `BRIDGE_PROBE_REQUIRED`
+- `TERMUX_CONFIGURATION_REQUIRED`
+- `BRIDGE_UNAVAILABLE`
+- `READY`
+
+A successful bridge result is persisted as app-wide External Provider evidence, not project state. READY bridge evidence is freshness-bounded; stale evidence falls back to a fresh probe requirement.
+
+The shared Termux connection test now emits:
+- `SIFTALPHA_TERMUX_ALLOW_EXTERNAL_APPS=YES|NO`
+- `SIFTALPHA_TERMUX_BRIDGE_OK`
+
+### Surface integration
+
+Normal Mode（普通模式）:
+- `ProjectRuntimeControlExecutor` consults the shared preflight before External PREPARE / RUN（外部准备 / 运行）.
+- `NormalProjectWorkspaceActivity` injects the same shared preflight into the Project Control Hub（项目控制枢纽）.
+
+Developer Workspace（开发者工作区）:
+- `V04Activity.ensureRuntime()` no longer independently asks TermuxBackend for installation/permission facts.
+- It consumes `ExternalProviderPreflight.inspect()` instead.
+- Existing Developer Workspace Runtime orchestration, pending operations, observation, Web Discovery and result presentation remain unchanged.
+
+Home / diagnostics:
+- the existing Termux bridge probe now records its result into the same shared readiness store.
+- Home Termux installed / RUN_COMMAND state also comes from the shared preflight.
+
+### Important scope boundary
+
+This slice moves the *decision and evidence model* into Shared Core.
+
+Android permission dialogs and “Open Termux” navigation remain presentation-layer responsibilities. A later thin UI slice may auto-request permission or auto-resume an interrupted PREPARE / RUN, but those UI actions must consume the shared readiness states above instead of creating another readiness implementation.
+
+### Version / cloud evidence
+
+Functional source:
+`3944e298de4d5444c23a0cbcea2c596f1a2c7c4d`
+
+Version:
+- versionName: `0.8.0-alpha43-r48a6`
+- versionCode: `186`
+- applicationId: `com.siftalpha.studio`
+
+Cloud:
+- W0 Cloud Build（W0 云端构建） #452: PASS（通过）
+- repository validators（仓库校验）: PASS（通过）
+- unit tests（单元测试）: PASS（通过）
+- assembleDebug（调试构建）: PASS（通过）
+- APK evidence collection（安装包证据收集）: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #68: PASS（通过） for the r48a6 runtime/build configuration
+
+Artifact:
+- `siftalpha-w0-452`
+- artifact id: `10626551773`
+- artifact ZIP digest: `sha256:56f6377d7db990ed5cf1674957acb8a9363158a454d382c57c2c0be183181f09`
+
+APK:
+- SHA-256: `54340d798b5f06a32321f9aeff72cb76d0163a254f41e74e606e233f423dd9b2`
+
+### Acceptance state
+
+Shared Core source/cloud gate: **PASS（通过）**.
+
+Real-device External Provider permission/bridge behavior remains pending user acceptance.
+
