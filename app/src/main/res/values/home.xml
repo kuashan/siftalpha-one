@@ -126,4 +126,6 @@
     <string name="home_importing">正在导入项目…</string>
     <string name="home_import_complete">项目 %1$s 已导入。</string>
     <string name="home_import_failed">导入失败</string>
+    <string name="home_import_github">从 GitHub 链接导入</string>
+    <string name="home_user_storage">运行空间</string>
 </resources>
