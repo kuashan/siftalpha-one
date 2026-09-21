@@ -29,4 +29,12 @@
     <string name="normal_project_prepare_stopped">Project preparation was stopped.</string>
     <string name="normal_project_configuration_saved">Configuration updated.</string>
     <string name="normal_project_waiting_action">No direct primary action is available right now. Refresh later or open the developer workspace for details.</string>
+    <string name="normal_external_provider_title">External provider</string>
+    <string name="normal_external_provider_permission_required">Allow SiftAlpha to call Termux through RUN_COMMAND.</string>
+    <string name="normal_external_provider_allow">Allow access</string>
+    <string name="normal_external_provider_open_termux">Open Termux, finish external-app setup, then return to SiftAlpha.</string>
+    <string name="normal_external_provider_open_termux_action">Open Termux</string>
+    <string name="normal_external_provider_check_required">The external provider check is required.</string>
+    <string name="normal_external_provider_checking">Checking the external provider…</string>
+    <string name="normal_external_provider_unavailable">The external provider is currently unavailable.</string>
 </resources>

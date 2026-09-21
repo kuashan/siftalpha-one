@@ -209,6 +209,8 @@
     <string name="runtime_source_metadata_failed">Source was cloned, but source metadata could not be saved: %1$s</string>
     <string name="runtime_current_directory_unsupported">Current directory cannot run projects</string>
     <string name="runtime_current_directory_unsupported_message">The current runtime requires the project root to be in Android shared internal storage. Use AcodeProjects or another directory in internal storage.</string>
+    <string name="runtime_external_provider_diagnostics_title">External provider preflight</string>
+    <string name="runtime_external_provider_diagnostics_format">TERMUX_INSTALLED=%1$s\nRUN_COMMAND_PERMISSION=%2$s\nALLOW_EXTERNAL_APPS=%3$s\nBRIDGE_PROBE=%4$s\nEXTERNAL_PROVIDER_READY=%5$s</string>
     <string name="runtime_termux_missing_title">Termux not detected</string>
     <string name="runtime_termux_missing_message">Project execution continues to use the verified Termux runtime bridge.</string>
     <string name="runtime_permission_missing_title">RUN_COMMAND not granted</string>
