@@ -2,7 +2,7 @@
 <resources>
     <string name="settings_title">設定</string>
     <string name="settings_language_section">語言</string>
-    <string name="settings_language_summary">選擇 SiftAlpha Studio 使用的介面語言。</string>
+    <string name="settings_language_summary">選擇 SiftAlpha X 使用的介面語言。</string>
     <string name="settings_language_current">目前語言：%1$s</string>
     <string name="settings_language_change">變更語言</string>
     <string name="settings_browser_section">瀏覽器</string>
