@@ -71,4 +71,5 @@
     <string name="normal_prepare_runtime_python">Python 项目</string>
     <string name="normal_prepare_runtime_node">Node.js 项目</string>
     <string name="normal_prepare_runtime_unknown">当前项目</string>
+    <string name="normal_prepare_config_required_detail">环境已准备，还需要完成 %1$d 项必要配置后才能运行。</string>
 </resources>
