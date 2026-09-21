@@ -2049,3 +2049,71 @@ APK（安装包）:
 Source/cloud gate: **PASS（通过）**.
 
 The Project Management（项目管理） hierarchy refinement remains pending user real-device visual acceptance.
+
+## 2026-09-21 · R48a6.1 Real Device Failure Repair（真机失败修复）
+
+### Trigger（触发）
+
+R48a6 real-device acceptance（真机验收）确认：
+- Shared External Provider Preflight（共享外部执行环境前置检查）真实通过：Termux installed、RUN_COMMAND granted、allow-external-apps enabled、bridge probe PASS、provider READY。
+- External PREPARE（外部准备）可以长期停留在 PREPARING（准备中）。
+- 用户发起 STOP（停止）后，External STOP（外部停止）也可以长期停留在 STOPPING（停止中）。
+- Normal Mode（普通模式）根页面不能纵向滚动，Internal Alpine（内部 Alpine）长错误的最终尾部不可见。
+- Internal Alpine 当前观测到 `INTERNAL_ALPINE_PYTHON_RUNTIME_PREPARE_FAILED: exit=4`，但本轮不猜测修改其安装逻辑，等待滚动修复后的完整真机证据。
+
+### Source audit（源码复核）
+
+Codex（代码代理）在 R48a6.1 首轮提交后留下三个未完成项：
+1. W0 Cloud Build #484 在 `compileDebugKotlin` 失败，真实错误为 `ProjectOperationCoordinator.consumeExternalResultDisposition` 的 public API 暴露 internal return type。
+2. installable version（可安装版本）仍停留在 r48a6 / versionCode 186。
+3. Normal Mode 尚未重新挂接已有的 `PrepareLiveProgressController`（准备进度控制器）；`docs/DEV_LOG.md` / `docs/PROJECT_CONTEXT.md` 也未完成本轮记录。
+
+### Repair（修复）
+
+Final functional source（最终功能源码）：
+`049e35f8cd32803f13dd33672f059406874b8a9c`
+
+- `RuntimeOperationContract` 现在为 External Provider（外部执行环境）的 PREPARE / START / STATUS / LOGS / STOP / CLEAN 使用 action-specific deadline（动作专属截止时间）。
+- `ProjectOperationCoordinator` 成为 External operation timeout（外部操作超时）的共享事实源，并使用 process-scoped watchdog（进程级看门狗），不依赖某一个 Activity（页面）。
+- PREPARE timeout（准备超时）释放 operation lock（操作锁）；无旧 READY 环境时进入 `ENVIRONMENT_ERROR`；已有 READY 环境时保留原环境事实。
+- STOP timeout（停止超时）释放 operation lock，但不会伪造 `STOPPED_BY_USER`；Runtime state（运行状态）回到 `UNKNOWN` 并记录 `RUNTIME_OPERATION_TIMED_OUT:STOP`。
+- Late callback fencing（迟到回调隔离）继续使用 projectId + generation + executionId，旧 PREPARE / STOP 回调不能覆盖新 generation（代际）。
+- V04Activity（开发者运行中心）只做必要的 Shared Coordinator（共享协调器）接线；External deadline 不再由 Activity 维护第二套看门狗。
+- Normal Mode 根 Compose（界面）布局恢复 `verticalScroll(rememberScrollState())`，长错误可纵向查看。
+- Normal Mode 重新复用已有 `PrepareLiveProgressController` / `PrepareProgressProbe` 作为只读 External PREPARE 进度展示；它不成为准备成功/失败的事实源，并可在 Activity 恢复时依据共享 operation record（操作记录）重新挂接。
+- 修复 Kotlin visibility（可见性）编译错误：`consumeExternalResultDisposition` 限定为 module-internal API（模块内部接口）。
+- Internal Alpine 安装逻辑未修改。
+
+### Version（版本）
+
+- versionName: `0.8.0-alpha43-r48a6.1`
+- versionCode: `187`
+- applicationId: `com.siftalpha.studio`
+
+### Cloud verification（云端验证）
+
+- W0 Cloud Build（W0 云端构建） #487 / run ID `35601141522`: **PASS（通过）**
+- Internal Alpine Probe（内部 Alpine 探针） #76 / run ID `35601141621`: **PASS（通过）**
+- repository validators（仓库校验）: PASS
+- unit tests（单元测试） + assembleDebug（调试构建）: PASS
+- artifact: `siftalpha-w0-487`
+- artifact ID: `10639401416`
+- artifact ZIP digest: `sha256:db6f8b414a8613befe01dac3eca2b57131184fee089d48123e5c7d9a56675ee2`
+- APK SHA-256: `ccf988663935e59c238c2805adb8fd6ed613f565e535c25467a2007fc35124af`
+- signer certificate SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- APK Signature Scheme v2: verified
+
+### Acceptance state（验收状态）
+
+CODE/CLOUD FIX COMPLETE（代码 / 云端修复完成）。
+
+REAL DEVICE FIX COMPLETE（真机修复完成）**尚不能声明**。
+
+下一轮真机必须验证：
+- External PREPARE 不再形成永久 PREPARING；
+- External STOP 在 callback（回调）缺失时最迟由共享 deadline 退出永久 STOPPING，并且不会伪造已停止；
+- Normal Mode 可以滚动到 Internal Alpine exit=4 的完整错误尾部；
+- External PREPARE 期间 Normal Mode 可看到只读准备进度；
+- STOP 仍只影响当前项目；
+- Internal CPython / Internal Alpine（内部运行环境）无回归。
+
