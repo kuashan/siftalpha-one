@@ -4877,6 +4877,13 @@ open class V04Activity : StudioActivity() {
             ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED,
             -> toast(getString(R.string.normal_external_provider_checking))
 
+            ExternalProviderReadiness.BRIDGE_UNRESPONSIVE -> AlertDialog.Builder(this)
+                .setTitle(getString(R.string.runtime_termux_missing_title))
+                .setMessage(getString(R.string.normal_external_provider_no_response))
+                .setNegativeButton(getString(R.string.common_cancel), null)
+                .setPositiveButton(getString(R.string.home_open_termux)) { _, _ -> openTermux() }
+                .show()
+
             ExternalProviderReadiness.UNAVAILABLE -> errorDialog(
                 getString(R.string.runtime_termux_missing_title),
                 result.detail ?: getString(R.string.normal_external_provider_unavailable),
