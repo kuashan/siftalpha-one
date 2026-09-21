@@ -89,6 +89,7 @@ android {
         // scripts keep a stable interpreter prefix while failed prepares still roll back cleanly.
         // alpha43-r48a6 realigns Normal Mode and Developer Workspace on the Shared Core and adds
         // the shared External Provider preflight/bridge readiness contract.
+        // R48a6: keep the final shared-core source tied to the cloud probe.
         versionCode = 186
         versionName = "0.8.0-alpha43-r48a6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
