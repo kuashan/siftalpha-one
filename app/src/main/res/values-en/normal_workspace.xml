@@ -71,4 +71,5 @@
     <string name="normal_prepare_runtime_python">Python project</string>
     <string name="normal_prepare_runtime_node">Node.js project</string>
     <string name="normal_prepare_runtime_unknown">project</string>
+    <string name="normal_prepare_config_required_detail">The environment is ready. Complete %1$d required configuration item(s) before running.</string>
 </resources>
