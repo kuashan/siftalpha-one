@@ -1250,3 +1250,43 @@ Source/cloud gate（源码 / 云端门禁）= PASS（通过）。
 Real-device acceptance（真机验收）= PENDING（待测试）。
 不自动 merge（合并），不移动 baseline（基线）。
 
+## 2026-09-22 · R48-D2 current state — shared background reliability + activity indicator（共享后台可靠性 + 活动指示条）
+
+User explicitly authorized two additions to both Normal Mode and Developer Mode:
+- Background Reliability Guidance（后台可靠性提醒）
+- Runtime Activity Indicator（运行活动指示条）
+
+Developer Mode remains frozen for all other behavior.
+
+Battery guidance:
+- generic Android settings routing, not OEM-specific
+- first real Prepare / Run trigger
+- shared acknowledgement across both surfaces
+- no automatic battery-exemption mutation
+
+Activity indicator:
+- indeterminate animation only
+- active bounded controls animate only while shared operation is alive
+- confirmed RUNNING can animate continuously
+- timeout/terminal state stops animation
+- no port dependency
+- no fake percent
+- no Runtime deadline changes
+
+Current functional source:
+`ab0b5fcad8402dcddb1f0986bcd7dbb2400017fb`
+
+Version:
+- `0.8.0-alpha43-r48d2`
+- versionCode `192`
+
+Cloud evidence:
+- W0 #599 PASS
+- Internal Alpine Probe #82 PASS
+- artifact `siftalpha-w0-599` / ID `10652097606`
+- APK SHA-256 `3acf37223d7a5ec7708215d851bf513ec403c2942c46f8cd026958b4aca12a4f`
+- signer SHA-256 `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+
+CODE/CLOUD COMPLETE（代码 / 云端完成）。
+REAL DEVICE ACCEPTANCE（真机验收）= PENDING（待测试）。
+
