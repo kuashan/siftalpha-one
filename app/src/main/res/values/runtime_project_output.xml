@@ -7,5 +7,5 @@
     <string name="runtime_center_section_system_output">导入 / 系统输出</string>
     <string name="runtime_button_refresh_logs">刷新日志</string>
     <string name="runtime_web_not_listening_title">网页端口尚未就绪</string>
-    <string name="runtime_web_not_listening_message">Studio 已检测到本地 Web 地址，但 %1$s 当前没有可连接的监听端口。浏览器入口会保持禁用，并继续自动检测。</string>
+    <string name="runtime_web_not_listening_message">SiftAlpha X 已检测到本地 Web 地址，但 %1$s 当前没有可连接的监听端口。浏览器入口会保持禁用，并继续自动检测。</string>
 </resources>
