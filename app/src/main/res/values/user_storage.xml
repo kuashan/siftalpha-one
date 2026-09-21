@@ -23,4 +23,6 @@
     <string name="user_storage_scan_failed">运行空间统计失败，请稍后重试。</string>
     <string name="user_storage_ready">空间统计已更新。</string>
     <string name="user_storage_error">运行空间操作失败</string>
+    <string name="user_storage_scanning_external">正在读取 Termux 运行空间…</string>
+    <string name="user_storage_external_checking">正在检测 Termux；检测完成后会自动读取运行空间。</string>
 </resources>
