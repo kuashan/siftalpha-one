@@ -113,6 +113,7 @@ fun HomeScreen(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var filterIndex by rememberSaveable { mutableIntStateOf(ProjectFilter.ALL.ordinal) }
+    var projectManagementExpanded by rememberSaveable { mutableStateOf(false) }
     val selectedFilter = ProjectFilter.entries.getOrElse(filterIndex) { ProjectFilter.ALL }
     val visibleProjects = state.projects.filter { project ->
         matchesProject(project, selectedFilter, query)
@@ -237,63 +238,65 @@ fun HomeScreen(
 
             item {
                 StudioSectionCard {
-                    Text(
-                        text = stringResource(R.string.home_section_project_management),
-                        style = MaterialTheme.typography.titleMedium,
+                    StudioPrimaryAction(
+                        label = stringResource(R.string.home_section_project_management),
+                        onClick = { projectManagementExpanded = !projectManagementExpanded },
                     )
-                    Spacer(modifier = Modifier.height(spacing.small))
-                    val rootLabel = when {
-                        !state.rootSelected -> stringResource(R.string.home_project_root_unselected)
-                        state.projectError != null -> stringResource(R.string.home_root_access_failed)
-                        else -> stringResource(
-                            R.string.home_root_selected,
-                            state.rootName ?: stringResource(R.string.home_none),
+                    if (projectManagementExpanded) {
+                        Spacer(modifier = Modifier.height(spacing.medium))
+                        val rootLabel = when {
+                            !state.rootSelected -> stringResource(R.string.home_project_root_unselected)
+                            state.projectError != null -> stringResource(R.string.home_root_access_failed)
+                            else -> stringResource(
+                                R.string.home_root_selected,
+                                state.rootName ?: stringResource(R.string.home_none),
+                            )
+                        }
+                        Text(
+                            text = rootLabel,
+                            style = MaterialTheme.typography.bodyLarge,
                         )
-                    }
-                    Text(
-                        text = rootLabel,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    if (state.projectError != null) {
+                        if (state.projectError != null) {
+                            Spacer(modifier = Modifier.height(spacing.small))
+                            Text(
+                                text = stringResource(
+                                    R.string.home_root_read_failed,
+                                    state.projectError,
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(spacing.medium))
+                        StudioPrimaryAction(
+                            label = stringResource(R.string.home_connect_acode),
+                            onClick = onConnectAcode,
+                        )
+                        OutlinedButton(
+                            onClick = onChooseRoot,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.home_choose_other_root))
+                        }
+                        OutlinedButton(
+                            onClick = onNewProject,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.home_new_python_project))
+                        }
+                        OutlinedButton(
+                            onClick = onRefreshProjects,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.home_refresh_projects))
+                        }
                         Spacer(modifier = Modifier.height(spacing.small))
                         Text(
-                            text = stringResource(
-                                R.string.home_root_read_failed,
-                                state.projectError,
-                            ),
+                            text = stringResource(R.string.home_root_help),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Spacer(modifier = Modifier.height(spacing.medium))
-                    StudioPrimaryAction(
-                        label = stringResource(R.string.home_connect_acode),
-                        onClick = onConnectAcode,
-                    )
-                    OutlinedButton(
-                        onClick = onChooseRoot,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(text = stringResource(R.string.home_choose_other_root))
-                    }
-                    OutlinedButton(
-                        onClick = onNewProject,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(text = stringResource(R.string.home_new_python_project))
-                    }
-                    OutlinedButton(
-                        onClick = onRefreshProjects,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(text = stringResource(R.string.home_refresh_projects))
-                    }
-                    Spacer(modifier = Modifier.height(spacing.small))
-                    Text(
-                        text = stringResource(R.string.home_root_help),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
 
