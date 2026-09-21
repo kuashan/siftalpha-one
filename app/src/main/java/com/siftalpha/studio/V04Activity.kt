@@ -35,6 +35,7 @@ import com.siftalpha.studio.runtime.ExternalProviderReadinessStatus
 import com.siftalpha.studio.runtime.EmbeddedPythonObservationPolicy
 import com.siftalpha.studio.runtime.EmbeddedProjectPollRegistry
 import com.siftalpha.studio.runtime.ProjectActivityRegistry
+import com.siftalpha.studio.runtime.ProjectPrepareWorkflow
 import com.siftalpha.studio.runtime.ProjectRuntimeController
 import com.siftalpha.studio.runtime.ProjectRuntimeExecutionPlanner
 import com.siftalpha.studio.runtime.ProjectRuntimeSelection
@@ -182,6 +183,7 @@ open class V04Activity : StudioActivity() {
     private lateinit var externalProviderUi: ExternalProviderPreflightUiCoordinator
     private lateinit var gateway: V04ProjectGateway
     private lateinit var runtime: ProjectRuntimeController
+    private lateinit var prepareWorkflow: ProjectPrepareWorkflow
     private lateinit var secretStore: ProjectSecretStore
     private lateinit var secretPolicyInspector: ProjectSecretPolicyInspector
     private lateinit var configurationInspector: ProjectConfigurationInspector
@@ -359,6 +361,7 @@ open class V04Activity : StudioActivity() {
             internalAlpineEnvironmentManager = InternalAlpineEnvironmentManager(this),
             internalAlpineSession = InternalAlpineSession.shared(this),
         )
+        prepareWorkflow = ProjectPrepareWorkflow(runtime)
         secretStore = ProjectSecretStore(this)
         lifecycleStore = RuntimeLifecycleStore(this)
         operationStore = RuntimeOperationStore(this)
@@ -2343,7 +2346,7 @@ open class V04Activity : StudioActivity() {
         )
         val future = embeddedStartExecutor.submit {
             val result = runCatching {
-                runtime.prepareEmbeddedPythonEnvironment(project) { liveText ->
+                prepareWorkflow.prepareInternal(project) { liveText ->
                     val safeLiveText = runCatching {
                         secretStore.redactRuntimeText(project.folderName, liveText)
                     }.getOrElse {
@@ -3434,7 +3437,7 @@ open class V04Activity : StudioActivity() {
         if (silentRecovery) recoveryProjects += stateKey
         val command = try {
             when (action) {
-                ProjectRuntimeController.Action.PREPARE -> runtime.prepare(project)
+                ProjectRuntimeController.Action.PREPARE -> prepareWorkflow.externalCommand(project)
                 ProjectRuntimeController.Action.START ->
                     if (launchInvocation == null) {
                         runtime.start(
@@ -3472,11 +3475,16 @@ open class V04Activity : StudioActivity() {
             )
             return false
         }
-        val managedCommand = runtime.wrapCancelableExternalActivity(
-            project = project,
-            action = action,
-            command = command,
-        )
+        val managedCommand = if (action == ProjectRuntimeController.Action.PREPARE) {
+            // PREPARE is already wrapped by the shared workflow kernel used by Normal Mode.
+            command
+        } else {
+            runtime.wrapCancelableExternalActivity(
+                project = project,
+                action = action,
+                command = command,
+            )
+        }
         val id = send(managedCommand, renderToSystemOutput = false)
         if (id == null) {
             if (silentRecovery) {

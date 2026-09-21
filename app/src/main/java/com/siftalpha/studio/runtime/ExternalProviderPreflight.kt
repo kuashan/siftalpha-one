@@ -152,9 +152,31 @@ object ExternalProviderPreflightPolicy {
     ): Boolean = snapshot.ready && hasFreshProbeEvidence(snapshot, nowEpochMs, freshnessMs)
 }
 
+enum class ExternalProviderRecoveryAction {
+    OPEN_TERMUX,
+    SETUP_AND_OPEN_TERMUX,
+}
+
+object ExternalProviderRecoveryPolicy {
+    fun bridgeUnavailableAction(
+        setupPreviouslyVerified: Boolean,
+        permissionGrantedThisFlow: Boolean,
+        plainOpenAttempted: Boolean,
+    ): ExternalProviderRecoveryAction = when {
+        plainOpenAttempted -> ExternalProviderRecoveryAction.SETUP_AND_OPEN_TERMUX
+        !setupPreviouslyVerified && permissionGrantedThisFlow ->
+            ExternalProviderRecoveryAction.SETUP_AND_OPEN_TERMUX
+        else -> ExternalProviderRecoveryAction.OPEN_TERMUX
+    }
+}
+
 /**
  * App-wide persisted bridge evidence. It is intentionally not project state: Termux RUN_COMMAND
  * readiness is an External Provider property shared by all projects.
+ *
+ * Setup evidence is intentionally sticky and separate from current bridge liveness. A user can have
+ * a previously configured Termux while the app is currently stopped; invalidating a live probe must
+ * never erase that historical fact.
  */
 class ExternalProviderReadinessStore internal constructor(
     private val prefs: SharedPreferences,
@@ -186,11 +208,14 @@ class ExternalProviderReadinessStore internal constructor(
     }
 
     fun write(snapshot: ExternalProviderReadiness) {
+        val setupVerified = setupPreviouslyVerified() ||
+            (snapshot.bridgeVerified && snapshot.allowExternalApps == true)
         prefs.edit()
             .putString(FIELD_STATUS, snapshot.status.name)
             .putBoolean(FIELD_INSTALLED, snapshot.termuxInstalled)
             .putBoolean(FIELD_PERMISSION, snapshot.runCommandPermissionGranted)
             .putBoolean(FIELD_BRIDGE, snapshot.bridgeVerified)
+            .putBoolean(FIELD_SETUP_VERIFIED, setupVerified)
             .apply {
                 if (snapshot.allowExternalApps == null) remove(FIELD_ALLOW_EXTERNAL_APPS)
                 else putBoolean(FIELD_ALLOW_EXTERNAL_APPS, snapshot.allowExternalApps)
@@ -199,6 +224,11 @@ class ExternalProviderReadinessStore internal constructor(
             }
             .apply()
     }
+
+    fun setupPreviouslyVerified(): Boolean =
+        prefs.getBoolean(FIELD_SETUP_VERIFIED, false) ||
+            // Migration path from r48a6-r48a8, where only the latest probe stored this fact.
+            prefs.getBoolean(FIELD_ALLOW_EXTERNAL_APPS, false)
 
     fun clear() {
         prefs.edit().clear().apply()
@@ -211,6 +241,7 @@ class ExternalProviderReadinessStore internal constructor(
         private const val FIELD_PERMISSION = "permission"
         private const val FIELD_BRIDGE = "bridge"
         private const val FIELD_ALLOW_EXTERNAL_APPS = "allow_external_apps"
+        private const val FIELD_SETUP_VERIFIED = "setup_verified"
         private const val FIELD_CHECKED_AT = "checked_at"
     }
 }
@@ -253,6 +284,8 @@ class ExternalProviderPreflight(
     }
 
     fun probeCommand(): RuntimeCommand = TermuxBackend.CONNECTION_TEST
+
+    fun setupPreviouslyVerified(): Boolean = store.setupPreviouslyVerified()
 
     fun recordProbe(result: RuntimeResult): ExternalProviderReadiness {
         val local = ExternalProviderPreflightPolicy.local(

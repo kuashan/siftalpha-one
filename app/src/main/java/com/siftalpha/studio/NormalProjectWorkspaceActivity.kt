@@ -183,6 +183,19 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 runtime = runtime,
                 externalBackend = externalBackend,
                 externalProviderPreflight = externalProviderPreflight,
+                internalPrepareProgress = {
+                    runOnUiThread {
+                        if (::project.isInitialized) {
+                            screenState.value = screenState.value.copy(
+                                statusLabel = getString(R.string.runtime_lifecycle_preparing),
+                                message = getString(R.string.normal_project_preparing),
+                                runtimeState = RuntimeState.PREPARING,
+                                runtimeSelectionCanChange = false,
+                                primaryAction = NormalProjectPrimaryActionPolicy.Action.STOP,
+                            )
+                        }
+                    }
+                },
             ),
             stateBridge = sharedLifecycleBridge,
         )

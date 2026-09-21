@@ -153,21 +153,23 @@ class ProjectRuntimeControlExecutor(
     private val runtime: ProjectRuntimeController,
     private val externalBackend: RuntimeBackend,
     private val externalProviderPreflight: ExternalProviderPreflight? = null,
+    private val internalPrepareProgress: ((String) -> Unit)? = null,
 ) : ProjectControlHub.Executor {
+    private val prepareWorkflow = ProjectPrepareWorkflow(runtime)
 
     override fun prepare(
         project: V04ProjectGateway.RuntimeProject,
         selection: ProjectRuntimeSelection,
     ): ProjectControlHub.Result {
-        val resolution = runCatching {
-            runtime.detectEnvironment(
+        val decision = runCatching {
+            prepareWorkflow.resolve(
                 project = project,
-                resolveCompatibility = selection == ProjectRuntimeSelection.EMBEDDED_R,
+                request = selection.controlRequest,
             )
         }.getOrElse { error ->
             return executionFailure(ProjectControlHub.Action.PREPARE, error)
         }
-        val plan = resolution.plan
+        val plan = decision.plan
         if (!plan.readyToPrepare) {
             return rejected(
                 action = ProjectControlHub.Action.PREPARE,
@@ -176,42 +178,29 @@ class ProjectRuntimeControlExecutor(
             )
         }
 
-        val route = runCatching {
-            runtime.resolveControlPath(
-                project = project,
-                action = ProjectRuntimeController.Action.PREPARE,
-                request = selection.controlRequest,
-            )
-        }.getOrElse { error ->
-            return executionFailure(ProjectControlHub.Action.PREPARE, error)
-        }
-        if (route.path == RuntimeControlPath.REJECTED) {
+        if (decision.route.path == RuntimeControlPath.REJECTED) {
             return rejected(
                 action = ProjectControlHub.Action.PREPARE,
                 failure = ProjectControlHub.Failure.ROUTE_REJECTED,
-                detail = route.reason.name,
+                detail = decision.route.reason.name,
             )
         }
 
-        return when (route.path) {
+        return when (decision.route.path) {
             RuntimeControlPath.EMBEDDED_R -> runCatching {
-                val prepared = runtime.prepareEmbeddedPythonEnvironment(project)
-                val verified = prepared.ready && runtime.embeddedPythonEnvironmentReady(project)
-                if (!verified) {
-                    rejected(
-                        action = ProjectControlHub.Action.PREPARE,
-                        failure = ProjectControlHub.Failure.EXECUTION_FAILED,
-                        detail = "Internal R environment verification failed",
-                    )
-                } else {
-                    ProjectControlHub.Result.Completed(
-                        action = ProjectControlHub.Action.PREPARE,
-                        provider = RuntimeOperationProvider.INTERNAL,
-                        environmentReady = true,
-                        observedState = RuntimeState.UNKNOWN,
-                        detail = prepared.backend.name + ":" + prepared.outcome.name,
-                    )
-                }
+                val prepared = prepareWorkflow.prepareInternal(
+                    project = project,
+                    progress = internalPrepareProgress,
+                )
+                // Match the accepted Developer Workspace semantics exactly: the shared preparation
+                // result is authoritative. Do not add a Normal-Mode-only second verification pass.
+                ProjectControlHub.Result.Completed(
+                    action = ProjectControlHub.Action.PREPARE,
+                    provider = RuntimeOperationProvider.INTERNAL,
+                    environmentReady = prepared.ready,
+                    observedState = RuntimeState.UNKNOWN,
+                    detail = prepared.backend.name + ":" + prepared.outcome.name,
+                )
             }.getOrElse { error ->
                 executionFailure(ProjectControlHub.Action.PREPARE, error)
             }
@@ -233,16 +222,12 @@ class ProjectRuntimeControlExecutor(
                     )
                 }
                 runCatching {
-                    val command = runtime.prepare(project)
-                    val managed = runtime.wrapCancelableExternalActivity(
-                        project = project,
-                        action = ProjectRuntimeController.Action.PREPARE,
-                        command = command,
-                    )
                     ProjectControlHub.Result.Dispatched(
                         action = ProjectControlHub.Action.PREPARE,
                         provider = RuntimeOperationProvider.EXTERNAL,
-                        executionId = externalBackend.execute(managed),
+                        executionId = externalBackend.execute(
+                            prepareWorkflow.externalCommand(project),
+                        ),
                         observedState = RuntimeState.PREPARING,
                     )
                 }.getOrElse { error ->

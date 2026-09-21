@@ -11,6 +11,8 @@ import android.os.Looper
 import android.widget.Toast
 import com.siftalpha.studio.runtime.ExternalProviderPreflight
 import com.siftalpha.studio.runtime.ExternalProviderReadinessStatus
+import com.siftalpha.studio.runtime.ExternalProviderRecoveryAction
+import com.siftalpha.studio.runtime.ExternalProviderRecoveryPolicy
 import com.siftalpha.studio.runtime.RuntimeResult
 import com.siftalpha.studio.runtime.TermuxBackend
 import com.siftalpha.studio.runtime.TermuxContract
@@ -46,6 +48,8 @@ class ExternalProviderPreflightUiCoordinator(
     private var retryOnResume = false
     private var dialogShowing = false
     private var probeTimeoutRunnable: Runnable? = null
+    private var permissionGrantedThisFlow = false
+    private var plainOpenAttempted = false
 
     private val probeListener: (RuntimeResult) -> Unit = listener@{ result ->
         if (result.executionId != probeExecutionId) return@listener
@@ -56,6 +60,8 @@ class ExternalProviderPreflightUiCoordinator(
         if (pendingAction != null || probeExecutionId != null || dialogShowing) return
         pendingAction = action
         retryOnResume = false
+        permissionGrantedThisFlow = false
+        plainOpenAttempted = false
         onStage(ExternalProviderPreflightUiStage.CHECKING_PROVIDER)
 
         // PREPARE / RUN require a current real bridge response rather than only cached READY evidence.
@@ -98,6 +104,7 @@ class ExternalProviderPreflightUiCoordinator(
         if (requestCode != REQUEST_RUN_COMMAND) return false
 
         if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            permissionGrantedThisFlow = true
             onStage(ExternalProviderPreflightUiStage.CHECKING_PROVIDER)
             preflight.invalidateBridgeEvidence()
             evaluate()
@@ -133,7 +140,7 @@ class ExternalProviderPreflightUiCoordinator(
             }
             ExternalProviderReadinessStatus.BRIDGE_UNAVAILABLE -> {
                 onStage(ExternalProviderPreflightUiStage.TERMUX_NOT_READY)
-                showBridgeUnavailableDialog()
+                showBridgeUnavailableRecovery()
             }
             ExternalProviderReadinessStatus.READY -> proceed()
         }
@@ -147,7 +154,7 @@ class ExternalProviderPreflightUiCoordinator(
         }.getOrElse {
             preflight.recordProbeTimeout()
             onStage(ExternalProviderPreflightUiStage.TERMUX_NOT_READY)
-            showBridgeUnavailableDialog()
+            showBridgeUnavailableRecovery()
             return
         }
         probeExecutionId = executionId
@@ -184,7 +191,7 @@ class ExternalProviderPreflightUiCoordinator(
         probeExecutionId = null
         preflight.recordProbeTimeout()
         onStage(ExternalProviderPreflightUiStage.TERMUX_NOT_READY)
-        showBridgeUnavailableDialog()
+        showBridgeUnavailableRecovery()
     }
 
     private fun handleProbeResult(result: RuntimeResult) {
@@ -231,12 +238,41 @@ class ExternalProviderPreflightUiCoordinator(
         )
     }
 
+    private fun showBridgeUnavailableRecovery() {
+        when (
+            ExternalProviderRecoveryPolicy.bridgeUnavailableAction(
+                setupPreviouslyVerified = preflight.setupPreviouslyVerified(),
+                permissionGrantedThisFlow = permissionGrantedThisFlow,
+                plainOpenAttempted = plainOpenAttempted,
+            )
+        ) {
+            ExternalProviderRecoveryAction.OPEN_TERMUX -> showBridgeUnavailableDialog()
+            ExternalProviderRecoveryAction.SETUP_AND_OPEN_TERMUX -> showSetupRecoveryDialog()
+        }
+    }
+
     private fun showBridgeUnavailableDialog() {
         showActionDialog(
             title = activity.getString(R.string.external_provider_bridge_unavailable_title),
             message = activity.getString(R.string.external_provider_bridge_unavailable_message),
             positiveLabel = activity.getString(R.string.external_provider_open_termux),
-            onPositive = ::openTermuxForRetry,
+            onPositive = {
+                plainOpenAttempted = true
+                openTermuxForRetry()
+            },
+        )
+    }
+
+    private fun showSetupRecoveryDialog() {
+        showActionDialog(
+            title = activity.getString(R.string.external_provider_setup_recovery_title),
+            message = activity.getString(R.string.external_provider_setup_recovery_message),
+            positiveLabel = activity.getString(R.string.external_provider_open_termux),
+            onPositive = {
+                plainOpenAttempted = true
+                copyTermuxSetupCommand()
+                openTermuxForRetry()
+            },
         )
     }
 
@@ -316,6 +352,8 @@ class ExternalProviderPreflightUiCoordinator(
         val action = pendingAction ?: return
         pendingAction = null
         retryOnResume = false
+        permissionGrantedThisFlow = false
+        plainOpenAttempted = false
         action()
     }
 
@@ -323,6 +361,8 @@ class ExternalProviderPreflightUiCoordinator(
         cancelProbeTimeout()
         pendingAction = null
         retryOnResume = false
+        permissionGrantedThisFlow = false
+        plainOpenAttempted = false
         onStage(ExternalProviderPreflightUiStage.CANCELLED)
     }
 

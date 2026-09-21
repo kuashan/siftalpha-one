@@ -15,4 +15,6 @@
     <string name="external_provider_setup_command_label">SiftAlpha Termux 設定コマンド</string>
     <string name="external_provider_setup_copied">Termux 設定コマンドをコピーしました。貼り付けて実行し、SiftAlpha に戻ってください。</string>
     <string name="external_provider_termux_open_failed">Termux を開けません。</string>
+    <string name="external_provider_setup_recovery_title">Termux の外部アプリ設定を確認してください</string>
+    <string name="external_provider_setup_recovery_message">Termux を開きましたが、RUN_COMMAND ブリッジがまだ応答していません。SiftAlpha が初回設定コマンドをコピーします。Termux で貼り付けて実行し、SiftAlpha に戻ると自動的に再確認して元の操作を続行します。</string>
 </resources>

@@ -91,8 +91,10 @@ android {
         // Preflight for PREPARE / RUN without duplicating readiness classification in either UI.
         // alpha43-r48a8 bounds External Provider bridge probing and exposes Normal Mode
         // preflight / dependency-preparation progress without redesigning Developer Workspace.
-        versionCode = 188
-        versionName = "0.8.0-alpha43-r48a8"
+        // alpha43-r48a9 restores the R48 shared-workflow contract: both surfaces use the same
+        // PREPARE kernel, and Termux setup history is kept separate from current bridge liveness.
+        versionCode = 189
+        versionName = "0.8.0-alpha43-r48a9"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

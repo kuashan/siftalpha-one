@@ -8,6 +8,50 @@ import org.junit.Test
 class ExternalProviderPreflightPolicyTest {
 
     @Test
+    fun `known configured provider first timeout only opens Termux`() {
+        assertEquals(
+            ExternalProviderRecoveryAction.OPEN_TERMUX,
+            ExternalProviderRecoveryPolicy.bridgeUnavailableAction(
+                setupPreviouslyVerified = true,
+                permissionGrantedThisFlow = false,
+                plainOpenAttempted = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `fresh permission flow offers setup command on first timeout`() {
+        assertEquals(
+            ExternalProviderRecoveryAction.SETUP_AND_OPEN_TERMUX,
+            ExternalProviderRecoveryPolicy.bridgeUnavailableAction(
+                setupPreviouslyVerified = false,
+                permissionGrantedThisFlow = true,
+                plainOpenAttempted = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `legacy unknown setup opens Termux once before offering setup command`() {
+        assertEquals(
+            ExternalProviderRecoveryAction.OPEN_TERMUX,
+            ExternalProviderRecoveryPolicy.bridgeUnavailableAction(
+                setupPreviouslyVerified = false,
+                permissionGrantedThisFlow = false,
+                plainOpenAttempted = false,
+            ),
+        )
+        assertEquals(
+            ExternalProviderRecoveryAction.SETUP_AND_OPEN_TERMUX,
+            ExternalProviderRecoveryPolicy.bridgeUnavailableAction(
+                setupPreviouslyVerified = false,
+                permissionGrantedThisFlow = false,
+                plainOpenAttempted = true,
+            ),
+        )
+    }
+
+    @Test
     fun `missing Termux wins over every later readiness stage`() {
         val snapshot = ExternalProviderPreflightPolicy.local(
             termuxInstalled = false,

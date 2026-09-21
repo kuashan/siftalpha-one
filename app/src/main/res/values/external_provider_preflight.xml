@@ -15,4 +15,6 @@
     <string name="external_provider_setup_command_label">SiftAlpha Termux 设置命令</string>
     <string name="external_provider_setup_copied">Termux 设置命令已复制，请粘贴执行后返回 SiftAlpha。</string>
     <string name="external_provider_termux_open_failed">无法打开 Termux。</string>
+    <string name="external_provider_setup_recovery_title">需要确认 Termux 外部调用设置</string>
+    <string name="external_provider_setup_recovery_message">Termux 已经尝试打开，但 RUN_COMMAND（命令桥）仍未响应。SiftAlpha 会复制首次设置命令；请在 Termux 中粘贴执行，然后返回 SiftAlpha，系统会自动重新检测并继续原操作。</string>
 </resources>
