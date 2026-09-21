@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="user_storage_title">執行空間</string>
+    <string name="user_storage_summary">查看 SiftAlpha X 使用的執行空間與專案環境占用。這裡只管理執行環境資料，不刪除專案原始碼。</string>
+    <string name="user_storage_refresh">重新整理空間</string>
+    <string name="user_storage_scanning">正在統計執行空間…</string>
+    <string name="user_storage_scanning_internal">正在統計應用程式內執行空間…</string>
+    <string name="user_storage_internal_title">應用程式內執行空間</string>
+    <string name="user_storage_external_title">Termux 執行空間</string>
+    <string name="user_storage_total">總占用：%1$s</string>
+    <string name="user_storage_project_total">專案環境合計：%1$s</string>
+    <string name="user_storage_project_row">%1$s · %2$s</string>
+    <string name="user_storage_no_project_space">目前沒有已準備的專案執行空間。</string>
+    <string name="user_storage_external_not_ready">Termux 執行環境尚未安裝或準備完成。</string>
+    <string name="user_storage_external_unavailable">目前無法讀取 Termux 執行空間。開啟 Termux 後可以重新整理；這不影響應用程式內執行空間。</string>
+    <string name="user_storage_clean_project">清理這個專案的執行空間</string>
+    <string name="user_storage_clean_title">清理 %1$s 的執行空間？</string>
+    <string name="user_storage_clean_message">只刪除這個專案已準備的執行環境、相依套件與執行資料，不刪除專案原始碼。之後再次執行前需要重新準備專案。</string>
+    <string name="user_storage_clean_confirm">確認清理</string>
+    <string name="user_storage_cleaning">正在清理執行空間…</string>
+    <string name="user_storage_clean_done">專案執行空間已清理。</string>
+    <string name="user_storage_clean_failed">清理執行空間失敗。</string>
+    <string name="user_storage_scan_failed">執行空間統計失敗，請稍後重試。</string>
+    <string name="user_storage_ready">空間統計已更新。</string>
+    <string name="user_storage_error">執行空間操作失敗</string>
+</resources>
