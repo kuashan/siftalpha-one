@@ -29,4 +29,12 @@
     <string name="normal_project_prepare_stopped">プロジェクトの準備を停止しました。</string>
     <string name="normal_project_configuration_saved">設定を更新しました。</string>
     <string name="normal_project_waiting_action">現在直接実行できる主操作はありません。後で状態を更新するか、開発者ワークスペースで詳細を確認してください。</string>
+    <string name="normal_external_provider_title">外部実行環境</string>
+    <string name="normal_external_provider_permission_required">RUN_COMMAND 経由で Termux を呼び出すことを SiftAlpha に許可してください。</string>
+    <string name="normal_external_provider_allow">アクセスを許可</string>
+    <string name="normal_external_provider_open_termux">Termux を開き、外部アプリ設定を完了してから SiftAlpha に戻ってください。</string>
+    <string name="normal_external_provider_open_termux_action">Termux を開く</string>
+    <string name="normal_external_provider_check_required">外部実行環境のチェックが必要です。</string>
+    <string name="normal_external_provider_checking">外部実行環境を確認しています…</string>
+    <string name="normal_external_provider_unavailable">外部実行環境は現在利用できません。</string>
 </resources>
