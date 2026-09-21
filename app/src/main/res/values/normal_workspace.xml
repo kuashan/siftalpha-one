@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="normal_project_missing">未找到项目</string>
+    <string name="normal_project_status_title">项目状态</string>
+    <string name="normal_project_actions_title">操作</string>
+    <string name="normal_project_starting">正在发送运行请求…</string>
+    <string name="normal_project_stopping">正在发送停止请求…</string>
+    <string name="normal_project_run_dispatched">运行请求已发送。</string>
+    <string name="normal_project_stop_dispatched">停止请求已发送。</string>
+    <string name="normal_project_noop">无需执行：%1$s</string>
+    <string name="normal_project_rejected">当前无法执行：%1$s</string>
+    <string name="normal_project_developer_title">开发者工具</string>
+    <string name="normal_project_developer_summary">打开完整开发者工作区，查看环境、状态、日志和高级运行控制。</string>
+    <string name="normal_project_open_developer">进入开发者工作区</string>
+</resources>
