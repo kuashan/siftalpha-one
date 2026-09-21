@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="normal_project_missing">プロジェクトが見つかりません</string>
+    <string name="normal_project_status_title">プロジェクト状態</string>
+    <string name="normal_project_actions_title">操作</string>
+    <string name="normal_project_starting">実行要求を送信しています…</string>
+    <string name="normal_project_stopping">停止要求を送信しています…</string>
+    <string name="normal_project_run_dispatched">実行要求を送信しました。</string>
+    <string name="normal_project_stop_dispatched">停止要求を送信しました。</string>
+    <string name="normal_project_noop">操作不要：%1$s</string>
+    <string name="normal_project_rejected">現在この操作は実行できません：%1$s</string>
+    <string name="normal_project_developer_title">開発者ツール</string>
+    <string name="normal_project_developer_summary">環境、状態、ログ、高度な実行制御を確認する完全な開発者ワークスペースを開きます。</string>
+    <string name="normal_project_open_developer">開発者ワークスペースを開く</string>
+</resources>
