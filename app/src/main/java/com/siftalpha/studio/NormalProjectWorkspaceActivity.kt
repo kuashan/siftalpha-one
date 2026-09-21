@@ -593,6 +593,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             message = getString(R.string.normal_project_preparing),
             runtimeState = RuntimeState.PREPARING,
             runtimeSelectionCanChange = false,
+            activityIndicatorVisible = true,
             preparePhaseTitle = getString(R.string.normal_prepare_phase_detecting),
             preparePhaseDetail = getString(R.string.normal_prepare_detecting_detail),
             primaryAction = NormalProjectPrimaryActionPolicy.Action.STOP,
@@ -757,6 +758,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         screenState.value = screenState.value.copy(
             busy = true,
             message = getString(R.string.normal_project_starting),
+            activityIndicatorVisible = true,
         )
         actionExecutor.execute {
             val result = controlHub.run(
