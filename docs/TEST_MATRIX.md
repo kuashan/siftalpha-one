@@ -1172,3 +1172,19 @@ R48-0B is cloud-verified but not yet an accepted/frozen baseline.
 
 R48-0C is cloud-verified but not yet an accepted/frozen baseline.
 
+### R48 Normal Home Project Management Hierarchy（普通首页项目管理分级）
+
+| Area | Verification | Result |
+| --- | --- | --- |
+| First-level home（首页一级） | Normal Mode home | only one Project Management（项目管理） entry is shown |
+| Secondary actions（二级操作） | tap Project Management | modal dialog exposes existing four management actions |
+| Existing callbacks（既有回调） | choose each secondary action | existing connect / choose root / new project / refresh callbacks are reused |
+| Project list visibility（项目列表可见性） | dialog closed | project list remains directly visible as primary content |
+| Developer Workspace protection（开发者工作区保护） | source diff | V04Activity.kt unchanged |
+| Runtime neutrality（运行中立） | source review | no Runtime / Environment / Project Control Hub behavior changed |
+| W0 Cloud Build（W0 云端构建） | #423 / source 8ff9424c... | PASS |
+| Internal Alpine Probe（内部 Alpine 探针） | #66 | PASS |
+| APK（安装包） | v184 / 0.8.0-alpha43-r48a4 | PASS |
+| APK SHA-256 | 9a41728e283db380c20fbead54230d3572a24b86e38eb1ba1dd2520a50f06fff | RECORDED |
+| Real-device visual acceptance（真机视觉验收） | hierarchy/dialog appearance | PENDING USER TEST |
+
