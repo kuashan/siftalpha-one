@@ -328,6 +328,8 @@ class ProjectRuntimeControlExecutor(
 class SharedRuntimeLifecycleBridge(
     private val store: RuntimeLifecycleStore,
 ) : ProjectControlHub.StateBridge {
+    private val previousRunState = linkedMapOf<String, RuntimeLifecycleStore.Snapshot>()
+
     override fun onActionStarted(
         project: V04ProjectGateway.RuntimeProject,
         selection: ProjectRuntimeSelection,
@@ -336,6 +338,9 @@ class SharedRuntimeLifecycleBridge(
         if (action != ProjectControlHub.Action.RUN) return
         val projectId = project.summary.documentId
         val current = store.read(projectId)
+        synchronized(previousRunState) {
+            previousRunState[projectId] = current
+        }
         store.write(
             projectKey = projectId,
             environmentReady = current.environmentReadyFor(selection),
@@ -354,7 +359,11 @@ class SharedRuntimeLifecycleBridge(
         val current = store.read(projectId)
         when (result) {
             is ProjectControlHub.Result.Dispatched -> when (result.action) {
-                ProjectControlHub.Action.RUN -> store.write(
+                ProjectControlHub.Action.RUN -> {
+                    synchronized(previousRunState) {
+                        previousRunState.remove(projectId)
+                    }
+                    store.write(
                     projectKey = projectId,
                     environmentReady = current.environmentReadyFor(selection),
                     runtimeState = if (result.observedState == RuntimeState.UNKNOWN) {
@@ -365,6 +374,7 @@ class SharedRuntimeLifecycleBridge(
                     failureReason = null,
                     runtimeSelection = selection,
                 )
+                }
                 ProjectControlHub.Action.STOP -> {
                     // STOP is asynchronous for both provider families. Keep the last active fact
                     // until a provider observation proves STOPPED / EXITED.
@@ -389,7 +399,22 @@ class SharedRuntimeLifecycleBridge(
                     runtimeSelection = selection,
                 )
             }
-            is ProjectControlHub.Result.Rejected -> Unit
+            is ProjectControlHub.Result.Rejected -> {
+                if (result.action == ProjectControlHub.Action.RUN) {
+                    val previous = synchronized(previousRunState) {
+                        previousRunState.remove(projectId)
+                    }
+                    if (previous != null) {
+                        store.write(
+                            projectKey = projectId,
+                            environmentReady = previous.environmentReadyFor(selection),
+                            runtimeState = previous.runtimeState,
+                            failureReason = previous.failureReason,
+                            runtimeSelection = selection,
+                        )
+                    }
+                }
+            }
         }
     }
 }
