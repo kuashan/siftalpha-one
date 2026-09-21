@@ -12,7 +12,9 @@ import android.widget.TextView
 import android.widget.Toast
 import com.siftalpha.studio.project.EmbeddedPythonProjectStager
 import com.siftalpha.studio.project.V04ProjectGateway
+import com.siftalpha.studio.runtime.ExternalProviderPreflightResult
 import com.siftalpha.studio.runtime.ExternalProviderProbeCoordinator
+import com.siftalpha.studio.runtime.ExternalProviderReadiness
 import com.siftalpha.studio.runtime.InternalRuntimeStorageController
 import com.siftalpha.studio.runtime.ProjectRuntimeController
 import com.siftalpha.studio.runtime.RuntimeResult
@@ -55,6 +57,17 @@ class NormalRuntimeStorageActivity : StudioActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     private var generation = 0L
     private var projects: List<V04ProjectGateway.RuntimeProject> = emptyList()
+
+    private val preflightListener: (ExternalProviderPreflightResult) -> Unit = { result ->
+        runOnUiThread {
+            when {
+                result.ready -> requestExternalSnapshot()
+                result.readiness == ExternalProviderReadiness.BRIDGE_CHECKING ->
+                    renderExternalChecking()
+                else -> renderExternalUnavailable()
+            }
+        }
+    }
 
     private val resultListener: (RuntimeResult) -> Unit = { result ->
         runOnUiThread {
@@ -101,6 +114,7 @@ class NormalRuntimeStorageActivity : StudioActivity() {
     override fun onStart() {
         super.onStart()
         TermuxResultBus.addListener(resultListener)
+        externalPreflight.addListener(preflightListener)
         pending.keys.toList().forEach { id ->
             TermuxResultBus.consume(id)?.let(resultListener)
         }
@@ -108,6 +122,7 @@ class NormalRuntimeStorageActivity : StudioActivity() {
     }
 
     override fun onStop() {
+        externalPreflight.removeListener(preflightListener)
         TermuxResultBus.removeListener(resultListener)
         super.onStop()
     }
@@ -176,11 +191,18 @@ class NormalRuntimeStorageActivity : StudioActivity() {
 
         externalContainer.removeAllViews()
         val readiness = externalPreflight.ensureReady()
-        if (!readiness.ready) {
-            renderExternalUnavailable()
-            return
+        when {
+            readiness.ready -> requestExternalSnapshot()
+            readiness.readiness == ExternalProviderReadiness.BRIDGE_CHECKING ->
+                renderExternalChecking()
+            else -> renderExternalUnavailable()
         }
+    }
 
+    private fun requestExternalSnapshot() {
+        if (pending.values.any { it == Pending.Snapshot }) return
+        externalContainer.removeAllViews()
+        externalContainer.addView(hint(getString(R.string.user_storage_scanning_external)))
         runCatching {
             val id = backend.execute(externalStorage.snapshot(projects))
             pending[id] = Pending.Snapshot
@@ -188,6 +210,11 @@ class NormalRuntimeStorageActivity : StudioActivity() {
         }.onFailure {
             renderExternalUnavailable()
         }
+    }
+
+    private fun renderExternalChecking() {
+        externalContainer.removeAllViews()
+        externalContainer.addView(hint(getString(R.string.user_storage_external_checking)))
     }
 
     private fun renderInternal(snapshot: InternalRuntimeStorageController.Snapshot) {
