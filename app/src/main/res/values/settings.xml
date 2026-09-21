@@ -19,4 +19,8 @@
     <string name="settings_about_summary">用于管理本地项目、运行环境与自动化任务的移动工作区。The world is vast and beautiful.</string>
     <string name="settings_version">版本 %1$s</string>
     <string name="settings_application_id">应用 ID：%1$s</string>
+    <string name="settings_developer_mode_section">开发者模式</string>
+    <string name="settings_developer_mode_summary">开启后可从普通项目页面进入完整开发者工作区。此开关只改变可见入口，不会停止、重启或切换项目运行环境。</string>
+    <string name="settings_developer_mode_on">已开启</string>
+    <string name="settings_developer_mode_off">已关闭</string>
 </resources>
