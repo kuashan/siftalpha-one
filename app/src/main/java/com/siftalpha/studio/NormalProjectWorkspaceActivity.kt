@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -39,6 +40,7 @@ import com.siftalpha.studio.presentation.ProjectActionPolicy
 import com.siftalpha.studio.presentation.ProjectUiSnapshot
 import com.siftalpha.studio.presentation.PrepareWorkflowFacts
 import com.siftalpha.studio.presentation.PrepareWorkflowPhase
+import com.siftalpha.studio.presentation.RuntimeActivityIndicatorPolicy
 import com.siftalpha.studio.presentation.PrepareWorkflowPresentationPolicy
 import com.siftalpha.studio.runtime.RuntimeLifecycleOperation
 import com.siftalpha.studio.runtime.RuntimeLifecycleResolver
@@ -116,6 +118,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         val openEnabled: Boolean = false,
         val preparePhaseTitle: String? = null,
         val preparePhaseDetail: String? = null,
+        val activityIndicatorVisible: Boolean = false,
         val primaryAction: NormalProjectPrimaryActionPolicy.Action =
             NormalProjectPrimaryActionPolicy.Action.PREPARE_PROJECT,
     )
@@ -130,6 +133,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     private lateinit var sharedLifecycleBridge: SharedRuntimeLifecycleBridge
     private lateinit var externalBackend: TermuxBackend
     private lateinit var externalPreflight: ExternalProviderProbeCoordinator
+    private lateinit var backgroundReliabilityGuidance: BackgroundReliabilityGuidanceController
     private lateinit var prepareLiveProgress: PrepareLiveProgressController
     private lateinit var configurationUi: ProjectConfigurationUiController
     private lateinit var secretStore: ProjectSecretStore
@@ -272,6 +276,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         }
         externalBackend = TermuxBackend(this)
         externalPreflight = ExternalProviderProbeCoordinator.shared(this)
+        backgroundReliabilityGuidance = BackgroundReliabilityGuidanceController(this)
         webInspector = WebProjectInspector(this)
         webStateStore = RuntimeWebStateStore(this)
         webLearnedEndpointStore = RuntimeWebLearnedEndpointStore(this)
@@ -463,6 +468,13 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         )
         val policy = ProjectActionPolicy.resolve(snapshot, selection)
         val primaryAction = NormalProjectPrimaryActionPolicy.resolve(policy)
+        val activityIndicatorVisible = RuntimeActivityIndicatorPolicy.shouldAnimate(
+            RuntimeActivityIndicatorPolicy.Input(
+                lifecycleState = lifecycleState,
+                runtimeState = lifecycle.runtimeState,
+                operationActive = operation != null,
+            ),
+        )
         val selectionCanChange = ProjectRuntimeSelectionChangePolicy.canChange(
             ProjectRuntimeSelectionChangePolicy.Input(
                 runtimeState = lifecycle.runtimeState,
@@ -509,6 +521,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             openEnabled = presentationTarget != PresentationTarget.NONE,
             preparePhaseTitle = prepareTitle,
             preparePhaseDetail = prepareDetail,
+            activityIndicatorVisible = activityIndicatorVisible,
             primaryAction = primaryAction,
         )
     }
@@ -566,6 +579,13 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     }
 
     private fun prepareProject() {
+        if (screenState.value.busy) return
+        backgroundReliabilityGuidance.maybeProceed {
+            prepareProjectAfterGuidance()
+        }
+    }
+
+    private fun prepareProjectAfterGuidance() {
         if (screenState.value.busy) return
         val selection = selectionStore.read(project.summary.documentId)
         screenState.value = screenState.value.copy(
@@ -722,6 +742,13 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     }
 
     private fun runProject() {
+        if (screenState.value.busy) return
+        backgroundReliabilityGuidance.maybeProceed {
+            runProjectAfterGuidance()
+        }
+    }
+
+    private fun runProjectAfterGuidance() {
         if (screenState.value.busy) return
         val configuration = configurationUi.snapshot(
             project.summary.documentId,
@@ -1331,6 +1358,12 @@ private fun NormalProjectWorkspaceScreen(
                     text = state.statusLabel,
                     style = MaterialTheme.typography.bodyLarge,
                 )
+                if (state.activityIndicatorVisible) {
+                    Spacer(modifier = Modifier.height(spacing.small))
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 state.message?.takeIf { it.isNotBlank() }?.let { message ->
                     Spacer(modifier = Modifier.height(spacing.small))
                     Text(
