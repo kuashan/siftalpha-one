@@ -1107,3 +1107,42 @@ R48-B source/cloud gate（源码 / 云端门禁）= PASS（通过）。
 Real-device acceptance（真机验收）= PENDING（待测试）。
 不自动 merge（合并），不移动 baseline（基线）。
 
+## 2026-09-21 · R48-B2 current state — bounded Termux bridge probe（有界 Termux 桥接探测）
+
+Normal Mode（普通模式）的 External Provider readiness（外部执行环境就绪检查）现在采用 bounded probe（有界探测）：
+
+```text
+dispatch CONNECTION_TEST
+-> wait up to 3 seconds
+-> callback received: PASS / FAIL
+-> no callback: BRIDGE_UNRESPONSIVE
+   -> Open Termux / Re-check
+   -> return to SiftAlpha -> automatic re-probe
+```
+
+关键规则：
+
+- 3 秒是 UX soft timeout（用户体验软超时），不是“Termux 已损坏”的结论。
+- timeout（超时）只表示当前没有收到响应。
+- Browser selection（浏览器选择）、Environment Detection / Plan（环境检测 / 计划）、Prepare（准备）和 Runtime backend selection（运行后端选择）均不受影响。
+- Shared coordinator / store（共享协调器 / 存储）仍是 Normal Mode 与 Developer Workspace 的唯一 Provider readiness（提供者就绪）事实源。
+- timed-out executionId（超时执行编号）的迟到 callback（回调）被隔离。
+
+Current functional source：
+`10af831cf725e5b01a090b84e526e6339bbc6d33`
+
+Version：
+- `0.8.0-alpha43-r48b2`
+- versionCode `189`
+
+Cloud evidence：
+- Internal Alpine Probe #78: PASS
+- W0 #504 attempt 2: PASS
+- artifact `siftalpha-w0-504` / ID `10644261286`
+- APK SHA-256 `1bbeea37e632a0c3a61d5746ba0c32b443b2db834a00bca7bee3560ac5caee34`
+- signer SHA-256 `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+
+Source/cloud gate（源码 / 云端门禁）= PASS（通过）。
+Real-device acceptance（真机验收）= PENDING（待测试）。
+不自动 merge（合并），不移动 baseline（基线）。
+
