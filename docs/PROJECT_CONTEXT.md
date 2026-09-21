@@ -818,3 +818,100 @@ R47 establishes one shared environment-management architecture across Internal R
 7. W0 Cloud Build（云端构建） #365 passed and real-device acceptance is PASS.
 
 This baseline does not change the frozen Worker decision, project-scoped STOP（停止）, Runtime Identity（运行身份）, Session / Generation（会话 / 代际）, Web Discovery（网页发现） or Endpoint Probe（端点探测） contracts.
+
+## 2026-09-21 · R48 UI architecture decision — Normal Mode（普通模式） / Developer Mode（开发者模式）
+
+### Product surface decision
+
+R48（第 48 阶段） introduces two product surfaces on top of one shared SiftAlpha Core（核心系统）:
+
+- Normal Mode（普通模式） is the default user-facing surface for managing and running completed scripts/projects.
+- Developer Mode（开发者模式） preserves the current complete Runtime Center（运行中心） as the advanced control and diagnostic surface.
+
+This is a UI / workflow split, not a Runtime（运行时） split.
+
+Both surfaces must read and control the same underlying project identity, lifecycle, operation, ownership, environment, Web and result state. No second Runtime controller, environment detector, preparation implementation, observation state machine or result store may be introduced for Normal Mode（普通模式）.
+
+### Single Source of Truth（单一事实源）
+
+Normal Mode（普通模式） and Developer Mode（开发者模式） must share the existing authoritative state/contracts, including:
+
+- ProjectUiSnapshot（项目界面快照）
+- ProjectActionPolicy（项目动作策略）
+- RuntimeLifecycleStore（运行生命周期存储）
+- RuntimeOperationStore（运行操作存储）
+- RuntimeOperationTracker（运行操作跟踪）
+- RuntimeOwnershipPolicy（运行归属策略）
+- ProjectRuntimeSelectionStore（项目运行环境选择存储）
+- RuntimeWebStateStore（运行网页状态存储）
+- ResultWebStore（结果网页存储）
+- Environment Detection / Environment Plan（环境检测 / 环境计划）
+
+Switching Developer Mode（开发者模式） ON/OFF must never mutate Runtime（运行时） state. It changes visible controls only.
+
+### Normal Mode（普通模式） control model
+
+Normal Mode（普通模式） should present project status and the next useful action rather than exposing every low-level command.
+
+Initial target surface:
+
+```text
+Project（项目）
+
+Status（状态）
+Guidance（状态说明）
+
+[Primary Action（主操作）]
+
+[Open（打开）] [Stop（停止）]
+
+[Refresh（刷新）]
+
+[More（更多）]
+```
+
+The Primary Action（主操作） remains policy-driven by the existing ProjectActionPolicy（项目动作策略）. Normal Mode（普通模式） must not invent an independent state machine.
+
+Planned first-stage workflow composition:
+- Refresh（刷新） = STATUS（状态查询） followed by conditional LOGS（日志查询） according to current lifecycle/observation policy.
+- Prepare Project（准备项目） = existing Detection（检测） -> Plan（计划） -> Compatibility Resolution（兼容性解析） -> Prepare（准备） -> Verification（验证）.
+- Import Project（导入项目） = one UI entry for existing PY / ZIP / GitHub import sources.
+- Select Project Location（选择项目目录） = one UI entry for AcodeProjects / other SAF（存储访问框架） roots.
+- Open（打开） continues to use PresentationTargetResolver（呈现目标解析器） and current WEB / RESULT_WEB / RICH_RESULT priority.
+
+### Developer Mode（开发者模式） control model
+
+The current Runtime Center（运行中心） remains available as Developer Workspace（开发者工作区） and keeps explicit access to low-level controls and diagnostics such as:
+- PREPARE / START / STOP / STATUS / LOGS / CLEAN
+- Runtime Selection（运行环境选择）
+- Raw Logs（原始日志）
+- Environment / Runtime diagnostics（环境 / 运行诊断）
+- Editor / Terminal（编辑器 / 终端）
+- advanced storage/maintenance actions
+
+These controls are not deleted merely because they are not primary Normal Mode（普通模式） controls.
+
+### Safety boundaries for workflow composition
+
+First-stage Normal Mode（普通模式） must not automatically chain:
+- Prepare -> Start
+- Stop -> Clean
+- Clean -> Prepare
+- Delete source -> Runtime cleanup
+- automatic Internal/External Provider switching
+- shared Runtime/toolchain/cache destructive maintenance
+
+STOP（停止） remains an independent project-scoped preemptive control. CLEAN（清理） remains a separate destructive operation. Runtime Provider（运行环境提供者） selection must not change invisibly.
+
+### Planned R48 sequence
+
+1. R48-0 — Developer Mode（开发者模式） setting and dual-surface routing foundation.
+2. R48-A — Normal Project Workspace（普通项目工作区） skeleton using existing policy/state.
+3. R48-B — Unified Refresh（统一刷新）.
+4. R48-C — Prepare Project Workflow（准备项目工作流）.
+5. R48-D — Unified Import（统一导入）.
+6. R48-E — Unified Project Location（统一项目目录）.
+7. R48-F — More / Developer Tools（更多 / 开发者工具） organization.
+
+Each phase must remain independently testable and must preserve the accepted R47（第 47 阶段） Runtime / Environment contracts.
+
