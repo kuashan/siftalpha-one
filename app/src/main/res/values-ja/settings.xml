@@ -2,7 +2,7 @@
 <resources>
     <string name="settings_title">設定</string>
     <string name="settings_language_section">言語</string>
-    <string name="settings_language_summary">SiftAlpha Studio で使用する表示言語を選択します。</string>
+    <string name="settings_language_summary">SiftAlpha X で使用する表示言語を選択します。</string>
     <string name="settings_language_current">現在の言語：%1$s</string>
     <string name="settings_language_change">言語を変更</string>
     <string name="settings_browser_section">ブラウザ</string>
