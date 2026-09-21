@@ -97,6 +97,7 @@ fun HomeScreen(
     onConnectAcode: () -> Unit,
     onChooseRoot: () -> Unit,
     onNewProject: () -> Unit,
+    onImportProject: () -> Unit,
     onRefreshProjects: () -> Unit,
     onOpenProject: (ProjectStore.ProjectSummary) -> Unit,
     onShowDetails: (ProjectStore.ProjectSummary) -> Unit,
@@ -115,6 +116,8 @@ fun HomeScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var filterIndex by rememberSaveable { mutableIntStateOf(ProjectFilter.ALL.ordinal) }
     var projectManagementOpen by rememberSaveable { mutableStateOf(false) }
+    var importOpen by rememberSaveable { mutableStateOf(false) }
+    var moreOpen by rememberSaveable { mutableStateOf(false) }
     val selectedFilter = ProjectFilter.entries.getOrElse(filterIndex) { ProjectFilter.ALL }
     val visibleProjects = state.projects.filter { project ->
         matchesProject(project, selectedFilter, query)
@@ -148,7 +151,7 @@ fun HomeScreen(
         AlertDialog(
             onDismissRequest = { projectManagementOpen = false },
             title = {
-                Text(text = stringResource(R.string.home_section_project_management))
+                Text(text = stringResource(R.string.home_project_location_title))
             },
             text = {
                 Column(
@@ -184,26 +187,8 @@ fun HomeScreen(
                     ) {
                         Text(text = stringResource(R.string.home_choose_other_root))
                     }
-                    OutlinedButton(
-                        onClick = {
-                            projectManagementOpen = false
-                            onNewProject()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(text = stringResource(R.string.home_new_python_project))
-                    }
-                    OutlinedButton(
-                        onClick = {
-                            projectManagementOpen = false
-                            onRefreshProjects()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(text = stringResource(R.string.home_refresh_projects))
-                    }
                     Text(
-                        text = stringResource(R.string.home_root_help),
+                        text = stringResource(R.string.home_project_location_help),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -213,6 +198,140 @@ fun HomeScreen(
             dismissButton = {
                 TextButton(onClick = { projectManagementOpen = false }) {
                     Text(text = stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+
+    if (importOpen) {
+        AlertDialog(
+            onDismissRequest = { importOpen = false },
+            title = {
+                Text(text = stringResource(R.string.home_import_title))
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(spacing.small),
+                ) {
+                    Text(
+                        text = stringResource(R.string.home_import_summary),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = stringResource(R.string.home_import_supported),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    StudioPrimaryAction(
+                        label = stringResource(R.string.home_import_choose_file),
+                        onClick = {
+                            importOpen = false
+                            onImportProject()
+                        },
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            importOpen = false
+                            onNewProject()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = stringResource(R.string.home_import_new_project))
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { importOpen = false }) {
+                    Text(text = stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+
+    if (moreOpen) {
+        AlertDialog(
+            onDismissRequest = { moreOpen = false },
+            title = {
+                Text(
+                    text = stringResource(
+                        if (state.developerModeEnabled) {
+                            R.string.home_more_developer_title
+                        } else {
+                            R.string.home_more_title
+                        },
+                    ),
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(spacing.small),
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            moreOpen = false
+                            onRefreshProjects()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = stringResource(R.string.home_refresh_projects))
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            moreOpen = false
+                            onNewProject()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = stringResource(R.string.home_new_python_project))
+                    }
+                    if (state.developerModeEnabled) {
+                        Text(
+                            text = stringResource(R.string.home_developer_tools_summary),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        StudioPrimaryAction(
+                            label = stringResource(R.string.home_runtime_center),
+                            onClick = {
+                                moreOpen = false
+                                onRuntimeCenter()
+                            },
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                moreOpen = false
+                                onEnvironment()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.home_runtime_storage_manager))
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                moreOpen = false
+                                onTerminal()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.home_terminal))
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                moreOpen = false
+                                onEmbeddedPython()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.home_siftalpha_x_experimental))
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { moreOpen = false }) {
+                    Text(text = stringResource(R.string.common_close))
                 }
             },
         )
@@ -236,6 +355,9 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    TextButton(onClick = { moreOpen = true }) {
+                        Text(text = stringResource(R.string.home_more_title))
+                    }
                     TextButton(onClick = onSettings) {
                         Text(text = stringResource(R.string.home_action_settings))
                     }
@@ -321,43 +443,29 @@ fun HomeScreen(
 
             item {
                 StudioSectionCard {
-                    StudioPrimaryAction(
-                        label = stringResource(R.string.home_section_project_management),
-                        onClick = { projectManagementOpen = true },
+                    Text(
+                        text = stringResource(R.string.home_project_entry_title),
+                        style = MaterialTheme.typography.titleMedium,
                     )
-                }
-            }
-
-            if (state.developerModeEnabled) {
-                item {
-                    StudioSectionCard {
+                    Spacer(modifier = Modifier.height(spacing.medium))
+                    StudioPrimaryAction(
+                        label = stringResource(R.string.home_import_title),
+                        onClick = { importOpen = true },
+                    )
+                    OutlinedButton(
+                        onClick = { projectManagementOpen = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Text(
-                            text = stringResource(R.string.home_quick_actions),
-                            style = MaterialTheme.typography.titleMedium,
+                            text = if (state.rootSelected && state.projectError == null) {
+                                stringResource(
+                                    R.string.home_project_location_current,
+                                    state.rootName ?: stringResource(R.string.home_none),
+                                )
+                            } else {
+                                stringResource(R.string.home_project_location_action)
+                            },
                         )
-                        Spacer(modifier = Modifier.height(spacing.medium))
-                        StudioPrimaryAction(
-                            label = stringResource(R.string.home_runtime_center),
-                            onClick = onRuntimeCenter,
-                        )
-                        OutlinedButton(
-                            onClick = onEnvironment,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(text = stringResource(R.string.home_runtime_storage_manager))
-                        }
-                        OutlinedButton(
-                            onClick = onTerminal,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(text = stringResource(R.string.home_terminal))
-                        }
-                        OutlinedButton(
-                            onClick = onEmbeddedPython,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(text = stringResource(R.string.home_siftalpha_x_experimental))
-                        }
                     }
                 }
             }
@@ -467,110 +575,6 @@ fun HomeScreen(
                 }
             }
 
-            if (state.developerModeEnabled) {
-                item {
-                    StudioSectionCard {
-                        Text(
-                            text = stringResource(R.string.home_section_runtime_bridge),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Spacer(modifier = Modifier.height(spacing.small))
-                        Text(
-                            text = termuxLabel,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(spacing.medium))
-                        StudioPrimaryAction(
-                            label = stringResource(R.string.home_probe_environment),
-                            onClick = onProbeEnvironment,
-                        )
-                        OutlinedButton(
-                            onClick = onTestTermux,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(text = stringResource(R.string.home_test_termux))
-                        }
-                        OutlinedButton(
-                            onClick = onRequestPermission,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(
-                                text = if (state.permissionGranted) {
-                                    stringResource(R.string.home_permission_granted_button)
-                                } else {
-                                    stringResource(R.string.home_request_permission)
-                                },
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(spacing.small),
-                        ) {
-                            OutlinedButton(
-                                onClick = onCopySetup,
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Text(text = stringResource(R.string.home_copy_termux_setup))
-                            }
-                            OutlinedButton(
-                                onClick = onOpenTermux,
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Text(text = stringResource(R.string.home_open_termux))
-                            }
-                        }
-                    }
-                }
-    
-                item {
-                    StudioSectionCard {
-                        Text(
-                            text = stringResource(R.string.home_section_command_output),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Spacer(modifier = Modifier.height(spacing.small))
-                        Text(
-                            text = state.commandOutput.ifBlank {
-                                stringResource(R.string.home_no_command)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            fontFamily = FontFamily.Monospace,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 24,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (state.commandOutput.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(spacing.small))
-                            OutlinedButton(
-                                onClick = onCopyOutput,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(text = stringResource(R.string.home_copy_output))
-                            }
-                        }
-                    }
-                }
-    
-                }
-
-            if (state.developerModeEnabled) {
-                item {
-                    StudioSectionCard {
-                        Text(
-                            text = stringResource(R.string.home_section_stage),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Spacer(modifier = Modifier.height(spacing.small))
-                        Text(
-                            text = stringResource(R.string.home_stage_text, versionName),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
         }
     }
 }
