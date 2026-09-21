@@ -93,4 +93,37 @@
     <string name="home_copy_output">出力をコピー</string>
     <string name="home_output_copied">コマンド出力をコピーしました</string>
 
+    <string name="home_project_location_title">プロジェクトの場所</string>
+    <string name="home_project_location_help">SiftAlpha がプロジェクトを読み書きする場所です。場所を変更してもプロジェクトのソースは書き換えません。</string>
+    <string name="home_project_location_action">プロジェクトの場所を選択</string>
+    <string name="home_project_location_current">プロジェクトの場所：%1$s</string>
+    <string name="home_project_entry_title">プロジェクト</string>
+    <string name="home_import_title">プロジェクトをインポート</string>
+    <string name="home_import_summary">1 つの入口から既存プロジェクトを SiftAlpha に追加します。</string>
+    <string name="home_import_supported">現在は ZIP プロジェクトと単一の Python ファイルに対応しています。インポート後は通常モードで直接開きます。</string>
+    <string name="home_import_choose_file">プロジェクトファイルを選択</string>
+    <string name="home_import_new_project">空のプロジェクトを作成</string>
+    <string name="home_more_title">その他</string>
+    <string name="home_more_developer_title">その他 / 開発者ツール</string>
+    <string name="home_developer_tools_summary">高度な診断・開発用の入口です。通常ユーザーの実行フローには影響しません。</string>
+    <string name="home_import_select_location_first">先にプロジェクトの場所を選択してください。</string>
+    <string name="home_import_unknown_file">名前のないファイル</string>
+    <string name="home_import_unsupported_title">未対応のファイル</string>
+    <string name="home_import_unsupported_message">統合インポートは現在 .zip と .py に対応しています。
+
+選択中：%1$s</string>
+    <string name="home_import_confirm_title">インポート確認</string>
+    <string name="home_import_confirm_message">ファイル：%1$s
+種類：%2$s
+
+プロジェクト名を確認してください。</string>
+    <string name="home_import_kind_python">Python ファイル</string>
+    <string name="home_import_kind_zip">ZIP プロジェクト</string>
+    <string name="home_import_kind_unknown">不明な種類</string>
+    <string name="home_import_action">インポート</string>
+    <string name="home_import_name_required">プロジェクト名を入力してください。</string>
+    <string name="home_import_project_exists">プロジェクト %1$s は既に存在します。</string>
+    <string name="home_importing">プロジェクトをインポートしています…</string>
+    <string name="home_import_complete">プロジェクト %1$s をインポートしました。</string>
+    <string name="home_import_failed">インポート失敗</string>
 </resources>
