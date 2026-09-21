@@ -61,6 +61,7 @@ import com.siftalpha.studio.runtime.RuntimeOperationPhase
 import com.siftalpha.studio.runtime.RuntimeOperationProvider
 import com.siftalpha.studio.runtime.RuntimeOperationRecord
 import com.siftalpha.studio.runtime.ProjectOperationCoordinator
+import com.siftalpha.studio.runtime.ExternalResultDisposition
 import com.siftalpha.studio.runtime.ExternalProviderPreflightResult
 import com.siftalpha.studio.runtime.ExternalProviderProbeCoordinator
 import com.siftalpha.studio.runtime.ExternalProviderReadiness
@@ -299,6 +300,17 @@ open class V04Activity : StudioActivity() {
             // A very fast Termux command can publish before the UI has registered its Pending item.
             // Never consume such an unmatched result: registerPending() will immediately reconcile it.
             val item = pending.remove(result.executionId) ?: return@runOnUiThread
+            if (
+                item.documentId != null &&
+                operationCoordinator.consumeExternalResultDisposition(result.executionId) ==
+                    ExternalResultDisposition.FENCED
+            ) {
+                // The shared coordinator has already superseded or timed out this generation.
+                // Consume the late result without allowing the old UI item to mutate current state.
+                TermuxResultBus.consume(result.executionId)
+                externalActivityTokens.remove(result.executionId)?.let(projectActivities::finish)
+                return@runOnUiThread
+            }
             TermuxResultBus.consume(result.executionId)
             externalActivityTokens.remove(result.executionId)?.let(projectActivities::finish)
             if (item.automaticObservation && !isCurrentAutomaticObservation(item)) {
@@ -342,6 +354,35 @@ open class V04Activity : StudioActivity() {
     private val externalPreflightListener: (ExternalProviderPreflightResult) -> Unit = {
         runOnUiThread {
             updateExternalProviderDiagnostics()
+            if (!isFinishing && !isDestroyed && ::projectList.isInitialized) refresh()
+        }
+    }
+
+    private val operationTimeoutListener: (ProjectOperationCoordinator.ExternalTimeout) -> Unit = { timeout ->
+        runOnUiThread {
+            if (!::lifecycleStore.isInitialized) return@runOnUiThread
+            val projectId = timeout.projectId
+            pending.entries
+                .filter { it.value.documentId == projectId }
+                .map { it.key }
+                .forEach { executionId ->
+                    cancelledExternalExecutions += executionId
+                    pending.remove(executionId)
+                    TermuxResultBus.consume(executionId)
+                    externalActivityTokens.remove(executionId)?.let(projectActivities::finish)
+                }
+            projectActivities.cancelProject(projectId)
+            runCatching { gateway.projects().firstOrNull { it.summary.documentId == projectId } }
+                .getOrNull()
+                ?.let { timedOutProject ->
+                    if (::prepareLiveProgress.isInitialized) {
+                        prepareLiveProgress.finish(timedOutProject.folderName)
+                    }
+                }
+            recoveryProjects.remove(projectId)
+            failureReasons[projectId] = timeout.failureReason
+            typedStates[projectId] = lifecycleStore.read(projectId).runtimeState
+            states[projectId] = getString(R.string.runtime_operation_timed_out)
             if (!isFinishing && !isDestroyed && ::projectList.isInitialized) refresh()
         }
     }
@@ -407,6 +448,7 @@ open class V04Activity : StudioActivity() {
         TermuxResultBus.addListener(resultListener)
         externalPreflight.addListener(externalPreflightListener)
         if (::prepareLiveProgress.isInitialized) prepareLiveProgress.resume()
+        operationCoordinator.addTimeoutListener(operationTimeoutListener)
         pending.keys.toList().forEach { id ->
             TermuxResultBus.consume(id)?.let(resultListener)
         }
@@ -431,6 +473,9 @@ open class V04Activity : StudioActivity() {
         refreshScheduled = false
         if (::webAvailability.isInitialized) webAvailability.pause()
         if (::prepareLiveProgress.isInitialized) prepareLiveProgress.pause()
+        if (::operationCoordinator.isInitialized) {
+            operationCoordinator.removeTimeoutListener(operationTimeoutListener)
+        }
         TermuxResultBus.removeListener(resultListener)
         if (::externalPreflight.isInitialized) {
             externalPreflight.removeListener(externalPreflightListener)
@@ -1640,8 +1685,10 @@ open class V04Activity : StudioActivity() {
             }
             when (record.provider) {
                 RuntimeOperationProvider.EXTERNAL -> {
-                    operationCoordinator.clearPersisted(key)
-                    recoveryProjects += key
+                    // Keep the shared operation and its watchdog across Activity recreation.
+                    // The coordinator owns reconciliation; this Activity must not erase an
+                    // in-flight PREPARE/START/STOP merely because the surface was recreated.
+                    operationCoordinator.current(key, includeHidden = true)
                 }
                 RuntimeOperationProvider.INTERNAL -> {
                     operationCoordinator.clearPersisted(key)
@@ -1660,6 +1707,9 @@ open class V04Activity : StudioActivity() {
         project: V04ProjectGateway.RuntimeProject,
         record: RuntimeOperationRecord,
     ) {
+        // External deadlines are owned by ProjectOperationCoordinator. Keeping a second Activity
+        // watchdog would create two competing timeout/state writers.
+        if (record.provider == RuntimeOperationProvider.EXTERNAL) return
         operationDeadlineRunnables[record.projectId]?.let(refreshHandler::removeCallbacks)
         val deadline = record.deadlineAtEpochMs ?: return
         lateinit var runnable: Runnable
@@ -1681,9 +1731,8 @@ open class V04Activity : StudioActivity() {
         project: V04ProjectGateway.RuntimeProject,
         record: RuntimeOperationRecord,
     ) {
-        // External completion belongs to the real Termux RuntimeResult. The Android operation
-        // tracker records and fences that result, but never turns elapsed wall-clock time into an
-        // External kill or terminal timeout. Only Internal records reach this deadline path.
+        // External completion and timeout belong to the shared ProjectOperationCoordinator.
+        // Only Internal records reach this legacy Activity deadline path.
         if (record.provider == RuntimeOperationProvider.EXTERNAL) return
         val current = currentOperation(record.projectId, includeHidden = true)
         if (current?.generation != record.generation) return
