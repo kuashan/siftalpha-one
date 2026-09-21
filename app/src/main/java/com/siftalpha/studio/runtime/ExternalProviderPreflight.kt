@@ -110,15 +110,28 @@ object ExternalProviderPreflightPolicy {
         }
     }
 
-    fun isFresh(
+    fun hasFreshProbeEvidence(
         snapshot: ExternalProviderReadiness,
         nowEpochMs: Long,
         freshnessMs: Long = DEFAULT_FRESHNESS_MS,
     ): Boolean {
-        if (!snapshot.ready) return false
+        if (snapshot.status !in setOf(
+                ExternalProviderReadinessStatus.READY,
+                ExternalProviderReadinessStatus.TERMUX_CONFIGURATION_REQUIRED,
+                ExternalProviderReadinessStatus.BRIDGE_UNAVAILABLE,
+            )
+        ) {
+            return false
+        }
         val checkedAt = snapshot.checkedAtEpochMs ?: return false
         return nowEpochMs >= checkedAt && nowEpochMs - checkedAt <= freshnessMs
     }
+
+    fun isFresh(
+        snapshot: ExternalProviderReadiness,
+        nowEpochMs: Long,
+        freshnessMs: Long = DEFAULT_FRESHNESS_MS,
+    ): Boolean = snapshot.ready && hasFreshProbeEvidence(snapshot, nowEpochMs, freshnessMs)
 }
 
 /**
@@ -213,7 +226,7 @@ class ExternalProviderPreflight(
             cached != null &&
             cached.termuxInstalled &&
             cached.runCommandPermissionGranted &&
-            ExternalProviderPreflightPolicy.isFresh(cached, nowEpochMs())
+            ExternalProviderPreflightPolicy.hasFreshProbeEvidence(cached, nowEpochMs())
         ) {
             cached
         } else {
