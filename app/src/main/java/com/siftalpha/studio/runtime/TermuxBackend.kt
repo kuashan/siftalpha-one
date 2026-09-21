@@ -11,7 +11,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
 
     override fun isAvailable(): Boolean = isTermuxInstalled()
 
-    fun isTermuxInstalled(): Boolean {
+    override fun isTermuxInstalled(): Boolean {
         return try {
             context.packageManager.getPackageInfo(TermuxContract.PACKAGE_NAME, 0)
             true
@@ -20,7 +20,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
         }
     }
 
-    fun hasRunCommandPermission(): Boolean {
+    override fun hasRunCommandPermission(): Boolean {
         return context.checkSelfPermission(TermuxContract.RUN_COMMAND_PERMISSION) ==
             PackageManager.PERMISSION_GRANTED
     }

@@ -203,7 +203,7 @@ class ExternalProviderReadinessStore internal constructor(
         executionId: Int,
         result: ExternalProviderProbeResult,
         atEpochMs: Long,
-        detail: String? = null,
+        detail: String?,
     ) {
         prefs.edit()
             .putString(

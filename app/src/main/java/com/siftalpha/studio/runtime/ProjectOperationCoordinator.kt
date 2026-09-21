@@ -281,11 +281,11 @@ class ProjectOperationCoordinator internal constructor(
         val state = when (record.action) {
             RuntimeOperationAction.PREPARE -> RuntimeState.PREPARING
             RuntimeOperationAction.START -> RuntimeState.STARTING
-            RuntimeOperationAction.STOP -> RuntimeState.STOPPING
+            RuntimeOperationAction.STOP -> RuntimeState.UNKNOWN
             RuntimeOperationAction.STATUS,
             RuntimeOperationAction.LOGS,
-            -> RuntimeState.CHECKING
-            RuntimeOperationAction.CLEAN -> RuntimeState.CLEANING
+            -> RuntimeState.UNKNOWN
+            RuntimeOperationAction.CLEAN -> RuntimeState.UNKNOWN
         }
         store.write(
             projectKey = record.projectId,
