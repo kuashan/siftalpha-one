@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="background_reliability_title">Allow SiftAlpha X to keep running in the background</string>
+    <string name="background_reliability_message">Python scripts, local Web services, and long-running projects can be paused or reclaimed by Android battery policies. In system battery settings, consider setting SiftAlpha X to Unrestricted (the wording varies by device).
+
+SiftAlpha X does not change this system setting automatically.</string>
+    <string name="background_reliability_open_settings">Open settings</string>
+    <string name="background_reliability_later">Remind me later</string>
+    <string name="background_reliability_settings_unavailable">Battery settings could not be opened directly. Find SiftAlpha X battery usage in system settings.</string>
+</resources>
