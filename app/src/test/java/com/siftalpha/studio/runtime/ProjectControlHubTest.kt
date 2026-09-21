@@ -39,6 +39,30 @@ class ProjectControlHubTest {
     }
 
     @Test
+    fun `prepare reads current project selection and delegates exact project identity`() {
+        val project = project("project-a", "alpha")
+        val fake = RecordingExecutor()
+        var selection = ProjectRuntimeSelection.EMBEDDED_R
+        val hub = ProjectControlHub(
+            selectionReader = { selection },
+            executor = fake,
+        )
+
+        val first = hub.prepare(project)
+
+        assertEquals(ProjectControlHub.Action.PREPARE, first.action)
+        assertEquals("project-a", fake.lastProjectId)
+        assertEquals(ProjectRuntimeSelection.EMBEDDED_R, fake.lastSelection)
+        assertEquals(1, fake.prepareCalls)
+
+        selection = ProjectRuntimeSelection.TERMUX
+        hub.prepare(project)
+
+        assertEquals(ProjectRuntimeSelection.TERMUX, fake.lastSelection)
+        assertEquals(2, fake.prepareCalls)
+    }
+
+    @Test
     fun `stop delegates only the requested project and never a neighboring project`() {
         val projectA = project("project-a", "alpha")
         val projectB = project("project-b", "beta")
@@ -133,6 +157,18 @@ class ProjectControlHubTest {
             }
         }
         val fake = object : ProjectControlHub.Executor {
+            override fun prepare(
+                project: V04ProjectGateway.RuntimeProject,
+                selection: ProjectRuntimeSelection,
+            ): ProjectControlHub.Result {
+                events += "execute:PREPARE"
+                return ProjectControlHub.Result.Completed(
+                    action = ProjectControlHub.Action.PREPARE,
+                    provider = RuntimeOperationProvider.INTERNAL,
+                    environmentReady = true,
+                )
+            }
+
             override fun run(
                 project: V04ProjectGateway.RuntimeProject,
                 selection: ProjectRuntimeSelection,
@@ -164,11 +200,15 @@ class ProjectControlHubTest {
             stateBridge = stateBridge,
         )
 
+        hub.prepare(project)
         hub.run(project)
         hub.stop(project)
 
         assertEquals(
             listOf(
+                "started:PREPARE",
+                "execute:PREPARE",
+                "result:PREPARE",
                 "started:RUN",
                 "execute:RUN",
                 "result:RUN",
@@ -199,6 +239,11 @@ class ProjectControlHubTest {
         )
 
     private class RecordingExecutor(
+        private val prepareResult: ProjectControlHub.Result = ProjectControlHub.Result.Completed(
+            action = ProjectControlHub.Action.PREPARE,
+            provider = RuntimeOperationProvider.INTERNAL,
+            environmentReady = true,
+        ),
         private val runResult: ProjectControlHub.Result = ProjectControlHub.Result.Dispatched(
             action = ProjectControlHub.Action.RUN,
             provider = RuntimeOperationProvider.INTERNAL,
@@ -213,11 +258,22 @@ class ProjectControlHubTest {
         var lastProjectId: String? = null
         var lastSelection: ProjectRuntimeSelection? = null
         var lastRunRequest: ProjectControlHub.RunRequest? = null
+        var prepareCalls: Int = 0
         var runCalls: Int = 0
         var stopCalls: Int = 0
 
         // Deliberately absent: the hub has no independent RuntimeState store.
         val localState: RuntimeState? = null
+
+        override fun prepare(
+            project: V04ProjectGateway.RuntimeProject,
+            selection: ProjectRuntimeSelection,
+        ): ProjectControlHub.Result {
+            prepareCalls += 1
+            lastProjectId = project.summary.documentId
+            lastSelection = selection
+            return prepareResult
+        }
 
         override fun run(
             project: V04ProjectGateway.RuntimeProject,
