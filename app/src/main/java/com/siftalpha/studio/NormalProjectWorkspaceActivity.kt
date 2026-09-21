@@ -37,6 +37,9 @@ import com.siftalpha.studio.project.WebProjectInspector
 import com.siftalpha.studio.presentation.NormalProjectPrimaryActionPolicy
 import com.siftalpha.studio.presentation.ProjectActionPolicy
 import com.siftalpha.studio.presentation.ProjectUiSnapshot
+import com.siftalpha.studio.presentation.PrepareWorkflowFacts
+import com.siftalpha.studio.presentation.PrepareWorkflowPhase
+import com.siftalpha.studio.presentation.PrepareWorkflowPresentationPolicy
 import com.siftalpha.studio.runtime.RuntimeLifecycleOperation
 import com.siftalpha.studio.runtime.RuntimeLifecycleResolver
 import com.siftalpha.studio.runtime.RuntimeLifecycleState
@@ -68,6 +71,7 @@ import com.siftalpha.studio.runtime.ProjectRuntimeController
 import com.siftalpha.studio.runtime.ProjectRuntimeSelection
 import com.siftalpha.studio.runtime.ProjectRuntimeSelectionStore
 import com.siftalpha.studio.runtime.ProjectRuntimeSelectionChangePolicy
+import com.siftalpha.studio.runtime.ProjectEnvironmentResolution
 import com.siftalpha.studio.runtime.ProjectSecretStore
 import com.siftalpha.studio.runtime.RuntimeLifecycleStore
 import com.siftalpha.studio.runtime.RuntimeState
@@ -110,6 +114,8 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         val externalReadiness: ExternalProviderReadiness? = null,
         val presentationTarget: PresentationTarget = PresentationTarget.NONE,
         val openEnabled: Boolean = false,
+        val preparePhaseTitle: String? = null,
+        val preparePhaseDetail: String? = null,
         val primaryAction: NormalProjectPrimaryActionPolicy.Action =
             NormalProjectPrimaryActionPolicy.Action.PREPARE_PROJECT,
     )
@@ -156,6 +162,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 ::prepareLiveProgress.isInitialized
             ) {
                 prepareLiveProgress.finish(project.folderName)
+                updatePrepareCompletion()
             }
 
             captureExternalEvidence(completion.action, completion.result)
@@ -197,6 +204,10 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                     ::prepareLiveProgress.isInitialized
                 ) {
                     prepareLiveProgress.finish(project.folderName)
+                    screenState.value = screenState.value.copy(
+                        preparePhaseTitle = getString(R.string.normal_prepare_phase_failed),
+                        preparePhaseDetail = getString(R.string.normal_prepare_timeout_detail),
+                    )
                 }
                 timeout.executionId?.let(manualRefreshExecutions::remove)
                 screenState.value = screenState.value.copy(busy = false)
@@ -288,13 +299,18 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             backend = externalBackend,
             gateway = gateway,
             runtime = runtime,
-        ) { folderName, liveText ->
-            if (::project.isInitialized && folderName == project.folderName) {
-                runOnUiThread {
-                    screenState.value = screenState.value.copy(message = liveText)
+            renderSnapshot = { folderName, snapshot ->
+                if (::project.isInitialized && folderName == project.folderName) {
+                    runOnUiThread {
+                        updatePrepareProgress(snapshot.stage)
+                    }
                 }
-            }
-        }
+            },
+            render = { _, _ ->
+                // Normal Mode presents product-facing phases. Raw prepare diagnostics remain in
+                // Developer Workspace and the shared Runtime logs.
+            },
+        )
 
         enableEdgeToEdge()
         refreshSharedState()
@@ -540,19 +556,141 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             message = getString(R.string.normal_project_preparing),
             runtimeState = RuntimeState.PREPARING,
             runtimeSelectionCanChange = false,
+            preparePhaseTitle = getString(R.string.normal_prepare_phase_detecting),
+            preparePhaseDetail = getString(R.string.normal_prepare_detecting_detail),
             primaryAction = NormalProjectPrimaryActionPolicy.Action.STOP,
         )
         internalPrepareFuture = prepareExecutor.submit {
+            val resolution = runCatching {
+                runtime.detectEnvironment(
+                    project = project,
+                    resolveCompatibility = selection == ProjectRuntimeSelection.EMBEDDED_R,
+                )
+            }.getOrNull()
+            if (resolution != null) {
+                runOnUiThread {
+                    updatePrepareResolution(resolution)
+                }
+            }
+
             val result = controlHub.prepare(project)
             runOnUiThread {
                 internalPrepareFuture = null
                 screenState.value = screenState.value.copy(busy = false)
                 attachExternalPrepareProgress(result)
+                updatePrepareResult(result)
                 handleActionRequirement(result, PendingUserIntent.PREPARE)
                 refreshSharedState(resultMessage(result))
             }
         }
         if (selection == ProjectRuntimeSelection.EMBEDDED_R) refreshSharedState()
+    }
+
+    private fun updatePrepareResolution(resolution: ProjectEnvironmentResolution) {
+        val facts = PrepareWorkflowPresentationPolicy.fromResolution(resolution)
+        val runtimeLabel = when (facts.primaryRuntimeId?.lowercase()) {
+            "python" -> getString(R.string.normal_prepare_runtime_python)
+            "nodejs", "node.js", "node" -> getString(R.string.normal_prepare_runtime_node)
+            else -> getString(R.string.normal_prepare_runtime_unknown)
+        }
+        val detail = when (facts.phase) {
+            PrepareWorkflowPhase.BLOCKED -> getString(
+                R.string.normal_prepare_blocked_detail,
+                facts.blockingIssueCount,
+            )
+            PrepareWorkflowPhase.COMPATIBILITY_CONFIRMED -> getString(
+                R.string.normal_prepare_compatibility_confirmed_detail,
+                runtimeLabel,
+                facts.directDependencyCount,
+                facts.resolvedPackageCount ?: facts.directDependencyCount,
+            )
+            PrepareWorkflowPhase.COMPATIBILITY_FALLBACK -> getString(
+                R.string.normal_prepare_compatibility_fallback_detail,
+                runtimeLabel,
+                facts.directDependencyCount,
+            )
+            else -> getString(
+                R.string.normal_prepare_plan_ready_detail,
+                runtimeLabel,
+                facts.directDependencyCount,
+            )
+        }
+        val title = when (facts.phase) {
+            PrepareWorkflowPhase.BLOCKED -> getString(R.string.normal_prepare_phase_blocked)
+            PrepareWorkflowPhase.COMPATIBILITY_CONFIRMED,
+            PrepareWorkflowPhase.COMPATIBILITY_FALLBACK,
+            -> getString(R.string.normal_prepare_phase_compatibility)
+            else -> getString(R.string.normal_prepare_phase_plan_ready)
+        }
+        screenState.value = screenState.value.copy(
+            preparePhaseTitle = title,
+            preparePhaseDetail = detail,
+        )
+    }
+
+    private fun updatePrepareProgress(stage: String) {
+        val phase = PrepareWorkflowPresentationPolicy.fromProgressStage(stage)
+        val title = when (phase) {
+            PrepareWorkflowPhase.INSTALLING_DEPENDENCIES ->
+                getString(R.string.normal_prepare_phase_installing)
+            PrepareWorkflowPhase.VERIFYING ->
+                getString(R.string.normal_prepare_phase_verifying)
+            else -> getString(R.string.normal_prepare_phase_environment)
+        }
+        val detail = when (phase) {
+            PrepareWorkflowPhase.INSTALLING_DEPENDENCIES ->
+                getString(R.string.normal_prepare_installing_detail)
+            PrepareWorkflowPhase.VERIFYING ->
+                getString(R.string.normal_prepare_verifying_detail)
+            else -> getString(R.string.normal_prepare_environment_detail)
+        }
+        screenState.value = screenState.value.copy(
+            preparePhaseTitle = title,
+            preparePhaseDetail = detail,
+        )
+    }
+
+    private fun updatePrepareCompletion() {
+        val selection = selectionStore.read(project.summary.documentId)
+        val ready = lifecycleStore.read(project.summary.documentId).environmentReadyFor(selection) == true
+        screenState.value = screenState.value.copy(
+            preparePhaseTitle = getString(
+                if (ready) R.string.normal_prepare_phase_ready else R.string.normal_prepare_phase_failed,
+            ),
+            preparePhaseDetail = getString(
+                if (ready) R.string.normal_prepare_ready_detail else R.string.normal_prepare_failed_detail,
+            ),
+        )
+    }
+
+    private fun updatePrepareResult(result: ProjectControlHub.Result) {
+        when (result) {
+            is ProjectControlHub.Result.Completed -> if (result.action == ProjectControlHub.Action.PREPARE) {
+                screenState.value = screenState.value.copy(
+                    preparePhaseTitle = getString(
+                        if (result.environmentReady) {
+                            R.string.normal_prepare_phase_ready
+                        } else {
+                            R.string.normal_prepare_phase_failed
+                        },
+                    ),
+                    preparePhaseDetail = getString(
+                        if (result.environmentReady) {
+                            R.string.normal_prepare_ready_detail
+                        } else {
+                            R.string.normal_prepare_failed_detail
+                        },
+                    ),
+                )
+            }
+            is ProjectControlHub.Result.Rejected -> if (result.action == ProjectControlHub.Action.PREPARE) {
+                screenState.value = screenState.value.copy(
+                    preparePhaseTitle = getString(R.string.normal_prepare_phase_blocked),
+                    preparePhaseDetail = getString(R.string.normal_prepare_blocked_generic),
+                )
+            }
+            else -> Unit
+        }
     }
 
     private fun configureProject() {
@@ -603,7 +741,11 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             internalPrepareFuture = null
             operationCoordinator.cancel(project.summary.documentId)
             sharedLifecycleBridge.cancelPrepare(project, selection)
-            screenState.value = screenState.value.copy(busy = false)
+            screenState.value = screenState.value.copy(
+                busy = false,
+                preparePhaseTitle = getString(R.string.normal_prepare_phase_stopped),
+                preparePhaseDetail = getString(R.string.normal_prepare_stopped_detail),
+            )
             refreshSharedState(getString(R.string.normal_project_prepare_stopped))
             return
         }
@@ -1187,6 +1329,28 @@ private fun NormalProjectWorkspaceScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
+                }
+            }
+
+            if (state.preparePhaseTitle != null) {
+                StudioSectionCard {
+                    Text(
+                        text = stringResource(R.string.normal_prepare_card_title),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Spacer(modifier = Modifier.height(spacing.small))
+                    Text(
+                        text = state.preparePhaseTitle,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    state.preparePhaseDetail?.takeIf { it.isNotBlank() }?.let { detail ->
+                        Spacer(modifier = Modifier.height(spacing.xSmall))
+                        Text(
+                            text = detail,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
