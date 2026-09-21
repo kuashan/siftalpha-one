@@ -59,15 +59,15 @@
     <string name="runtime_policy_disabled_reason">Unavailable because: %1$s</string>
     <string name="runtime_policy_pending_operation">Waiting for the current operation to finish.</string>
     <string name="runtime_policy_runtime_host_unavailable">Runtime execution is unavailable on this device; project files can still be managed.</string>
-    <string name="runtime_policy_runtime_selection_required">Studio cannot safely determine the project runtime. Check status or clean the runtime environment first.</string>
-    <string name="runtime_policy_runtime_active">The project process is still managed by Studio. You can stop it or check its status.</string>
+    <string name="runtime_policy_runtime_selection_required">SiftAlpha X cannot safely determine the project runtime. Check status or clean the runtime environment first.</string>
+    <string name="runtime_policy_runtime_active">The project process is still managed by SiftAlpha X. You can stop it or check its status.</string>
     <string name="runtime_policy_environment_preparing">Preparing the runtime environment. You can stop this project at any time.</string>
     <string name="runtime_policy_web_endpoint_pending">The project process has started, but its Web endpoint is not verified yet.</string>
     <string name="runtime_policy_configuration_required">Required project configuration is missing. Open configuration first.</string>
     <string name="runtime_policy_environment_prepare_required">The runtime environment is not prepared. Prepare it first.</string>
     <string name="runtime_policy_environment_status_required">The runtime environment state is unknown. Check status first.</string>
     <string name="runtime_policy_runtime_status_required">The runtime state is unknown. Check status first.</string>
-    <string name="runtime_policy_ready_to_run">The runtime environment is prepared and the project can start; Studio will prompt after launch if configuration is needed.</string>
+    <string name="runtime_policy_ready_to_run">The runtime environment is prepared and the project can start; SiftAlpha X will prompt after launch if configuration is needed.</string>
     <string name="runtime_policy_reason_pending_operation">another operation is already running</string>
     <string name="runtime_policy_reason_runtime_host_unavailable">runtime execution is unavailable on this device</string>
     <string name="runtime_policy_reason_runtime_selection_required">the project runtime is not uniquely determined</string>
@@ -121,7 +121,7 @@
     <string name="runtime_api_saved">API keys saved securely</string>
     <string name="runtime_api_save_failed">Save failed</string>
     <string name="runtime_prepare_title">Prepare %1$s?</string>
-    <string name="runtime_prepare_message">Studio will create an isolated Python environment and read requirements.txt. If requirements.txt is absent but pyproject.toml exists, dependencies are prepared from pyproject. The first setup may need an internet connection to download dependencies.</string>
+    <string name="runtime_prepare_message">SiftAlpha X will create an isolated Python environment and read requirements.txt. If requirements.txt is absent but pyproject.toml exists, dependencies are prepared from pyproject. The first setup may need an internet connection to download dependencies.</string>
     <string name="runtime_prepare_start">Start</string>
     <string name="runtime_clean_title">Clean the runtime environment for %1$s?</string>
     <string name="runtime_clean_message">This stops the project and removes its isolated venv and SiftAlpha runtime logs. It does not delete project source code or API keys stored in Android Keystore. You can prepare the environment again later.</string>
@@ -129,7 +129,7 @@
     <string name="runtime_run_secret_not_required">\n\nAPI keys: this project declares that Binance API credentials are not required.</string>
     <string name="runtime_run_secret_configured">\n\nAPI keys: configured and will be injected through secure stdin environment variables.</string>
     <string name="runtime_run_secret_missing">\n\nAPI keys: not configured. Ordinary projects are unaffected; projects that require authentication will report missing credentials themselves.</string>
-    <string name="runtime_run_web_detected">\n\nWeb: detected. Studio will register the local Dashboard address after the project starts.</string>
+    <string name="runtime_run_web_detected">\n\nWeb: detected. SiftAlpha X will register the local Dashboard address after the project starts.</string>
     <string name="runtime_native_web_run_title">Run %1$s native Web app?</string>
     <string name="runtime_native_web_run_message">A project-owned Web launch entry was detected with high confidence:\n\n%1$s\n\nSiftAlpha will start the local Web service provided by the project. Automatic browser launch by the project is disabled; after endpoint verification, SiftAlpha will open the native Web interface.</string>
     <string name="runtime_run_title">Run %1$s?</string>
@@ -155,12 +155,12 @@
     <string name="runtime_web_not_running_title">Web app is not running</string>
     <string name="runtime_web_not_running_message">This project is not running. Run it first, then tap “Browser”.</string>
     <string name="runtime_web_not_found_title">Web app not detected</string>
-    <string name="runtime_web_not_found_running">The project is running, but Studio does not yet have a local Web address. After a successful start, Studio performs one bounded project-scoped discovery pass; the Browser button itself does not scan ports.</string>
-    <string name="runtime_web_not_found_logs">The project is running, but Studio has not found a local Web address.\n\nThe project can output:\nSIFTALPHA_WEB_URL=http://127.0.0.1:&lt;port&gt;\n\nYou can also configure web.host / web.port in .project.json.</string>
+    <string name="runtime_web_not_found_running">The project is running, but SiftAlpha X does not yet have a local Web address. After a successful start, SiftAlpha X performs one bounded project-scoped discovery pass; the Browser button itself does not scan ports.</string>
+    <string name="runtime_web_not_found_logs">The project is running, but SiftAlpha X has not found a local Web address.\n\nThe project can output:\nSIFTALPHA_WEB_URL=http://127.0.0.1:&lt;port&gt;\n\nYou can also configure web.host / web.port in .project.json.</string>
     <string name="runtime_web_invalid_title">Invalid Web address</string>
-    <string name="runtime_web_invalid_message">Studio refuses to open a non-local HTTP/HTTPS Web address.\n\n%1$s</string>
+    <string name="runtime_web_invalid_message">SiftAlpha X refuses to open a non-local HTTP/HTTPS Web address.\n\n%1$s</string>
     <string name="runtime_no_browser_title">No browser available</string>
-    <string name="runtime_no_browser_message">Studio could not find an installed browser that can open HTTP/HTTPS pages.\n\n%1$s</string>
+    <string name="runtime_no_browser_message">SiftAlpha X could not find an installed browser that can open HTTP/HTTPS pages.\n\n%1$s</string>
     <string name="runtime_choose_browser">Choose browser</string>
     <string name="runtime_browser_failed_title">Failed to open browser</string>
     <string name="runtime_browser_failed_message">Could not open the current Dashboard with %1$s.\n\n%2$s\n%3$s</string>
