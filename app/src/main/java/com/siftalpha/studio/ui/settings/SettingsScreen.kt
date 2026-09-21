@@ -203,6 +203,7 @@ private fun SettingsScreenDarkPreview() {
             onBack = {},
             onChangeLanguage = {},
             onChangeBrowser = {},
+            onDeveloperModeChanged = {},
         )
     }
 }
