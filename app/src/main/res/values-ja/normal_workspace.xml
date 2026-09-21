@@ -21,4 +21,12 @@
     <string name="normal_runtime_selection_locked">プロジェクトが実行中、または操作が完了していません。停止または完了後に実行環境を切り替えてください。</string>
     <string name="normal_runtime_selection_busy">現在のプロジェクトは実行中、または操作が完了していないため、実行環境を切り替えられません。</string>
     <string name="normal_runtime_selection_saved">実行環境を変更しました：%1$s</string>
+    <string name="normal_project_prepare_action">プロジェクトを準備</string>
+    <string name="normal_project_configure_action">設定を完了</string>
+    <string name="normal_project_preparing">プロジェクト環境を検出して準備しています…</string>
+    <string name="normal_project_prepare_ready">プロジェクトの準備が完了し、実行できます。</string>
+    <string name="normal_project_prepare_failed">プロジェクトの準備に失敗しました。状態の詳細を確認するか、開発者ワークスペースを開いてください。</string>
+    <string name="normal_project_prepare_stopped">プロジェクトの準備を停止しました。</string>
+    <string name="normal_project_configuration_saved">設定を更新しました。</string>
+    <string name="normal_project_waiting_action">現在直接実行できる主操作はありません。後で状態を更新するか、開発者ワークスペースで詳細を確認してください。</string>
 </resources>
