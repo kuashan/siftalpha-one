@@ -51,6 +51,7 @@ import com.siftalpha.studio.runtime.ProjectRuntimeController
 import com.siftalpha.studio.runtime.ProjectRuntimeSelection
 import com.siftalpha.studio.runtime.ProjectRuntimeSelectionStore
 import com.siftalpha.studio.runtime.ProjectRuntimeSelectionChangePolicy
+import com.siftalpha.studio.runtime.PrepareProgressProbe
 import com.siftalpha.studio.runtime.RuntimeOperationStore
 import com.siftalpha.studio.runtime.ProjectSecretStore
 import com.siftalpha.studio.runtime.RuntimeLifecycleStore
@@ -100,6 +101,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     private lateinit var externalBackend: TermuxBackend
     private lateinit var externalProviderPreflight: ExternalProviderPreflight
     private lateinit var externalProviderUi: ExternalProviderPreflightUiCoordinator
+    private lateinit var prepareLiveProgress: PrepareLiveProgressController
     private lateinit var configurationUi: ProjectConfigurationUiController
     private val actionExecutor = Executors.newSingleThreadExecutor()
     private val prepareExecutor = Executors.newSingleThreadExecutor()
@@ -111,6 +113,9 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 
     private val resultListener: (RuntimeResult) -> Unit = { result ->
         runOnUiThread {
+            if (::prepareLiveProgress.isInitialized && prepareLiveProgress.consumeIfProbe(result)) {
+                return@runOnUiThread
+            }
             when (result.executionId) {
                 externalPrepareExecutionId -> handleExternalPrepareResult(result)
                 externalStopExecutionId -> handleExternalStopResult(result)
@@ -158,7 +163,19 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             activity = this,
             backend = externalBackend,
             preflight = externalProviderPreflight,
+            onStage = { stage ->
+                runOnUiThread { handleExternalPreflightStage(stage) }
+            },
         )
+        prepareLiveProgress = PrepareLiveProgressController(
+            context = this,
+            backend = externalBackend,
+            gateway = gateway,
+            runtime = runtime,
+            renderSnapshot = { _, snapshot ->
+                runOnUiThread { handlePrepareProgress(snapshot) }
+            },
+        ) { _, _ -> Unit }
         sharedLifecycleBridge = SharedRuntimeLifecycleBridge(lifecycleStore)
         controlHub = ProjectControlHub(
             selectionStore = selectionStore,
@@ -192,6 +209,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         super.onStart()
         TermuxResultBus.addListener(resultListener)
         externalProviderUi.onStart()
+        prepareLiveProgress.resume()
         if (::project.isInitialized) {
             reconcileExternalPrepareOperation()
         }
@@ -204,6 +222,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     }
 
     override fun onStop() {
+        if (::prepareLiveProgress.isInitialized) prepareLiveProgress.pause()
         if (::externalProviderUi.isInitialized) externalProviderUi.onStop()
         TermuxResultBus.removeListener(resultListener)
         super.onStop()
@@ -380,6 +399,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         }
         screenState.value = screenState.value.copy(
             busy = false,
+            statusLabel = getString(R.string.runtime_lifecycle_preparing),
             message = getString(R.string.normal_project_preparing),
             runtimeState = RuntimeState.PREPARING,
             runtimeSelectionCanChange = false,
@@ -441,6 +461,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         )
         screenState.value = screenState.value.copy(
             busy = true,
+            statusLabel = getString(R.string.runtime_lifecycle_starting),
             message = getString(R.string.normal_project_starting),
         )
         actionExecutor.execute {
@@ -474,6 +495,9 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         externalPrepareCancelRequested =
             selection == ProjectRuntimeSelection.TERMUX &&
                 screenState.value.runtimeState == RuntimeState.PREPARING
+        if (externalPrepareCancelRequested && ::prepareLiveProgress.isInitialized) {
+            prepareLiveProgress.finish(project.folderName)
+        }
         screenState.value = screenState.value.copy(
             busy = true,
             message = getString(R.string.normal_project_stopping),
@@ -498,6 +522,57 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 }
             }
         }
+    }
+
+    private fun handleExternalPreflightStage(stage: ExternalProviderPreflightUiStage) {
+        if (!::project.isInitialized) return
+        when (stage) {
+            ExternalProviderPreflightUiStage.CHECKING_PROVIDER ->
+                showNormalTransientStatus(R.string.normal_preflight_checking_provider)
+            ExternalProviderPreflightUiStage.WAITING_PERMISSION ->
+                showNormalTransientStatus(R.string.normal_preflight_waiting_permission)
+            ExternalProviderPreflightUiStage.CHECKING_TERMUX ->
+                showNormalTransientStatus(R.string.normal_preflight_checking_termux)
+            ExternalProviderPreflightUiStage.TERMUX_CONFIGURATION_REQUIRED ->
+                showNormalTransientStatus(R.string.normal_preflight_termux_configuration)
+            ExternalProviderPreflightUiStage.TERMUX_NOT_READY ->
+                showNormalTransientStatus(R.string.normal_preflight_waiting_termux)
+            ExternalProviderPreflightUiStage.READY -> {
+                screenState.value = screenState.value.copy(busy = false)
+            }
+            ExternalProviderPreflightUiStage.CANCELLED -> {
+                screenState.value = screenState.value.copy(busy = false)
+                refreshSharedState(message = null)
+            }
+        }
+    }
+
+    private fun showNormalTransientStatus(messageRes: Int) {
+        val message = getString(messageRes)
+        screenState.value = screenState.value.copy(
+            busy = true,
+            statusLabel = message,
+            message = message,
+            runtimeSelectionCanChange = false,
+        )
+    }
+
+    private fun handlePrepareProgress(snapshot: PrepareProgressProbe.Snapshot) {
+        val messageRes = when (snapshot.stage) {
+            "STARTING" -> R.string.runtime_prepare_live_stage_starting
+            "CREATE_OR_REUSE_VENV" -> R.string.runtime_prepare_live_stage_venv
+            "INSTALL_REQUIREMENTS" -> R.string.runtime_prepare_live_stage_requirements
+            "INSTALL_PYPROJECT" -> R.string.runtime_prepare_live_stage_pyproject
+            "FINALIZING" -> R.string.runtime_prepare_live_stage_finalizing
+            else -> R.string.runtime_prepare_live_stage_unknown
+        }
+        screenState.value = screenState.value.copy(
+            statusLabel = getString(R.string.runtime_lifecycle_preparing),
+            message = getString(messageRes),
+            runtimeState = RuntimeState.PREPARING,
+            runtimeSelectionCanChange = false,
+            primaryAction = NormalProjectPrimaryActionPolicy.Action.STOP,
+        )
     }
 
     private fun resultMessage(result: ProjectControlHub.Result): String = when (result) {
@@ -543,6 +618,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 phase = RuntimeOperationPhase.ACTIVE,
             ),
         )
+        prepareLiveProgress.start(project.folderName, executionId)
         TermuxResultBus.consume(executionId)?.let(resultListener)
     }
 
@@ -555,12 +631,14 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             record.executionId != null
         ) {
             externalPrepareExecutionId = record.executionId
+            prepareLiveProgress.start(project.folderName, record.executionId)
             TermuxResultBus.consume(record.executionId)?.let(resultListener)
         }
     }
 
     private fun handleExternalPrepareResult(result: RuntimeResult) {
         if (result.executionId != externalPrepareExecutionId) return
+        prepareLiveProgress.finish(project.folderName)
         TermuxResultBus.consume(result.executionId)
         val prepared = result.exitCode == 0 &&
             result.internalErrorMessage.isBlank() &&

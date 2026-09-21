@@ -103,6 +103,26 @@ class ExternalProviderPreflightPolicyTest {
     }
 
     @Test
+    fun `bridge timeout becomes unavailable shared readiness evidence`() {
+        val local = ExternalProviderPreflightPolicy.local(
+            termuxInstalled = true,
+            runCommandPermissionGranted = true,
+        )
+
+        val snapshot = ExternalProviderPreflightPolicy.fromTimeout(
+            local = local,
+            checkedAtEpochMs = 22_000L,
+        )
+
+        assertEquals(
+            ExternalProviderReadinessStatus.BRIDGE_UNAVAILABLE,
+            snapshot.status,
+        )
+        assertFalse(snapshot.ready)
+        assertEquals(22_000L, snapshot.checkedAtEpochMs)
+    }
+
+    @Test
     fun `bridge response without allow external apps evidence is not ready`() {
         val local = ExternalProviderPreflightPolicy.local(
             termuxInstalled = true,

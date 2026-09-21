@@ -29,4 +29,9 @@
     <string name="normal_project_prepare_stopped">プロジェクトの準備を停止しました。</string>
     <string name="normal_project_configuration_saved">設定を更新しました。</string>
     <string name="normal_project_waiting_action">現在直接実行できる主操作はありません。後で状態を更新するか、開発者ワークスペースで詳細を確認してください。</string>
+    <string name="normal_preflight_checking_provider">外部実行環境を確認しています…</string>
+    <string name="normal_preflight_waiting_permission">RUN_COMMAND 権限を待っています…</string>
+    <string name="normal_preflight_checking_termux">Termux の準備状態を確認しています…</string>
+    <string name="normal_preflight_termux_configuration">Termux の設定が未完了です。ユーザー操作を待っています…</string>
+    <string name="normal_preflight_waiting_termux">Termux が起動していないか、まだ準備できていません。ユーザー操作を待っています…</string>
 </resources>

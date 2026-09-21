@@ -89,8 +89,10 @@ android {
         // scripts keep a stable interpreter prefix while failed prepares still roll back cleanly.
         // alpha43-r48a7 completes the user-action recovery loop around Shared External Provider
         // Preflight for PREPARE / RUN without duplicating readiness classification in either UI.
-        versionCode = 187
-        versionName = "0.8.0-alpha43-r48a7"
+        // alpha43-r48a8 bounds External Provider bridge probing and exposes Normal Mode
+        // preflight / dependency-preparation progress without redesigning Developer Workspace.
+        versionCode = 188
+        versionName = "0.8.0-alpha43-r48a8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

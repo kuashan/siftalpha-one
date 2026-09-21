@@ -61,6 +61,23 @@ object ExternalProviderPreflightPolicy {
         )
     }
 
+    fun fromTimeout(
+        local: ExternalProviderReadiness,
+        checkedAtEpochMs: Long,
+    ): ExternalProviderReadiness {
+        if (local.status != ExternalProviderReadinessStatus.BRIDGE_PROBE_REQUIRED) {
+            return local
+        }
+        return ExternalProviderReadiness(
+            status = ExternalProviderReadinessStatus.BRIDGE_UNAVAILABLE,
+            termuxInstalled = true,
+            runCommandPermissionGranted = true,
+            bridgeVerified = false,
+            allowExternalApps = null,
+            checkedAtEpochMs = checkedAtEpochMs,
+        )
+    }
+
     fun fromProbe(
         local: ExternalProviderReadiness,
         result: RuntimeResult,
@@ -246,6 +263,20 @@ class ExternalProviderPreflight(
         val snapshot = ExternalProviderPreflightPolicy.fromProbe(
             local = local,
             result = result,
+            checkedAtEpochMs = nowEpochMs(),
+        )
+        store.write(snapshot)
+        return snapshot
+    }
+
+    fun recordProbeTimeout(): ExternalProviderReadiness {
+        val local = ExternalProviderPreflightPolicy.local(
+            termuxInstalled = runCatching { backend.isTermuxInstalled() }.getOrDefault(false),
+            runCommandPermissionGranted = runCatching { backend.hasRunCommandPermission() }
+                .getOrDefault(false),
+        )
+        val snapshot = ExternalProviderPreflightPolicy.fromTimeout(
+            local = local,
             checkedAtEpochMs = nowEpochMs(),
         )
         store.write(snapshot)

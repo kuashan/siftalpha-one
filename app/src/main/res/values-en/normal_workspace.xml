@@ -29,4 +29,9 @@
     <string name="normal_project_prepare_stopped">Project preparation was stopped.</string>
     <string name="normal_project_configuration_saved">Configuration updated.</string>
     <string name="normal_project_waiting_action">No direct primary action is available right now. Refresh later or open the developer workspace for details.</string>
+    <string name="normal_preflight_checking_provider">Checking the external runtime…</string>
+    <string name="normal_preflight_waiting_permission">Waiting for RUN_COMMAND permission…</string>
+    <string name="normal_preflight_checking_termux">Checking whether Termux is ready…</string>
+    <string name="normal_preflight_termux_configuration">Termux configuration is incomplete; waiting for user action…</string>
+    <string name="normal_preflight_waiting_termux">Termux is not started or not ready; waiting for user action…</string>
 </resources>

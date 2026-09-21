@@ -6,6 +6,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import com.siftalpha.studio.runtime.ExternalProviderPreflight
 import com.siftalpha.studio.runtime.ExternalProviderReadinessStatus
@@ -14,23 +16,36 @@ import com.siftalpha.studio.runtime.TermuxBackend
 import com.siftalpha.studio.runtime.TermuxContract
 import com.siftalpha.studio.runtime.TermuxResultBus
 
+enum class ExternalProviderPreflightUiStage {
+    CHECKING_PROVIDER,
+    WAITING_PERMISSION,
+    CHECKING_TERMUX,
+    TERMUX_CONFIGURATION_REQUIRED,
+    TERMUX_NOT_READY,
+    READY,
+    CANCELLED,
+}
+
 /**
  * Presentation recovery for Shared External Provider Preflight（共享外部执行环境前置检查）.
  *
- * Readiness facts remain owned by ExternalProviderPreflight. Both Normal Mode（普通模式） and
- * Developer Workspace（开发者工作区） reuse this one UI coordinator to request user actions and
- * resume the exact PREPARE / RUN callback only after a fresh bridge probe reaches READY（就绪）.
+ * Readiness facts remain owned by ExternalProviderPreflight. The bridge wait is bounded: if the
+ * Termux RUN_COMMAND callback does not arrive within PROBE_TIMEOUT_MS, shared readiness records
+ * BRIDGE_UNAVAILABLE and the UI can offer an explicit Open Termux recovery instead of hanging.
  */
 class ExternalProviderPreflightUiCoordinator(
     private val activity: Activity,
     private val backend: TermuxBackend,
     private val preflight: ExternalProviderPreflight,
+    private val onStage: (ExternalProviderPreflightUiStage) -> Unit = {},
 ) {
+    private val handler = Handler(Looper.getMainLooper())
     private var pendingAction: (() -> Unit)? = null
     private var probeExecutionId: Int? = null
     private var listening = false
     private var retryOnResume = false
     private var dialogShowing = false
+    private var probeTimeoutRunnable: Runnable? = null
 
     private val probeListener: (RuntimeResult) -> Unit = listener@{ result ->
         if (result.executionId != probeExecutionId) return@listener
@@ -41,6 +56,7 @@ class ExternalProviderPreflightUiCoordinator(
         if (pendingAction != null || probeExecutionId != null || dialogShowing) return
         pendingAction = action
         retryOnResume = false
+        onStage(ExternalProviderPreflightUiStage.CHECKING_PROVIDER)
 
         // PREPARE / RUN require a current real bridge response rather than only cached READY evidence.
         preflight.invalidateBridgeEvidence()
@@ -53,18 +69,25 @@ class ExternalProviderPreflightUiCoordinator(
             listening = true
         }
         probeExecutionId?.let { executionId ->
-            TermuxResultBus.consume(executionId)?.let(probeListener)
+            val cached = TermuxResultBus.consume(executionId)
+            if (cached != null) {
+                probeListener(cached)
+            } else {
+                scheduleProbeTimeout()
+            }
         }
     }
 
     fun onResume() {
         if (!retryOnResume || pendingAction == null) return
         retryOnResume = false
+        onStage(ExternalProviderPreflightUiStage.CHECKING_PROVIDER)
         preflight.invalidateBridgeEvidence()
         evaluate()
     }
 
     fun onStop() {
+        cancelProbeTimeout()
         if (listening) {
             TermuxResultBus.removeListener(probeListener)
             listening = false
@@ -75,6 +98,7 @@ class ExternalProviderPreflightUiCoordinator(
         if (requestCode != REQUEST_RUN_COMMAND) return false
 
         if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            onStage(ExternalProviderPreflightUiStage.CHECKING_PROVIDER)
             preflight.invalidateBridgeEvidence()
             evaluate()
         } else {
@@ -98,29 +122,75 @@ class ExternalProviderPreflightUiCoordinator(
                     message = activity.getString(R.string.external_provider_termux_missing_message),
                 )
             }
-            ExternalProviderReadinessStatus.RUN_COMMAND_PERMISSION_REQUIRED -> showPermissionDialog()
+            ExternalProviderReadinessStatus.RUN_COMMAND_PERMISSION_REQUIRED -> {
+                onStage(ExternalProviderPreflightUiStage.WAITING_PERMISSION)
+                showPermissionDialog()
+            }
             ExternalProviderReadinessStatus.BRIDGE_PROBE_REQUIRED -> startBridgeProbe()
-            ExternalProviderReadinessStatus.TERMUX_CONFIGURATION_REQUIRED -> showTermuxConfigurationDialog()
-            ExternalProviderReadinessStatus.BRIDGE_UNAVAILABLE -> showBridgeUnavailableDialog()
+            ExternalProviderReadinessStatus.TERMUX_CONFIGURATION_REQUIRED -> {
+                onStage(ExternalProviderPreflightUiStage.TERMUX_CONFIGURATION_REQUIRED)
+                showTermuxConfigurationDialog()
+            }
+            ExternalProviderReadinessStatus.BRIDGE_UNAVAILABLE -> {
+                onStage(ExternalProviderPreflightUiStage.TERMUX_NOT_READY)
+                showBridgeUnavailableDialog()
+            }
             ExternalProviderReadinessStatus.READY -> proceed()
         }
     }
 
     private fun startBridgeProbe() {
         if (probeExecutionId != null || pendingAction == null) return
+        onStage(ExternalProviderPreflightUiStage.CHECKING_TERMUX)
         val executionId = runCatching {
             backend.execute(preflight.probeCommand())
         }.getOrElse {
+            preflight.recordProbeTimeout()
+            onStage(ExternalProviderPreflightUiStage.TERMUX_NOT_READY)
             showBridgeUnavailableDialog()
             return
         }
         probeExecutionId = executionId
-        TermuxResultBus.consume(executionId)?.let(probeListener)
+        val cached = TermuxResultBus.consume(executionId)
+        if (cached != null) {
+            probeListener(cached)
+        } else {
+            scheduleProbeTimeout()
+        }
+    }
+
+    private fun scheduleProbeTimeout() {
+        if (probeExecutionId == null || probeTimeoutRunnable != null) return
+        val runnable = Runnable { handleProbeTimeout() }
+        probeTimeoutRunnable = runnable
+        handler.postDelayed(runnable, PROBE_TIMEOUT_MS)
+    }
+
+    private fun cancelProbeTimeout() {
+        probeTimeoutRunnable?.let(handler::removeCallbacks)
+        probeTimeoutRunnable = null
+    }
+
+    private fun handleProbeTimeout() {
+        probeTimeoutRunnable = null
+        val executionId = probeExecutionId ?: return
+
+        // Resolve a race in favor of a real callback if it arrived at the timeout boundary.
+        TermuxResultBus.consume(executionId)?.let {
+            handleProbeResult(it)
+            return
+        }
+
+        probeExecutionId = null
+        preflight.recordProbeTimeout()
+        onStage(ExternalProviderPreflightUiStage.TERMUX_NOT_READY)
+        showBridgeUnavailableDialog()
     }
 
     private fun handleProbeResult(result: RuntimeResult) {
         val executionId = probeExecutionId ?: return
         if (result.executionId != executionId) return
+        cancelProbeTimeout()
         TermuxResultBus.consume(executionId)
         probeExecutionId = null
         preflight.recordProbe(result)
@@ -241,6 +311,8 @@ class ExternalProviderPreflightUiCoordinator(
     }
 
     private fun proceed() {
+        cancelProbeTimeout()
+        onStage(ExternalProviderPreflightUiStage.READY)
         val action = pendingAction ?: return
         pendingAction = null
         retryOnResume = false
@@ -248,11 +320,14 @@ class ExternalProviderPreflightUiCoordinator(
     }
 
     private fun clearPendingAction() {
+        cancelProbeTimeout()
         pendingAction = null
         retryOnResume = false
+        onStage(ExternalProviderPreflightUiStage.CANCELLED)
     }
 
     companion object {
         private const val REQUEST_RUN_COMMAND = 741
+        internal const val PROBE_TIMEOUT_MS = 5_000L
     }
 }

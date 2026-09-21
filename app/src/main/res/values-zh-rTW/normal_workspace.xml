@@ -29,4 +29,9 @@
     <string name="normal_project_prepare_stopped">專案準備已停止。</string>
     <string name="normal_project_configuration_saved">設定已更新。</string>
     <string name="normal_project_waiting_action">目前沒有可直接執行的主要操作，請稍後重新整理狀態或進入開發者工作區查看詳情。</string>
+    <string name="normal_preflight_checking_provider">正在檢查外部執行環境…</string>
+    <string name="normal_preflight_waiting_permission">等待 RUN_COMMAND（外部命令執行）授權…</string>
+    <string name="normal_preflight_checking_termux">正在檢查 Termux 是否已就緒…</string>
+    <string name="normal_preflight_termux_configuration">Termux 設定尚未完成，等待使用者處理…</string>
+    <string name="normal_preflight_waiting_termux">Termux 尚未啟動或尚未就緒，等待使用者處理…</string>
 </resources>
