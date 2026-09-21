@@ -42,4 +42,6 @@
     <string name="normal_project_refresh_complete">상태가 업데이트되었습니다.</string>
     <string name="normal_project_open_action">열기</string>
     <string name="normal_project_open_unavailable">현재 열 수 있는 웹 페이지나 결과가 없습니다.</string>
+    <string name="normal_external_provider_no_response">3초 안에 Termux 응답을 감지하지 못했습니다. Termux를 연 뒤 다시 확인하세요.</string>
+    <string name="normal_external_provider_recheck">다시 확인</string>
 </resources>
