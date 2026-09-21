@@ -1072,3 +1072,38 @@ Acceptance（验收）：
 - Real-device repair acceptance（真机修复验收）仍为 PENDING（待真机）。
 - 不自动 merge（合并）、不移动 baseline（基线）。
 
+## 2026-09-21 · R48-B current state — Normal Observation + Open（普通模式观察 + 打开）
+
+Normal Mode（普通模式）现已具备第一版用户运行闭环：
+
+```text
+Prepare -> Run -> Refresh -> Open -> Stop
+```
+
+本阶段仍坚持 one backend / two surfaces（单一后端 / 双界面）：
+
+- Refresh（刷新）不是一套新的 Runtime state machine（运行状态机）。
+- Internal R 直接读取现有 Session（会话）事实。
+- External Provider 复用现有 Runtime controller + ProjectOperationCoordinator + RuntimeAutoObservationPolicy。
+- Open（打开）读取共享 Web / Result facts，并继续使用 PresentationTargetResolver。
+- Browser（浏览器）是 Presentation（呈现）偏好，不是 Environment（环境）事实。浏览器选择不得改变 Detection / Plan / Prepare / backend selection。
+- Developer Workspace（开发者工作区）仍是高级诊断界面；Normal Mode 不通过隐藏 Activity 或模拟点击调用它。
+
+Current functional source（当前功能源码）：
+`36d610baf89fa0af0380119b476901db51b7399b`
+
+Version（版本）：
+- `0.8.0-alpha43-r48b1`
+- versionCode `188`
+
+Cloud evidence（云端证据）：
+- W0 #494: PASS
+- Internal Alpine Probe #77: PASS
+- artifact `siftalpha-w0-494` / ID `10642481822`
+- APK SHA-256 `6893879eeeddb4354f19882b11e6ff38fa40e91d274604be064228bbb932d640`
+- signer SHA-256 `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+
+R48-B source/cloud gate（源码 / 云端门禁）= PASS（通过）。
+Real-device acceptance（真机验收）= PENDING（待测试）。
+不自动 merge（合并），不移动 baseline（基线）。
+
