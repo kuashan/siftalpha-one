@@ -7,7 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import java.util.concurrent.atomic.AtomicInteger
 
-class TermuxBackend(private val context: Context) : RuntimeBackend {
+class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProviderBridge {
 
     override fun isAvailable(): Boolean = isTermuxInstalled()
 

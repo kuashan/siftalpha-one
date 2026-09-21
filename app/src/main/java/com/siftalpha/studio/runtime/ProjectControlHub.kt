@@ -17,12 +17,14 @@ class ProjectControlHub internal constructor(
     private val selectionReader: (String) -> ProjectRuntimeSelection,
     private val executor: Executor,
     private val stateBridge: StateBridge = StateBridge.NONE,
+    private val externalPreflight: ExternalProviderPreflightGate? = null,
 ) {
     constructor(
         selectionStore: ProjectRuntimeSelectionStore,
         executor: Executor,
         stateBridge: StateBridge = StateBridge.NONE,
-    ) : this(selectionStore::read, executor, stateBridge)
+        externalPreflight: ExternalProviderPreflightGate? = null,
+    ) : this(selectionStore::read, executor, stateBridge, externalPreflight)
 
     data class RunRequest(
         val requiredConfiguration: Boolean = false,
@@ -39,10 +41,12 @@ class ProjectControlHub internal constructor(
 
     enum class Failure {
         ENVIRONMENT_PLAN_BLOCKED,
+        ENVIRONMENT_NOT_READY,
         CONFIGURATION_REQUIRED,
         ROUTE_REJECTED,
         RUNTIME_BUSY,
         BACKEND_UNAVAILABLE,
+        EXTERNAL_PREFLIGHT_REQUIRED,
         NO_ACTIVE_RUNTIME,
         EXECUTION_FAILED,
     }
@@ -75,6 +79,7 @@ class ProjectControlHub internal constructor(
             override val action: Action,
             val failure: Failure,
             val detail: String,
+            val readiness: ExternalProviderReadiness? = null,
         ) : Result
     }
 
@@ -116,6 +121,7 @@ class ProjectControlHub internal constructor(
 
     fun prepare(project: V04ProjectGateway.RuntimeProject): Result {
         val selection = selectionReader(project.summary.documentId)
+        externalPreflightRejection(Action.PREPARE, selection)?.let { return it }
         stateBridge.onActionStarted(project, selection, Action.PREPARE)
         val result = executor.prepare(project, selection)
         stateBridge.onActionResult(project, selection, result)
@@ -127,6 +133,7 @@ class ProjectControlHub internal constructor(
         request: RunRequest = RunRequest(),
     ): Result {
         val selection = selectionReader(project.summary.documentId)
+        externalPreflightRejection(Action.RUN, selection)?.let { return it }
         stateBridge.onActionStarted(project, selection, Action.RUN)
         val result = executor.run(project, selection, request)
         stateBridge.onActionResult(project, selection, result)
@@ -140,6 +147,21 @@ class ProjectControlHub internal constructor(
         stateBridge.onActionResult(project, selection, result)
         return result
     }
+
+    private fun externalPreflightRejection(
+        action: Action,
+        selection: ProjectRuntimeSelection,
+    ): Result.Rejected? {
+        if (selection != ProjectRuntimeSelection.TERMUX) return null
+        val result = externalPreflight?.ensureReady() ?: return null
+        if (result.ready) return null
+        return Result.Rejected(
+            action = action,
+            failure = Failure.EXTERNAL_PREFLIGHT_REQUIRED,
+            detail = result.detail ?: result.readiness.name,
+            readiness = result.readiness,
+        )
+    }
 }
 
 /**
@@ -152,6 +174,8 @@ class ProjectControlHub internal constructor(
 class ProjectRuntimeControlExecutor(
     private val runtime: ProjectRuntimeController,
     private val externalBackend: RuntimeBackend,
+    private val operationCoordinator: ProjectOperationCoordinator? = null,
+    private val environmentReadyReader: (String, ProjectRuntimeSelection) -> Boolean? = { _, _ -> null },
 ) : ProjectControlHub.Executor {
 
     override fun prepare(
@@ -193,26 +217,59 @@ class ProjectRuntimeControlExecutor(
         }
 
         return when (route.path) {
-            RuntimeControlPath.EMBEDDED_R -> runCatching {
-                val prepared = runtime.prepareEmbeddedPythonEnvironment(project)
-                val verified = prepared.ready && runtime.embeddedPythonEnvironmentReady(project)
-                if (!verified) {
-                    rejected(
+            RuntimeControlPath.EMBEDDED_R -> {
+                val operation = operationCoordinator?.begin(
+                    projectId = project.summary.documentId,
+                    provider = RuntimeOperationProvider.INTERNAL,
+                    action = RuntimeOperationAction.PREPARE,
+                    runtimeSelection = selection,
+                )
+                if (operationCoordinator != null && operation == null) {
+                    return rejected(
                         action = ProjectControlHub.Action.PREPARE,
-                        failure = ProjectControlHub.Failure.EXECUTION_FAILED,
-                        detail = "Internal R environment verification failed",
-                    )
-                } else {
-                    ProjectControlHub.Result.Completed(
-                        action = ProjectControlHub.Action.PREPARE,
-                        provider = RuntimeOperationProvider.INTERNAL,
-                        environmentReady = true,
-                        observedState = RuntimeState.UNKNOWN,
-                        detail = prepared.backend.name + ":" + prepared.outcome.name,
+                        failure = ProjectControlHub.Failure.RUNTIME_BUSY,
+                        detail = "Project already has an active operation",
                     )
                 }
-            }.getOrElse { error ->
-                executionFailure(ProjectControlHub.Action.PREPARE, error)
+                runCatching {
+                    val prepared = runtime.prepareEmbeddedPythonEnvironment(project)
+                    val verified = prepared.ready && runtime.embeddedPythonEnvironmentReady(project)
+                    operation?.let {
+                        operationCoordinator?.finish(
+                            projectId = project.summary.documentId,
+                            generation = it.generation,
+                            phase = if (verified) {
+                                RuntimeOperationPhase.SUCCESS
+                            } else {
+                                RuntimeOperationPhase.FAILED
+                            },
+                        )
+                    }
+                    if (!verified) {
+                        rejected(
+                            action = ProjectControlHub.Action.PREPARE,
+                            failure = ProjectControlHub.Failure.EXECUTION_FAILED,
+                            detail = "Internal R environment verification failed",
+                        )
+                    } else {
+                        ProjectControlHub.Result.Completed(
+                            action = ProjectControlHub.Action.PREPARE,
+                            provider = RuntimeOperationProvider.INTERNAL,
+                            environmentReady = true,
+                            observedState = RuntimeState.UNKNOWN,
+                            detail = prepared.backend.name + ":" + prepared.outcome.name,
+                        )
+                    }
+                }.getOrElse { error ->
+                    operation?.let {
+                        operationCoordinator?.finish(
+                            projectId = project.summary.documentId,
+                            generation = it.generation,
+                            phase = RuntimeOperationPhase.FAILED,
+                        )
+                    }
+                    executionFailure(ProjectControlHub.Action.PREPARE, error)
+                }
             }
 
             RuntimeControlPath.EXTERNAL_PROVIDER -> {
@@ -230,6 +287,19 @@ class ProjectRuntimeControlExecutor(
                         detail = "Environment Plan does not allow External Provider preparation",
                     )
                 }
+                val operation = operationCoordinator?.begin(
+                    projectId = project.summary.documentId,
+                    provider = RuntimeOperationProvider.EXTERNAL,
+                    action = RuntimeOperationAction.PREPARE,
+                    runtimeSelection = selection,
+                )
+                if (operationCoordinator != null && operation == null) {
+                    return rejected(
+                        action = ProjectControlHub.Action.PREPARE,
+                        failure = ProjectControlHub.Failure.RUNTIME_BUSY,
+                        detail = "Project already has an active operation",
+                    )
+                }
                 runCatching {
                     val command = runtime.prepare(project)
                     val managed = runtime.wrapCancelableExternalActivity(
@@ -237,13 +307,28 @@ class ProjectRuntimeControlExecutor(
                         action = ProjectRuntimeController.Action.PREPARE,
                         command = command,
                     )
+                    val executionId = externalBackend.execute(managed)
+                    operation?.let {
+                        operationCoordinator?.bindExternalExecution(
+                            projectId = project.summary.documentId,
+                            generation = it.generation,
+                            executionId = executionId,
+                        )
+                    }
                     ProjectControlHub.Result.Dispatched(
                         action = ProjectControlHub.Action.PREPARE,
                         provider = RuntimeOperationProvider.EXTERNAL,
-                        executionId = externalBackend.execute(managed),
+                        executionId = executionId,
                         observedState = RuntimeState.PREPARING,
                     )
                 }.getOrElse { error ->
+                    operation?.let {
+                        operationCoordinator?.finish(
+                            projectId = project.summary.documentId,
+                            generation = it.generation,
+                            phase = RuntimeOperationPhase.FAILED,
+                        )
+                    }
                     executionFailure(ProjectControlHub.Action.PREPARE, error)
                 }
             }
@@ -263,6 +348,15 @@ class ProjectRuntimeControlExecutor(
                 failure = ProjectControlHub.Failure.CONFIGURATION_REQUIRED,
                 detail = "Required project configuration is incomplete",
             )
+        }
+        if (selection == ProjectRuntimeSelection.TERMUX) {
+            if (environmentReadyReader(project.summary.documentId, selection) == false) {
+                return rejected(
+                    action = ProjectControlHub.Action.RUN,
+                    failure = ProjectControlHub.Failure.ENVIRONMENT_NOT_READY,
+                    detail = "External Provider environment is not ready",
+                )
+            }
         }
 
         val route = runCatching {
@@ -285,7 +379,7 @@ class ProjectRuntimeControlExecutor(
         }
 
         return when (route.path) {
-            RuntimeControlPath.EMBEDDED_R -> runCatching {
+            RuntimeControlPath.EMBEDDED_R -> {
                 if (!runtime.embeddedPythonCanStart(project)) {
                     return rejected(
                         action = ProjectControlHub.Action.RUN,
@@ -293,18 +387,47 @@ class ProjectRuntimeControlExecutor(
                         detail = "Internal R cannot accept another START",
                     )
                 }
-                val snapshot = runtime.startEmbeddedPython(
-                    project = project,
-                    requiredConfiguration = false,
-                    pythonLaunchInvocation = request.launchInvocation,
-                )
-                ProjectControlHub.Result.Dispatched(
-                    action = ProjectControlHub.Action.RUN,
+                val operation = operationCoordinator?.begin(
+                    projectId = project.summary.documentId,
                     provider = RuntimeOperationProvider.INTERNAL,
-                    observedState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot),
+                    action = RuntimeOperationAction.START,
+                    runtimeSelection = selection,
                 )
-            }.getOrElse { error ->
-                executionFailure(ProjectControlHub.Action.RUN, error)
+                if (operationCoordinator != null && operation == null) {
+                    return rejected(
+                        action = ProjectControlHub.Action.RUN,
+                        failure = ProjectControlHub.Failure.RUNTIME_BUSY,
+                        detail = "Project already has an active operation",
+                    )
+                }
+                runCatching {
+                    val snapshot = runtime.startEmbeddedPython(
+                        project = project,
+                        requiredConfiguration = false,
+                        pythonLaunchInvocation = request.launchInvocation,
+                    )
+                    operation?.let {
+                        operationCoordinator?.finish(
+                            projectId = project.summary.documentId,
+                            generation = it.generation,
+                            phase = RuntimeOperationPhase.SUCCESS,
+                        )
+                    }
+                    ProjectControlHub.Result.Dispatched(
+                        action = ProjectControlHub.Action.RUN,
+                        provider = RuntimeOperationProvider.INTERNAL,
+                        observedState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot),
+                    )
+                }.getOrElse { error ->
+                    operation?.let {
+                        operationCoordinator?.finish(
+                            projectId = project.summary.documentId,
+                            generation = it.generation,
+                            phase = RuntimeOperationPhase.FAILED,
+                        )
+                    }
+                    executionFailure(ProjectControlHub.Action.RUN, error)
+                }
             }
 
             RuntimeControlPath.EXTERNAL_PROVIDER -> {
@@ -313,6 +436,19 @@ class ProjectRuntimeControlExecutor(
                         action = ProjectControlHub.Action.RUN,
                         failure = ProjectControlHub.Failure.BACKEND_UNAVAILABLE,
                         detail = runtime.runtimeUnsupportedReason(),
+                    )
+                }
+                val operation = operationCoordinator?.begin(
+                    projectId = project.summary.documentId,
+                    provider = RuntimeOperationProvider.EXTERNAL,
+                    action = RuntimeOperationAction.START,
+                    runtimeSelection = selection,
+                )
+                if (operationCoordinator != null && operation == null) {
+                    return rejected(
+                        action = ProjectControlHub.Action.RUN,
+                        failure = ProjectControlHub.Failure.RUNTIME_BUSY,
+                        detail = "Project already has an active operation",
                     )
                 }
                 runCatching {
@@ -327,13 +463,28 @@ class ProjectRuntimeControlExecutor(
                         action = ProjectRuntimeController.Action.START,
                         command = command,
                     )
+                    val executionId = externalBackend.execute(managed)
+                    operation?.let {
+                        operationCoordinator?.bindExternalExecution(
+                            projectId = project.summary.documentId,
+                            generation = it.generation,
+                            executionId = executionId,
+                        )
+                    }
                     ProjectControlHub.Result.Dispatched(
                         action = ProjectControlHub.Action.RUN,
                         provider = RuntimeOperationProvider.EXTERNAL,
-                        executionId = externalBackend.execute(managed),
+                        executionId = executionId,
                         observedState = RuntimeState.STARTING,
                     )
                 }.getOrElse { error ->
+                    operation?.let {
+                        operationCoordinator?.finish(
+                            projectId = project.summary.documentId,
+                            generation = it.generation,
+                            phase = RuntimeOperationPhase.FAILED,
+                        )
+                    }
                     executionFailure(ProjectControlHub.Action.RUN, error)
                 }
             }
@@ -357,14 +508,41 @@ class ProjectRuntimeControlExecutor(
         }
 
         if (route.path == RuntimeControlPath.EMBEDDED_R) {
-            return runCatching {
+            val operation = operationCoordinator?.begin(
+                projectId = project.summary.documentId,
+                provider = RuntimeOperationProvider.INTERNAL,
+                action = RuntimeOperationAction.STOP,
+                runtimeSelection = selection,
+            )
+            if (operationCoordinator != null && operation == null) {
+                return rejected(
+                    action = ProjectControlHub.Action.STOP,
+                    failure = ProjectControlHub.Failure.RUNTIME_BUSY,
+                    detail = "Project already has a STOP operation",
+                )
+            }
+            runCatching {
                 if (!runtime.requestEmbeddedPythonStop(project.summary.documentId)) {
+                    operation?.let {
+                        operationCoordinator?.finish(
+                            projectId = project.summary.documentId,
+                            generation = it.generation,
+                            phase = RuntimeOperationPhase.FAILED,
+                        )
+                    }
                     rejected(
                         action = ProjectControlHub.Action.STOP,
                         failure = ProjectControlHub.Failure.NO_ACTIVE_RUNTIME,
                         detail = "Internal R has no stoppable project session",
                     )
                 } else {
+                    operation?.let {
+                        operationCoordinator?.finish(
+                            projectId = project.summary.documentId,
+                            generation = it.generation,
+                            phase = RuntimeOperationPhase.SUCCESS,
+                        )
+                    }
                     ProjectControlHub.Result.Dispatched(
                         action = ProjectControlHub.Action.STOP,
                         provider = RuntimeOperationProvider.INTERNAL,
@@ -372,6 +550,13 @@ class ProjectRuntimeControlExecutor(
                     )
                 }
             }.getOrElse { error ->
+                operation?.let {
+                    operationCoordinator?.finish(
+                        projectId = project.summary.documentId,
+                        generation = it.generation,
+                        phase = RuntimeOperationPhase.FAILED,
+                    )
+                }
                 executionFailure(ProjectControlHub.Action.STOP, error)
             }
         }
@@ -401,16 +586,44 @@ class ProjectRuntimeControlExecutor(
                 detail = runtime.runtimeUnsupportedReason(),
             )
         }
+        val operation = operationCoordinator?.begin(
+            projectId = project.summary.documentId,
+            provider = RuntimeOperationProvider.EXTERNAL,
+            action = RuntimeOperationAction.STOP,
+            runtimeSelection = selection,
+        )
+        if (operationCoordinator != null && operation == null) {
+            return rejected(
+                action = ProjectControlHub.Action.STOP,
+                failure = ProjectControlHub.Failure.RUNTIME_BUSY,
+                detail = "Project already has a STOP operation",
+            )
+        }
 
         return runCatching {
             val command = runtime.stop(project)
+            val executionId = externalBackend.execute(command)
+            operation?.let {
+                operationCoordinator?.bindExternalExecution(
+                    projectId = project.summary.documentId,
+                    generation = it.generation,
+                    executionId = executionId,
+                )
+            }
             ProjectControlHub.Result.Dispatched(
                 action = ProjectControlHub.Action.STOP,
                 provider = RuntimeOperationProvider.EXTERNAL,
-                executionId = externalBackend.execute(command),
+                executionId = executionId,
                 observedState = RuntimeState.RUNNING,
             )
         }.getOrElse { error ->
+            operation?.let {
+                operationCoordinator?.finish(
+                    projectId = project.summary.documentId,
+                    generation = it.generation,
+                    phase = RuntimeOperationPhase.FAILED,
+                )
+            }
             executionFailure(ProjectControlHub.Action.STOP, error)
         }
     }
@@ -419,11 +632,13 @@ class ProjectRuntimeControlExecutor(
         action: ProjectControlHub.Action,
         failure: ProjectControlHub.Failure,
         detail: String,
+        readiness: ExternalProviderReadiness? = null,
     ): ProjectControlHub.Result.Rejected =
         ProjectControlHub.Result.Rejected(
             action = action,
             failure = failure,
             detail = detail,
+            readiness = readiness,
         )
 
     private fun executionFailure(

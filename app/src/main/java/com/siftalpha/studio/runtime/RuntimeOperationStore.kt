@@ -9,14 +9,21 @@ import java.security.MessageDigest
  * Minimal durable operation metadata. It is deliberately not a result/history database: it only
  * lets a recreated Activity distinguish a real unfinished operation from a recovery probe.
  */
+interface RuntimeOperationRecordStore {
+    fun read(projectId: String): RuntimeOperationRecord?
+    fun lastGeneration(projectId: String): Long
+    fun write(record: RuntimeOperationRecord)
+    fun clear(projectId: String)
+}
+
 class RuntimeOperationStore internal constructor(
     private val prefs: SharedPreferences,
-) {
+) : RuntimeOperationRecordStore {
     constructor(context: Context) : this(
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
     )
 
-    fun read(projectId: String): RuntimeOperationRecord? {
+    override fun read(projectId: String): RuntimeOperationRecord? {
         val prefix = prefix(projectId)
         val action = prefs.getString(prefix + ACTION, null)?.let {
             runCatching { RuntimeOperationAction.valueOf(it) }.getOrNull()
@@ -56,10 +63,10 @@ class RuntimeOperationStore internal constructor(
         )
     }
 
-    fun lastGeneration(projectId: String): Long =
+    override fun lastGeneration(projectId: String): Long =
         prefs.getLong(prefix(projectId) + NEXT_GENERATION, 0L)
 
-    fun write(record: RuntimeOperationRecord) {
+    override fun write(record: RuntimeOperationRecord) {
         val prefix = prefix(record.projectId)
         prefs.edit()
             .putString(prefix + PROJECT, record.projectId)
@@ -79,7 +86,7 @@ class RuntimeOperationStore internal constructor(
             .apply()
     }
 
-    fun clear(projectId: String) {
+    override fun clear(projectId: String) {
         val prefix = prefix(projectId)
         prefs.edit()
             .remove(prefix + PROJECT)

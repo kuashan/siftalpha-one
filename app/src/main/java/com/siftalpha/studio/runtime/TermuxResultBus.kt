@@ -38,5 +38,8 @@ object TermuxResultBus {
     fun consume(executionId: Int): RuntimeResult? =
         synchronized(recentLock) { recent.remove(executionId) }
 
+    fun peek(executionId: Int): RuntimeResult? =
+        synchronized(recentLock) { recent[executionId] }
+
     private const val MAX_RECENT_RESULTS = 32
 }
