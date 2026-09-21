@@ -1094,3 +1094,25 @@ Implementation-note gate:
 - Additive shell/routing/settings code may be introduced to expose Normal Mode（普通模式） and the Developer Mode（开发者模式） preference.
 - Any edit to an existing Developer Workspace（开发者工作区） control file requires explicit justification as an unavoidable integration fix and must be called out separately before acceptance.
 
+### R48-0A — Project Control Hub（项目控制枢纽） implementation evidence
+
+| Area | Verification | Result |
+| --- | --- | --- |
+| Hub boundary（枢纽边界） | new ProjectControlHub exposes only RUN / STOP in first slice | PASS |
+| Current Runtime selection（当前运行环境选择） | selection is re-read per action | PASS — unit coverage |
+| Project identity（项目身份） | exact document identity forwarded to executor | PASS — unit coverage |
+| Project isolation（项目隔离） | STOP A does not target B | PASS — unit coverage |
+| Second state machine（第二状态机） | hub stores no independent RuntimeState | PASS — source + unit coverage |
+| Hidden UI automation（隐藏界面自动化） | no hidden V04Activity launch / button simulation | PASS — source review |
+| Developer Workspace protection（开发者工作区保护） | V04Activity and existing developer control source unchanged | PASS — source diff |
+| Internal RUN（内部运行） | executor delegates to existing ProjectRuntimeController.startEmbeddedPython | PASS — source contract / compile |
+| Internal STOP（内部停止） | executor delegates to existing ProjectRuntimeController.requestEmbeddedPythonStop | PASS — source contract / compile |
+| External RUN（外部运行） | existing start + project-scoped external activity wrapper + RuntimeBackend | PASS — source contract / compile |
+| External STOP（外部停止） | existing project-scoped stop + RuntimeBackend | PASS — source contract / compile |
+| W0 Cloud Build（W0 云端构建） | #378 / source b8933b4e... | PASS |
+| Internal Alpine Probe（内部 Alpine 探针） | #63 | PASS |
+| APK（安装包） | v181 / 0.8.0-alpha43-r48a1 / SHA-256 6edaef1d... | PASS |
+| Real-device linked-control acceptance（真机联动验收） | requires Normal Mode shell / routing to invoke hub | PENDING NEXT SLICE |
+
+R48-0A is a cloud-verified foundation only and is not a frozen baseline.
+
