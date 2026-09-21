@@ -3,6 +3,8 @@ package com.siftalpha.studio.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -15,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -33,9 +36,11 @@ fun SettingsScreen(
     currentBrowser: String?,
     versionName: String,
     applicationId: String,
+    developerModeEnabled: Boolean,
     onBack: () -> Unit,
     onChangeLanguage: () -> Unit,
     onChangeBrowser: () -> Unit,
+    onDeveloperModeChanged: (Boolean) -> Unit,
 ) {
     val spacing = StudioThemeTokens.spacing
     Scaffold(
@@ -110,6 +115,39 @@ fun SettingsScreen(
 
             StudioSectionCard {
                 Text(
+                    text = stringResource(R.string.settings_developer_mode_section),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(modifier = Modifier.height(spacing.small))
+                Text(
+                    text = stringResource(R.string.settings_developer_mode_summary),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(spacing.medium))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (developerModeEnabled) {
+                                R.string.settings_developer_mode_on
+                            } else {
+                                R.string.settings_developer_mode_off
+                            },
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Switch(
+                        checked = developerModeEnabled,
+                        onCheckedChange = onDeveloperModeChanged,
+                    )
+                }
+            }
+
+            StudioSectionCard {
+                Text(
                     text = stringResource(R.string.settings_about_section),
                     style = MaterialTheme.typography.titleMedium,
                 )
@@ -143,9 +181,11 @@ private fun SettingsScreenLightPreview() {
             currentBrowser = "Chrome",
             versionName = "0.8.0-alpha3",
             applicationId = "com.siftalpha.studio",
+            developerModeEnabled = false,
             onBack = {},
             onChangeLanguage = {},
             onChangeBrowser = {},
+            onDeveloperModeChanged = {},
         )
     }
 }
@@ -159,6 +199,7 @@ private fun SettingsScreenDarkPreview() {
             currentBrowser = null,
             versionName = "0.8.0-alpha3",
             applicationId = "com.siftalpha.studio",
+            developerModeEnabled = true,
             onBack = {},
             onChangeLanguage = {},
             onChangeBrowser = {},
