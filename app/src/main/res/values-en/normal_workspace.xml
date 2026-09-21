@@ -42,4 +42,6 @@
     <string name="normal_project_refresh_complete">Status updated.</string>
     <string name="normal_project_open_action">Open</string>
     <string name="normal_project_open_unavailable">There is no Web page or result available to open yet.</string>
+    <string name="normal_external_provider_no_response">No Termux response was detected within 3 seconds. Open Termux, then check again.</string>
+    <string name="normal_external_provider_recheck">Check again</string>
 </resources>
