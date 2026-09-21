@@ -560,14 +560,21 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         TermuxResultBus.consume(result.executionId)
         val success = result.exitCode == 0 && result.internalErrorMessage.isBlank()
         externalStopExecutionId = null
-        if (success && externalPrepareCancelRequested) {
-            externalPrepareExecutionId?.let(TermuxResultBus::consume)
-            externalPrepareExecutionId = null
-            operationStore.clear(project.summary.documentId)
-            sharedLifecycleBridge.cancelPrepare(
-                project = project,
-                selection = ProjectRuntimeSelection.TERMUX,
-            )
+        if (success) {
+            if (externalPrepareCancelRequested) {
+                externalPrepareExecutionId?.let(TermuxResultBus::consume)
+                externalPrepareExecutionId = null
+                operationStore.clear(project.summary.documentId)
+                sharedLifecycleBridge.cancelPrepare(
+                    project = project,
+                    selection = ProjectRuntimeSelection.TERMUX,
+                )
+            } else {
+                sharedLifecycleBridge.completeExternalStop(
+                    project = project,
+                    selection = ProjectRuntimeSelection.TERMUX,
+                )
+            }
         }
         externalPrepareCancelRequested = false
         screenState.value = screenState.value.copy(busy = false)
