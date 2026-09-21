@@ -23,4 +23,6 @@
     <string name="user_storage_scan_failed">실행 공간 확인에 실패했습니다. 잠시 후 다시 시도하세요.</string>
     <string name="user_storage_ready">공간 정보가 업데이트되었습니다.</string>
     <string name="user_storage_error">실행 공간 작업 실패</string>
+    <string name="user_storage_scanning_external">Termux 실행 공간을 읽는 중…</string>
+    <string name="user_storage_external_checking">Termux를 확인하는 중입니다. 확인이 끝나면 실행 공간을 자동으로 불러옵니다.</string>
 </resources>
