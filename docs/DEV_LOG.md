@@ -1773,3 +1773,87 @@ R48-0A（第 48 阶段 0A） has passed source/cloud verification, but it is not
 
 The hub is intentionally not user-visible yet. The next slice must wire the Developer Mode（开发者模式） preference / routing and a minimal Normal Mode（普通模式） shell to this hub before meaningful real-device linked-control acceptance can be performed.
 
+## 2026-09-21 · R48-0B implementation — Developer Mode（开发者模式） switch + Normal Project Workspace（普通项目工作区）
+
+### Scope completed
+
+R48-0B（第 48 阶段 0B） implements the first user-visible Dual Surface Architecture（双界面架构） slice.
+
+Implemented:
+- Settings（设置） now contains Developer Mode（开发者模式）.
+- Developer Mode（开发者模式） defaults OFF（关闭）.
+- Main project Open（打开） now routes to the new Normal Project Workspace（普通项目工作区）.
+- When Developer Mode（开发者模式） is OFF, developer-only home entries are hidden:
+  - Runtime Center（运行中心）
+  - Runtime Environment / Storage（运行环境 / 存储）
+  - Terminal（终端）
+  - Embedded Python experimental entry（内置 Python 实验入口）
+  - Termux bridge diagnostics（Termux 运行桥诊断）
+  - command output diagnostics（命令输出诊断）
+  - current development-stage card（当前开发阶段卡片）
+- When Developer Mode（开发者模式） is ON, Normal Mode（普通模式） remains the primary project surface and exposes an additional “Developer Workspace（开发者工作区）” entry.
+- The existing `ProjectWorkspaceActivity : V04Activity` remains the Developer Workspace（开发者工作区） destination and its existing behavior is unchanged.
+
+### Normal Project Workspace（普通项目工作区） first slice
+
+The first Normal Project Workspace（普通项目工作区） deliberately exposes only:
+- project status;
+- RUN（运行）;
+- STOP（停止）;
+- Developer Workspace（开发者工作区） entry when Developer Mode（开发者模式） is enabled.
+
+RUN / STOP are delegated through the existing `ProjectControlHub`（项目控制枢纽）.
+
+No second Runtime（运行时） implementation, observation loop, Environment Plan（环境计划）, Result（结果） store, Web Discovery（网页发现） or Developer Workspace button automation is introduced.
+
+### Cross-surface state linkage（双界面状态联动）
+
+A new `SharedRuntimeLifecycleBridge`（共享运行生命周期桥） publishes the same shared lifecycle facts consumed by the existing Developer Workspace（开发者工作区）:
+- RUN publishes STARTING（启动中） before dispatch so opening Developer Workspace cannot incorrectly treat the project as IDLE（空闲） and start a second Runtime.
+- An accepted RUN then stores the observed STARTING / RUNNING fact.
+- STOP does not falsely publish STOPPED（已停止） before the provider proves terminal state; it retains an active fact so Developer Workspace recovery can reconcile the same Runtime.
+- A rejected RUN restores the lifecycle snapshot that existed before the attempted start, preventing a failed Normal Mode action from leaving the project stuck at STARTING.
+
+Internal R（内部运行环境） continues to use the existing shared Embedded CPython / Internal Alpine Session（会话） objects.
+External Provider（外部运行环境提供者） continues to use the existing ProjectRuntimeController command and project-scoped Termux activity contract.
+
+### Protected Developer Workspace（开发者工作区）
+
+Final source comparison from the R48-0A documentation head to the R48-0B functional source confirms:
+- `app/src/main/java/com/siftalpha/studio/V04Activity.kt`: unchanged.
+- Existing Developer Workspace Runtime control behavior: unchanged.
+- Changes are additive in settings/routing/Normal Mode/Project Control Hub and shared resource files.
+
+### Version / cloud evidence
+
+- versionName: `0.8.0-alpha43-r48a2`
+- versionCode: `182`
+- functional source commit: `9266d5ad6272dab6c0616c0cabd3dd44de6419a5`
+- W0 Cloud Build（W0 云端构建） #405: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #64: PASS（通过） on the same r48a2 Runtime/build configuration
+- repository validators（仓库校验）: PASS（通过）
+- unit tests（单元测试）: PASS（通过）
+- assembleDebug（Debug 构建）: PASS（通过）
+- stable signing（稳定签名）: restored / APK Signature Scheme v2 verified
+- signer certificate SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- APK artifact（安装包产物）: `siftalpha-w0-405`
+- artifact id: `10622919796`
+- artifact ZIP digest: `sha256:dcfbb95b06edd2199f7c000085d555b66215440ab7821e36a6b48e4f8e65c89c`
+- APK SHA-256: `050fa184165f61a164f3b4051558dd0cfe9a57f145feaecd835176a255400895`
+- applicationId（应用标识）: `com.siftalpha.studio`
+
+### Acceptance state
+
+Source/cloud gate: PASS（通过）.
+
+Real-device Dual Surface linked-control acceptance（双界面联动真机验收） is still required before R48-0B is treated as accepted or frozen.
+
+First real-device acceptance focus:
+1. fresh/default Settings（设置） shows Developer Mode OFF（开发者模式关闭）;
+2. ordinary app/project flow opens Normal Mode（普通模式）;
+3. RUN from Normal Mode starts the project Runtime;
+4. enable Developer Mode, open Developer Workspace, verify the same project is RUNNING;
+5. STOP from Normal Mode stops that same project;
+6. Developer Workspace observes the same stopped/terminal Runtime state;
+7. project B remains unaffected when project A is stopped.
+
