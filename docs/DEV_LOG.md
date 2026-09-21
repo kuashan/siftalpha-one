@@ -2480,3 +2480,55 @@ REAL DEVICE ACCEPTANCE（真机验收）= PENDING（待测试）。
 
 不自动 merge（合并），不移动 baseline（基线）。
 
+## 2026-09-22 · R48-D2 Shared Reliability UX（共享可靠性体验）
+
+### Scope（范围）
+本轮是用户明确授权的 Normal Mode（普通模式）+ Developer Mode（开发者模式）共享体验增强，仅新增：
+1. Background Reliability Guidance（后台可靠性提醒）
+2. Runtime Activity Indicator（运行活动指示条）
+
+Developer Mode（开发者模式）其他已验收 UI / workflow（界面 / 工作流）继续冻结，不做重排或重构。
+
+### Background Reliability Guidance（后台可靠性提醒）
+新增 `BackgroundReliabilityGuidanceController`，两种模式共用同一提醒状态。
+- 第一次 Prepare / Run（准备 / 运行）前提醒。
+- 文案说明 Python 脚本、本地 Web 服务和长期运行项目可能受 Android 省电策略影响。
+- “前往设置”使用 Android 系统级 Battery Optimization（电池优化）入口；若设备不支持则退回 App Details（应用详情）页。
+- 不维护 OEM（厂商）品牌路径表。
+- 不自动请求或强制忽略电池优化。
+- “以后提醒”仅延后当前 App 进程，未来重新打开 App 可再次提醒。
+- 用户主动前往设置后持久记录已确认，两种模式不重复提醒。
+
+### Runtime Activity Indicator（运行活动指示条）
+新增 `RuntimeActivityIndicatorPolicy`：
+- 采用 indeterminate（不确定）循环动画，不显示虚假的百分比。
+- PREPARING / STARTING / CHECKING / STOPPING / CLEANING 等控制状态仅在共享 operation（操作）仍真实 active（活动）时动画。
+- RUNNING（运行中）可持续动画，表示服务仍在运行，不代表完成百分比。
+- operation timeout（操作超时）后共享 coordinator（协调器）清除/终止当前操作，动画停止，不会因为 UI 动画延长真实 Runtime deadline（运行时截止期限）。
+- terminal（终态）不动画。
+
+Normal Mode 使用 Material3 `LinearProgressIndicator`。
+Developer Mode 在现有项目状态行下方增加 Android horizontal indeterminate `ProgressBar`，不移动现有按钮、状态、Termux 或 Runtime 工作流。
+
+### Immediate feedback fix（即时反馈修复）
+Final functional commit `ab0b5fcad8402dcddb1f0986bcd7dbb2400017fb` 增加 Normal Mode 点击 Prepare / Run 后立即显示 activity indicator，避免等待 Shared Core 首次状态刷新期间出现“像卡住”的视觉空档。
+
+### Version / Cloud（版本 / 云端）
+- versionName: `0.8.0-alpha43-r48d2`
+- versionCode: `192`
+- applicationId: `com.siftalpha.studio`
+- Final functional HEAD: `ab0b5fcad8402dcddb1f0986bcd7dbb2400017fb`
+- W0 Cloud Build #599 / run ID `35625900737`: PASS
+- Internal Alpine Probe #82 / run ID `35624795059`: PASS
+- `testDebugUnitTest`: PASS
+- `assembleDebug`: PASS
+- artifact: `siftalpha-w0-599`
+- artifact ID: `10652097606`
+- artifact ZIP digest: `sha256:5c24e562b0bc8c28cfefbf130fda963c4465e8c6518f86b7fa9c4face6fc5755`
+- APK SHA-256: `3acf37223d7a5ec7708215d851bf513ec403c2942c46f8cd026958b4aca12a4f`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- APK Signature Scheme v2: verified
+
+CODE/CLOUD COMPLETE（代码 / 云端完成）。
+REAL DEVICE ACCEPTANCE（真机验收）= PENDING（待测试）。
+
