@@ -21,6 +21,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.siftalpha.studio.project.EmbeddedPythonProjectStager
 import com.siftalpha.studio.project.ProjectConfigurationInspector
+import com.siftalpha.studio.project.SharedGitHubImportService
 import com.siftalpha.studio.project.ConfigurationSource
 import com.siftalpha.studio.project.ProjectSecretPolicyInspector
 import com.siftalpha.studio.project.PythonCliArgumentKind
@@ -4790,51 +4791,33 @@ open class V04Activity : StudioActivity() {
         raw: String,
         rawBranch: String,
         rawName: String,
-    ): ProjectRuntimeController.GitHubCloneSpec {
-        val input = raw.trim()
-        require(input.isNotBlank()) { getString(R.string.runtime_github_enter_address) }
-        val repoPath: String
-        val cloneUrl: String
-        val sourceUrl: String
-        when {
-            input.startsWith("https://github.com/") -> {
-                val clean = input.substringBefore('?').substringBefore('#').trimEnd('/')
-                repoPath = clean.removePrefix("https://github.com/").removeSuffix(".git")
-                cloneUrl = if (clean.endsWith(".git")) clean else "$clean.git"
-                sourceUrl = "https://github.com/$repoPath"
-            }
-            input.startsWith("git@github.com:") -> {
-                repoPath = input.removePrefix("git@github.com:").removeSuffix(".git").trim('/')
-                cloneUrl = input
-                sourceUrl = "https://github.com/$repoPath"
-            }
-            else -> error(getString(R.string.runtime_github_only_supported))
+    ): ProjectRuntimeController.GitHubCloneSpec = SharedGitHubImportService.parse(
+        raw = raw,
+        rawBranch = rawBranch,
+        rawName = rawName,
+    ) { reason ->
+        when (reason) {
+            SharedGitHubImportService.ParseError.ENTER_ADDRESS ->
+                getString(R.string.runtime_github_enter_address)
+            SharedGitHubImportService.ParseError.ONLY_GITHUB_SUPPORTED ->
+                getString(R.string.runtime_github_only_supported)
+            SharedGitHubImportService.ParseError.ADDRESS_RULE ->
+                getString(R.string.runtime_github_address_rule)
+            SharedGitHubImportService.ParseError.PROJECT_NAME_RULE ->
+                getString(R.string.runtime_project_name_rule)
         }
-        val parts = repoPath.trim('/').split('/').filter { it.isNotBlank() }
-        require(parts.size == 2) { getString(R.string.runtime_github_address_rule) }
-        val branch = rawBranch.trim().ifBlank { "main" }
-        val projectName = rawName.trim().ifBlank { suggestName(parts.last()) }
-        require(PROJECT_NAME.matches(projectName)) { getString(R.string.runtime_project_name_rule) }
-        return ProjectRuntimeController.GitHubCloneSpec(cloneUrl, sourceUrl, branch, projectName)
     }
 
     private fun attachCloneMetadata(spec: ProjectRuntimeController.GitHubCloneSpec) {
         output.append("\n\n${getString(R.string.runtime_registering_source)}")
         Thread {
-            var project: V04ProjectGateway.RuntimeProject? = null
-            var last: Throwable? = null
-            for (attempt in 0 until 8) {
-                try {
-                    project = gateway.attachGitHubSource(spec.projectName, spec.sourceUrl, spec.branch)
-                    break
-                } catch (e: Throwable) {
-                    last = e
-                    if (attempt < 7) Thread.sleep(250)
-                }
+            val attached = runCatching {
+                SharedGitHubImportService.attachMetadata(gateway, spec)
             }
             runOnUiThread {
+                val project = attached.getOrNull()
                 if (project != null) {
-                    val stateKey = project!!.summary.documentId
+                    val stateKey = project.summary.documentId
                     states[stateKey] = getString(R.string.runtime_state_not_checked)
                     typedStates[stateKey] = RuntimeState.UNKNOWN
                     clearEnvironmentStates(stateKey)
@@ -4844,7 +4827,7 @@ open class V04Activity : StudioActivity() {
                     output.append(
                         "\n${getString(
                             R.string.runtime_source_metadata_failed,
-                            last?.message ?: getString(R.string.runtime_unknown_error),
+                            attached.exceptionOrNull()?.message ?: getString(R.string.runtime_unknown_error),
                         )}",
                     )
                 }
