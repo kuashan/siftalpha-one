@@ -55,6 +55,11 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".NormalProjectWorkspaceActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".ProjectWorkspaceActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
