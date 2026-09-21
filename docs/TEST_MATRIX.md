@@ -1230,3 +1230,26 @@ R48-0C is cloud-verified but not yet an accepted/frozen baseline.
 | APK（安装包） | v184 / 0.8.0-alpha43-r48a4 | PASS |
 | APK SHA-256 | 9a41728e283db380c20fbead54230d3572a24b86e38eb1ba1dd2520a50f06fff | RECORDED |
 | Real-device visual acceptance（真机视觉验收） | hierarchy/dialog appearance | PENDING USER TEST |
+
+### R48-B — Normal Mode Unified Refresh + Open（普通模式统一刷新 + 打开）
+
+| Area | Verification | Result |
+| --- | --- | --- |
+| Unified Refresh（统一刷新） | Normal Mode single Refresh action | PASS — source/cloud |
+| Internal refresh（内部刷新） | read existing Embedded R session snapshot | PASS — source/cloud |
+| External active refresh（外部活动态刷新） | existing RuntimeAutoObservationPolicy -> STATUS | PASS — source/cloud |
+| External terminal refresh（外部终态刷新） | STATUS terminal -> final LOGS in same user refresh | PASS — source/cloud |
+| Shared operation owner（共享操作所有者） | STATUS / LOGS use ProjectOperationCoordinator generation/execution/deadline | PASS — source/cloud |
+| Web capability source（网页能力来源） | WebProjectInspector project facts | PASS — source review |
+| Browser separation（浏览器解耦） | browser preference is read only when opening a verified URL | PASS — source review |
+| Web truth gate（网页事实门禁） | RuntimeWebStateStore candidate + Android endpoint probe | PASS — source/cloud |
+| Result Web（结果网页） | existing extractor/analyzer/renderer/store reused | PASS — source/cloud |
+| Rich Result（富结果） | existing parser/lifecycle reused | PASS — source/cloud |
+| Presentation priority（呈现优先级） | PresentationTargetResolver WEB -> RESULT_WEB -> RICH_RESULT | PASS — source/cloud |
+| Developer Runtime protection（开发者运行时保护） | no Internal R / Environment core rewrite | PASS — source diff |
+| Localization（多语言） | zh / en / ja / ko / zh-TW resources | PASS — repository validators |
+| W0 Cloud Build（W0 云端构建） | #494 | PASS |
+| Internal Alpine Probe（内部 Alpine 探针） | #77 | PASS |
+| APK（安装包） | v188 / 0.8.0-alpha43-r48b1 | PASS — cloud artifact |
+| Real-device acceptance（真机验收） | Refresh/Open + browser separation + cross-surface parity | PENDING |
+
