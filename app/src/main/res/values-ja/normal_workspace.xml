@@ -71,4 +71,5 @@
     <string name="normal_prepare_runtime_python">Python プロジェクト</string>
     <string name="normal_prepare_runtime_node">Node.js プロジェクト</string>
     <string name="normal_prepare_runtime_unknown">プロジェクト</string>
+    <string name="normal_prepare_config_required_detail">環境の準備は完了しています。実行前に必須設定を %1$d 件完了してください。</string>
 </resources>
