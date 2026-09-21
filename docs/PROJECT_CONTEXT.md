@@ -1146,3 +1146,52 @@ Source/cloud gate（源码 / 云端门禁）= PASS（通过）。
 Real-device acceptance（真机验收）= PENDING（待测试）。
 不自动 merge（合并），不移动 baseline（基线）。
 
+## 2026-09-21 · R48-C current state — productized Normal Mode project workflow（普通模式项目工作流产品化）
+
+Normal Mode（普通模式）当前用户主流程：
+
+```text
+Project Location
+-> Import Project
+-> Open Project
+-> Prepare:
+   Detection
+   -> Plan
+   -> Compatibility
+   -> Prepare
+   -> Verification
+-> Complete required configuration when needed
+-> Run
+-> Refresh
+-> Open Result / Web
+-> Stop
+```
+
+核心规则保持不变：
+
+- User Mode 是 presentation/product layer（展示 / 产品层），不是第二套 Runtime。
+- Prepare 继续消费现有 Environment Detection / Plan / Compatibility / Prepare / Verification。
+- Unified Import 继续复用 V04ProjectGateway 的成熟本地导入实现。
+- Project Location 继续复用 SAF / ProjectStore。
+- Developer tools 从普通首页主流程移到 More（更多），Developer Workspace 本身不重写。
+- Browser selection（浏览器选择）仍只影响 Presentation（呈现），不影响 Environment / Prepare / Runtime backend。
+- GitHub clone 目前仍保留在成熟 Developer Workspace / External Provider 流程；普通模式不通过隐藏 Activity 模拟它。
+
+Current validated source：
+`feab394d7e8daa7516946f8f782e549ee4038fcc`
+
+Version：
+- `0.8.0-alpha43-r48c1`
+- versionCode `190`
+
+Cloud evidence：
+- Internal Alpine Probe #80: PASS
+- W0 #533: PASS
+- artifact `siftalpha-w0-533` / ID `10645641261`
+- APK SHA-256 `a8e581fa7aca5d11d67c9f0c7f56cde0746a2f3db082dead2a7071aea3b8da28`
+- signer SHA-256 `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+
+Source/cloud gate（源码 / 云端门禁）= PASS（通过）。
+Real-device acceptance（真机验收）= PENDING（待测试）。
+不自动 merge（合并），不移动 baseline（基线）。
+
