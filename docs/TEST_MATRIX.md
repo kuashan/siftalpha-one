@@ -984,3 +984,23 @@ Real-device gate:
 | rollback failure | Previous env cannot be restored | Clear READY and emit `ENVIRONMENT_ROLLBACK_FAILED` |
 | successful activation | New env validated | Write new READY, delete backups, disarm rollback |
 | structured console launch | `$venv/bin/<script>` | Execute normally without exit 127 caused by stale temporary shebang |
+
+
+## 2026-09-21 · R47 Environment architecture acceptance
+
+| Area | Verification | Result |
+| --- | --- | --- |
+| Environment Detection（环境检测） | shared detection contract for Internal / External providers | PASS |
+| Environment Plan（环境计划） | deterministic Plan ID / runtime / dependency / backend / build-step contract | PASS |
+| Embedded CPython（内置 CPython） | deep dependency compatibility resolution before install | PASS |
+| Internal Alpine（内部 Alpine） | consumes planned Python extras without install-time pyproject rediscovery | PASS |
+| External Python（外部 Python） | consumes planned Python extras without install-time pyproject/Vite rediscovery | PASS |
+| External READY（外部就绪状态） | Environment Plan ID binding and compatible migration | PASS |
+| Build order（构建顺序） | existing Node/Vite → Python composition preserved | PASS |
+| W0 Cloud Build（云端构建） | Run #365 | PASS |
+| Internal Alpine Probe（内部 Alpine 探针） | release candidate probe | PASS |
+| APK（安装包） | versionCode 180 / 0.8.0-alpha43-r47 | PASS |
+| Real-device acceptance（真机验收） | user-confirmed real Android device test | PASS |
+
+Accepted functional source: `d611d18d08cf03b411cc687259e507ca91fcbaa8`.
+Frozen reference: `baseline/r47-environment-plan`.
