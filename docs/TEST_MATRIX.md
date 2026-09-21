@@ -1141,3 +1141,34 @@ R48-0A is a cloud-verified foundation only and is not a frozen baseline.
 
 R48-0B is cloud-verified but not yet an accepted/frozen baseline.
 
+### R48-0B real-device acceptance（双界面首版真机验收）
+
+| Area | Result |
+| --- | --- |
+| Normal Mode（普通模式） default user surface | PASS — user real-device test |
+| Developer Mode（开发者模式） unlock from Settings（设置） | PASS — user real-device test |
+| Shared RUN / STOP linkage（共享运行 / 停止联动） | PASS — user real-device test |
+| R48-0B overall | **PASS（通过）** |
+
+### R48-0C — Normal Runtime Selection（普通模式运行环境选择）
+
+| Area | Verification | Result |
+| --- | --- | --- |
+| Current Runtime visibility（当前运行环境可见） | Normal Mode shows persisted per-project selection | PASS — source/cloud |
+| Internal selection（内部执行环境） | user can select EMBEDDED_R while idle | PASS — source/cloud |
+| External selection（外部执行环境） | user can select TERMUX while idle | PASS — source/cloud |
+| Shared selection store（共享选择存储） | Normal Mode uses existing ProjectRuntimeSelectionStore | PASS — source review |
+| Active runtime lock（运行中锁定） | PREPARING / STARTING / RUNNING | PASS — unit coverage |
+| Active operation lock（操作中锁定） | non-terminal RuntimeOperationRecord blocks switching | PASS — unit coverage |
+| Terminal unlock（终态解锁） | terminal operation does not block switching | PASS — unit coverage |
+| Project isolation（项目隔离） | selection remains keyed by stable project documentId | PASS — existing contract / source review |
+| Developer Workspace protection（开发者工作区保护） | V04Activity.kt unchanged | PASS — source diff |
+| Localization（多语言） | all supported resource sets updated | PASS — repository validators |
+| W0 Cloud Build（W0 云端构建） | #417 / source 49ce5f0a... | PASS |
+| Internal Alpine Probe（内部 Alpine 探针） | #65 | PASS |
+| APK（安装包） | v183 / 0.8.0-alpha43-r48a3 | PASS |
+| APK SHA-256 | d4003fa76c0cc7678dab9d4929c3bed241ee68c02d98e593255a5180924f8617 | RECORDED |
+| Real-device Runtime selection（真机运行环境选择） | Internal / External persistence + active lock | PENDING USER TEST |
+
+R48-0C is cloud-verified but not yet an accepted/frozen baseline.
+
