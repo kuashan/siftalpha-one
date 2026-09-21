@@ -1,14 +1,16 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-17（alpha43 Baseline Closure）
+最后更新：2026-09-21（R48a6 Shared Core Realignment + External Provider Preflight）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
-当前文档/验收分支：`codex/siftalpha-x-embedded-cpython-spike`  
-Current branch/document HEAD：`860645af9745ebbb978dad6d177359f5fddb23f1`  
+当前文档/验收分支：`codex/r48-shared-core-realignment`
+Current branch/document HEAD：`待 R48a6 功能提交`
+R48a5 唯一源码基线：`8c8ede3eff9a8c0cf4dcdea4d2fd67a7d808e8e2`
+R48a6 目标版本：`0.8.0-alpha43-r48a6` / versionCode `186`。
 alpha43 production source baseline：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`  
 `main` 保持历史 production baseline，本轮未修改。  
 alpha30 source / real-device evidence remains historical; current branch continues from the alpha31 version-identity baseline。  
 M / R / X 架构与 Runtime prototype 工作分支：`codex/siftalpha-x-embedded-cpython-spike`  
-当前版本：0.8.0-alpha43 / versionCode 119（Automatic Project Observation + Contextual Status Guidance；真实 Android 真机验收 PASS）  
+历史 alpha43 版本：0.8.0-alpha43 / versionCode 119（Automatic Project Observation + Contextual Status Guidance；真实 Android 真机验收 PASS）
 最近 CI：GitHub Actions Run #122 / Run ID `35242617391` / conclusion `success`；Artifact：`siftalpha-w0-122`；APK SHA-256：`6b70fc222cc8e27124daf2a5a910abc1174380b257c5549959abb279d25def6a`。  
 alpha43 final production-source CI evidence：Run #121 / Run ID `35226167054` / conclusion `success`；Artifact：`siftalpha-w0-121`；APK SHA-256：`6b70fc222cc8e27124daf2a5a910abc1174380b257c5549959abb279d25def6a`。  
 当前文档定义：`M = Management System`，`R = Runtime System`，`X = M + R`  
@@ -16,6 +18,34 @@ alpha43 final production-source CI evidence：Run #121 / Run ID `35226167054` / 
 Production baseline merge：[893229c](https://github.com/kuashan/siftalpha-one/commit/893229ce26d49a6ea22c79d6e2be85290cb8b0c3)（历史基线记录）  
 上一版历史发布：[W2 test APK · w2-test-80efac5](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-80efac5)  
 最近一次带 Release 的历史 APK：[W2 test APK · w2-test-4e899c6](https://github.com/kuashan/siftalpha-one/releases/tag/w2-test-4e899c6)；Roadmap/docs base main 构建产物见 [Run #70 artifact](https://github.com/kuashan/siftalpha-one/actions/runs/34989822426/artifacts/10405122896)
+
+## R48a6 当前架构状态 — Shared Core Realignment（共享核心重新对齐）
+
+R48a6 从 R48a5 唯一源码基线重新建立开发分支，目标是保持“两套 UI + 一个 Shared Core + 一个 Runtime System（运行系统）”：
+
+```text
+Normal Mode（普通模式）       Developer Workspace（开发者工作区）
+             \                         /
+              Shared Management Core（共享管理核心）
+                         ↓
+                 ProjectControlHub
+                         ↓
+              Shared Stores / Runtime Core
+                         ↓
+             Internal R / External Provider
+```
+
+当前约束：
+
+- Normal Mode 不拥有独立的 external operation lifecycle（外部操作生命周期）、execution generation、Termux result routing、Prepare/STOP reconciliation 或 recovery。
+- `ProjectOperationCoordinator` 基于 `RuntimeOperationStore`、`RuntimeOperationContract` 和 `RuntimeLifecycleStore` 维护唯一的 project-scoped operation ownership（项目级操作所有权）。
+- `ExternalProviderProbeCoordinator` 基于现有 `TermuxBackend.CONNECTION_TEST` 更新唯一的 `ExternalProviderReadinessStore`；两个 UI 只读取该共享事实。
+- `Project Environment Detection → Requirements Profile → Compatibility Analysis → Environment Plan` 与 External Provider Preflight 分离。前者回答“项目需要什么”，后者回答“外部执行环境现在能否被调用”。
+- `V04Activity` 的 Web Discovery、Auto Observation、Result Presentation 和 Recovery 保持原有实现；只接入共享事实和协调器。
+- Internal R（Embedded CPython / Internal Alpine）行为保持不变，不自动触发 Termux，不自动切换 provider，也不引入 Worker 或 OCI 特殊补丁。
+- `baseline/r47-environment-plan`、`main` 和旧开发分支不在本轮修改范围内。
+
+R48a6 的真机验收重点是：RUN_COMMAND 授权、Termux `allow-external-apps` 实际桥探测、共享 readiness、Prepare/Run pending intent 恢复、项目级 STOP 隔离，以及 Normal Mode 与 Developer Workspace 的跨界面一致性。
 
 ## 1. 项目目标
 
@@ -1010,4 +1040,3 @@ Project Management（项目管理） is a first-level category only. Its mainten
 The project list itself remains first-level content because projects are the primary objects users operate.
 
 This hierarchy rule is presentation-only and must not duplicate or alter the underlying project-management callbacks, Runtime（运行时） state, Environment（环境） state, or Developer Workspace（开发者工作区） behavior.
-

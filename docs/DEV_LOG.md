@@ -4,6 +4,39 @@
 
 历史条目中的 W2、W3、W4、W5 仅按当时命名记录已发生的工作、构建或发布，不表示当前 Roadmap 阶段。
 
+## 2026-09-21 · R48a6 Shared Core Realignment（共享核心重新对齐） + External Provider Preflight（外部执行环境前置检查）
+
+### Source boundary（源码边界）
+
+- 唯一功能起点：`8c8ede3eff9a8c0cf4dcdea4d2fd67a7d808e8e2`（R48a5 / `0.8.0-alpha43-r48a5` / versionCode `185`）。
+- 新开发分支：`codex/r48-shared-core-realignment`。
+- 未 reset、rebase、merge 或 force push 旧分支；`main` 和 `baseline/r47-environment-plan` 未修改。
+- 目标版本：`0.8.0-alpha43-r48a6` / versionCode `186`。
+
+### Architecture realignment（架构重新对齐）
+
+R48a6 将 Normal Mode（普通模式）和 Developer Workspace（开发者工作区）重新固定为两个展示层，共享一套 Management Core（管理核心）和 Runtime Core（运行核心）：
+
+- `ProjectControlHub` 是 Normal Mode 的动作边界，继续调用现有 `ProjectRuntimeController`、`RuntimeLifecycleStore` 和 Runtime operation contract。
+- `ProjectOperationCoordinator` 成为共享 operation owner（操作权威所有者）；Normal Mode 不再创建 `RuntimeOperationRecord` 或生成 generation，Developer Workspace 的成熟路径也改为委托该 coordinator。
+- `RuntimeOperationStore` 继续提供每个项目一个可变 operation、STOP priority（停止优先）和 duplicate STOP rejection（重复停止拒绝）。
+- `V04Activity` 保留 Web Discovery、Auto Observation、Result Presentation 和 Recovery；只接入共享 operation/preflight 事实，不建立第二套 runtime state machine。
+- STOP 仍是项目级、项目隔离的动作，不会全局停止 Termux、Python 或其他项目。
+
+### Shared External Provider Preflight（共享外部执行环境前置检查）
+
+- 新增 `ExternalProviderPreflight`、`ExternalProviderProbeCoordinator` 和轻量 `ExternalProviderReadinessStore`。
+- 复用 `TermuxBackend.isTermuxInstalled()`、`hasRunCommandPermission()`、`RUN_COMMAND_PERMISSION` 和现有 `CONNECTION_TEST`。
+- Shared Core（共享核心）只返回 Termux、权限、外部应用配置/桥接探测和 READY 事实；权限弹窗与打开 Termux 仍由具体 Activity 负责。
+- Normal Mode 和 Developer Workspace 读取同一个 readiness store；Developer Workspace 可显示 `TERMUX_INSTALLED`、`RUN_COMMAND_PERMISSION`、`ALLOW_EXTERNAL_APPS`、`BRIDGE_PROBE` 和 `EXTERNAL_PROVIDER_READY` 诊断。
+- readiness 只按最近探测时间和当前权限/安装状态判断，不缓存永久 READY；每次 Prepare / Run 都重新经过轻量 preflight。
+- Environment Detection（项目环境检测）和 Provider Preflight（提供者可调用性检查）保持分离；Internal R 不触发 Termux，也不会自动切换 provider。
+
+### Verification（验证）
+
+- 已新增纯事实判断、共享桥探测、ProjectControlHub 阻断路径、operation ownership、STOP project isolation 和跨界面 readiness 测试。
+- GitHub Actions W0 Cloud Build（云端构建）和 Internal Alpine Probe（内部 Alpine 探针）将在该分支提交后运行；真机安装与 Termux 授权/桥接测试仍等待用户验收。
+
 ## 2026-09-14 · 项目记录初始化
 
 ### 目标
@@ -2013,4 +2046,3 @@ APK（安装包）:
 Source/cloud gate: **PASS（通过）**.
 
 The Project Management（项目管理） hierarchy refinement remains pending user real-device visual acceptance.
-

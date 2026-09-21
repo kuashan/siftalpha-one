@@ -16,6 +16,24 @@
 
 本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
 
+## R48a6 — Shared Core Realignment（共享核心重新对齐） / External Provider Preflight（外部执行环境前置检查）
+
+| ID | 验证项 | 期望 | 状态 |
+|---|---|---|---|
+| R48A6-01 | 唯一源码起点 | `8c8ede3eff9a8c0cf4dcdea4d2fd67a7d808e8e2`，新分支 `codex/r48-shared-core-realignment` | PASS — source review |
+| R48A6-02 | 版本 | `0.8.0-alpha43-r48a6` / versionCode `186` | PASS — source |
+| R48A6-03 | 两个 UI（界面）共享 operation owner | Normal Mode 不直接创建 operation；两界面委托 `ProjectOperationCoordinator` | PASS — source + unit test |
+| R48A6-04 | External Provider Preflight | Termux、RUN_COMMAND、桥探测和 READY 由共享服务归一化 | PASS — unit test |
+| R48A6-05 | Prepare / Run 阻断 | 权限缺失返回 UI action；桥未就绪返回打开 Termux/setup action | PASS — unit test |
+| R48A6-06 | 共享桥探测 | 复用 `TermuxBackend.CONNECTION_TEST`，结果进入共享 readiness store | PASS — unit test |
+| R48A6-07 | STOP 项目隔离 | 项目 A STOP 不影响项目 B | PASS — unit test + existing contract |
+| R48A6-08 | Environment 分离 | Provider Preflight 不替代 Project Environment Detection / Plan | PASS — source review |
+| R48A6-09 | V04Activity 保护 | 不重写 Web Discovery、Auto Observation、Result Presentation、Recovery | PASS — focused diff |
+| R48A6-10 | Internal R 保护 | Embedded CPython / Internal Alpine 不自动触发 Termux 或 provider 切换 | PASS — source review |
+| R48A6-11 | W0 Cloud Build | validators、unit tests、assembleDebug、APK evidence、stable signing | 待云端 |
+| R48A6-12 | Internal Alpine Probe | R48a6 分支探针通过 | 待云端 |
+| R48A6-13 | 真机验收 | 安装 APK，验证权限、打开 Termux、桥探测、Prepare/Run/STOP 和跨界面一致性 | 待真机 |
+
 ## A. 当前 alpha43 版本信息
 
 - 当前产品基线版本：`0.8.0-alpha43`
@@ -1187,4 +1205,3 @@ R48-0C is cloud-verified but not yet an accepted/frozen baseline.
 | APK（安装包） | v184 / 0.8.0-alpha43-r48a4 | PASS |
 | APK SHA-256 | 9a41728e283db380c20fbead54230d3572a24b86e38eb1ba1dd2520a50f06fff | RECORDED |
 | Real-device visual acceptance（真机视觉验收） | hierarchy/dialog appearance | PENDING USER TEST |
-
