@@ -124,6 +124,7 @@ class MainActivity : StudioComposeActivity() {
                 )
             }
         }
+        refreshDeveloperMode()
         refreshTermuxState()
         refreshProjects()
     }
@@ -131,12 +132,14 @@ class MainActivity : StudioComposeActivity() {
     override fun onStart() {
         super.onStart()
         TermuxResultBus.addListener(resultListener)
+        refreshDeveloperMode()
         refreshTermuxState()
-        maybeAutoProbeBridge()
+        if (homeState.value.developerModeEnabled) maybeAutoProbeBridge()
     }
 
     override fun onResume() {
         super.onResume()
+        refreshDeveloperMode()
         if (::projectStore.isInitialized) refreshProjects()
     }
 
@@ -279,7 +282,7 @@ class MainActivity : StudioComposeActivity() {
     }
 
     private fun openProject(project: ProjectStore.ProjectSummary) {
-        startActivity(Intent(this, ProjectWorkspaceActivity::class.java).apply {
+        startActivity(Intent(this, NormalProjectWorkspaceActivity::class.java).apply {
             putExtra(V04Activity.EXTRA_PROJECT_DOCUMENT_ID, project.documentId)
         })
     }
@@ -346,6 +349,12 @@ class MainActivity : StudioComposeActivity() {
                 bridgeState = HomeBridgeState.SEND_FAILED,
             )
         }
+    }
+
+    private fun refreshDeveloperMode() {
+        homeState.value = homeState.value.copy(
+            developerModeEnabled = DeveloperModeStore(this).isEnabled(),
+        )
     }
 
     private fun refreshTermuxState() {
