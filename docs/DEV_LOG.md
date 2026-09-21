@@ -1943,3 +1943,74 @@ Recommended real-device checks:
 5. STOP（停止） the project, then verify environment switching becomes available again.
 6. Selecting/changing project A does not change project B's Runtime selection.
 
+## 2026-09-21 · R48 Normal Mode（普通模式） home hierarchy refinement
+
+### User feedback
+
+Real-device review of `0.8.0-alpha43-r48a3` showed that Normal Mode（普通模式） still exposed the four Project Management（项目管理） actions directly on the home page:
+- connect existing AcodeProjects;
+- choose another project directory;
+- create a new Python project;
+- refresh the project list.
+
+The user confirmed that these operations may remain available, but should not occupy the first-level home surface.
+
+### Product hierarchy decision
+
+Normal Mode（普通模式） home now follows a two-level hierarchy:
+
+```text
+Home（首页）
+  -> Project Management（项目管理）
+      -> modal dialog（二级弹窗）
+          -> Connect existing AcodeProjects
+          -> Choose another project directory
+          -> Create new Python project
+          -> Refresh project list
+```
+
+The project list remains directly visible on Home（首页）, because projects themselves are the primary user objects. Project-directory maintenance and project creation are secondary management actions.
+
+### Implementation
+
+`HomeScreen.kt` now:
+- shows only one first-level Project Management（项目管理） entry;
+- opens a modal AlertDialog（二级弹窗） when that entry is tapped;
+- keeps the existing four underlying callbacks unchanged;
+- closes the dialog before forwarding each selected action;
+- keeps project-root state/error/help text inside the secondary dialog rather than permanently occupying the normal home page.
+
+No Runtime（运行时）, Environment（环境）, Project Control Hub（项目控制枢纽） or Developer Workspace（开发者工作区） behavior is changed.
+
+`V04Activity.kt` remains unchanged.
+
+### Version / cloud evidence
+
+Functional source:
+`8ff9424c7676dd201c7c314d64583686386794a2`
+
+Version:
+- versionName: `0.8.0-alpha43-r48a4`
+- versionCode: `184`
+
+Cloud:
+- W0 Cloud Build（W0 云端构建） #423: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #66: PASS（通过）
+- repository validators（仓库校验）: PASS（通过）
+- unit tests（单元测试）: PASS（通过）
+- assembleDebug（Debug 构建）: PASS（通过）
+
+Artifact（产物）:
+- `siftalpha-w0-423`
+- artifact id: `10623628918`
+- artifact ZIP digest: `sha256:1b8d096ea01d7360eee9acb97edc6a2574ec15094e72fa93d2eeb410dfc8ebf9`
+
+APK（安装包）:
+- SHA-256: `9a41728e283db380c20fbead54230d3572a24b86e38eb1ba1dd2520a50f06fff`
+
+### Acceptance state
+
+Source/cloud gate: **PASS（通过）**.
+
+The Project Management（项目管理） hierarchy refinement remains pending user real-device visual acceptance.
+
