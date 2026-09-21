@@ -42,4 +42,6 @@
     <string name="normal_project_refresh_complete">状態を更新しました。</string>
     <string name="normal_project_open_action">開く</string>
     <string name="normal_project_open_unavailable">現在開ける Web ページまたは結果はありません。</string>
+    <string name="normal_external_provider_no_response">3 秒以内に Termux から応答がありませんでした。Termux を開いてから再確認してください。</string>
+    <string name="normal_external_provider_recheck">再確認</string>
 </resources>
