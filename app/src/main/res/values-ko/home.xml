@@ -126,4 +126,6 @@
     <string name="home_importing">프로젝트를 가져오는 중…</string>
     <string name="home_import_complete">프로젝트 %1$s를 가져왔습니다.</string>
     <string name="home_import_failed">가져오기 실패</string>
+    <string name="home_import_github">GitHub 링크에서 가져오기</string>
+    <string name="home_user_storage">실행 공간</string>
 </resources>
