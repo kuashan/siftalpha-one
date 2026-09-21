@@ -1011,3 +1011,21 @@ The project list itself remains first-level content because projects are the pri
 
 This hierarchy rule is presentation-only and must not duplicate or alter the underlying project-management callbacks, Runtime（运行时） state, Environment（环境） state, or Developer Workspace（开发者工作区） behavior.
 
+### R48-0F current architecture — External Provider readiness is Shared Core（外部执行环境就绪属于共享核心）
+
+External Provider（外部执行环境） readiness is now a shared Management/Runtime boundary capability, not a property of one UI surface.
+
+Both Normal Mode（普通模式） and Developer Workspace（开发者工作区） consume the same `ExternalProviderPreflight` facts:
+- Termux installation
+- RUN_COMMAND permission
+- bridge probe state
+- allow-external-apps evidence
+- freshness-bounded READY evidence
+
+UI surfaces remain responsible only for presentation actions such as requesting Android permission or opening Termux. They must not reimplement readiness classification.
+
+Functional source: `3944e298de4d5444c23a0cbcea2c596f1a2c7c4d`
+Version: `0.8.0-alpha43-r48a6` / versionCode `186`
+W0 Cloud Build（W0 云端构建） #452 PASS
+APK SHA-256: `54340d798b5f06a32321f9aeff72cb76d0163a254f41e74e606e233f423dd9b2`
+
