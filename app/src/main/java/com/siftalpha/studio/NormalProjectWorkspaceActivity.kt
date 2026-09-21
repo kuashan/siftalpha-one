@@ -476,6 +476,21 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             richResultAvailable = richResult != null,
             resultWebAvailable = resultWebRef != null,
         )
+        val missingRequiredCount = configuration.preflight.missingRequired.size
+        val prepareTitle = if (environmentReady == true) {
+            getString(R.string.normal_prepare_phase_ready)
+        } else {
+            screenState.value.preparePhaseTitle
+        }
+        val prepareDetail = if (environmentReady == true) {
+            if (missingRequiredCount > 0) {
+                getString(R.string.normal_prepare_config_required_detail, missingRequiredCount)
+            } else {
+                getString(R.string.normal_prepare_ready_detail)
+            }
+        } else {
+            screenState.value.preparePhaseDetail
+        }
         screenState.value = screenState.value.copy(
             projectName = project.summary.name,
             statusLabel = lifecycleState.uiLabel(this),
@@ -492,6 +507,8 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             runtimeSelectionCanChange = selectionCanChange,
             presentationTarget = presentationTarget,
             openEnabled = presentationTarget != PresentationTarget.NONE,
+            preparePhaseTitle = prepareTitle,
+            preparePhaseDetail = prepareDetail,
             primaryAction = primaryAction,
         )
     }
