@@ -1097,3 +1097,14 @@ Cloud status:
 - APK SHA-256: `af348d6947bd09c6e18a9af126e315bf71ad8232936495383f20ab1339a41f59`.
 
 Next step: real-device acceptance only; do not rework either UI unless testing proves another integration defect.
+
+
+## r48a10 current Termux bridge fix
+
+Current functional source: `c68e2e0831cdd35363262f1f262827dd529d3245`.
+Version: `0.8.0-alpha43-r48a10` / versionCode `190`.
+
+The bridge re-probe bug was traced to the actual shell property detector, not to missing onResume logic. Kotlin raw-string `\\s` was reaching `grep -E` literally and failing to recognize `allow-external-apps=true`. The detector now uses POSIX `[[:space:]]` classes. Recovery dialogs also expose a manual Re-check action while retaining automatic return-time probing.
+
+Cloud gate: W0 #461 PASS / Internal Alpine Probe #72 PASS.
+APK SHA-256: `7f1d6f816f16e6ef5bcc0effc535b5124d46e6a9cff175c24ecd5b5c86c03b22`.

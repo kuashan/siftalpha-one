@@ -1284,3 +1284,16 @@ Required real-device checks:
 - [ ] On first-time / genuinely unconfigured Termux, setup recovery copies the one-time command and opens Termux.
 - [ ] PREPARE success stops at READY and does not automatically RUN.
 - [ ] STOP remains project-scoped and does not affect another project.
+
+
+## r48a10 Termux bridge real-device checks
+
+Build: `0.8.0-alpha43-r48a10` / versionCode `190`
+Source: `c68e2e0831cdd35363262f1f262827dd529d3245`
+Cloud: W0 #461 PASS / Internal Alpine Probe #72 PASS.
+
+- [ ] Run the copied setup command in Termux and confirm it completes.
+- [ ] Return to SiftAlpha; automatic Re-probe recognizes `allow-external-apps=true`.
+- [ ] If automatic Re-probe is not visible, tap Re-check（重新检测） and confirm a new bridge probe runs.
+- [ ] Successful probe resumes the original PREPARE rather than reopening the Termux recovery loop.
+- [ ] Previously configured but closed Termux still follows the plain Open Termux path.

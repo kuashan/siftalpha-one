@@ -2250,3 +2250,37 @@ Real-device acceptance is still required for:
 2. Previously configured Termux that is merely closed only asks the user to open Termux.
 3. First-time / genuinely unconfigured Termux still gets the convenient copied setup command.
 4. Returning from Termux triggers a fresh bridge probe and resumes the original PREPARE only after readiness is proven.
+
+
+## 2026-09-21 · r48a10 — Termux bridge property detection repair + explicit re-check
+
+Real-device feedback proved that the one-time Termux setup command could be executed successfully while SiftAlpha still returned to “open Termux”.
+
+Root cause:
+- `TermuxBackend.FIRST_RUN_SETUP_COMMAND` and `CONNECTION_TEST` used `\\s` inside Kotlin raw strings;
+- the double backslash reached `grep -E` literally, so a normal `allow-external-apps=true` line was not matched;
+- automatic onResume bridge re-probe was running, but its configuration classification was wrong.
+
+Correction:
+- both setup and probe now use POSIX `[[:space:]]` matching;
+- recovery/configuration dialogs now include an explicit Re-check（重新检测） action;
+- automatic onResume re-probe remains enabled, while manual Re-check is a fallback;
+- added `TermuxBackendCommandContractTest` so the broken `\\s` contract cannot silently return.
+
+Functional source: `c68e2e0831cdd35363262f1f262827dd529d3245`
+Version: `0.8.0-alpha43-r48a10` / versionCode `190`.
+
+Cloud verification:
+- W0 Cloud Build #461: PASS.
+- Internal Alpine Probe #72: PASS.
+- repository validators: PASS.
+- unit tests + assembleDebug: PASS.
+- artifact: `siftalpha-w0-461`, id `10630825284`.
+- artifact ZIP digest: `sha256:569f6e27495ccb6c578b1a2193f50d4bfd4010cb8ca85f2b399df5bdffb949e4`.
+- APK SHA-256: `7f1d6f816f16e6ef5bcc0effc535b5124d46e6a9cff175c24ecd5b5c86c03b22`.
+
+Real-device acceptance focus:
+1. execute the copied Termux setup command once;
+2. return to SiftAlpha and verify automatic re-probe recognizes `allow-external-apps=true`;
+3. if lifecycle auto re-probe is delayed, tap Re-check and verify the same probe runs immediately;
+4. once READY, the pending Prepare resumes instead of asking to open Termux again.
