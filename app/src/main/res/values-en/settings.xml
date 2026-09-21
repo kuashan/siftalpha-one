@@ -2,11 +2,11 @@
 <resources>
     <string name="settings_title">Settings</string>
     <string name="settings_language_section">Language</string>
-    <string name="settings_language_summary">Choose the interface language used by SiftAlpha Studio.</string>
+    <string name="settings_language_summary">Choose the interface language used by SiftAlpha X.</string>
     <string name="settings_language_current">Current language: %1$s</string>
     <string name="settings_language_change">Change language</string>
     <string name="settings_browser_section">Browser</string>
-    <string name="settings_browser_summary">Choose the browser used by Open Browser. Once selected, Studio opens it directly without asking every time.</string>
+    <string name="settings_browser_summary">Choose the browser used by Open Browser. Once selected, SiftAlpha X opens it directly without asking every time.</string>
     <string name="settings_browser_current">Current browser: %1$s</string>
     <string name="settings_browser_not_selected">Not selected</string>
     <string name="settings_browser_change">Choose browser</string>
