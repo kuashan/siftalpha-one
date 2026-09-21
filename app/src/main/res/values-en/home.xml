@@ -126,4 +126,6 @@ Confirm the project name.</string>
     <string name="home_importing">Importing project…</string>
     <string name="home_import_complete">Project %1$s was imported.</string>
     <string name="home_import_failed">Import failed</string>
+    <string name="home_import_github">Import from GitHub link</string>
+    <string name="home_user_storage">Runtime storage</string>
 </resources>
