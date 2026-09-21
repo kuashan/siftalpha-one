@@ -23,4 +23,6 @@
     <string name="user_storage_scan_failed">実行用ストレージの集計に失敗しました。後でもう一度お試しください。</string>
     <string name="user_storage_ready">容量情報を更新しました。</string>
     <string name="user_storage_error">実行用ストレージ操作に失敗しました</string>
+    <string name="user_storage_scanning_external">Termux の実行用ストレージを読み取っています…</string>
+    <string name="user_storage_external_checking">Termux を確認しています。確認完了後に実行用ストレージを自動で読み込みます。</string>
 </resources>
