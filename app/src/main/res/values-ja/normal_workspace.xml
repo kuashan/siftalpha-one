@@ -37,4 +37,9 @@
     <string name="normal_external_provider_check_required">外部実行環境のチェックが必要です。</string>
     <string name="normal_external_provider_checking">外部実行環境を確認しています…</string>
     <string name="normal_external_provider_unavailable">外部実行環境は現在利用できません。</string>
+    <string name="normal_project_refresh_action">更新</string>
+    <string name="normal_project_refreshing">プロジェクト状態を更新しています…</string>
+    <string name="normal_project_refresh_complete">状態を更新しました。</string>
+    <string name="normal_project_open_action">開く</string>
+    <string name="normal_project_open_unavailable">現在開ける Web ページまたは結果はありません。</string>
 </resources>
