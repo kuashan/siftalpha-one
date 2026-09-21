@@ -16,6 +16,7 @@ import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -30,6 +31,7 @@ import com.siftalpha.studio.project.V04ProjectGateway
 import com.siftalpha.studio.project.WebProjectInspector
 import com.siftalpha.studio.presentation.ProjectActionPolicy
 import com.siftalpha.studio.presentation.ProjectUiSnapshot
+import com.siftalpha.studio.presentation.RuntimeActivityIndicatorPolicy
 import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
 import com.siftalpha.studio.runtime.EmbeddedPythonObservationPolicy
 import com.siftalpha.studio.runtime.EmbeddedProjectPollRegistry
@@ -197,6 +199,7 @@ open class V04Activity : StudioActivity() {
     private lateinit var lifecycleStore: RuntimeLifecycleStore
     private lateinit var operationCoordinator: ProjectOperationCoordinator
     private lateinit var externalPreflight: ExternalProviderProbeCoordinator
+    private lateinit var backgroundReliabilityGuidance: BackgroundReliabilityGuidanceController
     private lateinit var projectRuntimeSelectionStore: ProjectRuntimeSelectionStore
     private val recoveryProjects = mutableSetOf<String>()
     private val failureReasons = mutableMapOf<String, String>()
@@ -406,6 +409,7 @@ open class V04Activity : StudioActivity() {
         lifecycleStore = RuntimeLifecycleStore(this)
         operationCoordinator = ProjectOperationCoordinator.shared(this)
         externalPreflight = ExternalProviderProbeCoordinator.shared(this)
+        backgroundReliabilityGuidance = BackgroundReliabilityGuidanceController(this)
         secretPolicyInspector = ProjectSecretPolicyInspector(this)
         configurationInspector = ProjectConfigurationInspector(this)
         webInspector = WebProjectInspector(this)
@@ -976,6 +980,13 @@ open class V04Activity : StudioActivity() {
         )
         val policy = ProjectActionPolicy.resolve(snapshot, runtimeSelection)
         val presentationState = snapshot.displayedLifecycle
+        val activityIndicatorVisible = RuntimeActivityIndicatorPolicy.shouldAnimate(
+            RuntimeActivityIndicatorPolicy.Input(
+                lifecycleState = snapshot.lifecycleState,
+                runtimeState = typedState,
+                operationActive = visiblePendingAction != null,
+            ),
+        )
 
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1089,6 +1100,20 @@ open class V04Activity : StudioActivity() {
             )
             setPadding(0, dp(2), 0, 0)
         })
+        if (activityIndicatorVisible) {
+            box.addView(
+                ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+                    isIndeterminate = true
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(6),
+                    ).apply {
+                        topMargin = dp(6)
+                        bottomMargin = dp(4)
+                    }
+                },
+            )
+        }
         val statusGuidance = ProjectStatusGuidancePolicy.resolve(
             state = typedState,
             webEndpointVerified = reachableWebUrl != null,
@@ -1920,11 +1945,13 @@ open class V04Activity : StudioActivity() {
             .setMessage(getString(R.string.runtime_prepare_message))
             .setNegativeButton(getString(R.string.common_cancel), null)
             .setPositiveButton(getString(R.string.runtime_prepare_start)) { _, _ ->
-                dispatch(
-                    project = project,
-                    action = ProjectRuntimeController.Action.PREPARE,
-                    controlRequest = controlRequest,
-                )
+                backgroundReliabilityGuidance.maybeProceed {
+                    dispatch(
+                        project = project,
+                        action = ProjectRuntimeController.Action.PREPARE,
+                        controlRequest = controlRequest,
+                    )
+                }
             }
             .show()
     }
@@ -1962,16 +1989,18 @@ open class V04Activity : StudioActivity() {
             framework = profile?.framework,
             learnedPort = learnedPort,
         )
-        dispatch(
-            project = project,
-            action = ProjectRuntimeController.Action.START,
-            browserConfiguredUrl = profile?.configuredLocalUrl(),
-            browserFramework = profile?.framework,
-            controlRequest = controlRequest ?: selectedRuntimeControlRequest(project),
-            launchInvocation = launchInvocation,
-            webLogDiscoveryAllowed = profile?.enabled == true,
-            webHintPorts = webHintPorts,
-        )
+        backgroundReliabilityGuidance.maybeProceed {
+            dispatch(
+                project = project,
+                action = ProjectRuntimeController.Action.START,
+                browserConfiguredUrl = profile?.configuredLocalUrl(),
+                browserFramework = profile?.framework,
+                controlRequest = controlRequest ?: selectedRuntimeControlRequest(project),
+                launchInvocation = launchInvocation,
+                webLogDiscoveryAllowed = profile?.enabled == true,
+                webHintPorts = webHintPorts,
+            )
+        }
     }
 
     private fun confirmRun(project: V04ProjectGateway.RuntimeProject) {
