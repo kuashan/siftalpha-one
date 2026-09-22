@@ -66,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -148,14 +149,15 @@ internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
 
     LaunchedEffect(Unit) {
         if (motion) {
-            // Stage 1 + 2: code/data converge along an S-like path and resolve into the original
-            // logo. Stage 3: hold the completed brand frame long enough to be intentionally seen.
-            assembly.animateTo(1f, tween(2700))
-            delay(800)
+            // Full launch choreography:
+            // 0..0.62  : dense code/data streams travel in from both sides.
+            // 0.44..0.90: the real app logo resolves at the convergence point.
+            // 0.72..1.0 : product wordmark/taglines settle into the final frame.
+            assembly.animateTo(1f, tween(3000, easing = LinearEasing))
+            delay(650)
         } else {
-            // Reduced-motion keeps the requested 3-5 second branded dwell without moving elements.
             assembly.snapTo(1f)
-            delay(3500)
+            delay(3600)
         }
         visible = false
     }
@@ -164,55 +166,22 @@ internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
         content()
         AnimatedVisibility(
             visible = visible,
-            enter = fadeIn(tween(160)),
+            enter = fadeIn(tween(150)),
             exit = fadeOut(tween(if (motion) 420 else 120)),
         ) {
-            Box(Modifier.fillMaxSize().background(Ink)) {
-                AuroraBackdrop(Modifier.fillMaxSize(), animate = motion)
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(horizontal = 28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    DataCodeLogoAssembly(
-                        progress = assembly.value,
-                        motion = motion,
-                    )
-                    Spacer(Modifier.height(14.dp))
-
-                    val wordmarkAlpha =
-                        ((assembly.value - .70f) / .22f).coerceIn(0f, 1f)
-                    Text(
-                        text = stringResource(R.string.app_name),
-                        color = TextPrimary,
-                        fontSize = 36.sp,
-                        lineHeight = 42.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.alpha(wordmarkAlpha),
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        text = stringResource(R.string.brand_tagline_primary),
-                        color = TextPrimary,
-                        fontSize = 17.sp,
-                        lineHeight = 25.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.alpha(wordmarkAlpha),
-                    )
-                    Spacer(Modifier.height(7.dp))
-                    Text(
-                        text = stringResource(R.string.brand_tagline_secondary),
-                        color = Cyan,
-                        fontSize = 12.sp,
-                        letterSpacing = 1.4.sp,
-                        modifier = Modifier.alpha(wordmarkAlpha),
-                    )
-                }
-            }
+            BrandLaunchScene(
+                progress = assembly.value,
+                motion = motion,
+            )
         }
     }
 }
+
+private val BrandCodeLexicon = listOf(
+    "101", "0101", "</>", "{ }", "[ ]", "AI", "Py", "JS",
+    "0x", "λ", "Σ", "R", "def", "fn", "API", "01",
+    "&&", "::", "{}", "<>", "ML", "X", "run", "data",
+)
 
 private data class BrandCodeParticle(
     val text: String,
@@ -221,20 +190,16 @@ private data class BrandCodeParticle(
     val delay: Float,
 )
 
-private val BrandCodeParticles = listOf(
-    BrandCodeParticle("101", upper = true, lane = .04f, delay = .00f),
-    BrandCodeParticle("{ }", upper = true, lane = .16f, delay = .05f),
-    BrandCodeParticle("</>", upper = true, lane = .30f, delay = .10f),
-    BrandCodeParticle("AI", upper = true, lane = .44f, delay = .15f),
-    BrandCodeParticle("0x", upper = true, lane = .58f, delay = .20f),
-    BrandCodeParticle("[ ]", upper = true, lane = .72f, delay = .25f),
-    BrandCodeParticle("Py", upper = false, lane = .06f, delay = .02f),
-    BrandCodeParticle("R", upper = false, lane = .20f, delay = .07f),
-    BrandCodeParticle("JS", upper = false, lane = .34f, delay = .12f),
-    BrandCodeParticle("Σ", upper = false, lane = .48f, delay = .17f),
-    BrandCodeParticle("λ", upper = false, lane = .62f, delay = .22f),
-    BrandCodeParticle("01", upper = false, lane = .76f, delay = .27f),
-)
+private val BrandCodeParticles = List(40) { index ->
+    val upper = index < 20
+    val local = if (upper) index else index - 20
+    BrandCodeParticle(
+        text = BrandCodeLexicon[index % BrandCodeLexicon.size],
+        upper = upper,
+        lane = local / 19f,
+        delay = (local % 10) * .012f + if (upper) 0f else .025f,
+    )
+}
 
 private fun cubicBezier(
     start: Float,
@@ -251,86 +216,251 @@ private fun cubicBezier(
 }
 
 @Composable
-private fun DataCodeLogoAssembly(
+private fun BrandLaunchScene(
     progress: Float,
     motion: Boolean,
 ) {
     val resolved = progress.coerceIn(0f, 1f)
     val logoAlpha = if (motion) {
-        ((resolved - .56f) / .34f).coerceIn(0f, 1f)
+        ((resolved - .44f) / .40f).coerceIn(0f, 1f)
+    } else {
+        1f
+    }
+    val textAlpha = if (motion) {
+        ((resolved - .70f) / .22f).coerceIn(0f, 1f)
     } else {
         1f
     }
     val particleFade = if (motion) {
-        (1f - ((resolved - .58f) / .28f).coerceIn(0f, 1f))
+        (1f - ((resolved - .76f) / .22f).coerceIn(0f, 1f))
     } else {
         0f
     }
 
     BoxWithConstraints(
-        modifier = Modifier.size(width = 292.dp, height = 194.dp),
-        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF03102B),
+                        Ink,
+                        Color(0xFF020817),
+                    ),
+                ),
+            ),
     ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val streamAlpha = if (motion) {
+                (.18f + .62f * resolved).coerceIn(0f, .82f)
+            } else {
+                .72f
+            }
+
+            fun streamPath(
+                upper: Boolean,
+                lane: Int,
+                lanes: Int,
+            ): Path {
+                val t = lane / (lanes - 1f)
+                return Path().apply {
+                    if (upper) {
+                        val sy = h * (.035f + .245f * t)
+                        val ey = h * (.395f + .055f * (t - .5f))
+                        moveTo(w * 1.06f, sy)
+                        cubicTo(
+                            w * (.88f - .02f * t),
+                            h * (.08f + .10f * t),
+                            w * (.71f - .09f * t),
+                            h * (.29f + .08f * t),
+                            w * (.53f + .015f * (t - .5f)),
+                            ey,
+                        )
+                    } else {
+                        val sy = h * (.69f + .23f * t)
+                        val ey = h * (.535f + .055f * (t - .5f))
+                        moveTo(w * -.06f, sy)
+                        cubicTo(
+                            w * (.16f + .03f * t),
+                            h * (.78f - .10f * t),
+                            w * (.33f + .07f * t),
+                            h * (.67f - .11f * t),
+                            w * (.47f - .015f * (t - .5f)),
+                            ey,
+                        )
+                    }
+                }
+            }
+
+            val lanes = 18
+            repeat(lanes) { lane ->
+                val laneRatio = lane / (lanes - 1f)
+                val widthPx = (0.65f + (lane % 4) * .22f).dp.toPx()
+                val topPath = streamPath(true, lane, lanes)
+                val bottomPath = streamPath(false, lane, lanes)
+
+                drawPath(
+                    path = topPath,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Blue.copy(alpha = .02f),
+                            ElectricBlue.copy(alpha = streamAlpha * .54f),
+                            Cyan.copy(alpha = streamAlpha),
+                        ),
+                        start = Offset(w, 0f),
+                        end = Offset(w * .48f, h * .44f),
+                    ),
+                    style = Stroke(widthPx, cap = StrokeCap.Round),
+                )
+                drawPath(
+                    path = bottomPath,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Cyan.copy(alpha = .04f),
+                            ElectricBlue.copy(alpha = streamAlpha * .62f),
+                            Violet.copy(alpha = streamAlpha),
+                        ),
+                        start = Offset(0f, h),
+                        end = Offset(w * .52f, h * .49f),
+                    ),
+                    style = Stroke(widthPx, cap = StrokeCap.Round),
+                )
+
+                // Short luminous packets make the streams feel like actual data lanes.
+                repeat(4) { packet ->
+                    val phase = if (motion) {
+                        ((resolved * 1.42f + laneRatio * .27f + packet * .21f) % 1f)
+                    } else {
+                        (packet + 1) / 5f
+                    }
+                    val topX = cubicBezier(
+                        w * 1.06f,
+                        w * (.88f - .02f * laneRatio),
+                        w * (.71f - .09f * laneRatio),
+                        w * (.53f + .015f * (laneRatio - .5f)),
+                        phase,
+                    )
+                    val topY = cubicBezier(
+                        h * (.035f + .245f * laneRatio),
+                        h * (.08f + .10f * laneRatio),
+                        h * (.29f + .08f * laneRatio),
+                        h * (.395f + .055f * (laneRatio - .5f)),
+                        phase,
+                    )
+                    drawRoundRect(
+                        color = if (packet % 2 == 0) Cyan.copy(alpha = .52f) else ElectricBlue.copy(alpha = .46f),
+                        topLeft = Offset(topX, topY),
+                        size = Size(
+                            width = (5f + (lane % 3) * 2f).dp.toPx(),
+                            height = 1.5.dp.toPx(),
+                        ),
+                        cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
+                    )
+
+                    val bottomX = cubicBezier(
+                        w * -.06f,
+                        w * (.16f + .03f * laneRatio),
+                        w * (.33f + .07f * laneRatio),
+                        w * (.47f - .015f * (laneRatio - .5f)),
+                        phase,
+                    )
+                    val bottomY = cubicBezier(
+                        h * (.69f + .23f * laneRatio),
+                        h * (.78f - .10f * laneRatio),
+                        h * (.67f - .11f * laneRatio),
+                        h * (.535f + .055f * (laneRatio - .5f)),
+                        phase,
+                    )
+                    drawRoundRect(
+                        color = if (packet % 2 == 0) Violet.copy(alpha = .52f) else Cyan.copy(alpha = .42f),
+                        topLeft = Offset(bottomX, bottomY),
+                        size = Size(
+                            width = (5f + ((lane + 1) % 3) * 2f).dp.toPx(),
+                            height = 1.5.dp.toPx(),
+                        ),
+                        cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
+                    )
+                }
+            }
+
+            // Central convergence glow behind the real logo.
+            val glow = (.30f + .56f * logoAlpha).coerceIn(0f, .88f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Cyan.copy(alpha = glow * .52f),
+                        Blue.copy(alpha = glow * .34f),
+                        Violet.copy(alpha = glow * .22f),
+                        Color.Transparent,
+                    ),
+                    center = Offset(w * .5f, h * .445f),
+                    radius = size.minDimension * .35f,
+                ),
+                radius = size.minDimension * .28f,
+                center = Offset(w * .5f, h * .445f),
+            )
+        }
+
         if (motion && particleFade > .01f) {
             BrandCodeParticles.forEachIndexed { index, particle ->
                 val localProgress =
                     ((resolved - particle.delay) / (1f - particle.delay))
                         .coerceIn(0f, 1f)
 
-                // Upper stream starts from the right and curls inward.
-                // Lower stream starts from the left and curls inward.
+                val lane = particle.lane
                 val startX = if (particle.upper) {
-                    .76f + particle.lane * .20f
+                    .80f + .20f * lane
                 } else {
-                    .02f + particle.lane * .18f
+                    -.02f + .20f * lane
                 }
                 val startY = if (particle.upper) {
-                    .08f + particle.lane * .24f
+                    .04f + .24f * lane
                 } else {
-                    .70f + particle.lane * .22f
+                    .70f + .22f * lane
                 }
-                val control1X = if (particle.upper) .98f else .02f
-                val control1Y = if (particle.upper) .30f else .72f
-                val control2X = if (particle.upper) .28f else .72f
-                val control2Y = if (particle.upper) .34f else .62f
-                val endX = .50f + ((index % 3) - 1) * .026f
-                val endY = if (particle.upper) {
-                    .45f + (index % 2) * .025f
+                val control1X = if (particle.upper) .90f else .12f
+                val control1Y = if (particle.upper) .10f + .08f * lane else .78f - .09f * lane
+                val control2X = if (particle.upper) .67f else .36f
+                val control2Y = if (particle.upper) .31f + .05f * lane else .65f - .08f * lane
+                val endX = if (particle.upper) {
+                    .525f + ((index % 4) - 1.5f) * .008f
                 } else {
-                    .55f - (index % 2) * .025f
+                    .475f + ((index % 4) - 1.5f) * .008f
+                }
+                val endY = if (particle.upper) {
+                    .418f + (index % 3) * .010f
+                } else {
+                    .505f + (index % 3) * .010f
                 }
 
-                val x = cubicBezier(
-                    startX,
-                    control1X,
-                    control2X,
-                    endX,
-                    localProgress,
-                )
-                val y = cubicBezier(
-                    startY,
-                    control1Y,
-                    control2Y,
-                    endY,
-                    localProgress,
-                )
+                val x = cubicBezier(startX, control1X, control2X, endX, localProgress)
+                val y = cubicBezier(startY, control1Y, control2Y, endY, localProgress)
 
                 Text(
                     text = particle.text,
-                    color = if (particle.upper) Cyan else ElectricBlue,
-                    fontSize = if (particle.text.length <= 2) 11.sp else 9.sp,
+                    color = when (index % 3) {
+                        0 -> Cyan
+                        1 -> ElectricBlue
+                        else -> Violet
+                    },
+                    fontSize = when {
+                        particle.text.length >= 4 -> 8.sp
+                        particle.text.length == 3 -> 9.sp
+                        else -> 11.sp
+                    },
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .offset(
-                            x = maxWidth * x - 13.dp,
+                            x = maxWidth * x - 16.dp,
                             y = maxHeight * y - 8.dp,
                         )
                         .alpha(
-                            particleFade *
-                                (.40f + .60f * localProgress),
+                            particleFade * (.34f + .66f * localProgress),
                         )
                         .graphicsLayer {
-                            val scale = .86f + .14f * localProgress
+                            val scale = .84f + .18f * localProgress
                             scaleX = scale
                             scaleY = scale
                         },
@@ -338,38 +468,105 @@ private fun DataCodeLogoAssembly(
             }
         }
 
-        // A small amount of path energy remains visible while the true logo resolves.
-        Canvas(
+        Column(
             modifier = Modifier
-                .size(164.dp)
-                .alpha((.35f + .65f * logoAlpha).coerceIn(0f, 1f)),
+                .align(Alignment.Center)
+                .offset(y = (-24).dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        Cyan.copy(alpha = .12f + .18f * logoAlpha),
-                        Blue.copy(alpha = .08f + .12f * logoAlpha),
-                        Violet.copy(alpha = .05f + .08f * logoAlpha),
-                        Color.Transparent,
-                    ),
-                    center = center,
-                    radius = size.minDimension * .50f,
-                ),
-                radius = size.minDimension * (.42f + .035f * logoAlpha),
-                center = center,
+            Box(
+                modifier = Modifier.size(168.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Canvas(Modifier.fillMaxSize()) {
+                    drawCircle(
+                        color = Cyan.copy(alpha = .12f + .18f * logoAlpha),
+                        radius = size.minDimension * .49f,
+                        center = center,
+                        style = Stroke(1.2.dp.toPx()),
+                    )
+                    drawCircle(
+                        color = Violet.copy(alpha = .08f + .13f * logoAlpha),
+                        radius = size.minDimension * .44f,
+                        center = center,
+                        style = Stroke(.8.dp.toPx()),
+                    )
+                }
+                OriginalLogoMark(
+                    modifier = Modifier
+                        .size(128.dp)
+                        .graphicsLayer {
+                            val scale = .92f + .08f * logoAlpha
+                            scaleX = scale
+                            scaleY = scale
+                        },
+                    alpha = logoAlpha,
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = stringResource(R.string.app_name),
+                color = TextPrimary,
+                fontSize = 36.sp,
+                lineHeight = 42.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.alpha(textAlpha),
+            )
+            Spacer(Modifier.height(13.dp))
+            Text(
+                text = stringResource(R.string.brand_tagline_primary),
+                color = TextPrimary,
+                fontSize = 17.sp,
+                lineHeight = 25.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.alpha(textAlpha),
+            )
+            Spacer(Modifier.height(7.dp))
+            Text(
+                text = stringResource(R.string.brand_tagline_secondary),
+                color = Muted,
+                fontSize = 12.sp,
+                letterSpacing = 1.4.sp,
+                modifier = Modifier.alpha(textAlpha),
             )
         }
 
-        OriginalLogoMark(
+        Column(
             modifier = Modifier
-                .size(126.dp)
-                .graphicsLayer {
-                    val scale = .94f + .06f * logoAlpha
-                    scaleX = scale
-                    scaleY = scale
-                },
-            alpha = logoAlpha,
-        )
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 34.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Canvas(
+                modifier = Modifier.size(width = 180.dp, height = 8.dp),
+            ) {
+                val y = size.height / 2f
+                drawLine(
+                    color = Blue.copy(alpha = .45f),
+                    start = Offset(0f, y),
+                    end = Offset(size.width, y),
+                    strokeWidth = 1.dp.toPx(),
+                )
+                drawLine(
+                    brush = Brush.horizontalGradient(
+                        listOf(Cyan, ElectricBlue, Violet),
+                    ),
+                    start = Offset(size.width * .35f, y),
+                    end = Offset(size.width * .65f, y),
+                    strokeWidth = 2.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+            }
+            Spacer(Modifier.height(7.dp))
+            Text(
+                text = "INTELLIGENCE IN MOTION",
+                color = MutedDeep,
+                fontSize = 9.sp,
+                letterSpacing = 2.4.sp,
+                modifier = Modifier.alpha(textAlpha),
+            )
+        }
     }
 }
 

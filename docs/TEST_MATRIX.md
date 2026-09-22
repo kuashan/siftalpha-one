@@ -1420,3 +1420,21 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Original logo | same R48-D2 logo asset; no geometry redraw | PASS REQUIRED |
 | Brand dwell | remains within ~3-5 s | PASS REQUIRED |
 | Cloud validators/tests/APK | W0 must pass before APK delivery | PENDING |
+
+
+### R48-D3 v199 — Approved launch concept implemented in Compose
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Real logo source | launch uses `R.drawable.siftalpha_launcher_art` | PASS REQUIRED |
+| No static concept image | visual is rendered by Compose code | PASS REQUIRED |
+| Upper data stream | dense code/data flows from upper-right to center | PASS REQUIRED |
+| Lower data stream | dense code/data flows from lower-left to center | PASS REQUIRED |
+| Convergence | streams visually meet around real logo | PASS REQUIRED |
+| Wordmark | SiftAlpha X shown after logo resolution | PASS REQUIRED |
+| Chinese tagline | existing approved brand tagline shown | PASS REQUIRED |
+| Bottom accent | restrained line + INTELLIGENCE IN MOTION | PASS REQUIRED |
+| Launch dwell | approximately 3-5 seconds | PASS REQUIRED |
+| Reduced motion | static equivalent without continuous decorative motion | PASS REQUIRED |
+| R48-D2 baseline | baseline branch/source unchanged | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |

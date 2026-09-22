@@ -100,7 +100,10 @@ android {
         // v198 links execution completion to the existing Open-ready fact, closes the running ring when
         // a result is available, adds restrained inner data-flow lines, and evolves the launch brand
         // transition into an S-path code/data convergence that resolves into the unchanged original logo.
-        versionCode = 198
+        // v199 rebuilds the Normal Mode launch page in code to match the approved full-screen concept:
+        // dense curved code/data streams from top-right and bottom-left converge into the unchanged
+        // real app logo, with SiftAlpha X wordmark, Chinese tagline, and restrained bottom accent.
+        versionCode = 199
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

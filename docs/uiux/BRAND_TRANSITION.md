@@ -52,3 +52,28 @@ The launch brand motion now follows this choreography while preserving the exact
 6. Wordmark and tagline appear only after the logo has begun resolving.
 7. Total perceived brand dwell remains in the approved ~3-5 second range.
 8. Reduced-motion mode removes moving convergence and presents the completed original logo statically.
+
+
+## R48-D3 v199 — Full-screen approved launch composition
+
+The approved concept is implemented directly in Compose rather than embedded as a rendered image.
+
+Final launch frame:
+- background: deep navy/black;
+- upper-right: dense blue/cyan code and data lanes curve inward;
+- lower-left: dense blue/violet code and data lanes curve inward;
+- convergence point: the **existing real SiftAlpha app logo**;
+- below logo: `SiftAlpha X`;
+- below wordmark: existing Chinese brand tagline;
+- bottom: restrained luminous accent line + `INTELLIGENCE IN MOTION`.
+
+Animation sequence:
+1. data lanes and code fragments become visible from both sides;
+2. fragments travel toward the center on curved S-like trajectories;
+3. convergence glow increases;
+4. the actual logo asset resolves in place;
+5. product name/taglines settle;
+6. completed frame holds briefly before entering Home.
+
+Hard rule:
+The launch animation may animate data, glow, opacity and scale around the logo, but it must never substitute another logo or redraw the logo geometry.

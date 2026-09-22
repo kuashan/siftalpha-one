@@ -2643,3 +2643,30 @@ No Runtime, Environment, Web Discovery, Stop, Open eligibility, or baseline sour
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `198`
+
+
+## 2026-09-22 · R48-D3 v199 launch page rebuilt from approved concept
+
+Clarification from user:
+The approved launch concept is not a static image asset and not a replacement logo. It must be implemented in the actual R48-D3 Compose code while retaining the app's existing real logo.
+
+Implementation:
+- full-screen dark navy launch scene;
+- dense curved code/data lanes from the upper-right toward the center;
+- dense curved code/data lanes from the lower-left toward the center;
+- 40 visible code/data tokens plus luminous data packets;
+- both streams converge around the center and resolve into the unchanged real app logo;
+- SiftAlpha X wordmark and existing Chinese brand tagline appear after logo resolution;
+- bottom accent line and “INTELLIGENCE IN MOTION” complete the approved composition;
+- total launch dwell remains approximately 3.6–4.1 seconds depending on exit animation;
+- Reduced Motion keeps the composition but removes continuous decorative motion.
+
+Boundary:
+- no generated launch image is embedded;
+- no new logo geometry is used;
+- `R.drawable.siftalpha_launcher_art` remains the logo source;
+- R48-D2 runtime/functionality baseline remains untouched.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `199`
