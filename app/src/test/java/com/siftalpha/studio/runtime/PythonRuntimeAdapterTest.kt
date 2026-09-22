@@ -161,7 +161,10 @@ class PythonRuntimeAdapterTest {
         assertTrue("old environment must be retained before replacement", backupMove >= 0)
         assertTrue("new environment must be created only after old environment is backed up", createFinal > backupMove)
         assertTrue("pip must install into the final stable prefix", installFinal > createFinal)
-        assertFalse("a completed venv must never be renamed from a temporary prefix", script.contains("mv -- \"$candidate\" \"$venv\""))
+        assertFalse(
+            "a completed venv must never be renamed from a temporary prefix",
+            script.contains("mv -- \"$candidate\" \"$venv\""),
+        )
         assertTrue("rollback stays armed until the new READY marker is committed", disableRollback > readyWrite)
         assertTrue("backup cleanup must not delay the transaction commit", cleanupAfterCommit > disableRollback)
     }

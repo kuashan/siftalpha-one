@@ -3352,3 +3352,11 @@ For a cached-wheel project such as `situation-monitor`, once the final environme
 Target:
 - versionCode = 221
 - versionName = 0.8.0-alpha43-r48d9
+
+
+## 2026-09-23 · R48-D9 W0 assertion compile follow-up
+
+- Production repair remains commit `242273366504106e039e9417ba003823a0b282a8`.
+- First W0 run #634 reached unit-test compilation and exposed a test-source-only Kotlin interpolation mistake in `PythonRuntimeAdapterTest`: the shell literals `$candidate` and `$venv` were interpreted as Kotlin references.
+- Corrected only the regression assertion to escape those shell variables. No production Runtime, Shared Core, Normal Mode, or Developer Mode source behavior changed.
+- Internal Alpine Probe #111 already passed on the unchanged production implementation.
