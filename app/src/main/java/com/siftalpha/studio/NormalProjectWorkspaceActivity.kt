@@ -711,20 +711,20 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED,
             ExternalProviderReadiness.BRIDGE_UNRESPONSIVE,
             -> screenState.value = screenState.value.copy(
-                externalReadiness = result.readiness,
+                externalReadiness = readiness,
                 message = getString(R.string.normal_external_provider_open_termux),
             )
 
             ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED,
             ExternalProviderReadiness.BRIDGE_CHECKING,
             -> screenState.value = screenState.value.copy(
-                externalReadiness = result.readiness,
+                externalReadiness = readiness,
                 message = getString(R.string.normal_external_provider_checking),
             )
 
             ExternalProviderReadiness.UNAVAILABLE ->
                 screenState.value = screenState.value.copy(
-                    externalReadiness = result.readiness,
+                    externalReadiness = readiness,
                     message = getString(R.string.normal_external_provider_unavailable),
                 )
 
