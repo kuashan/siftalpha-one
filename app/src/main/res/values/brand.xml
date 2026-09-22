@@ -2,6 +2,7 @@
 <resources>
     <string name="brand_tagline_primary">让复杂的技术，变成简单的可能</string>
     <string name="brand_tagline_secondary">智能筛选 · 简化执行 · 看见结果</string>
+    <string name="brand_normal_import_supported">当前支持 Python 文件、ZIP 项目和 GitHub 链接。</string>
     <string name="brand_normal_intro">让想法变成看得见的结果</string>
     <string name="brand_home_hello">你好</string>
     <string name="brand_import_short">支持多种文件格式\n快速开始</string>

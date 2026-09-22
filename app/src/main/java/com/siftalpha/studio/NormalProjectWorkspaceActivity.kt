@@ -304,6 +304,11 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 environmentReadyReader = { id, selected ->
                     lifecycleStore.read(id).environmentReadyFor(selected)
                 },
+                internalPrepareProgress = { progressText ->
+                    runOnUiThread {
+                        updateInternalPrepareProgress(progressText)
+                    }
+                },
             ),
             stateBridge = sharedLifecycleBridge,
             externalPreflight = externalPreflight,
@@ -712,7 +717,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             PrepareWorkflowPhase.COMPATIBILITY_CONFIRMED,
             PrepareWorkflowPhase.COMPATIBILITY_FALLBACK,
             -> getString(R.string.normal_prepare_phase_compatibility)
-            else -> getString(R.string.normal_prepare_phase_plan_ready)
+            else -> getString(R.string.normal_prepare_phase_compatibility)
         }
         screenState.value = screenState.value.copy(
             preparePhaseTitle = title,
@@ -735,6 +740,32 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             PrepareWorkflowPhase.VERIFYING ->
                 getString(R.string.normal_prepare_verifying_detail)
             else -> getString(R.string.normal_prepare_environment_detail)
+        }
+        screenState.value = screenState.value.copy(
+            preparePhaseTitle = title,
+            preparePhaseDetail = detail,
+        )
+    }
+
+    private fun updateInternalPrepareProgress(text: String) {
+        val phase = PrepareWorkflowPresentationPolicy.fromInternalProgress(text) ?: return
+        val title = when (phase) {
+            PrepareWorkflowPhase.PREPARING_RUNTIME ->
+                getString(R.string.normal_prepare_phase_environment)
+            PrepareWorkflowPhase.INSTALLING_DEPENDENCIES ->
+                getString(R.string.normal_prepare_phase_installing)
+            PrepareWorkflowPhase.VERIFYING ->
+                getString(R.string.normal_prepare_phase_verifying)
+            else -> return
+        }
+        val detail = when (phase) {
+            PrepareWorkflowPhase.PREPARING_RUNTIME ->
+                getString(R.string.normal_prepare_environment_detail)
+            PrepareWorkflowPhase.INSTALLING_DEPENDENCIES ->
+                getString(R.string.normal_prepare_installing_detail)
+            PrepareWorkflowPhase.VERIFYING ->
+                getString(R.string.normal_prepare_verifying_detail)
+            else -> return
         }
         screenState.value = screenState.value.copy(
             preparePhaseTitle = title,

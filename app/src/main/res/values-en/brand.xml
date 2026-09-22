@@ -2,6 +2,7 @@
 <resources>
     <string name="brand_tagline_primary">Turn complex technology into simple possibilities</string>
     <string name="brand_tagline_secondary">Smart filtering · Simple execution · See results</string>
+    <string name="brand_normal_import_supported">Supports Python files, ZIP projects, and GitHub links.</string>
     <string name="brand_normal_intro">Turn ideas into visible results</string>
     <string name="brand_home_hello">Hello</string>
     <string name="brand_import_short">Supports multiple file types\nStart quickly</string>

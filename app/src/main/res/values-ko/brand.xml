@@ -2,6 +2,7 @@
 <resources>
     <string name="brand_tagline_primary">복잡한 기술을, 단순한 가능성으로</string>
     <string name="brand_tagline_secondary">스마트 필터링 · 간단한 실행 · 결과 확인</string>
+    <string name="brand_normal_import_supported">Python 파일, ZIP 프로젝트, GitHub 링크를 지원합니다.</string>
     <string name="brand_normal_intro">아이디어를 보이는 결과로</string>
     <string name="brand_home_hello">안녕하세요</string>
     <string name="brand_import_short">여러 파일 형식 지원\n빠르게 시작</string>

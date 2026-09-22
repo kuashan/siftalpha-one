@@ -100,7 +100,7 @@
     <string name="home_project_entry_title">プロジェクト</string>
     <string name="home_import_title">プロジェクトをインポート</string>
     <string name="home_import_summary">1 つの入口から既存プロジェクトを SiftAlpha に追加します。</string>
-    <string name="home_import_supported">Python ファイル、ZIP プロジェクト、GitHub リンクに対応しています。</string>
+    <string name="home_import_supported">現在は ZIP プロジェクトと単一の Python ファイルに対応しています。インポート後は通常モードで直接開きます。</string>
     <string name="home_import_choose_file">プロジェクトファイルを選択</string>
     <string name="home_import_new_project">空のプロジェクトを作成</string>
     <string name="home_more_title">その他</string>

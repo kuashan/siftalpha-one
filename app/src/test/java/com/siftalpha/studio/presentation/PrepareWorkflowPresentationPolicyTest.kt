@@ -58,6 +58,34 @@ class PrepareWorkflowPresentationPolicyTest {
         )
     }
 
+    @Test
+    fun internalProgressUsesRealRuntimeBoundaries() {
+        assertEquals(
+            PrepareWorkflowPhase.PREPARING_RUNTIME,
+            PrepareWorkflowPresentationPolicy.fromInternalProgress(
+                "SIFTALPHA_X_INTERNAL_PREPARE_STAGE=PREPARING_RUNTIME",
+            ),
+        )
+        assertEquals(
+            PrepareWorkflowPhase.INSTALLING_DEPENDENCIES,
+            PrepareWorkflowPresentationPolicy.fromInternalProgress(
+                "SIFTALPHA_X_INTERNAL_PREPARE_STAGE=CPYTHON",
+            ),
+        )
+        assertEquals(
+            PrepareWorkflowPhase.INSTALLING_DEPENDENCIES,
+            PrepareWorkflowPresentationPolicy.fromInternalProgress(
+                "SIFTALPHA_X_INTERNAL_PREPARE_STAGE=ALPINE_PROJECT_DEPENDENCIES",
+            ),
+        )
+        assertEquals(
+            PrepareWorkflowPhase.VERIFYING,
+            PrepareWorkflowPresentationPolicy.fromInternalProgress(
+                "SIFTALPHA_X_INTERNAL_PREPARE_STAGE=VERIFYING",
+            ),
+        )
+    }
+
     private fun readyPlan(): ProjectEnvironmentPlan = ProjectEnvironmentPlan(
         schemaVersion = 1,
         planId = "plan",

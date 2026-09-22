@@ -3113,3 +3113,14 @@ Frozen baseline:
 Target:
 - versionName `0.8.0-alpha43-r48d3`
 - versionCode `214`.
+
+
+## 2026-09-22 · R48-D3 v215 Normal Mode launch/status/progress boundary repair
+
+- Android 12+ system starting window now uses a SiftAlpha dark splash background and the real launcher mark, removing the visible white launch gap while keeping the existing ~3 second static brand hold.
+- The brand hold is cold-launch-only for the MainActivity instance. Developer Mode -> Normal Mode switching no longer replays the launch brand surface.
+- Home restores only the small “智能筛选 · 简化执行 · 看见结果” line; “你好 / 让想法变成看得见的结果” stays removed.
+- Project description is independent from configuration state. Configuration and runtime-state badges now sit together on the same row.
+- Internal PREPARE progress is wired read-only into Normal Mode through an opt-in ProjectRuntimeControlExecutor callback. The compact six-phase card now advances from actual resolution/runtime/install/verify boundaries instead of remaining at step 1 until completion.
+- Shared Developer Mode Home scaffold remains frozen against baseline/r48d2. The previously changed shared import subtitle is restored to the R48-D2 wording; Normal Mode now owns a separate import subtitle resource.
+- versionCode = 215; versionName remains 0.8.0-alpha43-r48d3.

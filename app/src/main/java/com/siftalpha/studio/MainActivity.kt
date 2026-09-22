@@ -51,6 +51,7 @@ class MainActivity : StudioComposeActivity() {
     private lateinit var runtimeLifecycleStore: RuntimeLifecycleStore
     private lateinit var externalPreflight: ExternalProviderProbeCoordinator
     private val homeState = mutableStateOf(HomeState())
+    private val showLaunchBrand = mutableStateOf(false)
     private var autoBridgeProbeStarted = false
     private val pendingGitHubImports =
         mutableMapOf<Int, ProjectRuntimeController.GitHubCloneSpec>()
@@ -103,6 +104,8 @@ class MainActivity : StudioComposeActivity() {
         runtimeLifecycleStore = RuntimeLifecycleStore(this)
         externalPreflight = ExternalProviderProbeCoordinator.shared(this)
         refreshDeveloperMode()
+        showLaunchBrand.value =
+            savedInstanceState == null && !homeState.value.developerModeEnabled
         enableEdgeToEdge()
         setContent {
             val homeContent: @Composable () -> Unit = {
@@ -176,7 +179,12 @@ class MainActivity : StudioComposeActivity() {
                 StudioTheme { homeContent() }
             } else {
                 SiftAlphaNormalTheme {
-                    SiftAlphaBrandTransition { homeContent() }
+                    SiftAlphaBrandTransition(
+                        showOnEntry = showLaunchBrand.value,
+                        onFinished = { showLaunchBrand.value = false },
+                    ) {
+                        homeContent()
+                    }
                 }
             }
         }

@@ -1431,3 +1431,9 @@ Current Normal Mode opening and Home rules:
 - Prepare shows only the current one of six phases in one compact card;
 - decorative infinite animation remains lifecycle-gated and must stop in background;
 - baseline/r48d2 remains read-only.
+
+
+## 2026-09-22 · R48-D3 v215 Normal Mode / Developer Mode boundary
+
+Normal Mode owns its launch brand, Home presentation, project-card badges, and compact prepare-progress presentation.
+Developer Mode remains frozen against baseline/r48d2. Shared code may only receive behavior-neutral, opt-in plumbing needed by Normal Mode; the v215 internal-prepare progress callback defaults to null and therefore does not alter Developer Mode execution or UI. The static brand hold is cold-launch-only and must not replay when switching modes.

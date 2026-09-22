@@ -185,13 +185,22 @@ private fun rememberDecorativeMotionEnabled(): Boolean {
 }
 
 @Composable
-internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
-    var showBrand by remember { mutableStateOf(true) }
+internal fun SiftAlphaBrandTransition(
+    showOnEntry: Boolean,
+    onFinished: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    var showBrand by remember(showOnEntry) { mutableStateOf(showOnEntry) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(showOnEntry) {
+        if (!showOnEntry) {
+            showBrand = false
+            return@LaunchedEffect
+        }
         // Static brand hold only. No code-convergence or decorative loop is scheduled.
         delay(3000)
         showBrand = false
+        onFinished()
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -507,6 +516,14 @@ internal fun SiftAlphaNormalHomeScreen(
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
                 item {
+                    Text(
+                        text = stringResource(R.string.brand_tagline_secondary),
+                        color = Muted,
+                        fontSize = 13.sp,
+                    )
+                }
+
+                item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -769,24 +786,26 @@ private fun ProjectCardNormal(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        text = project.description.ifBlank {
-                            stringResource(
-                                if (ready) {
-                                    R.string.brand_project_ready
-                                } else {
-                                    R.string.brand_project_needs_setup
-                                },
+                    project.description
+                        .takeIf { it.isNotBlank() }
+                        ?.let { description ->
+                            Spacer(Modifier.height(3.dp))
+                            Text(
+                                text = description,
+                                color = Muted,
+                                fontSize = 11.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                             )
-                        },
-                        color = Muted,
-                        fontSize = 11.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                        }
                     Spacer(Modifier.height(7.dp))
-                    ProjectRuntimeStatusBadge(runtimeState)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
+                        ProjectConfigurationStatusBadge(configured = ready)
+                        ProjectRuntimeStatusBadge(runtimeState)
+                    }
                 }
                 Spacer(Modifier.width(8.dp))
                 ChevronGlyph(Modifier.size(18.dp), Muted)
@@ -834,6 +853,26 @@ private fun ProjectCardNormal(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ProjectConfigurationStatusBadge(configured: Boolean) {
+    val tone = if (configured) Green else Amber
+    Surface(
+        color = tone.copy(alpha = .12f),
+        shape = RoundedCornerShape(999.dp),
+        border = BorderStroke(1.dp, tone.copy(alpha = .35f)),
+    ) {
+        Text(
+            text = stringResource(
+                if (configured) R.string.brand_project_ready else R.string.brand_project_needs_setup,
+            ),
+            color = tone,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 

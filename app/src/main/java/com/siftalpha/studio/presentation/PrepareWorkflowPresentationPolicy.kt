@@ -72,4 +72,31 @@ object PrepareWorkflowPresentationPolicy {
         "FINALIZING" -> PrepareWorkflowPhase.VERIFYING
         else -> PrepareWorkflowPhase.PREPARING_RUNTIME
     }
+
+    fun fromInternalProgress(text: String): PrepareWorkflowPhase? {
+        val stage = text.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.startsWith("SIFTALPHA_X_INTERNAL_PREPARE_STAGE=") }
+            ?.substringAfter('=')
+            ?.trim()
+            ?.uppercase()
+            ?: return null
+        return when (stage) {
+            "PREPARING_RUNTIME",
+            "ALPINE_RUNTIME",
+            "ALPINE_PYTHON_RUNTIME",
+            "ALPINE_PYTHON_RUNTIME_IDENTITY",
+            "ALPINE_NODE_RUNTIME",
+            "ALPINE_FALLBACK",
+            -> PrepareWorkflowPhase.PREPARING_RUNTIME
+
+            "CPYTHON",
+            "ALPINE_PROJECT_DEPENDENCIES",
+            "ALPINE_VITE_BUILD",
+            -> PrepareWorkflowPhase.INSTALLING_DEPENDENCIES
+
+            "VERIFYING" -> PrepareWorkflowPhase.VERIFYING
+            else -> null
+        }
+    }
 }

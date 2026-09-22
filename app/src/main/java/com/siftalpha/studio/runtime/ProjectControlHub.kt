@@ -176,6 +176,7 @@ class ProjectRuntimeControlExecutor(
     private val externalBackend: RuntimeBackend,
     private val operationCoordinator: ProjectOperationCoordinator? = null,
     private val environmentReadyReader: (String, ProjectRuntimeSelection) -> Boolean? = { _, _ -> null },
+    private val internalPrepareProgress: ((String) -> Unit)? = null,
 ) : ProjectControlHub.Executor {
 
     override fun prepare(
@@ -232,7 +233,16 @@ class ProjectRuntimeControlExecutor(
                     )
                 }
                 runCatching {
-                    val prepared = runtime.prepareEmbeddedPythonEnvironment(project)
+                    internalPrepareProgress?.invoke(
+                        "SIFTALPHA_X_INTERNAL_PREPARE_STAGE=PREPARING_RUNTIME",
+                    )
+                    val prepared = runtime.prepareEmbeddedPythonEnvironment(
+                        project = project,
+                        progress = internalPrepareProgress,
+                    )
+                    internalPrepareProgress?.invoke(
+                        "SIFTALPHA_X_INTERNAL_PREPARE_STAGE=VERIFYING",
+                    )
                     val verified = prepared.ready && runtime.embeddedPythonEnvironmentReady(project)
                     operation?.let {
                         operationCoordinator?.finish(

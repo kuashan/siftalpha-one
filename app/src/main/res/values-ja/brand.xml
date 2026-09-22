@@ -2,6 +2,7 @@
 <resources>
     <string name="brand_tagline_primary">複雑な技術を、シンプルな可能性へ</string>
     <string name="brand_tagline_secondary">スマートに選別 · シンプルに実行 · 結果を見る</string>
+    <string name="brand_normal_import_supported">Python ファイル、ZIP プロジェクト、GitHub リンクに対応しています。</string>
     <string name="brand_normal_intro">アイデアを見える結果へ</string>
     <string name="brand_home_hello">こんにちは</string>
     <string name="brand_import_short">複数のファイル形式に対応\nすぐに開始</string>

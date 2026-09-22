@@ -200,7 +200,7 @@ internal fun SiftAlphaNormalImportDialog(
 ) {
     NormalSecondaryDialog(
         title = stringResource(R.string.home_import_title),
-        subtitle = stringResource(R.string.home_import_supported),
+        subtitle = stringResource(R.string.brand_normal_import_supported),
         onDismiss = onDismiss,
     ) {
         SecondaryActionCard(

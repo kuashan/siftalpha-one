@@ -1691,3 +1691,20 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | Localization parity | all five locale home.xml key sets remain aligned | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v215 — Launch / project card / prepare progress / Developer Mode boundary
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Android 12+ launch | system starting window uses SiftAlpha dark background + real launcher mark | PASS REQUIRED |
+| Static brand hold | ~3 seconds on cold launch only | PASS REQUIRED |
+| Mode switch | Developer Mode -> Normal Mode does not replay brand hold | PASS REQUIRED |
+| Home copy | big hello/result slogan absent; small secondary tagline present | PASS REQUIRED |
+| Project description | description remains visible without replacing configuration state | PASS REQUIRED |
+| Project badges | configuration badge immediately followed by runtime-state badge | PASS REQUIRED |
+| Internal PREPARE | phase 1 detection -> phase 2 compatibility -> actual runtime/install/verify events -> ready | PASS REQUIRED |
+| External PREPARE | existing log-probe mapping unchanged | PASS REQUIRED |
+| Developer Mode Home | shared scaffold remains byte-identical to baseline/r48d2 segment | PASS REQUIRED |
+| Developer shared import copy | restored to baseline/r48d2 wording | PASS REQUIRED |
+| W0 / tests / APK | cloud build must pass | PENDING |
