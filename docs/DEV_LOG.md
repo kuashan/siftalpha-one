@@ -3374,3 +3374,16 @@ Target:
 - W0 #636 confirmed the previous test-only escape fix was malformed in source serialization.
 - Replaced the affected assertion block with valid Kotlin literal escapes: `\$candidate` and `\$venv`.
 - Production Runtime repair is unchanged from `242273366504106e039e9417ba003823a0b282a8`.
+## 2026-09-23 · R48-D9 PREPARE lifecycle closure verification
+
+- Production root-cause repair remains `242273366504106e039e9417ba003823a0b282a8`: External Python PREPARE commits the validated environment and READY marker before old-backup maintenance, emits `SIFTALPHA_PREPARE_COMMITTED=1` / `SIFTALPHA_ENV=READY`, disarms rollback, and bounds post-commit backup deletion to 4 seconds.
+- Shared lifecycle audit confirmed that once the External Provider result returns, `ProjectOperationCoordinator` finishes the matching generation, cancels its watchdog, removes execution bindings, clears the persisted active-operation record, and updates environment readiness; the multi-minute PREPARING stall was therefore before callback delivery, not a second coordinator deadlock.
+- Added JVM regression coverage for External PREPARE success, failure, and STOP supersession. Each path verifies that PREPARING terminates and that no current/persisted active operation remains; the STOP case also fences a late result from the superseded PREPARE generation.
+- Rebuilt `PythonRuntimeAdapterTest.kt` from the clean R48-D9 source after earlier test-only interpolation/serialization follow-ups left duplicated trailing test text. No production Runtime, Shared Core behavior, Normal Mode, or Developer Mode source was changed by this cleanup.
+- W0 Cloud Build #642: PASS on `086ce75316263bca21a132d09a68e86294d98f87` (`testDebugUnitTest` + `assembleDebug` + APK evidence + stable signing).
+- Internal Alpine Probe #111: PASS on production implementation commit `242273366504106e039e9417ba003823a0b282a8`.
+- Developer Mode source boundary remains intact: no direct `V04Activity.kt` modification was made for R48-D9.
+
+Verification target remains:
+- versionCode = 221
+- versionName = 0.8.0-alpha43-r48d9
