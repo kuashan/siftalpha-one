@@ -1607,3 +1607,20 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Real logo asset | unchanged | PASS REQUIRED |
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v210 — True 2D code-S mask fill
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Intermediate silhouette | broad readable S, not text knot/blob | PASS REQUIRED |
+| Formation algorithm | 2D filled S mask, not offset path bands | PASS REQUIRED |
+| Mask grid | 30 × 36 normalized cells | PASS REQUIRED |
+| Waist | visibly tighter than upper/lower lobes | PASS REQUIRED |
+| Negative space | clear S interior separation | PASS REQUIRED |
+| Settled glyphs | distributed across full S mask | PASS REQUIRED |
+| Shell / terminal / cloud | absent | PASS REQUIRED |
+| Code-S hold | visible before real-logo reveal | PASS REQUIRED |
+| Real logo asset | unchanged | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |

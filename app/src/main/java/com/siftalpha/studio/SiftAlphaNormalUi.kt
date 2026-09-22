@@ -268,13 +268,13 @@ private fun SiftAlphaLaunchMotion(
             (
                 1f -
                     smoothStep(
-                        ((p - .88f) / .10f).coerceIn(0f, 1f),
+                        ((p - .90f) / .08f).coerceIn(0f, 1f),
                     )
                 )
     val realLogoAlpha =
         if (motion) {
             smoothStep(
-                ((p - .84f) / .13f).coerceIn(0f, 1f),
+                ((p - .87f) / .10f).coerceIn(0f, 1f),
             )
         } else {
             1f
@@ -342,8 +342,8 @@ private fun SiftAlphaLaunchMotion(
     ) {
         val cx = .50f
         val cy = .445f
-        val logoHalfW = 76.dp.value / maxWidth.value
-        val logoHalfH = 76.dp.value / maxHeight.value
+        val logoHalfW = 92.dp.value / maxWidth.value
+        val logoHalfH = 96.dp.value / maxHeight.value
 
         fun codeSPoint(u: Float): Offset {
             val t = u.coerceIn(0f, 1f)
@@ -446,60 +446,110 @@ private fun SiftAlphaLaunchMotion(
             }
         }
 
-        fun codeLogoTarget(index: Int, total: Int): Offset {
-            // The intermediate object is ONLY the S itself, built from real code glyphs.
-            // No rounded-square shell, no >_ terminal, no random fragment cloud.
-            // A 9-band lattice across the S normal gives the dense, readable code-built S
-            // seen in the approved reference image.
-            val bands = 9
-            val sampleIndex = index / bands
-            val bandIndex = index % bands
-            val sampleCount =
-                ((total + bands - 1) / bands).coerceAtLeast(2)
-            val u =
-                (
-                    sampleIndex.toFloat() /
-                        (sampleCount - 1).toFloat()
-                    ).coerceIn(0f, 1f)
+        fun normalizedSPoint(u: Float): Offset {
+            val t = u.coerceIn(0f, 1f)
+            return when {
+                t < .34f -> {
+                    val q = t / .34f
+                    Offset(
+                        cubicBezier(.64f, .15f, -.68f, -.60f, q),
+                        cubicBezier(-.72f, -.90f, -.74f, -.28f, q),
+                    )
+                }
+                t < .67f -> {
+                    val q = (t - .34f) / .33f
+                    Offset(
+                        cubicBezier(-.60f, -.58f, .62f, .60f, q),
+                        cubicBezier(-.28f, -.02f, .02f, .28f, q),
+                    )
+                }
+                else -> {
+                    val q = (t - .67f) / .33f
+                    Offset(
+                        cubicBezier(.60f, .66f, -.12f, -.66f, q),
+                        cubicBezier(.28f, .72f, .88f, .70f, q),
+                    )
+                }
+            }
+        }
 
-            val epsilon = .0045f
-            val base = codeSPoint(u)
-            val prev = codeSPoint((u - epsilon).coerceAtLeast(0f))
-            val next = codeSPoint((u + epsilon).coerceAtMost(1f))
-            val tx = next.x - prev.x
-            val ty = next.y - prev.y
-            val length =
-                kotlin.math.sqrt(tx * tx + ty * ty)
-                    .coerceAtLeast(.0001f)
-            val nx = -ty / length
-            val ny = tx / length
-            val band =
-                (bandIndex - (bands - 1) / 2f) /
-                    ((bands - 1) / 2f)
+        val codeSMaskTargets = remember(logoHalfW, logoHalfH) {
+            val candidates = mutableListOf<Pair<Int, Offset>>()
+            val columns = 30
+            val rows = 36
+            val pathSamples = 150
 
-            // Slightly thicker upper/lower lobes, tighter waist — matching the reference S.
-            val waist =
-                kotlin.math.abs(u - .50f) * 2f
-            val ribbonHalfWidth =
-                logoHalfW *
-                    (.215f - .055f * (1f - waist))
+            repeat(rows) { row ->
+                val ly =
+                    -1f +
+                        2f *
+                            row.toFloat() /
+                            (rows - 1).toFloat()
+                repeat(columns) { column ->
+                    val lx =
+                        -1f +
+                            2f *
+                                column.toFloat() /
+                                (columns - 1).toFloat()
 
-            // Tiny deterministic jitter prevents a sterile grid while preserving the S silhouette.
-            val jitter =
-                logoHalfW * .012f
-            val jx = kotlin.math.cos(index * 1.73f) * jitter
-            val jy = sin(index * 2.11f) * jitter * .72f
+                    var nearestDistanceSquared = Float.MAX_VALUE
+                    var nearestU = 0f
+                    repeat(pathSamples) { sample ->
+                        val u =
+                            sample.toFloat() /
+                                (pathSamples - 1).toFloat()
+                        val point = normalizedSPoint(u)
+                        val dx = lx - point.x
+                        val dy = ly - point.y
+                        val distanceSquared = dx * dx + dy * dy
+                        if (distanceSquared < nearestDistanceSquared) {
+                            nearestDistanceSquared = distanceSquared
+                            nearestU = u
+                        }
+                    }
 
-            return Offset(
-                base.x + nx * band * ribbonHalfWidth + jx,
-                base.y + ny * band * ribbonHalfWidth + jy,
-            )
+                    // Wide upper/lower lobes + intentionally tight waist.
+                    // This creates an actual filled S area instead of parallel path rows.
+                    val endWeight =
+                        kotlin.math.abs(nearestU * 2f - 1f)
+                    val allowedHalfWidth =
+                        .165f + .085f * endWeight
+                    if (
+                        nearestDistanceSquared <=
+                            allowedHalfWidth * allowedHalfWidth
+                    ) {
+                        val hash =
+                            (
+                                row * 193 +
+                                    column * 389 +
+                                    row * column * 17
+                                ) % 10007
+                        candidates +=
+                            hash to
+                                Offset(
+                                    cx + lx * logoHalfW,
+                                    cy + ly * logoHalfH,
+                                )
+                    }
+                }
+            }
+
+            candidates
+                .sortedBy { it.first }
+                .map { it.second }
+        }
+
+        fun codeLogoTarget(index: Int): Offset {
+            if (codeSMaskTargets.isEmpty()) {
+                return Offset(cx, cy)
+            }
+            return codeSMaskTargets[index % codeSMaskTargets.size]
         }
 
         fun codeLogoColor(target: Offset, index: Int): Color =
             when {
                 target.y < cy - logoHalfH * .18f ->
-                    if (index % 4 == 0) Color.White else Cyan
+                    if (index % 5 == 0) Color.White else Cyan
                 target.y > cy + logoHalfH * .18f ->
                     if (index % 5 == 0) ElectricBlue else Violet
                 index % 3 == 0 -> Cyan
@@ -606,10 +656,10 @@ private fun SiftAlphaLaunchMotion(
                     val clock = if (upper) upperClock else lowerClock
                     repeat(strandsPerSide) { strand ->
                         val lane = strand / (strandsPerSide - 1f)
-                        val target = codeLogoTarget(
-                            strand + side * strandsPerSide,
-                            strandsPerSide * 2,
-                        )
+                        val target =
+                            codeLogoTarget(
+                                strand + side * strandsPerSide,
+                            )
                         val phase =
                             (
                                 clock +
@@ -689,7 +739,7 @@ private fun SiftAlphaLaunchMotion(
                     val raw =
                         (clock + index * .024f + lane * .11f) % 1f
                     val t = smoothStep(raw)
-                    val target = codeLogoTarget(index, particleCount)
+                    val target = codeLogoTarget(index)
                     val n = inflowPoint(
                         upper,
                         lane,
@@ -737,7 +787,7 @@ private fun SiftAlphaLaunchMotion(
             }
         }
 
-        // The visible code itself converges directly onto the final logo geometry.
+        // The visible code itself converges directly into the filled S mask.
         if (motion && (inflowAlpha > .01f || codeLogoAlpha > .01f)) {
             BrandCodeParticles.forEachIndexed { index, particle ->
                 val lane = particle.lane
@@ -751,7 +801,7 @@ private fun SiftAlphaLaunchMotion(
                         ) % 1f
                 val t = smoothStep(raw)
                 val life = flowEnvelope(raw)
-                val target = codeLogoTarget(index, BrandCodeParticles.size)
+                val target = codeLogoTarget(index)
                 val stream = inflowPoint(
                     particle.upper,
                     lane,
@@ -794,9 +844,9 @@ private fun SiftAlphaLaunchMotion(
                     color = codeLogoColor(target, index),
                     fontSize =
                         when {
-                            particle.text.length >= 4 -> 6.2.sp
-                            particle.text.length == 3 -> 7.2.sp
-                            else -> 8.2.sp
+                            particle.text.length >= 4 -> 5.8.sp
+                            particle.text.length == 3 -> 6.8.sp
+                            else -> 7.8.sp
                         },
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier

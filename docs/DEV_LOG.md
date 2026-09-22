@@ -2969,3 +2969,33 @@ v209 changes only the launch formation target:
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `209`.
+
+
+## 2026-09-22 · R48-D3 v210 true 2D code-S mask fill
+
+Real-device v209 still looked like a narrow text knot instead of the approved broad S silhouette.
+
+Root cause:
+- v209 still used multiple offset rows around a centerline;
+- those rows compressed and crossed around the waist, visually collapsing into a blob;
+- the algorithm described an S path, not an S-shaped area.
+
+v210 replaces that formation algorithm:
+- samples a **true 2D S mask** on a 30 × 36 normalized grid;
+- the S mask is generated from a three-segment centerline plus distance-to-curve membership;
+- upper/lower lobes use wider fill while the waist is intentionally tighter;
+- accepted mask cells become the deterministic final positions for the code glyphs;
+- target order is deterministically shuffled so early-arriving code is distributed across the full S, rather than filling one corner first;
+- the code-S is enlarged to better match the approved reference;
+- glyph size is reduced slightly to preserve readable characters and clean negative space;
+- the real logo reveal is delayed so the completed code-S can be inspected before morphing;
+- no rounded-square shell, >_ terminal, code cloud, or code-stage halo is present.
+
+Boundary remains unchanged:
+- final real launcher logo is unchanged;
+- R48-D2 baseline is untouched;
+- no Runtime / Environment / Open / Stop / result behavior changes.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `210`.

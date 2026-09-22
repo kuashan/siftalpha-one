@@ -195,3 +195,15 @@ The intermediate formation must match the approved reference:
 - no >_ terminal in the code-built stage;
 - no generic cloud/blob around the S;
 - the code-S must remain visually readable before the real launcher logo resolves in place.
+
+
+## R48-D3 v210 Override — S is an area mask, not a path
+
+The approved intermediate must be generated as a **filled S-shaped area**.
+
+Current rule:
+- do not approximate the S by stacking rows around a path;
+- define the S as a 2D mask with broad lobes, a tight waist, and clear negative space;
+- code glyphs occupy only cells accepted by that S mask;
+- incoming code moves directly into those mask positions;
+- after the completed code-S is readable, the real launcher logo resolves in the same center position.

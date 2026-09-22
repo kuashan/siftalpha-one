@@ -131,7 +131,10 @@ android {
         // v209 follows the real-device correction: the intermediate state is ONLY a dense code-built S,
         // matching the approved reference image. No shell, no terminal, no particle cloud. Incoming code
         // converges into a 9-band S glyph lattice, holds clearly, then the unchanged real app logo resolves.
-        versionCode = 209
+        // v210 replaces the path-band approximation with a true 2D S mask fill. Glyph targets are sampled
+        // from a filled S area on a 30x36 grid, producing a broad, readable silhouette with a tight waist
+        // before the unchanged real application logo resolves in place.
+        versionCode = 210
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
