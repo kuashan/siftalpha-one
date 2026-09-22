@@ -97,7 +97,10 @@ android {
         // v197 repairs the running-state presentation and launch transition from real-device feedback:
         // result readiness follows the existing Open fact, running uses breathing motion, the launch
         // brand transition dwells 3-5 seconds with the original logo, and Stop adopts the blue system tone.
-        versionCode = 197
+        // v198 links execution completion to the existing Open-ready fact, closes the running ring when
+        // a result is available, adds restrained inner data-flow lines, and evolves the launch brand
+        // transition into an S-path code/data convergence that resolves into the unchanged original logo.
+        versionCode = 198
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

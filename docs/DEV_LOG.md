@@ -2619,3 +2619,27 @@ Repair:
 
 No Runtime, Environment, Web Discovery, Open eligibility, Stop semantics, or baseline source was changed.
 Target: `0.8.0-alpha43-r48d3` / versionCode `197`.
+
+
+## 2026-09-22 · R48-D3 v198 run-state completion + code-convergence brand motion
+
+Real-device feedback on v197 clarified the visual meaning of the existing R48-D2 `Open` fact.
+
+Changes are Presentation Layer only:
+
+- When `state.openEnabled=true`, the “Execute project task” phase now becomes Completed rather than remaining Running.
+- The “Wait for project result” phase simultaneously becomes Available.
+- The runtime page itself can still remain Running; this indicates the launched project/service is alive while its user-facing result is already available.
+- The running ring closes completely when the result is available.
+- The completed running ring keeps a restrained breathing treatment and adds only three thin internal data-flow curves with moving highlights.
+- The launch brand transition now uses code/data particles moving along two S-like curved streams:
+  - upper stream starts from the right and converges inward;
+  - lower stream starts from the left and converges inward;
+  - the particles fade as the unchanged original R48-D2 logo resolves in the center.
+- Reduced-motion removes moving particles/flow while preserving state and brand dwell.
+
+No Runtime, Environment, Web Discovery, Stop, Open eligibility, or baseline source semantics were modified.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `198`

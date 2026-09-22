@@ -38,3 +38,17 @@ Brand Transition（品牌启动过渡）强化 **SiftAlpha X + 原始 Logo（标
 - The logo uses a slow breathing rhythm rather than rotation.
 - The underlying Home screen is covered until the brand transition exits.
 - When Android system animations are disabled, the logo remains static for the dwell period and exits without decorative motion.
+
+
+## R48-D3 v198 Code / Data Convergence
+
+The launch brand motion now follows this choreography while preserving the exact original logo asset:
+
+1. Code/data tokens appear in two sparse streams.
+2. The upper stream begins on the right and follows a curved inward route.
+3. The lower stream begins on the left and follows a curved inward route.
+4. Together the streams suggest the directional rhythm of an S without redrawing the logo itself.
+5. As the streams converge, the code/data fades and the real R48-D2 logo resolves in the center.
+6. Wordmark and tagline appear only after the logo has begun resolving.
+7. Total perceived brand dwell remains in the approved ~3-5 second range.
+8. Reduced-motion mode removes moving convergence and presents the completed original logo statically.

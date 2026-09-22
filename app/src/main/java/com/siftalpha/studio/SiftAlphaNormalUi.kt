@@ -18,6 +18,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -142,18 +144,18 @@ internal fun SiftAlphaNormalTheme(content: @Composable () -> Unit) {
 internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
     val motion = remember { ValueAnimator.areAnimatorsEnabled() }
     var visible by rememberSaveable { mutableStateOf(true) }
-    val reveal = remember { Animatable(if (motion) 0f else 1f) }
-    val nameAlpha = remember { Animatable(if (motion) 0f else 1f) }
+    val assembly = remember { Animatable(if (motion) 0f else 1f) }
+
     LaunchedEffect(Unit) {
         if (motion) {
-            reveal.animateTo(1f, tween(700))
-            nameAlpha.animateTo(1f, tween(300))
-            // Keep the branded entry visible long enough to be perceived as an intentional
-            // product transition rather than a flash. 700 + 300 + 2450 + exit ≈ 3.9 s.
-            delay(2450)
+            // Stage 1 + 2: code/data converge along an S-like path and resolve into the original
+            // logo. Stage 3: hold the completed brand frame long enough to be intentionally seen.
+            assembly.animateTo(1f, tween(2700))
+            delay(800)
         } else {
-            // Reduced-motion keeps the requested dwell time but removes motion.
-            delay(3300)
+            // Reduced-motion keeps the requested 3-5 second branded dwell without moving elements.
+            assembly.snapTo(1f)
+            delay(3500)
         }
         visible = false
     }
@@ -173,18 +175,21 @@ internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
                         .padding(horizontal = 28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    AnimatedOriginalLogoMark(
-                        reveal = reveal.value,
+                    DataCodeLogoAssembly(
+                        progress = assembly.value,
                         motion = motion,
                     )
                     Spacer(Modifier.height(14.dp))
+
+                    val wordmarkAlpha =
+                        ((assembly.value - .70f) / .22f).coerceIn(0f, 1f)
                     Text(
                         text = stringResource(R.string.app_name),
                         color = TextPrimary,
                         fontSize = 36.sp,
                         lineHeight = 42.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.alpha(nameAlpha.value),
+                        modifier = Modifier.alpha(wordmarkAlpha),
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
@@ -193,7 +198,7 @@ internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
                         fontSize = 17.sp,
                         lineHeight = 25.sp,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.alpha(nameAlpha.value),
+                        modifier = Modifier.alpha(wordmarkAlpha),
                     )
                     Spacer(Modifier.height(7.dp))
                     Text(
@@ -201,7 +206,7 @@ internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
                         color = Cyan,
                         fontSize = 12.sp,
                         letterSpacing = 1.4.sp,
-                        modifier = Modifier.alpha(nameAlpha.value),
+                        modifier = Modifier.alpha(wordmarkAlpha),
                     )
                 }
             }
@@ -209,51 +214,149 @@ internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
     }
 }
 
+private data class BrandCodeParticle(
+    val text: String,
+    val upper: Boolean,
+    val lane: Float,
+    val delay: Float,
+)
+
+private val BrandCodeParticles = listOf(
+    BrandCodeParticle("101", upper = true, lane = .04f, delay = .00f),
+    BrandCodeParticle("{ }", upper = true, lane = .16f, delay = .05f),
+    BrandCodeParticle("</>", upper = true, lane = .30f, delay = .10f),
+    BrandCodeParticle("AI", upper = true, lane = .44f, delay = .15f),
+    BrandCodeParticle("0x", upper = true, lane = .58f, delay = .20f),
+    BrandCodeParticle("[ ]", upper = true, lane = .72f, delay = .25f),
+    BrandCodeParticle("Py", upper = false, lane = .06f, delay = .02f),
+    BrandCodeParticle("R", upper = false, lane = .20f, delay = .07f),
+    BrandCodeParticle("JS", upper = false, lane = .34f, delay = .12f),
+    BrandCodeParticle("Σ", upper = false, lane = .48f, delay = .17f),
+    BrandCodeParticle("λ", upper = false, lane = .62f, delay = .22f),
+    BrandCodeParticle("01", upper = false, lane = .76f, delay = .27f),
+)
+
+private fun cubicBezier(
+    start: Float,
+    control1: Float,
+    control2: Float,
+    end: Float,
+    t: Float,
+): Float {
+    val u = 1f - t
+    return u * u * u * start +
+        3f * u * u * t * control1 +
+        3f * u * t * t * control2 +
+        t * t * t * end
+}
+
 @Composable
-private fun AnimatedOriginalLogoMark(
-    reveal: Float,
+private fun DataCodeLogoAssembly(
+    progress: Float,
     motion: Boolean,
 ) {
-    val transition = rememberInfiniteTransition(label = "brand-logo-pulse")
-    val pulse by if (motion) {
-        transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(900),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "brand-logo-breath",
-        )
+    val resolved = progress.coerceIn(0f, 1f)
+    val logoAlpha = if (motion) {
+        ((resolved - .56f) / .34f).coerceIn(0f, 1f)
     } else {
-        remember { mutableStateOf(.5f) }
+        1f
+    }
+    val particleFade = if (motion) {
+        (1f - ((resolved - .58f) / .28f).coerceIn(0f, 1f))
+    } else {
+        0f
     }
 
-    Box(
-        modifier = Modifier.size(164.dp),
+    BoxWithConstraints(
+        modifier = Modifier.size(width = 292.dp, height = 194.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val phase = pulse.coerceIn(0f, 1f)
+        if (motion && particleFade > .01f) {
+            BrandCodeParticles.forEachIndexed { index, particle ->
+                val localProgress =
+                    ((resolved - particle.delay) / (1f - particle.delay))
+                        .coerceIn(0f, 1f)
+
+                // Upper stream starts from the right and curls inward.
+                // Lower stream starts from the left and curls inward.
+                val startX = if (particle.upper) {
+                    .76f + particle.lane * .20f
+                } else {
+                    .02f + particle.lane * .18f
+                }
+                val startY = if (particle.upper) {
+                    .08f + particle.lane * .24f
+                } else {
+                    .70f + particle.lane * .22f
+                }
+                val control1X = if (particle.upper) .98f else .02f
+                val control1Y = if (particle.upper) .30f else .72f
+                val control2X = if (particle.upper) .28f else .72f
+                val control2Y = if (particle.upper) .34f else .62f
+                val endX = .50f + ((index % 3) - 1) * .026f
+                val endY = if (particle.upper) {
+                    .45f + (index % 2) * .025f
+                } else {
+                    .55f - (index % 2) * .025f
+                }
+
+                val x = cubicBezier(
+                    startX,
+                    control1X,
+                    control2X,
+                    endX,
+                    localProgress,
+                )
+                val y = cubicBezier(
+                    startY,
+                    control1Y,
+                    control2Y,
+                    endY,
+                    localProgress,
+                )
+
+                Text(
+                    text = particle.text,
+                    color = if (particle.upper) Cyan else ElectricBlue,
+                    fontSize = if (particle.text.length <= 2) 11.sp else 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .offset(
+                            x = maxWidth * x - 13.dp,
+                            y = maxHeight * y - 8.dp,
+                        )
+                        .alpha(
+                            particleFade *
+                                (.40f + .60f * localProgress),
+                        )
+                        .graphicsLayer {
+                            val scale = .86f + .14f * localProgress
+                            scaleX = scale
+                            scaleY = scale
+                        },
+                )
+            }
+        }
+
+        // A small amount of path energy remains visible while the true logo resolves.
+        Canvas(
+            modifier = Modifier
+                .size(164.dp)
+                .alpha((.35f + .65f * logoAlpha).coerceIn(0f, 1f)),
+        ) {
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Cyan.copy(alpha = .18f + .16f * phase),
-                        Blue.copy(alpha = .10f + .10f * phase),
-                        Violet.copy(alpha = .06f + .08f * phase),
+                        Cyan.copy(alpha = .12f + .18f * logoAlpha),
+                        Blue.copy(alpha = .08f + .12f * logoAlpha),
+                        Violet.copy(alpha = .05f + .08f * logoAlpha),
                         Color.Transparent,
                     ),
                     center = center,
                     radius = size.minDimension * .50f,
                 ),
-                radius = size.minDimension * (.44f + .035f * phase),
+                radius = size.minDimension * (.42f + .035f * logoAlpha),
                 center = center,
-            )
-            drawCircle(
-                color = Cyan.copy(alpha = .14f + .18f * phase),
-                radius = size.minDimension * (.41f + .018f * phase),
-                center = center,
-                style = Stroke(width = 1.5.dp.toPx()),
             )
         }
 
@@ -261,19 +364,14 @@ private fun AnimatedOriginalLogoMark(
             modifier = Modifier
                 .size(126.dp)
                 .graphicsLayer {
-                    val scale = if (motion) {
-                        .965f + .035f * pulse
-                    } else {
-                        1f
-                    }
+                    val scale = .94f + .06f * logoAlpha
                     scaleX = scale
                     scaleY = scale
                 },
-            alpha = reveal,
+            alpha = logoAlpha,
         )
     }
 }
-
 
 @Composable
 private fun SiftRibbonMark(
@@ -1850,7 +1948,12 @@ private fun RunProjectScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             item { ProjectIdentityCard(state) }
-            item { RunOrb(running = state.runtimeState == RuntimeState.RUNNING) }
+            item {
+                RunOrb(
+                    running = state.runtimeState == RuntimeState.RUNNING,
+                    resultAvailable = state.openEnabled,
+                )
+            }
             item {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
@@ -1903,11 +2006,13 @@ private fun RunProjectScreen(
 }
 
 @Composable
-private fun RunOrb(running: Boolean) {
+private fun RunOrb(
+    running: Boolean,
+    resultAvailable: Boolean,
+) {
     val motion = remember { ValueAnimator.areAnimatorsEnabled() }
     val transition = rememberInfiniteTransition(label = "run-orb")
 
-    // STARTING keeps a directional spin because it communicates transition.
     val angle by if (motion && !running) {
         transition.animateFloat(
             initialValue = -90f,
@@ -1921,17 +2026,28 @@ private fun RunOrb(running: Boolean) {
         remember { mutableStateOf(-90f) }
     }
 
-    // RUNNING switches to a breathing state: no continuous rotation, only restrained
-    // scale/glow modulation so the visual reads as "alive" instead of "still loading".
     val breath by if (motion && running) {
         transition.animateFloat(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(1050),
+                animation = tween(1080),
                 repeatMode = RepeatMode.Reverse,
             ),
             label = "run-breath",
+        )
+    } else {
+        remember { mutableStateOf(.5f) }
+    }
+
+    val flow by if (motion && running && resultAvailable) {
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1800, easing = LinearEasing),
+            ),
+            label = "run-inner-flow",
         )
     } else {
         remember { mutableStateOf(.5f) }
@@ -1953,51 +2069,141 @@ private fun RunOrb(running: Boolean) {
             val baseStroke = 10.dp.toPx()
             val pulse = breath.coerceIn(0f, 1f)
 
-            drawArc(
+            drawCircle(
                 color = Color(0xFF1D356B),
-                startAngle = 0f,
-                sweepAngle = 360f,
-                useCenter = false,
-                topLeft = Offset(baseStroke / 2, baseStroke / 2),
-                size = Size(size.width - baseStroke, size.height - baseStroke),
-                style = Stroke(baseStroke, cap = StrokeCap.Round),
+                radius = (size.minDimension - baseStroke) / 2f,
+                center = center,
+                style = Stroke(baseStroke),
             )
 
-            if (running) {
-                val haloStroke = 2.dp.toPx()
-                drawCircle(
-                    color = Cyan.copy(alpha = .10f + .22f * pulse),
-                    radius = size.minDimension * (.46f + .014f * pulse),
-                    center = center,
-                    style = Stroke(haloStroke),
-                )
-                drawArc(
-                    brush = Brush.sweepGradient(
-                        listOf(Cyan, Blue, Violet, Cyan),
-                    ),
-                    startAngle = -90f,
-                    sweepAngle = 332f,
-                    useCenter = false,
-                    topLeft = Offset(baseStroke / 2, baseStroke / 2),
-                    size = Size(size.width - baseStroke, size.height - baseStroke),
-                    style = Stroke(
-                        width = baseStroke + 2.dp.toPx() * pulse,
-                        cap = StrokeCap.Round,
-                    ),
-                    alpha = .74f + .22f * pulse,
-                )
-            } else {
-                drawArc(
-                    brush = Brush.sweepGradient(
-                        listOf(Cyan, Blue, Violet, Cyan),
-                    ),
-                    startAngle = angle,
-                    sweepAngle = 160f,
-                    useCenter = false,
-                    topLeft = Offset(baseStroke / 2, baseStroke / 2),
-                    size = Size(size.width - baseStroke, size.height - baseStroke),
-                    style = Stroke(baseStroke, cap = StrokeCap.Round),
-                )
+            when {
+                running && resultAvailable -> {
+                    // Once the existing R48-D2 Open fact is true, the launch/result surface is
+                    // ready. Close the ring completely rather than leaving a loading gap.
+                    drawCircle(
+                        brush = Brush.sweepGradient(
+                            listOf(Cyan, Blue, Violet, Cyan),
+                        ),
+                        radius = (size.minDimension - baseStroke) / 2f,
+                        center = center,
+                        style = Stroke(
+                            width = baseStroke + 2.dp.toPx() * pulse,
+                            cap = StrokeCap.Round,
+                        ),
+                        alpha = .76f + .20f * pulse,
+                    )
+
+                    // Three restrained "thinking/data" lines. Their control points move slightly
+                    // and a tiny highlight travels along each curve; no dense wireframe clutter.
+                    val lineColors = listOf(
+                        Cyan.copy(alpha = .34f),
+                        ElectricBlue.copy(alpha = .30f),
+                        Violet.copy(alpha = .27f),
+                    )
+                    val top = size.height * .39f
+                    val gap = size.height * .105f
+
+                    fun pointOnCubic(
+                        p0: Offset,
+                        p1: Offset,
+                        p2: Offset,
+                        p3: Offset,
+                        t: Float,
+                    ): Offset {
+                        val u = 1f - t
+                        return Offset(
+                            x = u * u * u * p0.x +
+                                3f * u * u * t * p1.x +
+                                3f * u * t * t * p2.x +
+                                t * t * t * p3.x,
+                            y = u * u * u * p0.y +
+                                3f * u * u * t * p1.y +
+                                3f * u * t * t * p2.y +
+                                t * t * t * p3.y,
+                        )
+                    }
+
+                    repeat(3) { index ->
+                        val y = top + gap * index
+                        val direction = if (index % 2 == 0) 1f else -1f
+                        val shift = (flow - .5f) * 10.dp.toPx() * direction
+                        val p0 = Offset(size.width * .25f, y)
+                        val p1 = Offset(
+                            size.width * .39f,
+                            y - 13.dp.toPx() * direction + shift,
+                        )
+                        val p2 = Offset(
+                            size.width * .61f,
+                            y + 13.dp.toPx() * direction - shift,
+                        )
+                        val p3 = Offset(size.width * .75f, y)
+                        val path = Path().apply {
+                            moveTo(p0.x, p0.y)
+                            cubicTo(
+                                p1.x,
+                                p1.y,
+                                p2.x,
+                                p2.y,
+                                p3.x,
+                                p3.y,
+                            )
+                        }
+                        drawPath(
+                            path = path,
+                            color = lineColors[index],
+                            style = Stroke(
+                                width = 1.15.dp.toPx(),
+                                cap = StrokeCap.Round,
+                            ),
+                        )
+
+                        val dotT = (flow + index * .31f) % 1f
+                        val dot = pointOnCubic(p0, p1, p2, p3, dotT)
+                        drawCircle(
+                            color = lineColors[index].copy(alpha = .80f),
+                            radius = 1.8.dp.toPx(),
+                            center = dot,
+                        )
+                    }
+                }
+
+                running -> {
+                    drawArc(
+                        brush = Brush.sweepGradient(
+                            listOf(Cyan, Blue, Violet, Cyan),
+                        ),
+                        startAngle = -90f,
+                        sweepAngle = 332f,
+                        useCenter = false,
+                        topLeft = Offset(baseStroke / 2, baseStroke / 2),
+                        size = Size(
+                            size.width - baseStroke,
+                            size.height - baseStroke,
+                        ),
+                        style = Stroke(
+                            width = baseStroke + 2.dp.toPx() * pulse,
+                            cap = StrokeCap.Round,
+                        ),
+                        alpha = .74f + .22f * pulse,
+                    )
+                }
+
+                else -> {
+                    drawArc(
+                        brush = Brush.sweepGradient(
+                            listOf(Cyan, Blue, Violet, Cyan),
+                        ),
+                        startAngle = angle,
+                        sweepAngle = 160f,
+                        useCenter = false,
+                        topLeft = Offset(baseStroke / 2, baseStroke / 2),
+                        size = Size(
+                            size.width - baseStroke,
+                            size.height - baseStroke,
+                        ),
+                        style = Stroke(baseStroke, cap = StrokeCap.Round),
+                    )
+                }
             }
         }
 
@@ -2027,6 +2233,9 @@ private fun RunPhaseList(
     starting: Boolean,
     resultAvailable: Boolean,
 ) {
+    val executionCompleted = resultAvailable
+    val executionActive = !starting && !resultAvailable
+
     GlowCard {
         RunPhaseRow(
             label = stringResource(R.string.brand_run_phase_start),
@@ -2036,8 +2245,8 @@ private fun RunPhaseList(
         Spacer(Modifier.height(12.dp))
         RunPhaseRow(
             label = stringResource(R.string.brand_run_phase_execute),
-            completed = false,
-            active = !starting,
+            completed = executionCompleted,
+            active = executionActive,
         )
         Spacer(Modifier.height(12.dp))
         RunPhaseRow(

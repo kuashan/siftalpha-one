@@ -1402,3 +1402,21 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Brand dwell | launch brand transition is ~3-5 seconds | PASS REQUIRED |
 | Brand logo | original R48-D2 logo asset; geometry not redrawn | PASS REQUIRED |
 | Cloud validators/tests/APK | W0 must pass before APK delivery | PENDING |
+
+
+### R48-D3 v198 — Result-linked execution completion + S-path brand assembly
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| R48-D2 baseline | `baseline/r48d2` remains at `729659c...` | PASS REQUIRED |
+| Execute phase | `openEnabled=true` -> Execute Project Task = Completed | PASS REQUIRED |
+| Result phase | `openEnabled=true` -> Wait for Result = Available | PASS REQUIRED |
+| Runtime lifecycle | page may still show Running while result is available | UNCHANGED |
+| Full running ring | result available -> no visual gap in outer ring | PASS REQUIRED |
+| Inner flow | exactly three restrained thin data-flow curves | PASS REQUIRED |
+| Inner motion | subtle highlights move only when animations enabled | PASS REQUIRED |
+| Reduced motion | no continuous decorative motion | PASS REQUIRED |
+| Brand data streams | upper right->center, lower left->center curved convergence | PASS REQUIRED |
+| Original logo | same R48-D2 logo asset; no geometry redraw | PASS REQUIRED |
+| Brand dwell | remains within ~3-5 s | PASS REQUIRED |
+| Cloud validators/tests/APK | W0 must pass before APK delivery | PENDING |

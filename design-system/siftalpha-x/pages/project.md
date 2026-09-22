@@ -86,3 +86,14 @@ Real-device rule:
 - If `Open（打开）` is already enabled, the result phase must immediately reflect availability; do not continue to show “waiting for result”.
 - Running Stop（停止运行）remains a high-priority action but uses the established blue system tone; destructive red is reserved for irreversible/destructive actions, not ordinary runtime stop.
 - Reduced-motion users receive the same state information without continuous animation.
+
+
+## v198 Result-linked Running State（结果联动运行状态）
+
+The existing R48-D2 Open（打开）fact is the visual completion boundary for the launch/result preparation sequence:
+
+- `Open=false`: Execute Project Task（执行项目任务）may remain Running（进行中） and the outer ring may retain a small incomplete arc.
+- `Open=true`: Execute Project Task becomes Completed（已完成） and Wait for Project Result（等待项目结果） becomes Available（可打开）.
+- The underlying runtime may still be Running（运行中）; do not falsely mark the whole project process as exited.
+- Once Open is available, the outer ring becomes a complete circle and switches to breathing emphasis.
+- Interior “thinking/data” decoration is limited to three thin curves with restrained moving highlights; avoid dense circuit-board/wireframe clutter.
