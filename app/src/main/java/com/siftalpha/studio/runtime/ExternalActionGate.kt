@@ -48,6 +48,7 @@ class ExternalActionGate internal constructor(
     private val lock = Any()
     private val pendingByProject = linkedMapOf<String, Request>()
     private val generations = linkedMapOf<String, Long>()
+    private val requestInFlightProjects = mutableSetOf<String>()
 
     fun request(
         projectId: String,
@@ -75,7 +76,12 @@ class ExternalActionGate internal constructor(
             }
         }
 
-        val after = ensureReadiness()
+        synchronized(lock) { requestInFlightProjects += projectId }
+        val after = try {
+            ensureReadiness()
+        } finally {
+            synchronized(lock) { requestInFlightProjects -= projectId }
+        }
         if (after.ready) {
             val claimed = claimReady(
                 projectId = projectId,
@@ -105,6 +111,7 @@ class ExternalActionGate internal constructor(
     ): Request? {
         if (!currentReadiness().ready) return null
         return synchronized(lock) {
+            if (projectId in requestInFlightProjects) return@synchronized null
             val request = pendingByProject[projectId] ?: return@synchronized null
             if (request.origin != origin) return@synchronized null
             if (generation != null && request.generation != generation) return@synchronized null
@@ -116,7 +123,9 @@ class ExternalActionGate internal constructor(
     fun claimReady(origin: Origin): List<Request> {
         if (!currentReadiness().ready) return emptyList()
         return synchronized(lock) {
-            val requests = pendingByProject.values.filter { it.origin == origin }
+            val requests = pendingByProject.values.filter {
+                it.origin == origin && it.projectId !in requestInFlightProjects
+            }
             requests.forEach { pendingByProject.remove(it.projectId) }
             requests
         }
