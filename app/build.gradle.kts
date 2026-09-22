@@ -140,7 +140,9 @@ android {
         // v212 removes the experimental custom code-opening sequence entirely and adds one lifecycle-aware
         // decorative-motion gate: Aurora, RunOrb and DotPulse leave infinite animation composition whenever
         // their Activity is no longer STARTED or Android system animations are disabled. Runtime work is unchanged.
-        versionCode = 212
+        // v213 is the installable verification build for that motion-lifecycle change and restores the shared
+        // Compose geometry Size import required by existing non-launch Normal Mode drawing code.
+        versionCode = 213
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

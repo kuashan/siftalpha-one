@@ -3054,3 +3054,20 @@ Explicitly unchanged:
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `212`.
+
+
+## 2026-09-22 · R48-D3 v213 lifecycle-gated motion build repair
+
+Cloud build #621 exposed one compile-only regression after deleting the custom launch implementation:
+the import for `androidx.compose.ui.geometry.Size` was removed with launch-only imports, but existing Normal Mode drawing code still uses `Size`.
+
+v213:
+- restores only that required Compose geometry import;
+- keeps the custom code opening removed;
+- keeps the shared decorative-motion lifecycle gate unchanged;
+- keeps AuroraBackdrop / RunOrb / DotPulse gated by Activity STARTED + Android system-animation state;
+- leaves runtime/background project work unchanged.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `213`.

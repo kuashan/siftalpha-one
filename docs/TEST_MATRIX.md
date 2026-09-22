@@ -1657,3 +1657,17 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Prepare/download/Web/log activity | unaffected by UI motion gate | PASS REQUIRED |
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | Unit tests / assembleDebug | cloud build must pass | PENDING |
+
+
+### R48-D3 v213 — Installable lifecycle-motion verification build
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Custom code opening | absent | PASS REQUIRED |
+| AuroraBackdrop | stops below Activity STARTED | PASS REQUIRED |
+| RunOrb | stops below Activity STARTED | PASS REQUIRED |
+| DotPulse | stops below Activity STARTED | PASS REQUIRED |
+| System animations disabled | decorative motion disabled | PASS REQUIRED |
+| Runtime/project background work | unaffected | PASS REQUIRED |
+| Existing Normal Mode Canvas Size usage | compiles | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |
