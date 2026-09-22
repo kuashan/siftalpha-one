@@ -1513,3 +1513,16 @@ The rollback trap remains armed until the READY marker is atomically committed. 
 R48a6.1's 30-minute PREPARE deadline remains only a final hard safety cap, not the normal success detector.
 
 No direct Developer Mode source change is included; both product surfaces inherit this shared Runtime behavior.
+
+## 2026-09-23 · R48-D10 External Action Gate authority
+
+External Provider readiness checking and deferred user actions are now separate shared responsibilities:
+- `ExternalProviderProbeCoordinator` owns provider readiness facts and the two-stage probe.
+- `ExternalActionGate` owns deferred user intent identity: project + action + generation + origin.
+- `ProjectOperationCoordinator` owns actual Runtime operation generations, lifecycle and external completion.
+
+Both Normal Mode and Developer Mode must enter External PREPARE/RUN through this shared gate. Normal manual REFRESH also uses it. A request is stored before probing begins, READY resumes it once, duplicate/late callbacks cannot launch it twice, terminal provider failure clears it, and STOP cancels only that project's deferred request.
+
+A successful External PREPARE ending with `SIFTALPHA_ENV=READY` is itself a Runtime Capability proof and refreshes the shared provider-readiness timestamp. The 60-second freshness window therefore applies to real successful PREPARE as well as explicit probes.
+
+Direct Developer Mode source modification is authorized only for this gate wiring. Developer layout, Web Discovery, auto observation, log/result presentation and existing runtime-control semantics remain unchanged.
