@@ -1347,3 +1347,15 @@ Developer Mode remains unchanged.
 Target version:
 - `0.8.0-alpha43-r48d3`
 - versionCode `196`
+
+
+## 2026-09-22 · R48-D3 v205 opening-motion boundary
+
+Current launch-page authority:
+- keep the v204 opening page/layout/copy/background/timing;
+- modify only convergence -> code-S formation -> real-logo transition;
+- upper-right enters lower-left S end;
+- lower-left enters upper-right S end;
+- both streams wrap around the logo rather than crossing through its center;
+- code fragments visibly fill the S before the real app logo resolves;
+- `baseline/r48d2` remains untouched.

@@ -115,7 +115,11 @@ android {
         // v204 intentionally restores the v202 launch composition and changes only convergence density:
         // 40 curved strands per side, 120 code tokens, and 144 luminous particles per side. No phase
         // headers, extra launch copy, layout changes, logo changes, or R48-D2 functional changes.
-        versionCode = 204
+        // v205 preserves that v204 page exactly and changes only the convergence choreography:
+        // upper-right data spirals around the logo into the lower-left S end; lower-left data spirals
+        // around the logo into the upper-right S end; the incoming code then fills a fragment-built S
+        // which continuously resolves into the unchanged real application logo.
+        versionCode = 205
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

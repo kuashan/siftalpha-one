@@ -1521,3 +1521,20 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Logo/text/background/timing | unchanged from v202 | PASS REQUIRED |
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v205 — Cross-endpoint spiral + code-S formation
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Scope | launch convergence/formation only | PASS REQUIRED |
+| v204 layout/text/background | unchanged | PASS REQUIRED |
+| Upper-right stream | wraps right/bottom -> lower-left S end | PASS REQUIRED |
+| Lower-left stream | wraps left/top -> upper-right S end | PASS REQUIRED |
+| Center crossing | no direct X-shaped crossing through logo center | PASS REQUIRED |
+| Endpoint absorption | orbit radius collapses into S endpoints | PASS REQUIRED |
+| Code continuity | code enters endpoints and redistributes along S body | PASS REQUIRED |
+| Code S | dense fragment-built S before real logo | PASS REQUIRED |
+| Real logo | unchanged original app logo resolves last | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |

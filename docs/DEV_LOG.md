@@ -2821,3 +2821,28 @@ The v203 four-stage headings/captions are not part of the v204 app presentation.
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `204`.
+
+
+## 2026-09-22 · R48-D3 v205 cross-endpoint spiral -> code S -> real logo
+
+Execution follows the user's clarified visual sequence while preserving the v204 opening page.
+
+Only launch convergence/formation motion changed:
+
+- upper-right code/data stream now curves around the right/bottom side and enters the **lower-left end of S**;
+- lower-left code/data stream now curves around the left/top side and enters the **upper-right end of S**;
+- paths do not cross directly through the logo center, avoiding an X-like look;
+- the orbital radius collapses continuously at the two S endpoints, so data appears absorbed by the S rather than stopping at it;
+- incoming code tokens continue from the endpoints into the S body;
+- 260 luminous fragments plus the actual code tokens create a dense blue/cyan -> violet **code-built S**;
+- the fragment S fades/compacts while the unchanged real app logo resolves in the same position;
+- v204 background, wordmark, taglines, bottom accent, launch timing and page layout remain unchanged.
+
+Boundary:
+- no R48-D2 source/functionality changes;
+- no Runtime / Environment / Open / Stop / result-semantic changes;
+- no extra headings, phase labels or storyboard chrome added.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `205`.

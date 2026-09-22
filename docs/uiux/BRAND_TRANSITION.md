@@ -131,3 +131,17 @@ Current launch authority is:
 - use 40 curved strands per side, 120 code tokens, and 144 luminous particles per side.
 
 No extra stage headings, captions, or storyboard chrome may be added unless explicitly requested again.
+
+
+## R48-D3 v205 Override — Current launch motion authority
+
+The v204 page composition remains authoritative. v205 changes only the motion inside that page:
+
+- upper-right stream -> spiral around right/bottom -> lower-left S endpoint;
+- lower-left stream -> spiral around left/top -> upper-right S endpoint;
+- no direct center crossing;
+- incoming code continues into the S body;
+- the S becomes visibly composed of code/data fragments;
+- that fragment-built S continuously resolves into the actual app logo.
+
+Do not add phase cards, headings, extra captions, or other storyboard chrome.

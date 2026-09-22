@@ -236,9 +236,6 @@ private fun BrandLaunchScene(
 ) {
     val resolved = progress.coerceIn(0f, 1f)
 
-    // Independent flow clocks keep both streams moving continuously instead of tying every
-    // token to the one-shot launch progress. Different durations prevent mirrored/mechanical
-    // synchronization while LinearEasing preserves constant travel between curve samples.
     val flowTransition = rememberInfiniteTransition(label = "brand-code-flow")
     val upperClock by if (motion) {
         flowTransition.animateFloat(
@@ -264,20 +261,36 @@ private fun BrandLaunchScene(
     } else {
         remember { mutableStateOf(.48f) }
     }
-    val logoAlpha = if (motion) {
-        ((resolved - .44f) / .40f).coerceIn(0f, 1f)
-    } else {
-        1f
-    }
-    val textAlpha = if (motion) {
-        ((resolved - .70f) / .22f).coerceIn(0f, 1f)
-    } else {
-        1f
-    }
-    val particleFade = if (motion) {
-        (1f - ((resolved - .76f) / .22f).coerceIn(0f, 1f))
+
+    // v205 choreography:
+    // wide rotating streams -> cross-target S endpoints -> code/data S -> real app logo.
+    val streamAlpha = if (motion) {
+        1f - smoothStep(((resolved - .50f) / .25f).coerceIn(0f, 1f))
     } else {
         0f
+    }
+    val formationIn = if (motion) {
+        smoothStep(((resolved - .36f) / .30f).coerceIn(0f, 1f))
+    } else {
+        0f
+    }
+    val logoAlpha = if (motion) {
+        smoothStep(((resolved - .76f) / .18f).coerceIn(0f, 1f))
+    } else {
+        1f
+    }
+    val formationAlpha =
+        formationIn *
+            (
+                1f -
+                    smoothStep(
+                        ((resolved - .80f) / .16f).coerceIn(0f, 1f),
+                    )
+                )
+    val textAlpha = if (motion) {
+        smoothStep(((resolved - .83f) / .13f).coerceIn(0f, 1f))
+    } else {
+        1f
     }
 
     BoxWithConstraints(
@@ -293,147 +306,263 @@ private fun BrandLaunchScene(
                 ),
             ),
     ) {
+        val upperEndpointX = .50f + 34.dp.value / maxWidth.value
+        val upperEndpointY = .445f - 36.dp.value / maxHeight.value
+        val lowerEndpointX = .50f - 34.dp.value / maxWidth.value
+        val lowerEndpointY = .445f + 36.dp.value / maxHeight.value
+
+        fun sFormationPoint(u: Float): Offset {
+            val t = u.coerceIn(0f, 1f)
+            return when {
+                t < .34f -> {
+                    val q = t / .34f
+                    Offset(
+                        cubicBezier(
+                            upperEndpointX,
+                            .50f,
+                            .405f,
+                            .425f,
+                            q,
+                        ),
+                        cubicBezier(
+                            upperEndpointY,
+                            .355f,
+                            .365f,
+                            .430f,
+                            q,
+                        ),
+                    )
+                }
+                t < .68f -> {
+                    val q = (t - .34f) / .34f
+                    Offset(
+                        cubicBezier(
+                            .425f,
+                            .385f,
+                            .615f,
+                            .575f,
+                            q,
+                        ),
+                        cubicBezier(
+                            .430f,
+                            .455f,
+                            .480f,
+                            .505f,
+                            q,
+                        ),
+                    )
+                }
+                else -> {
+                    val q = (t - .68f) / .32f
+                    Offset(
+                        cubicBezier(
+                            .575f,
+                            .600f,
+                            .500f,
+                            lowerEndpointX,
+                            q,
+                        ),
+                        cubicBezier(
+                            .505f,
+                            .545f,
+                            .565f,
+                            lowerEndpointY,
+                            q,
+                        ),
+                    )
+                }
+            }
+        }
+
+        fun streamPoint(
+            upper: Boolean,
+            lane: Float,
+            t: Float,
+            clock: Float,
+        ): Offset {
+            val eased = smoothStep(t)
+            val laneSigned = lane * 2f - 1f
+            val targetX = if (upper) lowerEndpointX else upperEndpointX
+            val targetY = if (upper) lowerEndpointY else upperEndpointY
+
+            // Cross-target swirl:
+            // upper-right -> around right/bottom -> lower-left S end
+            // lower-left -> around left/top -> upper-right S end.
+            val split = .57f
+            val base = if (eased < split) {
+                val q = eased / split
+                if (upper) {
+                    Offset(
+                        cubicBezier(
+                            1.10f,
+                            .98f,
+                            .84f,
+                            .665f,
+                            q,
+                        ),
+                        cubicBezier(
+                            .03f + .22f * lane,
+                            .10f + .11f * lane,
+                            .49f + .07f * lane,
+                            .615f + .025f * laneSigned,
+                            q,
+                        ),
+                    )
+                } else {
+                    Offset(
+                        cubicBezier(
+                            -.10f,
+                            .02f,
+                            .16f,
+                            .335f,
+                            q,
+                        ),
+                        cubicBezier(
+                            .73f + .20f * lane,
+                            .80f - .10f * lane,
+                            .40f - .06f * lane,
+                            .275f - .025f * laneSigned,
+                            q,
+                        ),
+                    )
+                }
+            } else {
+                val q = (eased - split) / (1f - split)
+                if (upper) {
+                    Offset(
+                        cubicBezier(
+                            .665f,
+                            .625f,
+                            .485f,
+                            targetX,
+                            q,
+                        ),
+                        cubicBezier(
+                            .615f + .025f * laneSigned,
+                            .675f,
+                            .635f,
+                            targetY,
+                            q,
+                        ),
+                    )
+                } else {
+                    Offset(
+                        cubicBezier(
+                            .335f,
+                            .375f,
+                            .515f,
+                            targetX,
+                            q,
+                        ),
+                        cubicBezier(
+                            .275f - .025f * laneSigned,
+                            .215f,
+                            .255f,
+                            targetY,
+                            q,
+                        ),
+                    )
+                }
+            }
+
+            // Galaxy-like orbital motion is strongest at the outer edge and collapses exactly
+            // into the S endpoint so the code looks absorbed rather than crossing the logo.
+            val taper = (1f - eased) * (1f - eased)
+            val direction = if (upper) 1f else -1f
+            val angle =
+                direction *
+                    (
+                        eased * 1.55f * PI.toFloat() +
+                            clock * 2f * PI.toFloat()
+                        ) +
+                    laneSigned * 1.25f
+            val orbit = (.030f + .012f * kotlin.math.abs(laneSigned)) * taper
+
+            return Offset(
+                base.x +
+                    kotlin.math.cos(angle) * orbit +
+                    laneSigned * .018f * taper,
+                base.y +
+                    sin(angle) * orbit * .62f +
+                    laneSigned * .020f * taper,
+            )
+        }
+
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
             val logoCenter = Offset(w * .50f, h * .445f)
-
-            // The two stream targets are the visible upper-right and lower-left ends of the
-            // actual S mark inside the 128dp logo. They are intentionally NOT the logo center.
-            // All strand radius/orbit terms collapse to zero at t=1 so the flow lands exactly
-            // on these two S endpoints rather than on an approximate central rail.
             val upperSTarget = Offset(
-                logoCenter.x + 34.dp.toPx(),
-                logoCenter.y - 36.dp.toPx(),
+                w * upperEndpointX,
+                h * upperEndpointY,
             )
             val lowerSTarget = Offset(
-                logoCenter.x - 34.dp.toPx(),
-                logoCenter.y + 36.dp.toPx(),
+                w * lowerEndpointX,
+                h * lowerEndpointY,
             )
-
-            fun galaxyPoint(
-                upper: Boolean,
-                lane: Float,
-                t: Float,
-                clock: Float,
-                target: Offset,
-            ): Offset {
-                val eased = smoothStep(t)
-                val taper = (1f - eased) * (1f - eased)
-
-                val baseX = if (upper) {
-                    cubicBezier(
-                        w * 1.10f,
-                        w * .92f,
-                        w * .67f,
-                        target.x,
-                        eased,
-                    )
-                } else {
-                    cubicBezier(
-                        w * -.10f,
-                        w * .08f,
-                        w * .34f,
-                        target.x,
-                        eased,
-                    )
-                }
-                val baseY = if (upper) {
-                    cubicBezier(
-                        h * (.015f + .23f * lane),
-                        h * (.06f + .14f * lane),
-                        h * (.27f + .09f * lane),
-                        target.y,
-                        eased,
-                    )
-                } else {
-                    cubicBezier(
-                        h * (.72f + .22f * lane),
-                        h * (.82f - .12f * lane),
-                        h * (.64f - .08f * lane),
-                        target.y,
-                        eased,
-                    )
-                }
-
-                // Wide galaxy fan at the edge -> increasingly tight spiral -> exact S endpoint.
-                val laneSigned = lane * 2f - 1f
-                val orbitRadius =
-                    w * (.045f + .018f * kotlin.math.abs(laneSigned)) *
-                        taper
-                val turns = 2.15f
-                val direction = if (upper) 1f else -1f
-                val angle =
-                    direction *
-                        (
-                            eased * turns * 2f * PI.toFloat() +
-                                clock * 2f * PI.toFloat()
-                            ) +
-                        laneSigned * 1.35f
-
-                return Offset(
-                    x = baseX +
-                        kotlin.math.cos(angle) * orbitRadius +
-                        laneSigned * w * .032f * taper,
-                    y = baseY +
-                        sin(angle) * orbitRadius * .72f +
-                        laneSigned * h * .038f * taper,
-                )
-            }
 
             fun drawGalaxyBundle(
                 upper: Boolean,
                 clock: Float,
-                target: Offset,
             ) {
                 val strandCount = 40
-                val samples = 28
+                val samples = 30
 
                 repeat(strandCount) { strand ->
                     val lane = strand / (strandCount - 1f)
                     val strandPhase =
-                        (clock +
-                            strand * .043f +
-                            lane * if (upper) .17f else .21f) % 1f
+                        (
+                            clock +
+                                strand * .041f +
+                                lane * if (upper) .16f else .20f
+                            ) % 1f
 
-                    var previous = galaxyPoint(
+                    val p0 = streamPoint(
                         upper = upper,
                         lane = lane,
                         t = 0f,
                         clock = clock,
-                        target = target,
                     )
+                    var previous = Offset(p0.x * w, p0.y * h)
 
                     for (sample in 1..samples) {
                         val t = sample / samples.toFloat()
-                        val point = galaxyPoint(
+                        val n = streamPoint(
                             upper = upper,
                             lane = lane,
                             t = t,
                             clock = clock,
-                            target = target,
                         )
+                        val point = Offset(n.x * w, n.y * h)
 
-                        // A moving brightness wave travels down every strand. The strand itself
-                        // remains curved and continuous, while its ends fade so nothing looks cut.
                         val rawDistance =
                             kotlin.math.abs(t - strandPhase)
                         val wrappedDistance =
                             kotlin.math.min(rawDistance, 1f - rawDistance)
                         val highlight =
-                            (1f - (wrappedDistance / .16f).coerceIn(0f, 1f))
+                            1f -
+                                (wrappedDistance / .15f).coerceIn(0f, 1f)
                         val edgeEnvelope =
-                            smoothStep((t / .08f).coerceIn(0f, 1f)) *
+                            smoothStep((t / .07f).coerceIn(0f, 1f)) *
                                 (
                                     1f -
                                         smoothStep(
-                                            ((t - .94f) / .06f).coerceIn(0f, 1f),
+                                            ((t - .985f) / .015f)
+                                                .coerceIn(0f, 1f),
                                         )
                                     )
                         val alpha =
-                            edgeEnvelope *
-                                (.075f + .42f * highlight) *
-                                (1f - .25f * kotlin.math.abs(lane * 2f - 1f))
+                            streamAlpha *
+                                edgeEnvelope *
+                                (.08f + .44f * highlight) *
+                                (
+                                    1f -
+                                        .22f *
+                                            kotlin.math.abs(
+                                                lane * 2f - 1f,
+                                            )
+                                    )
+
                         val color = if (upper) {
                             when (strand % 4) {
                                 0 -> Cyan
@@ -455,7 +584,7 @@ private fun BrandLaunchScene(
                             start = previous,
                             end = point,
                             strokeWidth =
-                                (.46f + (strand % 6) * .11f).dp.toPx(),
+                                (.45f + (strand % 6) * .11f).dp.toPx(),
                             cap = StrokeCap.Round,
                         )
                         previous = point
@@ -463,21 +592,16 @@ private fun BrandLaunchScene(
                 }
             }
 
-            // Many curved strands rotate inward from both sides. Unlike v201, the visual is
-            // intentionally a dense bundle, not a few sparse streaks.
             drawGalaxyBundle(
                 upper = true,
                 clock = upperClock,
-                target = upperSTarget,
             )
             drawGalaxyBundle(
                 upper = false,
                 clock = lowerClock,
-                target = lowerSTarget,
             )
 
-            // A cloud of luminous data points rides the same funnel so the line bundle feels
-            // like a galaxy/data stream rather than a wireframe.
+            // Dense luminous particles ride the same cross-target spiral.
             val galaxyParticlesPerSide = 144
             repeat(galaxyParticlesPerSide) { index ->
                 val lane = (index % 48) / 47f
@@ -485,25 +609,23 @@ private fun BrandLaunchScene(
                     (upperClock + index * .029f + lane * .11f) % 1f
                 val lowerRaw =
                     (lowerClock + index * .031f + lane * .13f) % 1f
-                val upperT = smoothStep(upperRaw)
-                val lowerT = smoothStep(lowerRaw)
-                val upperLife = flowEnvelope(upperRaw)
-                val lowerLife = flowEnvelope(lowerRaw)
 
-                val upperPoint = galaxyPoint(
-                    upper = true,
-                    lane = lane,
-                    t = upperT,
-                    clock = upperClock,
-                    target = upperSTarget,
+                val upperLife = flowEnvelope(upperRaw) * streamAlpha
+                val lowerLife = flowEnvelope(lowerRaw) * streamAlpha
+                val upperN = streamPoint(
+                    true,
+                    lane,
+                    smoothStep(upperRaw),
+                    upperClock,
                 )
-                val lowerPoint = galaxyPoint(
-                    upper = false,
-                    lane = lane,
-                    t = lowerT,
-                    clock = lowerClock,
-                    target = lowerSTarget,
+                val lowerN = streamPoint(
+                    false,
+                    lane,
+                    smoothStep(lowerRaw),
+                    lowerClock,
                 )
+                val upperPoint = Offset(upperN.x * w, upperN.y * h)
+                val lowerPoint = Offset(lowerN.x * w, lowerN.y * h)
 
                 drawCircle(
                     color = when (index % 3) {
@@ -525,20 +647,108 @@ private fun BrandLaunchScene(
                 )
             }
 
-            // Endpoint glows are tiny and local to the actual S ends. There is deliberately no
-            // long central filament or direct line that can look sliced/cut.
+            // Code/data S: fragments spread around the S centerline, not just an outline.
+            if (formationAlpha > .004f) {
+                val fragmentCount = 260
+                repeat(fragmentCount) { index ->
+                    val u = index / (fragmentCount - 1f)
+                    val centerN = sFormationPoint(u)
+                    val phase =
+                        index * 2.399963f +
+                            upperClock * 2f * PI.toFloat()
+                    val thickness =
+                        (.010f + (index % 7) * .0022f) *
+                            (1f - .18f * kotlin.math.abs(u * 2f - 1f))
+                    val dx = kotlin.math.cos(phase) * thickness
+                    val dy = sin(phase) * thickness * .70f
+                    val x = (centerN.x + dx) * w
+                    val y = (centerN.y + dy) * h
+                    val twinkle =
+                        .55f +
+                            .45f *
+                                kotlin.math.abs(
+                                    sin(
+                                        lowerClock * 2f * PI.toFloat() +
+                                            index * .37f,
+                                    ),
+                                )
+                    val color = when {
+                        u < .48f -> if (index % 3 == 0) Cyan else ElectricBlue
+                        u < .62f -> if (index % 2 == 0) ElectricBlue else Violet
+                        else -> if (index % 3 == 0) Blue else Violet
+                    }
+
+                    if (index % 4 == 0) {
+                        drawRoundRect(
+                            color = color.copy(
+                                alpha =
+                                    formationAlpha *
+                                        (.34f + .52f * twinkle),
+                            ),
+                            topLeft = Offset(x, y),
+                            size = Size(
+                                (2.5f + (index % 4) * .75f).dp.toPx(),
+                                (2.0f + (index % 3) * .70f).dp.toPx(),
+                            ),
+                            cornerRadius = CornerRadius(
+                                1.0.dp.toPx(),
+                                1.0.dp.toPx(),
+                            ),
+                        )
+                    } else {
+                        drawCircle(
+                            color = color.copy(
+                                alpha =
+                                    formationAlpha *
+                                        (.30f + .50f * twinkle),
+                            ),
+                            radius =
+                                (.78f + (index % 4) * .36f).dp.toPx(),
+                            center = Offset(x, y),
+                        )
+                    }
+                }
+
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        listOf(
+                            Cyan.copy(alpha = .14f * formationAlpha),
+                            Violet.copy(alpha = .10f * formationAlpha),
+                            Color.Transparent,
+                        ),
+                        center = logoCenter,
+                        radius = size.minDimension * .24f,
+                    ),
+                    radius = size.minDimension * .23f,
+                    center = logoCenter,
+                )
+            }
+
+            // Small endpoint energy blooms visually connect the incoming streams to the S body.
             drawCircle(
-                color = Cyan.copy(alpha = .18f + .24f * logoAlpha),
+                color = Cyan.copy(
+                    alpha =
+                        (.10f * streamAlpha + .20f * formationAlpha)
+                            .coerceAtMost(.28f),
+                ),
                 radius = 5.5.dp.toPx(),
                 center = upperSTarget,
             )
             drawCircle(
-                color = Violet.copy(alpha = .16f + .22f * logoAlpha),
+                color = Violet.copy(
+                    alpha =
+                        (.10f * streamAlpha + .20f * formationAlpha)
+                            .coerceAtMost(.28f),
+                ),
                 radius = 5.5.dp.toPx(),
                 center = lowerSTarget,
             )
 
-            val glow = (.28f + .55f * logoAlpha).coerceIn(0f, .86f)
+            val glow =
+                (
+                    .18f * formationAlpha +
+                        .72f * logoAlpha
+                    ).coerceIn(0f, .86f)
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
@@ -555,95 +765,86 @@ private fun BrandLaunchScene(
             )
         }
 
-        if (motion && particleFade > .01f) {
+        // Actual code tokens travel through the spiral, enter the opposite S endpoint, then
+        // redistribute along the S body. This makes the S visibly made from code rather than
+        // appearing as an unrelated overlay.
+        if (motion && (streamAlpha > .01f || formationAlpha > .01f)) {
             BrandCodeParticles.forEachIndexed { index, particle ->
                 val lane = particle.lane
-                val sourceClock = if (particle.upper) upperClock else lowerClock
-                val rawPhase = if (motion) {
+                val sourceClock =
+                    if (particle.upper) upperClock else lowerClock
+                val rawPhase =
                     (
                         sourceClock +
                             index * .071f +
                             lane * .137f +
                             particle.delay
                         ) % 1f
-                } else {
-                    .58f
-                }
                 val localProgress = smoothStep(rawPhase)
-                val particleAlpha = flowEnvelope(rawPhase)
-                val taper = (1f - localProgress) * (1f - localProgress)
-                val angle =
-                    rawPhase * 2f * PI.toFloat() +
-                        index * if (particle.upper) .73f else .79f
-                val laneOffset = lane * 2f - 1f
+                val particleLife = flowEnvelope(rawPhase)
+                val streamN = streamPoint(
+                    upper = particle.upper,
+                    lane = lane,
+                    t = localProgress,
+                    clock = sourceClock,
+                )
 
-                val startX = if (particle.upper) {
-                    .82f + .18f * lane
-                } else {
-                    -.01f + .18f * lane
-                }
-                val startY = if (particle.upper) {
-                    .045f + .20f * lane
-                } else {
-                    .73f + .18f * lane
-                }
-                val control1X = if (particle.upper) .91f else .11f
-                val control1Y = if (particle.upper) {
-                    .10f + .09f * lane
-                } else {
-                    .78f - .08f * lane
-                }
-                val control2X = if (particle.upper) .66f else .36f
-                val control2Y = if (particle.upper) {
-                    .31f + .04f * lane
-                } else {
-                    .60f - .045f * lane
-                }
+                val formationU =
+                    (
+                        index.toFloat() /
+                            (BrandCodeParticles.size - 1).toFloat()
+                        ).coerceIn(0f, 1f)
+                val sPoint = sFormationPoint(formationU)
+                val localSpread =
+                    (.009f + (index % 6) * .0017f) *
+                        (
+                            1f -
+                                .18f *
+                                    kotlin.math.abs(
+                                        formationU * 2f - 1f,
+                                    )
+                            )
+                val sAngle =
+                    index * 1.83f +
+                        sourceClock * 2f * PI.toFloat()
+                val targetX =
+                    sPoint.x +
+                        kotlin.math.cos(sAngle) * localSpread
+                val targetY =
+                    sPoint.y +
+                        sin(sAngle) * localSpread * .72f
 
-                val endpointX =
-                    if (particle.upper) {
-                        .50f + 34.dp.value / maxWidth.value
-                    } else {
-                        .50f - 34.dp.value / maxWidth.value
-                    }
-                val endpointY =
-                    if (particle.upper) {
-                        .445f - 36.dp.value / maxHeight.value
-                    } else {
-                        .445f + 36.dp.value / maxHeight.value
-                    }
+                val morph =
+                    smoothStep(
+                        ((resolved - .39f) / .31f)
+                            .coerceIn(0f, 1f),
+                    )
+                val x =
+                    streamN.x * (1f - morph) +
+                        targetX * morph
+                val y =
+                    streamN.y * (1f - morph) +
+                        targetY * morph
 
-                // Code collapses to the same two visible S endpoints as the curved line bundles.
-                val x = cubicBezier(
-                    startX,
-                    control1X,
-                    control2X,
-                    endpointX,
-                    localProgress,
-                ) +
-                    sin(angle) * .022f * taper +
-                    laneOffset * .012f * taper
-                val y = cubicBezier(
-                    startY,
-                    control1Y,
-                    control2Y,
-                    endpointY,
-                    localProgress,
-                ) +
-                    kotlin.math.cos(angle) * .013f * taper +
-                    laneOffset * .017f * taper
+                val alpha =
+                    (
+                        streamAlpha * particleLife * (1f - morph) +
+                            formationAlpha *
+                                morph *
+                                (.58f + .42f * particleLife)
+                        ).coerceIn(0f, 1f)
 
                 Text(
                     text = particle.text,
-                    color = when (index % 3) {
-                        0 -> Cyan
-                        1 -> ElectricBlue
-                        else -> Violet
+                    color = when {
+                        formationU < .48f -> if (index % 3 == 0) Cyan else ElectricBlue
+                        formationU < .62f -> if (index % 2 == 0) ElectricBlue else Violet
+                        else -> if (index % 3 == 0) Blue else Violet
                     },
                     fontSize = when {
-                        particle.text.length >= 4 -> 8.sp
-                        particle.text.length == 3 -> 9.sp
-                        else -> 11.sp
+                        particle.text.length >= 4 -> 7.sp
+                        particle.text.length == 3 -> 8.sp
+                        else -> 10.sp
                     },
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
@@ -651,15 +852,12 @@ private fun BrandLaunchScene(
                             x = maxWidth * x - 16.dp,
                             y = maxHeight * y - 8.dp,
                         )
-                        .alpha(
-                            particleFade *
-                                particleAlpha *
-                                (.34f + .66f * localProgress),
-                        )
+                        .alpha(alpha)
                         .graphicsLayer {
-                            // Code becomes slightly smaller as it is absorbed by the logo.
                             val scale =
-                                .94f - .12f * localProgress
+                                .96f -
+                                    .16f * morph -
+                                    .08f * logoAlpha
                             scaleX = scale
                             scaleY = scale
                         },
