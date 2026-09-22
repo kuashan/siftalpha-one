@@ -3154,3 +3154,61 @@ Shared Core already owned project identity, lifecycle, operation ownership, prov
 Target:
 - versionCode = 217
 - versionName = 0.8.0-alpha43-r48d5
+
+
+## 2026-09-22 · Shared Core bug ownership discussion — READY environment still allows PREPARE
+
+### Real-device observation
+Developer Mode（开发者模式）currently still allows PREPARE（准备环境）to be clicked after the selected project's Environment（环境）is already READY（就绪）.
+
+### Source audit result
+This is a real policy defect, not merely a button-rendering issue.
+
+Current Developer Workspace（开发者工作区）enables its Prepare button from:
+
+`ProjectActionPolicy.isEnabled(Action.PREPARE)`
+
+The shared `ProjectActionPolicy（项目动作策略）` correctly changes the primary action to START（运行）when Environment readiness is READY, but it does not simultaneously disable PREPARE. Therefore the shared fact is currently inconsistent:
+
+- Environment = READY
+- START = enabled
+- PREPARE = still enabled  <-- defect
+
+This can affect both Internal R（内部运行环境）and External Provider（外部运行环境）because both product surfaces consume the same shared action policy.
+
+### Architecture clarification agreed during discussion
+Developer Mode（开发者模式）and Normal Mode（普通用户模式）must be understood as two product surfaces over the same Shared Core（共享核心）and Runtime Core（运行核心）, not two implementations of project execution.
+
+- Developer Mode keeps the shared capabilities more directly exposed for control, observation and diagnosis.
+- Normal Mode groups and orchestrates the same shared capabilities into simpler user workflows such as Prepare Project（准备项目）and Run（运行）.
+- Normal Mode may simplify presentation and sequence multiple shared operations automatically, but it must not own a second Environment / Prepare / Run / Configuration / Runtime state machine.
+- A symptom first observed in Developer Mode is not automatically a Developer-UI bug. The defect must first be classified by ownership: presentation-layer defect vs Shared Core defect.
+
+### Repair rule for this bug
+Do NOT patch `V04Activity（开发者工作区）` with a local condition such as “if READY then disable the button”.
+
+That would only make Developer Mode look correct while leaving the shared policy wrong, and Normal Mode would continue consuming the incorrect shared fact.
+
+The correct repair target is the shared `ProjectActionPolicy（项目动作策略）`:
+
+- Environment = NOT_READY -> PREPARE enabled, START disabled
+- Environment = UNKNOWN -> preserve the existing status/prepare recovery policy
+- Environment = READY -> PREPARE disabled, START enabled
+- Active / pending / recovery states -> continue obeying their existing stronger restrictions
+
+Once the Shared Core rule is repaired, both Developer Mode and Normal Mode must become correct without duplicating business logic in either UI.
+
+### Important Normal Mode distinction
+Normal Mode's RecoveryProjectScreen（恢复页面）must still be allowed to offer Prepare Project（重新准备项目）when RuntimeState = ENVIRONMENT_ERROR（环境错误）. That is recovery from a failed/broken environment, and is different from allowing redundant PREPARE after Environment = READY.
+
+### Required regression coverage before implementation is closed
+At minimum add tests proving:
+
+1. `ProjectActionPolicy`: Environment READY -> primaryAction = START, START enabled, PREPARE disabled.
+2. `NormalProjectPrimaryActionPolicy`: the corrected shared START decision maps to Normal Mode RUN and does not regress back to PREPARE_PROJECT.
+3. Existing NOT_READY / UNKNOWN / ENVIRONMENT_ERROR recovery behavior remains intact.
+
+### Status
+DISCUSSION + SOURCE AUDIT COMPLETE.
+The READY/PREPARE defect is confirmed but has NOT yet been repaired in this documentation-only commit.
+Developer Mode source, Normal Mode source, Shared Core behavior and Runtime behavior are unchanged by this entry.

@@ -1456,3 +1456,14 @@ The new ProjectRunWorkflowCoordinator owns only RUN orchestration decisions: act
 Runtime-discovered configuration continues to use the existing v1 discovery preference contract consumed by ProjectConfigurationUiController, preserving one configuration fact model. Pending RUN recovery is stored separately and contains only reason + timestamp, never credentials or argument values.
 
 Developer Mode remains frozen; no V04Activity UI/workflow edits are part of R48-D5.
+
+
+## 2026-09-22 · Shared Core ownership invariant clarified
+
+Developer Mode（开发者模式）and Normal Mode（普通用户模式）are two product surfaces over one Shared Core（共享核心）/ Runtime Core（运行核心）.
+
+Developer Mode exposes more of the shared controls and diagnostics directly. Normal Mode performs Workflow Orchestration（工作流编排）and Presentation Simplification（呈现简化）over the same facts and operations. Normal Mode must not reimplement Environment, Prepare, Run, Configuration, lifecycle, operation ownership or Runtime state.
+
+When a behavior defect appears in only one visible surface, first determine where the incorrect fact is owned. If the wrong rule is in a shared policy/service, fix the Shared Core once; do not hide it with a surface-specific UI condition.
+
+Confirmed example awaiting repair: `ProjectActionPolicy` currently leaves PREPARE enabled even when Environment readiness is READY. The intended shared invariant is READY -> PREPARE disabled + START enabled. Normal Mode's ENVIRONMENT_ERROR recovery path remains a separate valid case where re-prepare is allowed.
