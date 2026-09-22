@@ -65,6 +65,7 @@ import com.siftalpha.studio.runtime.RuntimeOperationProvider
 import com.siftalpha.studio.runtime.RuntimeOperationRecord
 import com.siftalpha.studio.runtime.ProjectOperationCoordinator
 import com.siftalpha.studio.runtime.ExternalResultDisposition
+import com.siftalpha.studio.runtime.ExternalActionGate
 import com.siftalpha.studio.runtime.ExternalProviderPreflightResult
 import com.siftalpha.studio.runtime.ExternalProviderProbeCoordinator
 import com.siftalpha.studio.runtime.ExternalProviderReadiness
@@ -199,6 +200,7 @@ open class V04Activity : StudioActivity() {
     private lateinit var lifecycleStore: RuntimeLifecycleStore
     private lateinit var operationCoordinator: ProjectOperationCoordinator
     private lateinit var externalPreflight: ExternalProviderProbeCoordinator
+    private lateinit var externalActionGate: ExternalActionGate
     private lateinit var backgroundReliabilityGuidance: BackgroundReliabilityGuidanceController
     private lateinit var projectRuntimeSelectionStore: ProjectRuntimeSelectionStore
     private val recoveryProjects = mutableSetOf<String>()
@@ -223,6 +225,8 @@ open class V04Activity : StudioActivity() {
     private val externalObservations = mutableMapOf<String, ExternalObservation>()
     private val externalObservationGenerations = mutableMapOf<String, Long>()
     private val externalObservationRunnables = mutableMapOf<String, Runnable>()
+    private val externalGateDeferredActions =
+        mutableMapOf<String, Pair<Long, DeferredManualAction>>()
     private val deferredManualActions = mutableMapOf<String, DeferredManualAction>()
     private val embeddedStartExecutor = Executors.newSingleThreadExecutor()
     private val embeddedObservationExecutor = Executors.newSingleThreadExecutor()
@@ -355,9 +359,12 @@ open class V04Activity : StudioActivity() {
         }
     }
 
-    private val externalPreflightListener: (ExternalProviderPreflightResult) -> Unit = {
+    private val externalPreflightListener: (ExternalProviderPreflightResult) -> Unit = { result ->
         runOnUiThread {
             updateExternalProviderDiagnostics()
+            if (result.ready) {
+                resumeExternalActionGate()
+            }
             if (!isFinishing && !isDestroyed && ::projectList.isInitialized) refresh()
         }
     }
@@ -409,6 +416,7 @@ open class V04Activity : StudioActivity() {
         lifecycleStore = RuntimeLifecycleStore(this)
         operationCoordinator = ProjectOperationCoordinator.shared(this)
         externalPreflight = ExternalProviderProbeCoordinator.shared(this)
+        externalActionGate = ExternalActionGate.shared(this)
         backgroundReliabilityGuidance = BackgroundReliabilityGuidanceController(this)
         secretPolicyInspector = ProjectSecretPolicyInspector(this)
         configurationInspector = ProjectConfigurationInspector(this)
@@ -464,6 +472,9 @@ open class V04Activity : StudioActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (::externalActionGate.isInitialized && externalPreflight.current().ready) {
+            resumeExternalActionGate()
+        }
         if (::projectList.isInitialized) refresh()
         resumeEmbeddedPolling()
         resumeExternalObservations()
@@ -495,6 +506,7 @@ open class V04Activity : StudioActivity() {
         externalObservations.keys.toList().forEach(::invalidateExternalObservation)
         externalObservationRunnables.clear()
         deferredManualActions.clear()
+        externalGateDeferredActions.clear()
         operationDeadlineRunnables.values.forEach(refreshHandler::removeCallbacks)
         operationDeadlineRunnables.clear()
         embeddedStartExecutor.shutdownNow()
@@ -2694,6 +2706,8 @@ open class V04Activity : StudioActivity() {
 
     private fun stopProjectActivities(project: V04ProjectGateway.RuntimeProject) {
         val stateKey = project.summary.documentId
+        externalActionGate.cancel(stateKey)
+        externalGateDeferredActions.remove(stateKey)
         val projectPending = pending.entries.filter { (_, item) ->
             item.documentId == stateKey ||
                 (item.documentId == null && item.folderName == project.folderName)
@@ -3449,10 +3463,28 @@ open class V04Activity : StudioActivity() {
         if (
             route.path == RuntimeControlPath.EXTERNAL_PROVIDER &&
             (action == ProjectRuntimeController.Action.PREPARE ||
-                action == ProjectRuntimeController.Action.START) &&
-            !ensureExternalProviderReady()
+                action == ProjectRuntimeController.Action.START)
         ) {
-            return false
+            val gateAction = if (action == ProjectRuntimeController.Action.PREPARE) {
+                ExternalActionGate.Action.PREPARE
+            } else {
+                ExternalActionGate.Action.RUN
+            }
+            val deferred = DeferredManualAction(
+                project = project,
+                action = action,
+                openBrowserAfterLogs = openBrowserAfterLogs,
+                browserConfiguredUrl = browserConfiguredUrl,
+                browserFramework = browserFramework,
+                silentRecovery = silentRecovery,
+                controlRequest = effectiveControlRequest,
+                launchInvocation = launchInvocation,
+                webLogDiscoveryAllowed = webLogDiscoveryAllowed,
+                webHintPorts = webHintPorts,
+            )
+            if (!ensureExternalProviderReady(project, gateAction, deferred)) {
+                return false
+            }
         }
         if (!canDispatch(project, action, route.path)) return false
         if (action == ProjectRuntimeController.Action.PREPARE && !automaticObservation) {
@@ -4867,9 +4899,30 @@ open class V04Activity : StudioActivity() {
         }.start()
     }
 
-    private fun ensureExternalProviderReady(): Boolean {
-        val result = externalPreflight.ensureReady()
-        if (result.ready) return true
+    private fun ensureExternalProviderReady(
+        project: V04ProjectGateway.RuntimeProject,
+        action: ExternalActionGate.Action,
+        deferred: DeferredManualAction,
+    ): Boolean {
+        val projectId = project.summary.documentId
+        val decision = externalActionGate.request(
+            projectId = projectId,
+            action = action,
+            origin = ExternalActionGate.Origin.DEVELOPER_MODE,
+        )
+        if (decision is ExternalActionGate.Decision.Proceed) {
+            externalGateDeferredActions.remove(projectId)
+            return true
+        }
+
+        val request = (decision as? ExternalActionGate.Decision.Awaiting)?.request
+        if (request != null) {
+            externalGateDeferredActions[projectId] = request.generation to deferred
+        } else {
+            externalGateDeferredActions.remove(projectId)
+        }
+
+        val result = externalPreflight.current()
         when (result.readiness) {
             ExternalProviderReadiness.TERMUX_NOT_INSTALLED,
             ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED,
@@ -4906,6 +4959,29 @@ open class V04Activity : StudioActivity() {
             ExternalProviderReadiness.READY -> Unit
         }
         return false
+    }
+
+    private fun resumeExternalActionGate() {
+        if (!::externalActionGate.isInitialized) return
+        val ready = externalActionGate.claimReady(ExternalActionGate.Origin.DEVELOPER_MODE)
+        ready.forEach { request ->
+            val deferredEntry = externalGateDeferredActions.remove(request.projectId)
+                ?: return@forEach
+            if (deferredEntry.first != request.generation) return@forEach
+            val deferred = deferredEntry.second
+            dispatch(
+                project = deferred.project,
+                action = deferred.action,
+                openBrowserAfterLogs = deferred.openBrowserAfterLogs,
+                browserConfiguredUrl = deferred.browserConfiguredUrl,
+                browserFramework = deferred.browserFramework,
+                silentRecovery = deferred.silentRecovery,
+                controlRequest = deferred.controlRequest,
+                launchInvocation = deferred.launchInvocation,
+                webLogDiscoveryAllowed = deferred.webLogDiscoveryAllowed,
+                webHintPorts = deferred.webHintPorts,
+            )
+        }
     }
 
     private fun openTermux() {
