@@ -3387,3 +3387,53 @@ Target:
 Verification target remains:
 - versionCode = 221
 - versionName = 0.8.0-alpha43-r48d9
+
+## 2026-09-23 · R48-D10 v222 Shared External Action Gate
+
+### Trigger
+Real-device behavior showed the same usability defect in both Normal Mode（普通模式）and Developer Mode（开发者模式）: the first RUN click could be consumed by External Provider readiness checking, while the user had to click RUN a second time after the check had already passed.
+
+Source audit confirmed two concrete causes:
+- Normal Mode called `externalPreflight.ensureReady()` before saving its local `pendingUserIntent`, so a fast/cached readiness callback could arrive before the deferred action existed.
+- Developer Mode `ensureExternalProviderReady()` returned false while checking and its readiness listener only refreshed diagnostics/UI; it did not preserve and resume the intercepted PREPARE/RUN action.
+
+### Shared Core repair
+- Added `ExternalActionGate` as the single project-scoped external-intent gate.
+- Pending identity is `projectId + action + generation + origin`; duplicate same-action clicks reuse one generation and READY can consume a request only once.
+- The request is registered before provider checking starts.
+- A synchronous READY callback is fenced while `request()` itself is still in flight so it cannot consume an action before its caller has finished recording continuation state.
+- Terminal provider failure/timeout clears deferred requests instead of creating false STARTING/PREPARING state.
+- STOP invalidates only the selected project's deferred request and advances that project's generation; other projects are not affected.
+- 60-second readiness freshness remains authoritative. When it expires, the original user action stays registered and resumes after the two-stage probe returns READY.
+
+### Runtime proof refresh
+A successful External PREPARE with `SIFTALPHA_ENV=READY` now records a fresh Runtime Capability proof in the shared External Provider readiness store. PREPARE itself therefore proves the Termux -> RUN_COMMAND -> PRoot/runtime path, preventing an immediate redundant probe when the user presses RUN.
+
+### Normal Mode wiring
+- Removed `pendingUserIntent` as the local authority.
+- PREPARE / RUN / manual REFRESH now enter through `ExternalActionGate`.
+- READY claims the current project request exactly once and resumes the original existing path.
+- STOP cancels the project's deferred gate request before normal stop handling.
+
+### Developer Mode wiring — explicitly authorized
+The user explicitly authorized the minimal direct Developer Mode source modification for this repair.
+- `V04Activity.dispatch()` routes only External PREPARE/START through the shared gate.
+- If readiness blocks dispatch, the existing `DeferredManualAction` shape is used only to retain the original dispatch parameters for that gate generation.
+- READY resumes the original `dispatch()` once.
+- STOP cancels only that project's gate request/continuation.
+- No Developer layout, Web Discovery, automatic observation, logs, result presentation, runtime command generation, or STOP process-tree semantics were redesigned.
+
+### Regression coverage
+- request exists before readiness checking;
+- immediate/synchronous READY proceeds exactly once;
+- asynchronous READY can be claimed only once;
+- duplicate click does not create duplicate continuation;
+- STOP cancels only the selected project's deferred request and fences its old generation;
+- terminal probe failure clears pending requests;
+- successful External PREPARE refreshes Runtime Capability readiness proof.
+
+Target:
+- versionCode = 222
+- versionName = 0.8.0-alpha43-r48d10
+
+Cloud verification and APK evidence follow after the final W0 run.
