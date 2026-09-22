@@ -223,8 +223,8 @@ private fun smoothStep(value: Float): Float {
 }
 
 private fun flowEnvelope(phase: Float): Float {
-    val enter = smoothStep((phase / .16f).coerceIn(0f, 1f))
-    val exit = 1f - smoothStep(((phase - .82f) / .18f).coerceIn(0f, 1f))
+    val enter = smoothStep((phase / .20f).coerceIn(0f, 1f))
+    val exit = 1f - smoothStep(((phase - .86f) / .14f).coerceIn(0f, 1f))
     return enter * exit
 }
 
@@ -296,182 +296,168 @@ private fun BrandLaunchScene(
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            val streamAlpha = if (motion) {
-                (.18f + .62f * resolved).coerceIn(0f, .82f)
-            } else {
-                .72f
-            }
+            val convergence = Offset(w * .50f, h * .445f)
 
-            fun streamPath(
-                upper: Boolean,
-                lane: Int,
-                lanes: Int,
-            ): Path {
-                val t = lane / (lanes - 1f)
-                return Path().apply {
-                    if (upper) {
-                        val sy = h * (.035f + .245f * t)
-                        val ey = h * (.395f + .055f * (t - .5f))
-                        moveTo(w * 1.06f, sy)
-                        cubicTo(
-                            w * (.88f - .02f * t),
-                            h * (.08f + .10f * t),
-                            w * (.71f - .09f * t),
-                            h * (.29f + .08f * t),
-                            w * (.53f + .015f * (t - .5f)),
-                            ey,
-                        )
-                    } else {
-                        val sy = h * (.69f + .23f * t)
-                        val ey = h * (.535f + .055f * (t - .5f))
-                        moveTo(w * -.06f, sy)
-                        cubicTo(
-                            w * (.16f + .03f * t),
-                            h * (.78f - .10f * t),
-                            w * (.33f + .07f * t),
-                            h * (.67f - .11f * t),
-                            w * (.47f - .015f * (t - .5f)),
-                            ey,
-                        )
-                    }
+            // No full-length path is drawn. The visible stream is made from moving code/data
+            // particles only, so there is no hard straight edge or "cut" line.
+            val galaxyParticlesPerSide = 58
+            repeat(galaxyParticlesPerSide) { index ->
+                val seed = index / (galaxyParticlesPerSide - 1f)
+                val upperRaw = if (motion) {
+                    (upperClock + index * .037f + seed * .113f) % 1f
+                } else {
+                    .58f
                 }
-            }
+                val lowerRaw = if (motion) {
+                    (lowerClock + index * .041f + seed * .127f) % 1f
+                } else {
+                    .54f
+                }
 
-            val lanes = 18
-            repeat(lanes) { lane ->
-                val laneRatio = lane / (lanes - 1f)
-                val widthPx = (0.65f + (lane % 4) * .22f).dp.toPx()
-                val topPath = streamPath(true, lane, lanes)
-                val bottomPath = streamPath(false, lane, lanes)
+                val upperT = smoothStep(upperRaw)
+                val lowerT = smoothStep(lowerRaw)
+                val upperLife = flowEnvelope(upperRaw)
+                val lowerLife = flowEnvelope(lowerRaw)
 
-                drawPath(
-                    path = topPath,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Blue.copy(alpha = .02f),
-                            ElectricBlue.copy(alpha = streamAlpha * .54f),
-                            Cyan.copy(alpha = streamAlpha),
-                        ),
-                        start = Offset(w, 0f),
-                        end = Offset(w * .48f, h * .44f),
-                    ),
-                    style = Stroke(widthPx, cap = StrokeCap.Round),
+                // Galaxy width is intentionally broad at the edges and collapses toward zero
+                // as particles approach the real logo.
+                val upperSpread = (1f - upperT) * (1f - upperT)
+                val lowerSpread = (1f - lowerT) * (1f - lowerT)
+                val lane = seed * 2f - 1f
+
+                val upperBaseX = cubicBezier(
+                    w * 1.08f,
+                    w * .91f,
+                    w * .67f,
+                    convergence.x,
+                    upperT,
                 )
-                drawPath(
-                    path = bottomPath,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Cyan.copy(alpha = .04f),
-                            ElectricBlue.copy(alpha = streamAlpha * .62f),
-                            Violet.copy(alpha = streamAlpha),
-                        ),
-                        start = Offset(0f, h),
-                        end = Offset(w * .52f, h * .49f),
-                    ),
-                    style = Stroke(widthPx, cap = StrokeCap.Round),
+                val upperBaseY = cubicBezier(
+                    h * (.05f + .16f * seed),
+                    h * (.10f + .12f * seed),
+                    h * (.31f + .045f * seed),
+                    convergence.y,
+                    upperT,
                 )
 
-                // Short luminous packets make the streams feel like actual data lanes.
-                repeat(4) { packet ->
-                    val topRawPhase = if (motion) {
-                        (upperClock + laneRatio * .19f + packet * .237f) % 1f
-                    } else {
-                        (packet + 1) / 5f
-                    }
-                    val bottomRawPhase = if (motion) {
-                        (lowerClock + laneRatio * .23f + packet * .219f) % 1f
-                    } else {
-                        (packet + 1) / 5f
-                    }
-                    val topPhase = smoothStep(topRawPhase)
-                    val bottomPhase = smoothStep(bottomRawPhase)
-                    val topPacketAlpha = flowEnvelope(topRawPhase)
-                    val bottomPacketAlpha = flowEnvelope(bottomRawPhase)
-                    val topX = cubicBezier(
-                        w * 1.06f,
-                        w * (.88f - .02f * laneRatio),
-                        w * (.71f - .09f * laneRatio),
-                        w * (.53f + .015f * (laneRatio - .5f)),
-                        topPhase,
-                    )
-                    val topY = cubicBezier(
-                        h * (.035f + .245f * laneRatio),
-                        h * (.08f + .10f * laneRatio),
-                        h * (.29f + .08f * laneRatio),
-                        h * (.395f + .055f * (laneRatio - .5f)),
-                        topPhase,
-                    )
-                    drawRoundRect(
-                        color = if (packet % 2 == 0) {
-                            Cyan.copy(alpha = .58f * topPacketAlpha)
-                        } else {
-                            ElectricBlue.copy(alpha = .50f * topPacketAlpha)
-                        },
-                        topLeft = Offset(
-                            topX,
-                            topY + sin(
-                                (topRawPhase * 2f * PI.toFloat()) +
-                                    laneRatio * 3.2f,
-                            ) * 2.2.dp.toPx(),
-                        ),
-                        size = Size(
-                            width = (5f + (lane % 3) * 2f).dp.toPx(),
-                            height = 1.5.dp.toPx(),
-                        ),
-                        cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
-                    )
+                val lowerBaseX = cubicBezier(
+                    w * -.08f,
+                    w * .11f,
+                    w * .35f,
+                    convergence.x,
+                    lowerT,
+                )
+                val lowerBaseY = cubicBezier(
+                    h * (.74f + .16f * seed),
+                    h * (.78f - .10f * seed),
+                    h * (.61f - .055f * seed),
+                    convergence.y,
+                    lowerT,
+                )
 
-                    val bottomX = cubicBezier(
-                        w * -.06f,
-                        w * (.16f + .03f * laneRatio),
-                        w * (.33f + .07f * laneRatio),
-                        w * (.47f - .015f * (laneRatio - .5f)),
-                        bottomPhase,
+                val upperAngle =
+                    upperRaw * 2f * PI.toFloat() + index * .61f
+                val lowerAngle =
+                    lowerRaw * 2f * PI.toFloat() + index * .67f
+
+                // Small orbital drift creates the galaxy feel while the taper factor makes
+                // the stream collapse cleanly into a line before entering the logo.
+                val upperX = upperBaseX +
+                    sin(upperAngle) * w * .030f * upperSpread +
+                    lane * w * .020f * upperSpread
+                val upperY = upperBaseY +
+                    kotlin.math.cos(upperAngle) * h * .018f * upperSpread +
+                    lane * h * .030f * upperSpread
+
+                val lowerX = lowerBaseX +
+                    sin(lowerAngle) * w * .028f * lowerSpread +
+                    lane * w * .019f * lowerSpread
+                val lowerY = lowerBaseY +
+                    kotlin.math.cos(lowerAngle) * h * .017f * lowerSpread +
+                    lane * h * .028f * lowerSpread
+
+                val upperRadius =
+                    (0.9f + (index % 4) * .42f).dp.toPx() *
+                        (.82f + .18f * upperSpread)
+                val lowerRadius =
+                    (0.9f + ((index + 2) % 4) * .42f).dp.toPx() *
+                        (.82f + .18f * lowerSpread)
+
+                drawCircle(
+                    color = when (index % 3) {
+                        0 -> Cyan.copy(alpha = .56f * upperLife)
+                        1 -> ElectricBlue.copy(alpha = .45f * upperLife)
+                        else -> Color.White.copy(alpha = .30f * upperLife)
+                    },
+                    radius = upperRadius,
+                    center = Offset(upperX, upperY),
+                )
+                drawCircle(
+                    color = when (index % 3) {
+                        0 -> Violet.copy(alpha = .54f * lowerLife)
+                        1 -> Cyan.copy(alpha = .42f * lowerLife)
+                        else -> ElectricBlue.copy(alpha = .34f * lowerLife)
+                    },
+                    radius = lowerRadius,
+                    center = Offset(lowerX, lowerY),
+                )
+
+                // Sparse short streaks are local to particles only. They imply motion without
+                // creating a rigid visible rail from the screen edge to the logo.
+                if (index % 5 == 0) {
+                    val upperTrail = 8.dp.toPx() * (1f - .55f * upperT)
+                    drawLine(
+                        color = Cyan.copy(alpha = .20f * upperLife),
+                        start = Offset(upperX + upperTrail, upperY - upperTrail * .22f),
+                        end = Offset(upperX, upperY),
+                        strokeWidth = .8.dp.toPx(),
+                        cap = StrokeCap.Round,
                     )
-                    val bottomY = cubicBezier(
-                        h * (.69f + .23f * laneRatio),
-                        h * (.78f - .10f * laneRatio),
-                        h * (.67f - .11f * laneRatio),
-                        h * (.535f + .055f * (laneRatio - .5f)),
-                        bottomPhase,
-                    )
-                    drawRoundRect(
-                        color = if (packet % 2 == 0) {
-                            Violet.copy(alpha = .56f * bottomPacketAlpha)
-                        } else {
-                            Cyan.copy(alpha = .48f * bottomPacketAlpha)
-                        },
-                        topLeft = Offset(
-                            bottomX,
-                            bottomY + sin(
-                                (bottomRawPhase * 2f * PI.toFloat()) +
-                                    laneRatio * 3.6f,
-                            ) * 2.0.dp.toPx(),
-                        ),
-                        size = Size(
-                            width = (5f + ((lane + 1) % 3) * 2f).dp.toPx(),
-                            height = 1.5.dp.toPx(),
-                        ),
-                        cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
+                    val lowerTrail = 8.dp.toPx() * (1f - .55f * lowerT)
+                    drawLine(
+                        color = Violet.copy(alpha = .18f * lowerLife),
+                        start = Offset(lowerX - lowerTrail, lowerY + lowerTrail * .22f),
+                        end = Offset(lowerX, lowerY),
+                        strokeWidth = .8.dp.toPx(),
+                        cap = StrokeCap.Round,
                     )
                 }
             }
 
-            // Central convergence glow behind the real logo.
-            val glow = (.30f + .56f * logoAlpha).coerceIn(0f, .88f)
+            // A very short, soft convergence filament exists only immediately before the logo.
+            // It visually explains "wide galaxy -> thin line -> enter logo" without exposing a
+            // long direct path on the upper-right side.
+            val filamentAlpha = (.10f + .20f * logoAlpha).coerceAtMost(.30f)
+            drawLine(
+                brush = Brush.horizontalGradient(
+                    listOf(
+                        Color.Transparent,
+                        Cyan.copy(alpha = filamentAlpha),
+                        Color.Transparent,
+                    ),
+                    startX = w * .43f,
+                    endX = w * .57f,
+                ),
+                start = Offset(w * .43f, convergence.y),
+                end = Offset(w * .57f, convergence.y),
+                strokeWidth = 1.15.dp.toPx(),
+                cap = StrokeCap.Round,
+            )
+
+            val glow = (.28f + .55f * logoAlpha).coerceIn(0f, .86f)
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Cyan.copy(alpha = glow * .52f),
-                        Blue.copy(alpha = glow * .34f),
-                        Violet.copy(alpha = glow * .22f),
+                        Cyan.copy(alpha = glow * .50f),
+                        Blue.copy(alpha = glow * .31f),
+                        Violet.copy(alpha = glow * .20f),
                         Color.Transparent,
                     ),
-                    center = Offset(w * .5f, h * .445f),
+                    center = convergence,
                     radius = size.minDimension * .35f,
                 ),
                 radius = size.minDimension * .28f,
-                center = Offset(w * .5f, h * .445f),
+                center = convergence,
             )
         }
 
@@ -491,39 +477,54 @@ private fun BrandLaunchScene(
                 }
                 val localProgress = smoothStep(rawPhase)
                 val particleAlpha = flowEnvelope(rawPhase)
-                val drift =
-                    sin(
-                        rawPhase * 2f * PI.toFloat() +
-                            index * .73f,
-                    ) * if (particle.upper) .0045f else .0040f
+                val taper = (1f - localProgress) * (1f - localProgress)
+                val angle =
+                    rawPhase * 2f * PI.toFloat() +
+                        index * if (particle.upper) .73f else .79f
+                val laneOffset = lane * 2f - 1f
 
                 val startX = if (particle.upper) {
-                    .80f + .20f * lane
+                    .82f + .18f * lane
                 } else {
-                    -.02f + .20f * lane
+                    -.01f + .18f * lane
                 }
                 val startY = if (particle.upper) {
-                    .04f + .24f * lane
+                    .045f + .20f * lane
                 } else {
-                    .70f + .22f * lane
+                    .73f + .18f * lane
                 }
-                val control1X = if (particle.upper) .90f else .12f
-                val control1Y = if (particle.upper) .10f + .08f * lane else .78f - .09f * lane
-                val control2X = if (particle.upper) .67f else .36f
-                val control2Y = if (particle.upper) .31f + .05f * lane else .65f - .08f * lane
-                val endX = if (particle.upper) {
-                    .525f + ((index % 4) - 1.5f) * .008f
+                val control1X = if (particle.upper) .91f else .11f
+                val control1Y = if (particle.upper) {
+                    .10f + .09f * lane
                 } else {
-                    .475f + ((index % 4) - 1.5f) * .008f
+                    .78f - .08f * lane
                 }
-                val endY = if (particle.upper) {
-                    .418f + (index % 3) * .010f
+                val control2X = if (particle.upper) .66f else .36f
+                val control2Y = if (particle.upper) {
+                    .31f + .04f * lane
                 } else {
-                    .505f + (index % 3) * .010f
+                    .60f - .045f * lane
                 }
 
-                val x = cubicBezier(startX, control1X, control2X, endX, localProgress)
-                val y = cubicBezier(startY, control1Y, control2Y, endY, localProgress)
+                // Both sides collapse to the exact same convergence point.
+                val x = cubicBezier(
+                    startX,
+                    control1X,
+                    control2X,
+                    .50f,
+                    localProgress,
+                ) +
+                    sin(angle) * .022f * taper +
+                    laneOffset * .012f * taper
+                val y = cubicBezier(
+                    startY,
+                    control1Y,
+                    control2Y,
+                    .445f,
+                    localProgress,
+                ) +
+                    kotlin.math.cos(angle) * .013f * taper +
+                    laneOffset * .017f * taper
 
                 Text(
                     text = particle.text,
@@ -541,15 +542,17 @@ private fun BrandLaunchScene(
                     modifier = Modifier
                         .offset(
                             x = maxWidth * x - 16.dp,
-                            y = maxHeight * (y + drift) - 8.dp,
+                            y = maxHeight * y - 8.dp,
                         )
                         .alpha(
                             particleFade *
                                 particleAlpha *
-                                (.38f + .62f * localProgress),
+                                (.34f + .66f * localProgress),
                         )
                         .graphicsLayer {
-                            val scale = .88f + .12f * localProgress
+                            // Code becomes slightly smaller as it is absorbed by the logo.
+                            val scale =
+                                .94f - .12f * localProgress
                             scaleX = scale
                             scaleY = scale
                         },

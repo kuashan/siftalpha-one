@@ -2696,3 +2696,28 @@ Motion repair:
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `200`.
+
+
+## 2026-09-22 · R48-D3 v201 galaxy-style code convergence refinement
+
+Scope remains limited to the launch code/data motion.
+
+Real-device feedback:
+- current direction is correct;
+- streams still feel too engineered / linear;
+- upper-right side exposes a visible direct rail that looks cut off;
+- desired behavior is galaxy-like: broad at the edges, naturally narrowing, then becoming a single line entering the center logo.
+
+Repair:
+- removed all full-length static stream rails;
+- flow is now built from moving luminous particles/code only;
+- each side starts as a broad cloud and narrows quadratically as it approaches the center;
+- subtle orbital drift gives the stream a galaxy-like feel without changing the approved direction;
+- both upper-right and lower-left code streams collapse to the exact same convergence point;
+- only a very short, soft filament exists immediately before the logo;
+- code shrinks slightly as it is visually absorbed into the logo;
+- logo, layout, text, timing and R48-D2 functionality remain unchanged.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `201`.

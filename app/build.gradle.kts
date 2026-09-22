@@ -106,7 +106,10 @@ android {
         // v200 changes only code/data flow motion: independent upper/lower clocks, staggered token phases,
         // soft entry/exit envelopes and subtle curve drift remove the rigid synchronized movement while
         // preserving the approved launch composition, timing, logo, text and R48-D2 functionality.
-        versionCode = 200
+        // v201 refines that motion into a galaxy-style convergence: wide particle clouds at both edges
+        // taper into a single soft filament immediately before the real logo, while all long rigid rails
+        // are removed to eliminate the visible cut-line effect.
+        versionCode = 201
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

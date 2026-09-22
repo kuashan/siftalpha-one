@@ -1453,3 +1453,19 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Launch timing | unchanged from v199 | PASS REQUIRED |
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v201 — Galaxy-style launch flow refinement
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Scope | launch code/data motion only | PASS REQUIRED |
+| Wide entry | both sides start broad / cloud-like | PASS REQUIRED |
+| Galaxy feel | subtle orbital drift, no rigid synchronized rails | PASS REQUIRED |
+| Taper | stream width continuously narrows toward center | PASS REQUIRED |
+| Convergence | both sides collapse to one center point | PASS REQUIRED |
+| Hard rail | no full-length visible upper-right direct line | PASS REQUIRED |
+| Final filament | only short soft line immediately before logo | PASS REQUIRED |
+| Logo/layout/text/timing | unchanged from v200 | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |
