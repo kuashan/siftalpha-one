@@ -3280,3 +3280,7 @@ No direct Developer Mode source edit is part of R48-D7. V04Activity remains unch
 Target:
 - versionCode = 219
 - versionName = 0.8.0-alpha43-r48d7
+
+
+### R48-D7 W0 #630 follow-up
+W0 #630 compiled the production source but exposed two legacy unit-test expectations that still used the old provider-neutral 45-second STATUS/STOP timing. The implementation was unchanged. Tests were aligned to the new external-specific deadlines: STATUS 10s and STOP 15s; the project-isolation test now advances only past STOP (15s) so the concurrent START (30s) correctly remains active.

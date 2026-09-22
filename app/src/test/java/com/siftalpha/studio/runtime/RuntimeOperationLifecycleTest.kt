@@ -164,10 +164,10 @@ class RuntimeOperationLifecycleTest {
         )!!
 
         assertEquals(
-            now + RuntimeOperationContract.STATUS_TIMEOUT_MS,
+            now + RuntimeOperationContract.EXTERNAL_STATUS_TIMEOUT_MS,
             externalStatus.deadlineAtEpochMs,
         )
-        now += RuntimeOperationContract.STATUS_TIMEOUT_MS + 1L
+        now += RuntimeOperationContract.EXTERNAL_STATUS_TIMEOUT_MS + 1L
 
         assertEquals(1, tracker.markExpired(now).size)
         assertEquals(RuntimeOperationPhase.TIMED_OUT, tracker.current("external-project")?.phase)

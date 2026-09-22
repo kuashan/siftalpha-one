@@ -242,7 +242,7 @@ class ProjectOperationCoordinatorTest {
             executionId = 7602,
         )!!
 
-        now += RuntimeOperationContract.STOP_TIMEOUT_MS + 1L
+        now += RuntimeOperationContract.EXTERNAL_STOP_TIMEOUT_MS + 1L
         watchdog.fire("project-a", a.generation)
 
         assertNull(coordinator.current("project-a"))
