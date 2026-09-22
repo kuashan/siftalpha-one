@@ -220,6 +220,9 @@ private fun smoothStep(value: Float): Float {
     return t * t * (3f - 2f * t)
 }
 
+private fun mixFloat(start: Float, end: Float, t: Float): Float =
+    start + (end - start) * t
+
 private fun flowEnvelope(phase: Float): Float {
     val enter = smoothStep((phase / .18f).coerceIn(0f, 1f))
     val exit = 1f - smoothStep(((phase - .86f) / .14f).coerceIn(0f, 1f))
@@ -420,22 +423,22 @@ private fun SiftAlphaLaunchMotion(
             val seg = u * 8f
             val q = seg % 1f
             return when (seg.toInt().coerceIn(0, 7)) {
-                0 -> Offset(lerp(left + cornerX, right - cornerX, q), top)
+                0 -> Offset(mixFloat(left + cornerX, right - cornerX, q), top)
                 1 -> Offset(
                     right - cornerX + cornerX * q,
                     top + cornerY * (1f - kotlin.math.cos(q * PI.toFloat() / 2f)),
                 )
-                2 -> Offset(right, lerp(top + cornerY, bottom - cornerY, q))
+                2 -> Offset(right, mixFloat(top + cornerY, bottom - cornerY, q))
                 3 -> Offset(
                     right - cornerX * (1f - kotlin.math.sin(q * PI.toFloat() / 2f)),
                     bottom - cornerY + cornerY * q,
                 )
-                4 -> Offset(lerp(right - cornerX, left + cornerX, q), bottom)
+                4 -> Offset(mixFloat(right - cornerX, left + cornerX, q), bottom)
                 5 -> Offset(
                     left + cornerX * (1f - q),
                     bottom - cornerY * (1f - kotlin.math.cos(q * PI.toFloat() / 2f)),
                 )
-                6 -> Offset(left, lerp(bottom - cornerY, top + cornerY, q))
+                6 -> Offset(left, mixFloat(bottom - cornerY, top + cornerY, q))
                 else -> Offset(
                     left + cornerX * (1f - kotlin.math.sin(q * PI.toFloat() / 2f)),
                     top + cornerY * (1f - q),
@@ -480,20 +483,20 @@ private fun SiftAlphaLaunchMotion(
                     val y1 = cy + logoHalfH * .11f
                     if (index % 2 == 0) {
                         Offset(
-                            lerp(x0, x1, local),
-                            lerp(y0, cy, local),
+                            mixFloat(x0, x1, local),
+                            mixFloat(y0, cy, local),
                         )
                     } else {
                         Offset(
-                            lerp(x0, x1, local),
-                            lerp(y1, cy, local),
+                            mixFloat(x0, x1, local),
+                            mixFloat(y1, cy, local),
                         )
                     }
                 }
                 else -> {
                     val local = ((r - 92) / 8f).coerceIn(0f, 1f)
                     Offset(
-                        lerp(
+                        mixFloat(
                             cx + logoHalfW * .02f,
                             cx + logoHalfW * .25f,
                             local,
