@@ -1,5 +1,6 @@
 package com.siftalpha.studio.runtime
 
+import android.content.SharedPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -221,6 +222,141 @@ class ProjectOperationCoordinatorTest {
     }
 
     @Test
+    fun successfulExternalPrepareLeavesPreparingReadyAndNoActiveOperation() {
+        val lifecycle = RuntimeLifecycleStore(MemorySharedPreferences())
+        val coordinator = coordinator(
+            listenForExternalResults = true,
+            lifecycleStore = lifecycle,
+        )
+        coordinator.begin(
+            projectId = "project-prepare-success",
+            provider = RuntimeOperationProvider.EXTERNAL,
+            action = RuntimeOperationAction.PREPARE,
+            executionId = 7701,
+        )!!
+
+        assertEquals(
+            RuntimeState.PREPARING,
+            lifecycle.read("project-prepare-success").runtimeState,
+        )
+
+        TermuxResultBus.publish(
+            RuntimeResult(
+                executionId = 7701,
+                stdout = "SIFTALPHA_PREPARE_COMMITTED=1\nSIFTALPHA_ENV=READY",
+                stderr = "",
+                exitCode = 0,
+                internalErrorCode = 0,
+                internalErrorMessage = "",
+            ),
+        )
+
+        val snapshot = lifecycle.read("project-prepare-success")
+        assertEquals(true, snapshot.environmentReadyFor(ProjectRuntimeSelection.TERMUX))
+        assertEquals(RuntimeState.UNKNOWN, snapshot.runtimeState)
+        assertNull(snapshot.failureReason)
+        assertNull(coordinator.current("project-prepare-success"))
+        assertNull(coordinator.persisted("project-prepare-success"))
+    }
+
+    @Test
+    fun failedExternalPrepareLeavesPreparingFailedAndNoActiveOperation() {
+        val lifecycle = RuntimeLifecycleStore(MemorySharedPreferences())
+        val coordinator = coordinator(
+            listenForExternalResults = true,
+            lifecycleStore = lifecycle,
+        )
+        coordinator.begin(
+            projectId = "project-prepare-failure",
+            provider = RuntimeOperationProvider.EXTERNAL,
+            action = RuntimeOperationAction.PREPARE,
+            executionId = 7702,
+        )!!
+
+        assertEquals(
+            RuntimeState.PREPARING,
+            lifecycle.read("project-prepare-failure").runtimeState,
+        )
+
+        TermuxResultBus.publish(
+            RuntimeResult(
+                executionId = 7702,
+                stdout = "",
+                stderr = "dependency verification failed",
+                exitCode = 1,
+                internalErrorCode = 0,
+                internalErrorMessage = "",
+            ),
+        )
+
+        val snapshot = lifecycle.read("project-prepare-failure")
+        assertNull(snapshot.environmentReadyFor(ProjectRuntimeSelection.TERMUX))
+        assertEquals(RuntimeState.ENVIRONMENT_ERROR, snapshot.runtimeState)
+        assertEquals("dependency verification failed", snapshot.failureReason)
+        assertNull(coordinator.current("project-prepare-failure"))
+        assertNull(coordinator.persisted("project-prepare-failure"))
+    }
+
+    @Test
+    fun stopDuringExternalPrepareEndsStoppedAndLeavesNoPrepareOperation() {
+        val lifecycle = RuntimeLifecycleStore(MemorySharedPreferences())
+        val coordinator = coordinator(
+            listenForExternalResults = true,
+            lifecycleStore = lifecycle,
+        )
+        coordinator.begin(
+            projectId = "project-prepare-stop",
+            provider = RuntimeOperationProvider.EXTERNAL,
+            action = RuntimeOperationAction.PREPARE,
+            executionId = 7703,
+        )!!
+
+        assertEquals(
+            RuntimeState.PREPARING,
+            lifecycle.read("project-prepare-stop").runtimeState,
+        )
+
+        val stop = coordinator.begin(
+            projectId = "project-prepare-stop",
+            provider = RuntimeOperationProvider.EXTERNAL,
+            action = RuntimeOperationAction.STOP,
+            executionId = 7704,
+        )!!
+        assertEquals(RuntimeOperationAction.STOP, stop.action)
+
+        TermuxResultBus.publish(
+            RuntimeResult(
+                executionId = 7704,
+                stdout = "SIFTALPHA_STATUS=STOPPED_BY_USER",
+                stderr = "",
+                exitCode = 0,
+                internalErrorCode = 0,
+                internalErrorMessage = "",
+            ),
+        )
+
+        var snapshot = lifecycle.read("project-prepare-stop")
+        assertEquals(RuntimeState.STOPPED_BY_USER, snapshot.runtimeState)
+        assertNull(coordinator.current("project-prepare-stop"))
+        assertNull(coordinator.persisted("project-prepare-stop"))
+
+        // A late result from the superseded PREPARE generation stays fenced.
+        TermuxResultBus.publish(
+            RuntimeResult(
+                executionId = 7703,
+                stdout = "SIFTALPHA_ENV=READY",
+                stderr = "",
+                exitCode = 0,
+                internalErrorCode = 0,
+                internalErrorMessage = "",
+            ),
+        )
+        snapshot = lifecycle.read("project-prepare-stop")
+        assertEquals(RuntimeState.STOPPED_BY_USER, snapshot.runtimeState)
+        assertNull(coordinator.current("project-prepare-stop"))
+    }
+
+    @Test
     fun timeoutOfProjectADoesNotAffectProjectB() {
         var now = 40_000L
         val watchdog = ManualWatchdog()
@@ -254,8 +390,10 @@ class ProjectOperationCoordinatorTest {
         nowEpochMs: () -> Long = { 1_000L },
         listenForExternalResults: Boolean,
         watchdog: RuntimeOperationWatchdog = ManualWatchdog(),
+        lifecycleStore: RuntimeLifecycleStore? = null,
     ) = ProjectOperationCoordinator(
         operationStore = MemoryOperationStore(),
+        lifecycleStore = lifecycleStore,
         nowEpochMs = nowEpochMs,
         listenForExternalResults = listenForExternalResults,
         watchdog = watchdog,
@@ -280,6 +418,73 @@ class ProjectOperationCoordinatorTest {
 
         fun fire(projectId: String, generation: Long) {
             callbacks.remove(Key(projectId, generation))?.invoke()
+        }
+    }
+
+    private class MemorySharedPreferences : SharedPreferences {
+        private val values = linkedMapOf<String, Any?>()
+
+        override fun getAll(): Map<String, *> = values.toMap()
+        override fun getString(key: String, defValue: String?): String? =
+            values[key] as? String ?: defValue
+        @Suppress("UNCHECKED_CAST")
+        override fun getStringSet(key: String, defValues: Set<String>?): Set<String>? =
+            (values[key] as? Set<String>)?.toSet() ?: defValues
+        override fun getInt(key: String, defValue: Int): Int = values[key] as? Int ?: defValue
+        override fun getLong(key: String, defValue: Long): Long = values[key] as? Long ?: defValue
+        override fun getFloat(key: String, defValue: Float): Float = values[key] as? Float ?: defValue
+        override fun getBoolean(key: String, defValue: Boolean): Boolean =
+            values[key] as? Boolean ?: defValue
+        override fun contains(key: String): Boolean = values.containsKey(key)
+        override fun edit(): SharedPreferences.Editor = Editor()
+        override fun registerOnSharedPreferenceChangeListener(
+            listener: SharedPreferences.OnSharedPreferenceChangeListener,
+        ) = Unit
+        override fun unregisterOnSharedPreferenceChangeListener(
+            listener: SharedPreferences.OnSharedPreferenceChangeListener,
+        ) = Unit
+
+        private inner class Editor : SharedPreferences.Editor {
+            private val changes = linkedMapOf<String, Any?>()
+            private var clearRequested = false
+
+            override fun putString(key: String, value: String?): SharedPreferences.Editor =
+                put(key, value)
+            override fun putStringSet(key: String, values: Set<String>?): SharedPreferences.Editor =
+                put(key, values?.toSet())
+            override fun putInt(key: String, value: Int): SharedPreferences.Editor = put(key, value)
+            override fun putLong(key: String, value: Long): SharedPreferences.Editor = put(key, value)
+            override fun putFloat(key: String, value: Float): SharedPreferences.Editor = put(key, value)
+            override fun putBoolean(key: String, value: Boolean): SharedPreferences.Editor = put(key, value)
+            override fun remove(key: String): SharedPreferences.Editor {
+                changes[key] = REMOVED
+                return this
+            }
+            override fun clear(): SharedPreferences.Editor {
+                clearRequested = true
+                return this
+            }
+            override fun commit(): Boolean {
+                applyChanges()
+                return true
+            }
+            override fun apply() {
+                applyChanges()
+            }
+            private fun put(key: String, value: Any?): SharedPreferences.Editor {
+                changes[key] = value ?: REMOVED
+                return this
+            }
+            private fun applyChanges() {
+                if (clearRequested) values.clear()
+                changes.forEach { (key, value) ->
+                    if (value === REMOVED) values.remove(key) else values[key] = value
+                }
+            }
+        }
+
+        private companion object {
+            val REMOVED = Any()
         }
     }
 
