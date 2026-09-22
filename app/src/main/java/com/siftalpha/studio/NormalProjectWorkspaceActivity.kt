@@ -103,6 +103,14 @@ import java.util.concurrent.Future
  */
 class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 
+    data class ConfigurationFieldState(
+        val key: String,
+        val description: String,
+        val secret: Boolean,
+        val required: Boolean,
+        val configured: Boolean,
+    )
+
     data class ScreenState(
         val projectName: String = "",
         val statusLabel: String = "",
@@ -121,6 +129,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         val activityIndicatorVisible: Boolean = false,
         val primaryAction: NormalProjectPrimaryActionPolicy.Action =
             NormalProjectPrimaryActionPolicy.Action.PREPARE_PROJECT,
+        val configurationFields: List<ConfigurationFieldState> = emptyList(),
     )
 
     private lateinit var gateway: V04ProjectGateway
@@ -330,6 +339,9 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                     onStop = { stopProject() },
                     onRefresh = { refreshProject() },
                     onOpen = { openProjectPresentation() },
+                    onSaveConfiguration = { values, runAfterSave ->
+                        saveNormalConfiguration(values, runAfterSave)
+                    },
                     onSelectRuntime = { selectRuntime(it) },
                     onOpenDeveloper = { openDeveloperWorkspace() },
                     onRequestPermission = { requestRunCommandPermission() },
@@ -488,6 +500,47 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             richResultAvailable = richResult != null,
             resultWebAvailable = resultWebRef != null,
         )
+        val configuredConfigurationNames =
+            configuration.profile.configuredProjectEnvKeys + configuration.protectedKeys
+        val requiredConfigurationByName =
+            linkedMapOf<String, com.siftalpha.studio.project.ProjectConfigurationInspector.Requirement>()
+        configuration.profile.required.forEach { requirement ->
+            requiredConfigurationByName.putIfAbsent(requirement.name, requirement)
+        }
+        configuration.preflight.missingRequired.forEach { requirement ->
+            requiredConfigurationByName.putIfAbsent(requirement.name, requirement)
+        }
+        val optionalConfigurationByName =
+            linkedMapOf<String, com.siftalpha.studio.project.ProjectConfigurationInspector.Requirement>()
+        configuration.profile.optional.forEach { requirement ->
+            if (requirement.name !in requiredConfigurationByName) {
+                optionalConfigurationByName.putIfAbsent(requirement.name, requirement)
+            }
+        }
+        val configurationFields = buildList {
+            requiredConfigurationByName.values.forEach { requirement ->
+                add(
+                    ConfigurationFieldState(
+                        key = requirement.name,
+                        description = requirement.description,
+                        secret = requirement.secret,
+                        required = true,
+                        configured = requirement.name in configuredConfigurationNames,
+                    ),
+                )
+            }
+            optionalConfigurationByName.values.forEach { requirement ->
+                add(
+                    ConfigurationFieldState(
+                        key = requirement.name,
+                        description = requirement.description,
+                        secret = requirement.secret,
+                        required = false,
+                        configured = requirement.name in configuredConfigurationNames,
+                    ),
+                )
+            }
+        }
         val missingRequiredCount = configuration.preflight.missingRequired.size
         val prepareTitle = if (environmentReady == true) {
             getString(R.string.normal_prepare_phase_ready)
@@ -523,6 +576,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             preparePhaseDetail = prepareDetail,
             activityIndicatorVisible = activityIndicatorVisible,
             primaryAction = primaryAction,
+            configurationFields = configurationFields,
         )
     }
 
@@ -739,6 +793,57 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             folderName = project.folderName,
         ) {
             refreshSharedState(getString(R.string.normal_project_configuration_saved))
+        }
+    }
+
+    private fun saveNormalConfiguration(
+        values: Map<String, String>,
+        runAfterSave: Boolean,
+    ) {
+        if (screenState.value.busy) return
+        val fields = screenState.value.configurationFields
+        val missingRequired = fields.firstOrNull { field ->
+            field.required &&
+                !field.configured &&
+                values[field.key].orEmpty().isBlank()
+        }
+        if (missingRequired != null) {
+            Toast.makeText(
+                this,
+                getString(R.string.runtime_configuration_blank_value, missingRequired.key),
+                Toast.LENGTH_SHORT,
+            ).show()
+            return
+        }
+
+        runCatching {
+            values.forEach { (key, value) ->
+                val normalized = value.trim()
+                if (normalized.isNotBlank()) {
+                    secretStore.saveEnvironmentValue(project.folderName, key, normalized)
+                }
+            }
+        }.onFailure { error ->
+            Toast.makeText(
+                this,
+                getString(R.string.runtime_configuration_save_failed) +
+                    ": " + (error.message ?: error.javaClass.simpleName),
+                Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
+
+        refreshSharedState(getString(R.string.normal_project_configuration_saved))
+        if (!runAfterSave) return
+
+        val refreshed = configurationUi.snapshot(
+            project.summary.documentId,
+            project.folderName,
+        )
+        if (refreshed.preflight.missingRequired.isEmpty()) {
+            runProject()
+        } else {
+            refreshSharedState()
         }
     }
 
@@ -1322,6 +1427,7 @@ private fun NormalProjectWorkspaceScreen(
     onStop: () -> Unit,
     onRefresh: () -> Unit,
     onOpen: () -> Unit,
+    onSaveConfiguration: (Map<String, String>, Boolean) -> Unit,
     onSelectRuntime: (ProjectRuntimeSelection) -> Unit,
     onOpenDeveloper: () -> Unit,
     onRequestPermission: () -> Unit,
@@ -1337,6 +1443,7 @@ private fun NormalProjectWorkspaceScreen(
         onStop = onStop,
         onRefresh = onRefresh,
         onOpen = onOpen,
+        onSaveConfiguration = onSaveConfiguration,
         onSelectRuntime = onSelectRuntime,
         onOpenDeveloper = onOpenDeveloper,
         onRequestPermission = onRequestPermission,

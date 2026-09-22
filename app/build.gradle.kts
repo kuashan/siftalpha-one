@@ -93,7 +93,7 @@ android {
         // and indeterminate Runtime activity indicator without changing Runtime deadlines.
         // R48-D3 implements the SiftAlpha-first Normal Mode visual system, S-mark launch
         // transition and state-driven presentation without changing Shared Core semantics.
-        versionCode = 193
+        versionCode = 194
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
