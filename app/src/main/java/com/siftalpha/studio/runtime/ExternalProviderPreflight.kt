@@ -186,6 +186,11 @@ interface ExternalProviderReadinessStateStore {
         stage: ExternalProviderProbeStage,
     )
     fun recordProbeTimeout(executionId: Int, atEpochMs: Long, detail: String)
+
+    fun recordRuntimeCapabilityProof(
+        atEpochMs: Long,
+        detail: String? = null,
+    ) = Unit
 }
 
 class ExternalProviderReadinessStore internal constructor(
@@ -288,6 +293,23 @@ class ExternalProviderReadinessStore internal constructor(
             .remove(FIELD_LAST_PROBE_RESULT)
             .putLong(FIELD_LAST_PROBE_AT, atEpochMs)
             .putString(FIELD_DETAIL, detail.trim().take(MAX_DETAIL_LENGTH))
+            .apply()
+    }
+
+    override fun recordRuntimeCapabilityProof(
+        atEpochMs: Long,
+        detail: String?,
+    ) {
+        prefs.edit()
+            .putString(FIELD_BRIDGE_STATE, ExternalProviderBridgeState.PASS.name)
+            .putString(FIELD_PROBE_STAGE, ExternalProviderProbeStage.RUNTIME_CAPABILITY.name)
+            .putString(FIELD_LAST_PROBE_RESULT, ExternalProviderProbeResult.PASS.name)
+            .putLong(FIELD_LAST_PROBE_AT, atEpochMs)
+            .remove(FIELD_LAST_PROBE_ID)
+            .apply {
+                if (detail.isNullOrBlank()) remove(FIELD_DETAIL)
+                else putString(FIELD_DETAIL, detail.trim().take(MAX_DETAIL_LENGTH))
+            }
             .apply()
     }
 
