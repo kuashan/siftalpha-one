@@ -3360,3 +3360,10 @@ Target:
 - First W0 run #634 reached unit-test compilation and exposed a test-source-only Kotlin interpolation mistake in `PythonRuntimeAdapterTest`: the shell literals `$candidate` and `$venv` were interpreted as Kotlin references.
 - Corrected only the regression assertion to escape those shell variables. No production Runtime, Shared Core, Normal Mode, or Developer Mode source behavior changed.
 - Internal Alpine Probe #111 already passed on the unchanged production implementation.
+
+
+## 2026-09-23 · R48-D9 W0 assertion escape correction
+
+- W0 #635 confirmed the first follow-up still emitted Kotlin interpolation for the shell placeholders.
+- The regression assertion now preserves the intended literal shell text `${'$'}candidate` / `${'$'}venv`.
+- Test/documentation-only follow-up; production repair remains unchanged.
