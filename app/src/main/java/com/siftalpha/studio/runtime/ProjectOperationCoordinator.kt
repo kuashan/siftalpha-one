@@ -79,6 +79,7 @@ class ProjectOperationCoordinator internal constructor(
     private val nowEpochMs: () -> Long = { System.currentTimeMillis() },
     private val listenForExternalResults: Boolean = true,
     private val watchdog: RuntimeOperationWatchdog = ScheduledRuntimeOperationWatchdog(),
+    private val externalReadinessStore: ExternalProviderReadinessStateStore? = null,
 ) {
     data class ExternalCompletion(
         val projectId: String,
@@ -440,6 +441,17 @@ class ProjectOperationCoordinator internal constructor(
             // cannot interleave and have its state overwritten by this old callback.
             finishLocked(record, phase, fenceResult = false)
             updateLifecycleAfterExternalResult(record, result, previous)
+            if (
+                record.action == RuntimeOperationAction.PREPARE &&
+                result.exitCode == 0 &&
+                result.internalErrorMessage.isBlank() &&
+                "SIFTALPHA_ENV=READY" in result.stdout
+            ) {
+                externalReadinessStore?.recordRuntimeCapabilityProof(
+                    atEpochMs = nowEpochMs(),
+                    detail = "EXTERNAL_PREPARE_SUCCEEDED",
+                )
+            }
             rememberManagedResult(result.executionId, ExternalResultDisposition.ACCEPTED)
             completion = ExternalCompletion(projectId, record.action, generation, result)
         }
@@ -669,6 +681,7 @@ class ProjectOperationCoordinator internal constructor(
                 sharedInstance ?: ProjectOperationCoordinator(
                     operationStore = RuntimeOperationStore(context.applicationContext),
                     lifecycleStore = RuntimeLifecycleStore(context.applicationContext),
+                    externalReadinessStore = ExternalProviderReadinessStore(context.applicationContext),
                 ).also { sharedInstance = it }
             }
     }
