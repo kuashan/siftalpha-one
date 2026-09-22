@@ -2846,3 +2846,45 @@ Boundary:
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `205`.
+
+
+## 2026-09-22 · R48-D3 v206 final four-stage opening motion
+
+User supplied the final opening-motion specification and explicitly allowed implementation choice as long as the visual result is preserved.
+
+Implementation choice:
+- Native Jetpack Compose Canvas / text layers, not HTML/WebView.
+- Reason: this is the Android app launch surface; native Canvas avoids WebView startup overhead and keeps the existing real app logo asset authoritative.
+
+Final sequence:
+1. **Stage 1 — chaotic edge inflow**
+   - dense code characters and luminous points enter from lower-left and upper-right;
+   - short trails + broad fan distribution create high-speed, chaotic motion.
+2. **Stage 2 — S-shaped convergence**
+   - the same code/data population bends into a clear S flow;
+   - upper-right stream wraps around right/bottom toward the lower S end;
+   - lower-left stream wraps around left/top toward the upper S end.
+3. **Stage 3 — code/nebula S**
+   - stream characters and 330 luminous fragments condense into a volumetric S;
+   - sparse orbiting dust adds slow nebula rotation/flicker.
+4. **Stage 4 — completed app mark**
+   - fragment noise resolves into the unchanged real app logo;
+   - only final SiftAlpha X + INTELLIGENCE IN MOTION remain;
+   - the logo uses restrained breathing glow.
+
+Hard visual boundary:
+- no stage titles;
+- no numbers (01/02/03/04);
+- no explanatory bottom captions;
+- no storyboard chrome;
+- final logo continues to use the repository's real launcher asset.
+
+Timing:
+- 4.1 s choreography + 0.5 s final hold + exit fade, roughly 4.9 s perceived duration.
+- Reduced Motion skips continuous decorative movement and holds the completed frame.
+
+R48-D2 baseline/runtime/functionality remains untouched.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `206`.

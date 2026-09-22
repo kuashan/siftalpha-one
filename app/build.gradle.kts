@@ -119,7 +119,10 @@ android {
         // upper-right data spirals around the logo into the lower-left S end; lower-left data spirals
         // around the logo into the upper-right S end; the incoming code then fills a fragment-built S
         // which continuously resolves into the unchanged real application logo.
-        versionCode = 205
+        // v206 implements the final approved four-stage opening motion without any stage titles,
+        // numbers or explanatory captions: chaotic edge inflow -> S-shaped convergence ->
+        // code/nebula S formation -> breathing reveal of the unchanged real app logo.
+        versionCode = 206
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

@@ -145,3 +145,22 @@ The v204 page composition remains authoritative. v205 changes only the motion in
 - that fragment-built S continuously resolves into the actual app logo.
 
 Do not add phase cards, headings, extra captions, or other storyboard chrome.
+
+
+## R48-D3 v206 Override — Final current opening authority
+
+Current opening is one full-screen sequential animation with no stage labels/chrome.
+
+Visual sequence only:
+1. chaotic code/data inflow from lower-left and upper-right;
+2. smooth S-shaped convergence;
+3. dense code/particle nebula forms an S;
+4. unchanged real app logo resolves with SiftAlpha X + INTELLIGENCE IN MOTION.
+
+Do not render:
+- stage titles;
+- 01/02/03/04 numbers;
+- explanatory captions;
+- storyboard cards.
+
+The real launcher logo remains the final mark.

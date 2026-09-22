@@ -1538,3 +1538,20 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Real logo | unchanged original app logo resolves last | PASS REQUIRED |
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v206 — Final four-stage opening motion
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Stage 1 | dense chaotic lower-left / upper-right inflow with trails | PASS REQUIRED |
+| Stage 2 | clear S-shaped curved convergence | PASS REQUIRED |
+| Stage 3 | volumetric code/nebula S with rotation/flicker | PASS REQUIRED |
+| Stage 4 | actual app logo + SiftAlpha X + INTELLIGENCE IN MOTION | PASS REQUIRED |
+| Stage titles / numbers | absent | PASS REQUIRED |
+| Explanatory captions | absent | PASS REQUIRED |
+| Required code glyphs | AI, 101, </>, {}, 0x, Py, JS present | PASS REQUIRED |
+| Logo source | unchanged real launcher asset | PASS REQUIRED |
+| Reduced motion | completed-frame fallback | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |
