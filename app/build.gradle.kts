@@ -94,7 +94,10 @@ android {
         // R48-D3 implements the approved SiftAlpha X Normal Mode visual system.
         // v196 adds the mandatory R48-D2 parity repair: no baseline capability may be removed
         // or merged by presentation work; secondary Normal Mode routes receive the same design system.
-        versionCode = 196
+        // v197 repairs the running-state presentation and launch transition from real-device feedback:
+        // result readiness follows the existing Open fact, running uses breathing motion, the launch
+        // brand transition dwells 3-5 seconds with the original logo, and Stop adopts the blue system tone.
+        versionCode = 197
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

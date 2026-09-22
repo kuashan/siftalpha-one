@@ -28,3 +28,13 @@ Brand Transition（品牌启动过渡）强化 **SiftAlpha X + 原始 Logo（标
 
 ## Boundary（边界）
 只属于 Presentation Layer（表现层），不得修改 Developer Mode（开发者模式）、Runtime（运行时）、Environment（环境）或 Shared Core（共享核心）事实。
+
+
+## R48-D3 v197 Real-device Timing + Motion
+
+- Launch brand transition dwell: approximately 3.9 seconds, within the approved 3-5 second range.
+- The original R48-D2 logo asset remains unchanged.
+- Motion may animate only opacity, restrained scale, and surrounding cyan/blue glow; logo geometry is never redrawn.
+- The logo uses a slow breathing rhythm rather than rotation.
+- The underlying Home screen is covered until the brand transition exits.
+- When Android system animations are disabled, the logo remains static for the dwell period and exits without decorative motion.

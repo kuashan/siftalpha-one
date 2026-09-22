@@ -1385,3 +1385,20 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Developer Mode | unchanged | REQUIRED |
 | Runtime / Environment semantics | unchanged | REQUIRED |
 | W0 Cloud Build | validators + tests + APK | PENDING |
+
+
+### R48-D3 v197 — Real-device running + brand transition repair
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| R48-D2 baseline | `baseline/r48d2` remains unchanged | PASS REQUIRED |
+| Result linkage | `state.openEnabled=true` while RUNNING makes result phase Available | PASS REQUIRED |
+| Open behavior | Open enablement semantics unchanged from Shared Core | PASS REQUIRED |
+| Running text | center Running label uses Normal Mode primary text color | PASS REQUIRED |
+| STARTING motion | rotating progress remains only while STARTING | PASS REQUIRED |
+| RUNNING motion | no continuous rotation; restrained breathing glow/scale | PASS REQUIRED |
+| Reduced motion | no breathing/rotating animation when system animations disabled | PASS REQUIRED |
+| Stop behavior | same R48-D2 action/enablement; presentation uses blue tone | PASS REQUIRED |
+| Brand dwell | launch brand transition is ~3-5 seconds | PASS REQUIRED |
+| Brand logo | original R48-D2 logo asset; geometry not redrawn | PASS REQUIRED |
+| Cloud validators/tests/APK | W0 must pass before APK delivery | PENDING |

@@ -55,6 +55,7 @@
     <string name="brand_run_phase_result">프로젝트 결과 대기</string>
     <string name="brand_run_background_hint">백그라운드 실행 중에도 앱을 사용할 수 있게 두면 작업을 안정적으로 완료하는 데 도움이 됩니다</string>
     <string name="brand_state_completed">완료</string>
+    <string name="brand_state_available">열기 가능</string>
     <string name="brand_state_running">진행 중…</string>
     <string name="brand_state_waiting">대기 중</string>
     <string name="brand_result_title">프로젝트 결과</string>

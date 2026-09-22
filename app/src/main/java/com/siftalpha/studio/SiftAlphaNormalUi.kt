@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -143,14 +144,16 @@ internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
     var visible by rememberSaveable { mutableStateOf(true) }
     val reveal = remember { Animatable(if (motion) 0f else 1f) }
     val nameAlpha = remember { Animatable(if (motion) 0f else 1f) }
-
     LaunchedEffect(Unit) {
         if (motion) {
-            reveal.animateTo(1f, tween(620))
-            nameAlpha.animateTo(1f, tween(220))
-            delay(170)
+            reveal.animateTo(1f, tween(700))
+            nameAlpha.animateTo(1f, tween(300))
+            // Keep the branded entry visible long enough to be perceived as an intentional
+            // product transition rather than a flash. 700 + 300 + 2450 + exit ≈ 3.9 s.
+            delay(2450)
         } else {
-            delay(120)
+            // Reduced-motion keeps the requested dwell time but removes motion.
+            delay(3300)
         }
         visible = false
     }
@@ -159,20 +162,22 @@ internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
         content()
         AnimatedVisibility(
             visible = visible,
-            enter = fadeIn(tween(120)),
-            exit = fadeOut(tween(if (motion) 240 else 70)),
+            enter = fadeIn(tween(160)),
+            exit = fadeOut(tween(if (motion) 420 else 120)),
         ) {
             Box(Modifier.fillMaxSize().background(Ink)) {
                 AuroraBackdrop(Modifier.fillMaxSize(), animate = motion)
                 Column(
-                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 28.dp),
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(horizontal = 28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    OriginalLogoMark(
-                        modifier = Modifier.size(126.dp),
-                        alpha = reveal.value,
+                    AnimatedOriginalLogoMark(
+                        reveal = reveal.value,
+                        motion = motion,
                     )
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(14.dp))
                     Text(
                         text = stringResource(R.string.app_name),
                         color = TextPrimary,
@@ -203,6 +208,72 @@ internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
         }
     }
 }
+
+@Composable
+private fun AnimatedOriginalLogoMark(
+    reveal: Float,
+    motion: Boolean,
+) {
+    val transition = rememberInfiniteTransition(label = "brand-logo-pulse")
+    val pulse by if (motion) {
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(900),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "brand-logo-breath",
+        )
+    } else {
+        remember { mutableStateOf(.5f) }
+    }
+
+    Box(
+        modifier = Modifier.size(164.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val phase = pulse.coerceIn(0f, 1f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Cyan.copy(alpha = .18f + .16f * phase),
+                        Blue.copy(alpha = .10f + .10f * phase),
+                        Violet.copy(alpha = .06f + .08f * phase),
+                        Color.Transparent,
+                    ),
+                    center = center,
+                    radius = size.minDimension * .50f,
+                ),
+                radius = size.minDimension * (.44f + .035f * phase),
+                center = center,
+            )
+            drawCircle(
+                color = Cyan.copy(alpha = .14f + .18f * phase),
+                radius = size.minDimension * (.41f + .018f * phase),
+                center = center,
+                style = Stroke(width = 1.5.dp.toPx()),
+            )
+        }
+
+        OriginalLogoMark(
+            modifier = Modifier
+                .size(126.dp)
+                .graphicsLayer {
+                    val scale = if (motion) {
+                        .965f + .035f * pulse
+                    } else {
+                        1f
+                    }
+                    scaleX = scale
+                    scaleY = scale
+                },
+            alpha = reveal,
+        )
+    }
+}
+
 
 @Composable
 private fun SiftRibbonMark(
@@ -1796,13 +1867,17 @@ private fun RunProjectScreen(
                     Text(state.projectName, color = Muted, fontSize = 11.sp)
                 }
             }
-            item { RunPhaseList(starting = state.runtimeState == RuntimeState.STARTING) }
+            item {
+                RunPhaseList(
+                    starting = state.runtimeState == RuntimeState.STARTING,
+                    resultAvailable = state.openEnabled,
+                )
+            }
             item {
                 GradientPrimaryButton(
                     stringResource(R.string.brand_action_stop),
                     onStop,
                     enabled = !state.busy || state.runtimeState == RuntimeState.RUNNING,
-                    danger = true,
                 )
             }
             item {
@@ -1831,59 +1906,160 @@ private fun RunProjectScreen(
 private fun RunOrb(running: Boolean) {
     val motion = remember { ValueAnimator.areAnimatorsEnabled() }
     val transition = rememberInfiniteTransition(label = "run-orb")
-    val angle by if (motion) {
+
+    // STARTING keeps a directional spin because it communicates transition.
+    val angle by if (motion && !running) {
         transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(1500, easing = LinearEasing)),
-            label = "run-angle",
+            initialValue = -90f,
+            targetValue = 270f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1500, easing = LinearEasing),
+            ),
+            label = "run-start-angle",
         )
     } else {
-        remember { mutableStateOf(35f) }
+        remember { mutableStateOf(-90f) }
     }
-    Box(Modifier.size(224.dp), contentAlignment = Alignment.Center) {
+
+    // RUNNING switches to a breathing state: no continuous rotation, only restrained
+    // scale/glow modulation so the visual reads as "alive" instead of "still loading".
+    val breath by if (motion && running) {
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1050),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "run-breath",
+        )
+    } else {
+        remember { mutableStateOf(.5f) }
+    }
+
+    Box(
+        modifier = Modifier
+            .size(224.dp)
+            .graphicsLayer {
+                if (running && motion) {
+                    val scale = .985f + .015f * breath
+                    scaleX = scale
+                    scaleY = scale
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
         Canvas(Modifier.fillMaxSize()) {
-            val stroke = 10.dp.toPx()
+            val baseStroke = 10.dp.toPx()
+            val pulse = breath.coerceIn(0f, 1f)
+
             drawArc(
                 color = Color(0xFF1D356B),
                 startAngle = 0f,
                 sweepAngle = 360f,
                 useCenter = false,
-                topLeft = Offset(stroke / 2, stroke / 2),
-                size = Size(size.width - stroke, size.height - stroke),
-                style = Stroke(stroke, cap = StrokeCap.Round),
+                topLeft = Offset(baseStroke / 2, baseStroke / 2),
+                size = Size(size.width - baseStroke, size.height - baseStroke),
+                style = Stroke(baseStroke, cap = StrokeCap.Round),
             )
-            drawArc(
-                brush = Brush.sweepGradient(listOf(Cyan, Blue, Violet, Cyan)),
-                startAngle = angle,
-                sweepAngle = if (running) 230f else 160f,
-                useCenter = false,
-                topLeft = Offset(stroke / 2, stroke / 2),
-                size = Size(size.width - stroke, size.height - stroke),
-                style = Stroke(stroke, cap = StrokeCap.Round),
-            )
+
+            if (running) {
+                val haloStroke = 2.dp.toPx()
+                drawCircle(
+                    color = Cyan.copy(alpha = .10f + .22f * pulse),
+                    radius = size.minDimension * (.46f + .014f * pulse),
+                    center = center,
+                    style = Stroke(haloStroke),
+                )
+                drawArc(
+                    brush = Brush.sweepGradient(
+                        listOf(Cyan, Blue, Violet, Cyan),
+                    ),
+                    startAngle = -90f,
+                    sweepAngle = 332f,
+                    useCenter = false,
+                    topLeft = Offset(baseStroke / 2, baseStroke / 2),
+                    size = Size(size.width - baseStroke, size.height - baseStroke),
+                    style = Stroke(
+                        width = baseStroke + 2.dp.toPx() * pulse,
+                        cap = StrokeCap.Round,
+                    ),
+                    alpha = .74f + .22f * pulse,
+                )
+            } else {
+                drawArc(
+                    brush = Brush.sweepGradient(
+                        listOf(Cyan, Blue, Violet, Cyan),
+                    ),
+                    startAngle = angle,
+                    sweepAngle = 160f,
+                    useCenter = false,
+                    topLeft = Offset(baseStroke / 2, baseStroke / 2),
+                    size = Size(size.width - baseStroke, size.height - baseStroke),
+                    style = Stroke(baseStroke, cap = StrokeCap.Round),
+                )
+            }
         }
+
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(if (running) stringResource(R.string.brand_run_live) else stringResource(R.string.brand_run_starting_short), fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = if (running) {
+                    stringResource(R.string.brand_run_live)
+                } else {
+                    stringResource(R.string.brand_run_starting_short)
+                },
+                color = TextPrimary,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+            )
             Spacer(Modifier.height(4.dp))
-            Text(stringResource(R.string.brand_run_task_active), color = Muted, fontSize = 11.sp)
+            Text(
+                stringResource(R.string.brand_run_task_active),
+                color = Muted,
+                fontSize = 11.sp,
+            )
         }
     }
 }
 
 @Composable
-private fun RunPhaseList(starting: Boolean) {
+private fun RunPhaseList(
+    starting: Boolean,
+    resultAvailable: Boolean,
+) {
     GlowCard {
-        RunPhaseRow(stringResource(R.string.brand_run_phase_start), completed = !starting, active = starting)
+        RunPhaseRow(
+            label = stringResource(R.string.brand_run_phase_start),
+            completed = !starting,
+            active = starting,
+        )
         Spacer(Modifier.height(12.dp))
-        RunPhaseRow(stringResource(R.string.brand_run_phase_execute), completed = false, active = !starting)
+        RunPhaseRow(
+            label = stringResource(R.string.brand_run_phase_execute),
+            completed = false,
+            active = !starting,
+        )
         Spacer(Modifier.height(12.dp))
-        RunPhaseRow(stringResource(R.string.brand_run_phase_result), completed = false, active = false)
+        RunPhaseRow(
+            label = stringResource(R.string.brand_run_phase_result),
+            completed = resultAvailable,
+            active = false,
+            completedText = if (resultAvailable) {
+                stringResource(R.string.brand_state_available)
+            } else {
+                null
+            },
+        )
     }
 }
 
 @Composable
-private fun RunPhaseRow(label: String, completed: Boolean, active: Boolean) {
+private fun RunPhaseRow(
+    label: String,
+    completed: Boolean,
+    active: Boolean,
+    completedText: String? = null,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Surface(
             modifier = Modifier.size(24.dp),
@@ -1893,19 +2069,31 @@ private fun RunPhaseRow(label: String, completed: Boolean, active: Boolean) {
                 active -> Blue
                 else -> PanelStrong
             },
-            border = BorderStroke(1.dp, if (active) Cyan.copy(.6f) else Border),
+            border = BorderStroke(
+                1.dp,
+                if (active) Cyan.copy(.6f) else Border,
+            ),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                if (completed) CheckGlyph(Modifier.size(12.dp), Color.White)
-                else if (active) DotPulse(Modifier.size(10.dp))
-                else Text("·", color = Muted)
+                if (completed) {
+                    CheckGlyph(Modifier.size(12.dp), Color.White)
+                } else if (active) {
+                    DotPulse(Modifier.size(10.dp))
+                } else {
+                    Text("·", color = Muted)
+                }
             }
         }
         Spacer(Modifier.width(10.dp))
-        Text(label, color = if (completed || active) TextPrimary else MutedDeep, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        Text(
+            label,
+            color = if (completed || active) TextPrimary else MutedDeep,
+            fontSize = 12.sp,
+            modifier = Modifier.weight(1f),
+        )
         Text(
             text = when {
-                completed -> stringResource(R.string.brand_state_completed)
+                completed -> completedText ?: stringResource(R.string.brand_state_completed)
                 active -> stringResource(R.string.brand_state_running)
                 else -> stringResource(R.string.brand_state_waiting)
             },
@@ -1924,8 +2112,15 @@ private fun DotPulse(modifier: Modifier) {
     val motion = remember { ValueAnimator.areAnimatorsEnabled() }
     val transition = rememberInfiniteTransition(label = "pulse")
     val alpha by if (motion) {
-        transition.animateFloat(.35f, 1f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "pulse-alpha")
-    } else remember { mutableStateOf(1f) }
+        transition.animateFloat(
+            .35f,
+            1f,
+            infiniteRepeatable(tween(700), RepeatMode.Reverse),
+            label = "pulse-alpha",
+        )
+    } else {
+        remember { mutableStateOf(1f) }
+    }
     Box(modifier.background(Cyan.copy(alpha = alpha), CircleShape))
 }
 

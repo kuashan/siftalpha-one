@@ -2598,3 +2598,24 @@ Target:
 - versionName `0.8.0-alpha43-r48d3`
 - versionCode `196`
 - cloud gate pending.
+
+
+## 2026-09-22 · R48-D3 v197 real-device UI repair
+
+Real-device feedback on the running screen identified four presentation issues while R48-D2 functionality remained intact:
+
+- Result phase was visually stuck at waiting even when the existing R48-D2 Open fact was already true.
+- The center "Running" label inherited an incorrect dark/black text color.
+- The running orb continued to rotate after the project had entered RUNNING.
+- The launch brand transition was too short and the original logo was static.
+- The running Stop action used a red tone that conflicted with the established blue visual system.
+
+Repair:
+- Run result phase now derives directly from `state.openEnabled`; when Open is available, the result phase becomes Available.
+- Running text explicitly uses the Normal Mode primary text token.
+- STARTING keeps directional rotation; RUNNING switches to a blue/cyan breathing glow with no continuous spin.
+- Brand transition now remains visible for approximately 3.9 seconds, uses the unchanged original R48-D2 logo, and adds restrained scale/glow breathing. Reduced-motion keeps the dwell but removes movement.
+- Running Stop keeps identical R48-D2 behavior but uses the blue primary visual tone.
+
+No Runtime, Environment, Web Discovery, Open eligibility, Stop semantics, or baseline source was changed.
+Target: `0.8.0-alpha43-r48d3` / versionCode `197`.

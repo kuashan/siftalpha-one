@@ -75,3 +75,14 @@ External Provider（外部执行环境）恢复必须保持 R48-D2 行为：
 - permission（权限）
 - Open Termux（打开 Termux）
 - BRIDGE_UNRESPONSIVE（桥无响应）时同时保留 Open Termux + Re-check（重新检测）
+
+
+## Running Motion Override（运行中动效覆盖）
+
+Real-device rule:
+- STARTING（启动中）may use directional rotation because it communicates transition.
+- RUNNING（运行中）must not look like an endless loading spinner.
+- RUNNING uses restrained breathing motion: blue/cyan halo opacity + very small non-layout scale modulation.
+- If `Open（打开）` is already enabled, the result phase must immediately reflect availability; do not continue to show “waiting for result”.
+- Running Stop（停止运行）remains a high-priority action but uses the established blue system tone; destructive red is reserved for irreversible/destructive actions, not ordinary runtime stop.
+- Reduced-motion users receive the same state information without continuous animation.

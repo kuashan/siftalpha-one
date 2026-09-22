@@ -55,6 +55,7 @@
     <string name="brand_run_phase_result">等待專案結果</string>
     <string name="brand_run_background_hint">背景執行時，保持應用程式可用有助於任務穩定完成</string>
     <string name="brand_state_completed">已完成</string>
+    <string name="brand_state_available">可開啟</string>
     <string name="brand_state_running">進行中…</string>
     <string name="brand_state_waiting">等待中</string>
     <string name="brand_result_title">專案結果</string>
