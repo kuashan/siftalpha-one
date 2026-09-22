@@ -2999,3 +2999,25 @@ Boundary remains unchanged:
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `210`.
+
+
+## 2026-09-22 · R48-D3 v211 dense full-mask code S
+
+Real-device evidence from v210 showed five disconnected code islands instead of one S.
+
+Root cause:
+- the 2D S mask itself was acceptable;
+- but only 252 selected target cells were rendered as composable text;
+- the mask contains substantially more accepted cells, so rendering only a sparse subset broke the visual continuity.
+
+v211 keeps the 2D S mask but changes rendering:
+- every accepted S-mask cell is rendered as an actual code glyph;
+- dense glyph fill is drawn efficiently through native Canvas text instead of creating hundreds of extra Compose Text nodes;
+- code mask uses monospaced bold glyphs with restrained cyan/blue/violet glow;
+- moving inflow glyphs fade as the filled mask takes over, avoiding double-density clutter;
+- no shell, terminal, cloud, or generic intermediate object is introduced;
+- completed code-S remains the direct predecessor of the unchanged real logo.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `211`.

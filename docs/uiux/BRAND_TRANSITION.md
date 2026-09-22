@@ -207,3 +207,15 @@ Current rule:
 - code glyphs occupy only cells accepted by that S mask;
 - incoming code moves directly into those mask positions;
 - after the completed code-S is readable, the real launcher logo resolves in the same center position.
+
+
+## R48-D3 v211 Override — Full S-mask occupancy
+
+The code-built intermediate must render the complete accepted S mask, not a sparse subset.
+
+Required visual:
+- one continuous wide S;
+- code glyphs densely occupy the S area;
+- no disconnected islands;
+- no generic particle cloud;
+- after the S is fully readable, the real logo resolves in the same location.

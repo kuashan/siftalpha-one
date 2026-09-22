@@ -1,6 +1,8 @@
 package com.siftalpha.studio
 
 import android.animation.ValueAnimator
+import android.graphics.Paint as AndroidPaint
+import android.graphics.Typeface
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -75,6 +77,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -287,6 +291,10 @@ private fun SiftAlphaLaunchMotion(
         } else {
             1f
         }
+    val maskFillAlpha =
+        smoothStep(
+            ((p - .34f) / .28f).coerceIn(0f, 1f),
+        ) * codeLogoAlpha
 
     val flowTransition = rememberInfiniteTransition(label = "siftalpha-logo-build-flow")
     val upperClock by if (motion) {
@@ -546,6 +554,13 @@ private fun SiftAlphaLaunchMotion(
             return codeSMaskTargets[index % codeSMaskTargets.size]
         }
 
+        val codeMaskPaint = remember {
+            AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                textAlign = AndroidPaint.Align.CENTER
+            }
+        }
+
         fun codeLogoColor(target: Offset, index: Int): Color =
             when {
                 target.y < cy - logoHalfH * .18f ->
@@ -763,9 +778,64 @@ private fun SiftAlphaLaunchMotion(
                 }
             }
 
-            // Intentionally no code-stage halo/cloud: the intermediate shape must read
-            // as a clean S made from code, not as a glowing blob.
+            // v211: draw EVERY accepted S-mask cell as a real code glyph.
+            // This is the key difference from v210: the silhouette is now fully filled instead
+            // of showing only 252 scattered samples, so it reads immediately as one continuous S.
+            if (maskFillAlpha > .004f && codeSMaskTargets.isNotEmpty()) {
+                val native = drawContext.canvas.nativeCanvas
+                codeMaskPaint.textSize = 5.9.dp.toPx()
 
+                codeSMaskTargets.forEachIndexed { index, target ->
+                    val revealOrder =
+                        index.toFloat() /
+                            (codeSMaskTargets.size - 1)
+                                .coerceAtLeast(1)
+                                .toFloat()
+                    val localReveal =
+                        smoothStep(
+                            (
+                                (logoBuild - revealOrder * .28f) /
+                                    .44f
+                                ).coerceIn(0f, 1f),
+                        )
+                    val shimmer =
+                        .78f +
+                            .22f *
+                                kotlin.math.abs(
+                                    sin(
+                                        lowerClock * 2f * PI.toFloat() +
+                                            index * .19f,
+                                    ),
+                                )
+                    val alpha =
+                        (
+                            maskFillAlpha *
+                                localReveal *
+                                shimmer
+                            ).coerceIn(0f, 1f)
+
+                    if (alpha > .01f) {
+                        val color = codeLogoColor(target, index)
+                        codeMaskPaint.color = color.toArgb()
+                        codeMaskPaint.alpha = (alpha * 255f).toInt().coerceIn(0, 255)
+                        codeMaskPaint.setShadowLayer(
+                            4.2.dp.toPx(),
+                            0f,
+                            0f,
+                            color.copy(alpha = .70f).toArgb(),
+                        )
+                        native.drawText(
+                            BrandCodeLexicon[index % BrandCodeLexicon.size],
+                            target.x * w,
+                            target.y * h + 2.0.dp.toPx(),
+                            codeMaskPaint,
+                        )
+                    }
+                }
+                codeMaskPaint.clearShadowLayer()
+            }
+
+            // No code-stage halo/cloud: the S shape itself must be the visual object.
             if (realLogoAlpha > .004f) {
                 val pulse = .72f + .28f * breathe
                 drawCircle(
@@ -836,7 +906,10 @@ private fun SiftAlphaLaunchMotion(
                 val alpha =
                     (
                         inflowAlpha * life * (1f - morph) +
-                            codeLogoAlpha * morph * settledAlpha
+                            codeLogoAlpha *
+                                morph *
+                                settledAlpha *
+                                (1f - .88f * maskFillAlpha)
                         ).coerceIn(0f, 1f)
 
                 Text(

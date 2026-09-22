@@ -1397,3 +1397,11 @@ Do not use parallel path bands or generic particle clouds for S formation.
 Required chain remains:
 **incoming code -> filled code-S silhouette -> real app logo**.
 R48-D2 remains untouched.
+
+
+## 2026-09-22 · R48-D3 v211 current launch fix
+
+v210 mask geometry is retained, but v211 renders every accepted mask cell as code.
+This specifically fixes the real-device disconnected-island failure.
+Required chain:
+**incoming code -> continuous dense code-S -> real app logo**.

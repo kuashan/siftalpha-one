@@ -1624,3 +1624,18 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Real logo asset | unchanged | PASS REQUIRED |
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v211 — Dense full-mask code S
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Intermediate shape | one continuous S | PASS REQUIRED |
+| Disconnected islands | absent | PASS REQUIRED |
+| Mask coverage | every accepted S cell rendered | PASS REQUIRED |
+| Glyph material | actual code text, not dots/cloud | PASS REQUIRED |
+| Rendering | Canvas text for dense fill | PASS REQUIRED |
+| Inflow handoff | moving glyphs fade into settled S | PASS REQUIRED |
+| Real logo | unchanged final asset | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |
