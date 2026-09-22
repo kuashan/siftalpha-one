@@ -2721,3 +2721,27 @@ Repair:
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `201`.
+
+
+## 2026-09-22 · R48-D3 v202 dense rotating galaxy strands to S endpoints
+
+Real-device feedback on v201:
+- hard cut-line problem is solved;
+- current flow is visually too thin / too sparse;
+- desired presentation is many curved lines rotating inward;
+- upper-right and lower-left streams should enter the two visible ends of the S mark, not the logo center.
+
+Presentation-only repair:
+- increased code particles from 40 to 64;
+- added 24 continuously curved strands per side (48 total);
+- each strand uses a rotating inward trajectory with moving brightness waves;
+- outer area remains broad, then the bundle narrows as it approaches the logo;
+- upper-right bundle terminates at the visible upper-right S endpoint;
+- lower-left bundle terminates at the visible lower-left S endpoint;
+- removed the previous center filament entirely;
+- endpoint glows are local to the two S ends only;
+- real app logo asset, layout, text, launch timing and R48-D2 functionality remain unchanged.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `202`.

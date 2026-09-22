@@ -109,7 +109,10 @@ android {
         // v201 refines that motion into a galaxy-style convergence: wide particle clouds at both edges
         // taper into a single soft filament immediately before the real logo, while all long rigid rails
         // are removed to eliminate the visible cut-line effect.
-        versionCode = 201
+        // v202 increases the galaxy density and replaces sparse streaks with 24 curved rotating strands
+        // per side plus denser code/data particles. Upper-right flow now lands on the visible upper S end
+        // and lower-left flow lands on the visible lower S end instead of converging on the logo center.
+        versionCode = 202
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

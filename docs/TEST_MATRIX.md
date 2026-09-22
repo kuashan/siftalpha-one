@@ -1469,3 +1469,20 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Logo/layout/text/timing | unchanged from v200 | PASS REQUIRED |
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v202 — Dense rotating galaxy strands to S endpoints
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Scope | launch code/data motion only | PASS REQUIRED |
+| Line density | 24 curved strands per side / 48 total | PASS REQUIRED |
+| Code density | 64 visible code tokens | PASS REQUIRED |
+| Rotation | strands curve/rotate inward, not straight rails | PASS REQUIRED |
+| Funnel | broad edge -> narrow bundle near logo | PASS REQUIRED |
+| Upper target | upper-right stream reaches upper visible S endpoint | PASS REQUIRED |
+| Lower target | lower-left stream reaches lower visible S endpoint | PASS REQUIRED |
+| Center rail | no long center/direct filament | PASS REQUIRED |
+| Logo/layout/text/timing | unchanged | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |
