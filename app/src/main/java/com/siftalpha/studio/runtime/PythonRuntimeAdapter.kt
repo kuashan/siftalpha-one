@@ -127,14 +127,34 @@ SIFTALPHA_PYTHON_REQUIRES_CHECK
 
             ${dependencyFingerprintShell()}
 
+            # Deleting a full venv through PRoot can be much slower than the actual dependency
+            # install. Cleanup is maintenance, not part of the PREPARE success boundary, so every
+            # opportunistic cleanup attempt is bounded and may be resumed by a later PREPARE/CLEAN.
+            siftalpha_cleanup_prepare_backups_bounded() {
+              cleanup_deferred=0
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 4s rm -rf -- "${'$'}venv".backup-* >/dev/null 2>&1 || cleanup_deferred=1
+              else
+                cleanup_deferred=1
+              fi
+              rm -f -- "${'$'}ready".backup-* >/dev/null 2>&1 || true
+              if ls "${'$'}venv".backup-* >/dev/null 2>&1; then
+                cleanup_deferred=1
+              fi
+              if [ "${'$'}cleanup_deferred" -eq 1 ]; then
+                echo 'SIFTALPHA_ENV_BACKUP_CLEANUP_DEFERRED=1'
+              else
+                echo 'SIFTALPHA_ENV_BACKUP_CLEANUP_COMPLETE=1'
+              fi
+            }
+
             # Heal an earlier prepare transaction that was killed before its EXIT rollback ran.
             stale_backup="${'$'}(ls -td "${'$'}venv".backup-* 2>/dev/null | head -n 1 || true)"
             stale_ready="${'$'}(ls -t "${'$'}ready".backup-* 2>/dev/null | head -n 1 || true)"
             if [ -n "${'$'}stale_backup" ]; then
               if [ -x "${'$'}venv/bin/python" ] && [ -f "${'$'}ready" ]; then
-                rm -rf -- "${'$'}venv".backup-*
-                rm -f -- "${'$'}ready".backup-*
-                echo 'SIFTALPHA_ENV_STALE_BACKUP_CLEANED=1'
+                siftalpha_cleanup_prepare_backups_bounded
+                echo 'SIFTALPHA_ENV_STALE_BACKUP_RECONCILED=1'
               else
                 stale_suffix="${'$'}{stale_backup#${'$'}venv.backup-}"
                 matching_ready="${'$'}ready.backup-${'$'}stale_suffix"
@@ -144,8 +164,7 @@ SIFTALPHA_PYTHON_REQUIRES_CHECK
                 if [ -f "${'$'}matching_ready" ]; then
                   mv -- "${'$'}matching_ready" "${'$'}ready"
                 fi
-                rm -rf -- "${'$'}venv".backup-*
-                rm -f -- "${'$'}ready".backup-*
+                siftalpha_cleanup_prepare_backups_bounded
                 echo 'SIFTALPHA_ENV_INTERRUPTED_PREPARE_RECOVERED=1'
               fi
             elif [ -n "${'$'}stale_ready" ]; then
@@ -153,7 +172,7 @@ SIFTALPHA_PYTHON_REQUIRES_CHECK
                 mv -- "${'$'}stale_ready" "${'$'}ready"
                 echo 'SIFTALPHA_ENV_INTERRUPTED_PREPARE_RECOVERED=1'
               fi
-              rm -f -- "${'$'}ready".backup-*
+              rm -f -- "${'$'}ready".backup-* >/dev/null 2>&1 || true
             fi
 
             # Python virtual environments are not relocatable. pip-generated console scripts and
@@ -245,15 +264,19 @@ SIFTALPHA_PYTHON_REQUIRES_CHECK
             fi
 
             umask 077
+            ready_commit="${'$'}ready.commit-${'$'}${'$'}"
             printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nINSTALL_EXTRAS=%s\nPLAN_ID=%s\n' \
-              "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}python_version" "${'$'}required_python" "${'$'}planned_extras" "${'$'}required_plan" >"${'$'}ready"
+              "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}python_version" "${'$'}required_python" "${'$'}planned_extras" "${'$'}required_plan" >"${'$'}ready_commit"
+            mv -f -- "${'$'}ready_commit" "${'$'}ready"
 
-            rm -rf -- "${'$'}backup"
-            rm -f -- "${'$'}ready_backup"
+            # Commit is complete once the validated venv and READY marker are both durable.
+            # From this point forward, old-backup deletion must never keep PREPARE in PREPARING.
             trap - EXIT
-
+            echo 'SIFTALPHA_PREPARE_COMMITTED=1'
             echo 'SIFTALPHA_ENV=READY'
             printf 'SIFTALPHA_ENV_DEPENDENCY_SOURCE=%s\n' "${'$'}dependency_source"
+
+            siftalpha_cleanup_prepare_backups_bounded
             tail -n 30 "${'$'}log" 2>/dev/null || true
         """.trimIndent()
     }

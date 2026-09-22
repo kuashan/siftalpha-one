@@ -1800,3 +1800,19 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Developer Mode source | V04Activity unchanged | PASS REQUIRED |
 | W0 / unit tests / assembleDebug | cloud build | PENDING |
 | Internal Alpine Probe | cloud probe | PENDING |
+
+
+### R48-D9 v221 — PREPARE commit-boundary closure
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Commit order | validate venv -> atomic READY marker -> disable rollback -> READY signal | PASS |
+| Post-commit cleanup | old venv backup deletion | occurs only after commit |
+| Cleanup deadline | opportunistic rollback-backup removal | hard-bounded to 4s |
+| Cleanup over budget | backup still contains files after bound | PREPARE remains success; emits cleanup deferred |
+| Failure before commit | install / validation fails | existing rollback remains armed and restores old environment |
+| Stale backup on next PREPARE | valid final env plus old backup | bounded cleanup; must not block PREPARE for minutes |
+| Shared lifecycle | committed External PREPARE | main operation leaves PREPARING after real callback |
+| Developer source boundary | V04Activity.kt | unchanged |
+| W0 / unit tests / assembleDebug | cloud build | PENDING |
+| Internal Alpine Probe | cloud probe | PENDING |

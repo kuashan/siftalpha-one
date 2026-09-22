@@ -1502,3 +1502,14 @@ External Python Plan ID is planning metadata, not a standalone venv compatibilit
 External PREPARE rollback backups are transaction-scoped. A later PREPARE self-heals stale backups; STOP during active PREPARE restores the project-scoped rollback pair; CLEAN removes final and backup environment artifacts.
 
 No direct Developer Mode source modification is included in R48-D8.
+
+
+## 2026-09-23 · R48-D9 PREPARE success boundary
+
+External Python PREPARE success is defined by a validated replacement venv plus an atomically committed READY marker. Deleting the previous rollback backup is maintenance and must not define or indefinitely delay PREPARE success.
+
+The rollback trap remains armed until the READY marker is atomically committed. After commit it is disabled, READY is emitted, and old-backup deletion is only a bounded best-effort task. A slow Android/PRoot delete may leave project-scoped cleanup residue, but it may not hold RuntimeLifecycleStore in PREPARING or block the main PREPARE callback for minutes.
+
+R48a6.1's 30-minute PREPARE deadline remains only a final hard safety cap, not the normal success detector.
+
+No direct Developer Mode source change is included; both product surfaces inherit this shared Runtime behavior.

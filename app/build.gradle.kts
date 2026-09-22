@@ -151,8 +151,11 @@ android {
         // v220 repairs Environment Plan identity so runtime-generated project files cannot invalidate
         // prepared environments, preserves r46 Python/runtime compatibility gates, and self-heals
         // interrupted External Python PREPARE rollback backups without touching Developer Mode source.
-        versionCode = 220
-        versionName = "0.8.0-alpha43-r48d8"
+        // v221 moves External Python PREPARE's success boundary ahead of potentially slow rollback-
+        // backup deletion and caps opportunistic backup cleanup so a committed READY environment
+        // cannot leave the shared operation stuck in PREPARING for minutes.
+        versionCode = 221
+        versionName = "0.8.0-alpha43-r48d9"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

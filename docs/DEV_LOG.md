@@ -3319,3 +3319,36 @@ No direct Developer Mode source file is modified in R48-D8. The known Developer 
 Target:
 - versionCode = 220
 - versionName = 0.8.0-alpha43-r48d8
+
+
+## 2026-09-23 · R48-D9 v221 PREPARE commit-boundary closure repair
+
+### Trigger
+Real-device External Python PREPARE for `situation-monitor` installed all requirements successfully and the progress probe advanced to the final verification/finalizing stage, but the user-visible main PREPARE operation stayed in PREPARING for more than five minutes.
+
+This is the same failure class first observed in R48a6.1, but with a different concrete cause. R48a6.1 added a 30-minute shared hard timeout so PREPARE could not remain PREPARING forever. It did not define an early positive success boundary once a replacement environment had already been fully validated and committed.
+
+### Root cause
+R46.3's rollback transaction kept the EXIT rollback trap armed and performed a synchronous `rm -rf` of the previous virtual-environment backup before disabling rollback and returning `SIFTALPHA_ENV=READY`.
+
+On Android + Termux + PRoot, deleting a Python venv with many small files can be much slower than installing from cached wheels. The new environment and READY marker could therefore already be valid while the main RUN_COMMAND process remained alive only to delete the old backup. Shared lifecycle correctly waited for the main callback and therefore kept PREPARING.
+
+### Repair
+- The External Python environment now reaches an explicit commit point immediately after:
+  1. dependency installation finishes;
+  2. the replacement venv's Python version and final executable prefix are validated; and
+  3. a complete READY marker is atomically written via `ready.commit-<pid>` then renamed into place.
+- The rollback EXIT trap is disabled at that commit point.
+- `SIFTALPHA_PREPARE_COMMITTED=1` and `SIFTALPHA_ENV=READY` are emitted before any old-backup deletion.
+- Rollback-backup deletion is now post-commit maintenance and is hard-bounded to 4 seconds per opportunistic attempt with `timeout`.
+- If the backup cannot be fully removed inside that small maintenance budget, PREPARE still completes successfully and emits `SIFTALPHA_ENV_BACKUP_CLEANUP_DEFERRED=1`. A later PREPARE or explicit CLEAN may continue removing the same project-scoped residue.
+- Stale-backup reconciliation at the beginning of PREPARE uses the same bounded cleanup rule so old residue cannot recreate a multi-minute PREPARING stall.
+- Failure before the commit point still executes the existing rollback semantics and restores the previous environment/READY marker when available.
+- No direct Developer Mode source file is modified. Developer Workspace receives the fix automatically because its PREPARE command already goes through the same shared Python Runtime adapter and ProjectOperationCoordinator.
+
+### Expected real-device behavior
+For a cached-wheel project such as `situation-monitor`, once the final environment has been validated, the main PREPARE callback should close within only a few seconds even when deletion of the previous venv backup is slow. The project must leave PREPARING and become environment READY without waiting for the 30-minute hard timeout.
+
+Target:
+- versionCode = 221
+- versionName = 0.8.0-alpha43-r48d9

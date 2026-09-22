@@ -99,8 +99,11 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("PYTHON_VERSION=%s"))
         assertTrue(script.contains("REQUIRES_PYTHON=%s"))
         assertTrue(script.contains("INSTALL_EXTRAS=%s"))
-        assertTrue(script.contains("SIFTALPHA_ENV_STALE_BACKUP_CLEANED=1"))
+        assertTrue(script.contains("SIFTALPHA_ENV_STALE_BACKUP_RECONCILED=1"))
         assertTrue(script.contains("SIFTALPHA_ENV_INTERRUPTED_PREPARE_RECOVERED=1"))
+        assertTrue(script.contains("SIFTALPHA_ENV_BACKUP_CLEANUP_COMPLETE=1"))
+        assertTrue(script.contains("SIFTALPHA_ENV_BACKUP_CLEANUP_DEFERRED=1"))
+        assertTrue(script.contains("SIFTALPHA_PREPARE_COMMITTED=1"))
         assertTrue(script.contains("SIFTALPHA_ENV=READY"))
 
         val finalVenvCreation = script.indexOf("python3 -m venv \"${'$'}venv\"")
@@ -109,11 +112,20 @@ class PythonRuntimeAdapterTest {
             finalVenvCreation,
         )
         val prefixValidation = script.indexOf("prepared_python_executable", pythonValidation)
-        val readySignal = script.indexOf("echo 'SIFTALPHA_ENV=READY'")
+        val readyCommit = script.indexOf("ready_commit=", prefixValidation)
+        val disableRollback = script.indexOf("trap - EXIT", readyCommit)
+        val commitSignal = script.indexOf("SIFTALPHA_PREPARE_COMMITTED=1", disableRollback)
+        val readySignal = script.indexOf("echo 'SIFTALPHA_ENV=READY'", commitSignal)
+        val boundedCleanup = script.indexOf("siftalpha_cleanup_prepare_backups_bounded", readySignal)
         assertTrue("replacement venv must be created at the stable final path", finalVenvCreation >= 0)
         assertTrue("dependency work must use the stable final venv", pythonValidation > finalVenvCreation)
-        assertTrue("stable-prefix validation must occur before READY", prefixValidation > pythonValidation)
-        assertTrue("READY must only be emitted after final Python validation", readySignal > prefixValidation)
+        assertTrue("stable-prefix validation must occur before commit", prefixValidation > pythonValidation)
+        assertTrue("READY marker must be committed after Python validation", readyCommit > prefixValidation)
+        assertTrue("rollback must be disarmed at the environment commit point", disableRollback > readyCommit)
+        assertTrue("commit marker must be emitted after rollback is disarmed", commitSignal > disableRollback)
+        assertTrue("READY must be emitted immediately after commit", readySignal > commitSignal)
+        assertTrue("old-backup cleanup must be post-commit maintenance", boundedCleanup > readySignal)
+        assertTrue("old-backup cleanup must have a hard bound", script.contains("timeout 4s rm -rf"))
     }
 
 
@@ -142,14 +154,16 @@ class PythonRuntimeAdapterTest {
         val backupMove = script.indexOf("mv -- \"${'$'}venv\" \"${'$'}backup\"")
         val createFinal = script.indexOf("python3 -m venv \"${'$'}venv\"")
         val installFinal = script.indexOf("\"${'$'}venv/bin/python\" -m pip install")
-        val readyWrite = script.indexOf("REQUIRES_PYTHON=%s")
+        val readyWrite = script.indexOf("ready_commit=")
         val disableRollback = script.indexOf("trap - EXIT", readyWrite)
+        val cleanupAfterCommit = script.indexOf("siftalpha_cleanup_prepare_backups_bounded", disableRollback)
 
         assertTrue("old environment must be retained before replacement", backupMove >= 0)
         assertTrue("new environment must be created only after old environment is backed up", createFinal > backupMove)
         assertTrue("pip must install into the final stable prefix", installFinal > createFinal)
-        assertFalse("a completed venv must never be renamed from a temporary prefix", script.contains("mv -- \"${'$'}candidate\" \"${'$'}venv\""))
-        assertTrue("rollback stays armed until the new READY marker is written", disableRollback > readyWrite)
+        assertFalse("a completed venv must never be renamed from a temporary prefix", script.contains("mv -- \"$candidate\" \"$venv\""))
+        assertTrue("rollback stays armed until the new READY marker is committed", disableRollback > readyWrite)
+        assertTrue("backup cleanup must not delay the transaction commit", cleanupAfterCommit > disableRollback)
     }
 
     @Test
