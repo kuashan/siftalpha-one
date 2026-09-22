@@ -310,7 +310,7 @@ class ProjectEnvironmentPlanTest {
     }
 
     @Test
-    fun planIdentityIsDeterministicAndTracksSnapshotInputs() {
+    fun planIdentityIsDeterministicAndIgnoresUnrelatedProjectFiles() {
         val first = ProjectEnvironmentPlanner.plan(
             detect(
                 paths = listOf("pyproject.toml", "main.py"),
@@ -334,6 +334,50 @@ class ProjectEnvironmentPlanTest {
         )
 
         assertEquals(first.planId, second.planId)
+        assertEquals(
+            "README or runtime-output path changes must not invalidate the prepared environment",
+            first.planId,
+            changed.planId,
+        )
+
+        val generated = ProjectEnvironmentPlanner.plan(
+            detect(
+                paths = listOf(
+                    "pyproject.toml",
+                    "main.py",
+                    "__pycache__/main.cpython-314.pyc",
+                    "logs/latest.log",
+                    "results/output.json",
+                    "cache/runtime.db",
+                ),
+                pyproject = "[project]\nname = \"demo\"\n",
+            ),
+            allCapabilities,
+        )
+        assertEquals(first.planId, generated.planId)
+    }
+
+    @Test
+    fun dependencyManifestChangeStillChangesEnvironmentPlanIdentity() {
+        val first = ProjectEnvironmentPlanner.plan(
+            ProjectEnvironmentDetector.detect(
+                ProjectEnvironmentDetectionInput(
+                    relativePaths = listOf("requirements.txt", "main.py"),
+                    requirementsText = "requests==2.32.5\n",
+                ),
+            ),
+            allCapabilities,
+        )
+        val changed = ProjectEnvironmentPlanner.plan(
+            ProjectEnvironmentDetector.detect(
+                ProjectEnvironmentDetectionInput(
+                    relativePaths = listOf("requirements.txt", "main.py"),
+                    requirementsText = "requests==2.32.5\nhttpx==0.28.1\n",
+                ),
+            ),
+            allCapabilities,
+        )
+
         assertNotEquals(first.planId, changed.planId)
     }
 

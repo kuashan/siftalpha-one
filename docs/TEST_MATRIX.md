@@ -1779,3 +1779,24 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Developer Mode source | V04Activity unchanged | PASS REQUIRED |
 | W0 / unit tests / assembleDebug | cloud build | PENDING |
 | Internal Alpine Probe | cloud probe | PENDING |
+
+
+### R48-D8 v220 — Environment identity / PREPARE transaction repair
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Plan identity | Add README / __pycache__ / log / output JSON / runtime DB path | Plan ID unchanged when environment facts are unchanged |
+| Dependency identity | Change requirements.txt contents | Plan ID changes |
+| Plan schema | Shared Environment Plan schema | 2 |
+| Runtime compatibility | Python full version changes | Existing External venv NOT_READY |
+| Python requirement | requires-python changes | Existing External venv NOT_READY |
+| Python extras | install extras change / cannot be proven on legacy marker | Existing External venv NOT_READY |
+| Plan metadata only | Plan ID changes with same manifest/runtime/requirement/extras | READY marker rebound in place; no reinstall |
+| Interrupted PREPARE | stale .backup-PID exists with invalid/missing final environment | Previous project-scoped rollback recovered before next PREPARE |
+| Completed PREPARE residue | valid final venv + READY plus stale backup | stale backup removed |
+| STOP during PREPARE | active prepare killed | rollback pair restored project-locally |
+| CLEAN | project environment cleanup | final venv + project rollback backups removed |
+| Internal R | generated runtime-output paths appear | Shared plan remains stable; backend bindings unchanged |
+| Developer Mode source | V04Activity unchanged | PASS REQUIRED |
+| W0 / unit tests / assembleDebug | cloud build | PENDING |
+| Internal Alpine Probe | cloud probe | PENDING |

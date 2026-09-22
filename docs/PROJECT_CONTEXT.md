@@ -1489,3 +1489,16 @@ If the provider is unresponsive, Normal Mode keeps the requested PREPARE/RUN/REF
 External quick control deadlines are intentionally short (START 30s, STATUS/LOGS 10s, STOP 15s); PREPARE retains a 30-minute hard cap for real dependency installation. Internal provider deadlines are unchanged.
 
 Developer Mode remains frozen at the source-surface boundary. R48-D7 changes Shared Core facts and Normal orchestration only; no direct V04Activity edit is authorized or included.
+
+
+## 2026-09-23 · R48-D8 Environment identity rule
+
+Prepared-environment reuse must be invalidated only by facts that materially define the environment. Runtime-generated project files are not environment identity.
+
+Authoritative invalidators include dependency manifest content, actual Python Runtime version/identity, declared `requires-python`, backend-specific Runtime identity, and exact selected Python install extras. The complete project path tree remains detection evidence for runtime/structure decisions, but is not itself hashed as the reusable environment identity.
+
+External Python Plan ID is planning metadata, not a standalone venv compatibility key. When dependency hash, Python version, Python requirement and install extras all match, a Plan ID-only evolution is rebound in place rather than forcing reinstall. This preserves the r46 Runtime Compatibility principle while removing the r47 over-broad project-tree invalidation.
+
+External PREPARE rollback backups are transaction-scoped. A later PREPARE self-heals stale backups; STOP during active PREPARE restores the project-scoped rollback pair; CLEAN removes final and backup environment artifacts.
+
+No direct Developer Mode source modification is included in R48-D8.

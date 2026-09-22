@@ -3284,3 +3284,38 @@ Target:
 
 ### R48-D7 W0 #630 follow-up
 W0 #630 compiled the production source but exposed two legacy unit-test expectations that still used the old provider-neutral 45-second STATUS/STOP timing. The implementation was unchanged. Tests were aligned to the new external-specific deadlines: STATUS 10s and STOP 15s; the project-isolation test now advances only past STOP (15s) so the concurrent START (30s) correctly remains active.
+
+
+## 2026-09-23 · R48-D8 v220 Environment Identity / PREPARE transaction repair
+
+### Real-device evidence
+- External Python project `situation-monitor` prepared and ran successfully once, then after STOP the next START failed with exitCode 73.
+- STATUS evidence: `SIFTALPHA_ENV=NOT_READY` and `SIFTALPHA_ENV_REASON=ENVIRONMENT_PLAN_CHANGED` while the venv still existed.
+- Runtime storage showed `situation-monitor-....backup-<pid>` as an orphaned 28.2 MB environment, proving a PREPARE rollback backup survived an interrupted transaction.
+
+### Root cause
+R47 Environment Plan fingerprinting hashed the complete project path set. Runtime-generated files such as `__pycache__`, logs, result files or databases could therefore change Project Fingerprint / Plan ID even when dependencies, Python version and Runtime identity were unchanged. External Python additionally treated the whole Plan ID as a hard venv reuse key.
+
+### Repair
+- Project Environment Plan schema advances to 2.
+- `projectFingerprint` is now an environment-input fingerprint based on dependency manifests (`requirements.txt` / `pyproject.toml`) rather than the complete project file tree.
+- The complete path snapshot is still used for runtime selection, Vite detection, unsupported-manifest checks and static-reference validation; those derived facts/issues remain encoded into Plan ID. Vite component count is explicitly encoded in Plan ID.
+- r46 compatibility gates remain authoritative: dependency manifest hash, actual Python full version, `requires-python`, Runtime identity and Python install extras can still invalidate reuse.
+- External Python READY markers now record `INSTALL_EXTRAS`. A Plan ID-only change is migrated in place after manifest/runtime/requirement/extras compatibility is proven; install-extra changes still require PREPARE.
+- Existing compatible legacy markers with no install extras migrate without reinstall. If current preparation requires extras that an old marker cannot prove, reuse is rejected.
+- PREPARE now detects stale `.backup-<pid>` / READY backups from an interrupted prior transaction and either restores the rollback pair or removes it when a valid final environment already exists.
+- STOP of an active PREPARE performs the same project-scoped rollback recovery after terminating the prepare process.
+- CLEAN removes both the final project venv/READY marker and any project-scoped rollback backups.
+
+### Expected behavior
+- Running a prepared project may create caches/logs/results without making the environment NOT_READY.
+- STOP -> START reuses the same compatible environment.
+- Changing `requirements.txt`, `pyproject.toml`, Python version, `requires-python`, or Python install extras still invalidates/rebuilds as required.
+- Internal R also receives the stable Shared Environment Plan identity; its existing backend-specific dependency/runtime bindings remain intact.
+
+### Boundary
+No direct Developer Mode source file is modified in R48-D8. The known Developer presentation cache issue remains a separate item requiring explicit authorization if a direct `V04Activity.kt` change is needed.
+
+Target:
+- versionCode = 220
+- versionName = 0.8.0-alpha43-r48d8

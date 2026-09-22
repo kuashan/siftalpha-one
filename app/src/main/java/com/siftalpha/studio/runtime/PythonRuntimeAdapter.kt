@@ -65,15 +65,7 @@ class PythonRuntimeAdapter(
     )
 
     private fun buildPrepare(project: RuntimeProjectSpec): String {
-        val plannedExtras = project.pythonInstallExtras
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .distinct()
-            .sorted()
-        require(plannedExtras.all { PYTHON_EXTRA_NAME.matches(it) }) {
-            "Invalid Python install extra in Environment Plan"
-        }
-        val plannedExtrasValue = plannedExtras.joinToString(",")
+        val plannedExtrasValue = plannedPythonExtrasValue(project)
         val id = host.runtimeId(project.folderName)
         val path = "/root/projects/${project.folderName}"
         val venv = "/root/venvs/$id"
@@ -134,6 +126,35 @@ SIFTALPHA_PYTHON_REQUIRES_CHECK
             fi
 
             ${dependencyFingerprintShell()}
+
+            # Heal an earlier prepare transaction that was killed before its EXIT rollback ran.
+            stale_backup="${'$'}(ls -td "${'$'}venv".backup-* 2>/dev/null | head -n 1 || true)"
+            stale_ready="${'$'}(ls -t "${'$'}ready".backup-* 2>/dev/null | head -n 1 || true)"
+            if [ -n "${'$'}stale_backup" ]; then
+              if [ -x "${'$'}venv/bin/python" ] && [ -f "${'$'}ready" ]; then
+                rm -rf -- "${'$'}venv".backup-*
+                rm -f -- "${'$'}ready".backup-*
+                echo 'SIFTALPHA_ENV_STALE_BACKUP_CLEANED=1'
+              else
+                stale_suffix="${'$'}{stale_backup#${'$'}venv.backup-}"
+                matching_ready="${'$'}ready.backup-${'$'}stale_suffix"
+                rm -rf -- "${'$'}venv"
+                rm -f -- "${'$'}ready"
+                mv -- "${'$'}stale_backup" "${'$'}venv"
+                if [ -f "${'$'}matching_ready" ]; then
+                  mv -- "${'$'}matching_ready" "${'$'}ready"
+                fi
+                rm -rf -- "${'$'}venv".backup-*
+                rm -f -- "${'$'}ready".backup-*
+                echo 'SIFTALPHA_ENV_INTERRUPTED_PREPARE_RECOVERED=1'
+              fi
+            elif [ -n "${'$'}stale_ready" ]; then
+              if [ -x "${'$'}venv/bin/python" ] && [ ! -f "${'$'}ready" ]; then
+                mv -- "${'$'}stale_ready" "${'$'}ready"
+                echo 'SIFTALPHA_ENV_INTERRUPTED_PREPARE_RECOVERED=1'
+              fi
+              rm -f -- "${'$'}ready".backup-*
+            fi
 
             # Python virtual environments are not relocatable. pip-generated console scripts and
             # other environment files may embed the absolute venv prefix. Keep the previous
@@ -224,8 +245,8 @@ SIFTALPHA_PYTHON_REQUIRES_CHECK
             fi
 
             umask 077
-            printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nPLAN_ID=%s\n' \
-              "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}python_version" "${'$'}required_python" "${'$'}required_plan" >"${'$'}ready"
+            printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nINSTALL_EXTRAS=%s\nPLAN_ID=%s\n' \
+              "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}python_version" "${'$'}required_python" "${'$'}planned_extras" "${'$'}required_plan" >"${'$'}ready"
 
             rm -rf -- "${'$'}backup"
             rm -f -- "${'$'}ready_backup"
@@ -634,7 +655,34 @@ SIFTALPHA_RUNNER
 
     private fun buildStop(project: RuntimeProjectSpec): String {
         val id = host.runtimeId(project.folderName)
+        val venv = "/root/venvs/$id"
+        val ready = "/root/siftalpha/env-ready-$id.txt"
         val state = "/root/siftalpha/state-$id.txt"
+        val recoverInterruptedPrepare = """
+            venv=${sh(venv)}
+            ready=${sh(ready)}
+            stale_backup="${'$'}(ls -td "${'$'}venv".backup-* 2>/dev/null | head -n 1 || true)"
+            stale_ready="${'$'}(ls -t "${'$'}ready".backup-* 2>/dev/null | head -n 1 || true)"
+            if [ -n "${'$'}stale_backup" ]; then
+              stale_suffix="${'$'}{stale_backup#${'$'}venv.backup-}"
+              matching_ready="${'$'}ready.backup-${'$'}stale_suffix"
+              rm -rf -- "${'$'}venv"
+              rm -f -- "${'$'}ready"
+              mv -- "${'$'}stale_backup" "${'$'}venv"
+              if [ -f "${'$'}matching_ready" ]; then
+                mv -- "${'$'}matching_ready" "${'$'}ready"
+              fi
+              rm -rf -- "${'$'}venv".backup-*
+              rm -f -- "${'$'}ready".backup-*
+              echo 'SIFTALPHA_ENV_INTERRUPTED_PREPARE_RECOVERED=1'
+            elif [ -n "${'$'}stale_ready" ]; then
+              if [ -x "${'$'}venv/bin/python" ] && [ ! -f "${'$'}ready" ]; then
+                mv -- "${'$'}stale_ready" "${'$'}ready"
+                echo 'SIFTALPHA_ENV_INTERRUPTED_PREPARE_RECOVERED=1'
+              fi
+              rm -f -- "${'$'}ready".backup-*
+            fi
+        """.trimIndent()
         val markStopped = """
             mkdir -p /root/siftalpha
             printf 'STATE=STOPPED_BY_USER\nEXIT_CODE=143\n' >${sh(state)}
@@ -661,6 +709,10 @@ SIFTALPHA_RUNNER
                 exit 78
               fi
               echo 'SIFTALPHA_PREPARE_STOPPED=1'
+              if ! proot-distro login ubuntu -- bash -lc ${sh(recoverInterruptedPrepare)}; then
+                echo 'SIFTALPHA_ERROR=ENVIRONMENT_ROLLBACK_FAILED'
+                exit 76
+              fi
             fi
             rm -f -- "${'$'}prepare_pid_file" "${'$'}prepare_pgid_file"
 
@@ -811,8 +863,8 @@ SIFTALPHA_RUNNER
     private fun buildClean(project: RuntimeProjectSpec): String {
         val id = host.runtimeId(project.folderName)
         val cleanInner = """
-            rm -rf -- ${sh("/root/venvs/$id")}
-            rm -f -- ${sh("/root/siftalpha/logs/run-$id.log")} ${sh("/root/siftalpha/logs/prepare-$id.log")} ${sh("/root/siftalpha/run-$id.sh")} ${sh("/root/siftalpha/state-$id.txt")} ${sh("/root/siftalpha/secrets-$id.env")} ${sh("/root/siftalpha/env-ready-$id.txt")}
+            rm -rf -- ${sh("/root/venvs/$id")} ${sh("/root/venvs/$id")}.backup-*
+            rm -f -- ${sh("/root/siftalpha/logs/run-$id.log")} ${sh("/root/siftalpha/logs/prepare-$id.log")} ${sh("/root/siftalpha/run-$id.sh")} ${sh("/root/siftalpha/state-$id.txt")} ${sh("/root/siftalpha/secrets-$id.env")} ${sh("/root/siftalpha/env-ready-$id.txt")} ${sh("/root/siftalpha/env-ready-$id.txt")}.backup-*
         """.trimIndent()
         return """
             ${host.hostPreamble()}
@@ -863,6 +915,7 @@ SIFTALPHA_RUNNER
     private fun environmentReadyCheckShell(project: RuntimeProjectSpec): String = """
         ${dependencyFingerprintShell()}
         required_python=${sh(project.pythonRequiresVersion.orEmpty())}
+        required_extras=${sh(plannedPythonExtrasValue(project))}
         required_plan=${sh(project.environmentPlanId.orEmpty())}
         env_ready=0
         env_reason='VENV_MISSING'
@@ -877,6 +930,9 @@ SIFTALPHA_RUNNER
               saved_hash="${'$'}(awk -F= '/^HASH=/{print substr(${ '$' }0,6); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_python="${'$'}(awk -F= '/^PYTHON_VERSION=/{print substr(${ '$' }0,16); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_requires="${'$'}(awk -F= '/^REQUIRES_PYTHON=/{print substr(${ '$' }0,17); exit}' "${'$'}ready" 2>/dev/null || true)"
+              saved_extras="${'$'}(awk -F= '/^INSTALL_EXTRAS=/{print substr(${ '$' }0,16); exit}' "${'$'}ready" 2>/dev/null || true)"
+              saved_extras_present=0
+              grep -q '^INSTALL_EXTRAS=' "${'$'}ready" 2>/dev/null && saved_extras_present=1
               saved_plan="${'$'}(awk -F= '/^PLAN_ID=/{print substr(${ '$' }0,9); exit}' "${'$'}ready" 2>/dev/null || true)"
               if [ "${'$'}saved_source" != "${'$'}dependency_source" ] || [ "${'$'}saved_hash" != "${'$'}dependency_hash" ]; then
                 env_reason='DEPENDENCY_MANIFEST_CHANGED'
@@ -892,13 +948,17 @@ SIFTALPHA_RUNNER
                     "${'$'}venv/bin/python" -c 'import sys; from pip._vendor.packaging.specifiers import SpecifierSet; from pip._vendor.packaging.version import Version; current=Version(".".join(str(v) for v in sys.version_info[:3])); raise SystemExit(0 if current in SpecifierSet(sys.argv[1]) else 1)' "${'$'}required_python" >/dev/null 2>&1 || legacy_requirement_ok=0
                   fi
                   if [ "${'$'}legacy_requirement_ok" -eq 1 ]; then
-                    umask 077
-                    migrated_ready="${'$'}ready.migrate-${'$'}${'$'}"
-                    printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nPLAN_ID=%s\n' \
-                      "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" "${'$'}required_plan" >"${'$'}migrated_ready"
-                    mv -f -- "${'$'}migrated_ready" "${'$'}ready"
-                    env_ready=1
-                    env_reason='READY_MIGRATED'
+                    if [ -n "${'$'}required_extras" ]; then
+                      env_reason='PYTHON_INSTALL_EXTRAS_UNKNOWN'
+                    else
+                      umask 077
+                      migrated_ready="${'$'}ready.migrate-${'$'}${'$'}"
+                      printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nINSTALL_EXTRAS=%s\nPLAN_ID=%s\n' \
+                        "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
+                      mv -f -- "${'$'}migrated_ready" "${'$'}ready"
+                      env_ready=1
+                      env_reason='READY_MIGRATED'
+                    fi
                   else
                     env_reason='PYTHON_RUNTIME_VERSION_UNKNOWN'
                   fi
@@ -907,16 +967,30 @@ SIFTALPHA_RUNNER
                 env_reason='PYTHON_RUNTIME_VERSION_CHANGED'
               elif [ "${'$'}saved_requires" != "${'$'}required_python" ]; then
                 env_reason='PYTHON_REQUIREMENT_CHANGED'
-              elif [ -n "${'$'}required_plan" ] && [ -z "${'$'}saved_plan" ]; then
+              elif [ "${'$'}saved_extras_present" -ne 1 ]; then
+                if [ -n "${'$'}required_extras" ]; then
+                  env_reason='PYTHON_INSTALL_EXTRAS_UNKNOWN'
+                else
+                  umask 077
+                  migrated_ready="${'$'}ready.plan-${'$'}${'$'}"
+                  printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nINSTALL_EXTRAS=%s\nPLAN_ID=%s\n' \
+                    "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
+                  mv -f -- "${'$'}migrated_ready" "${'$'}ready"
+                  env_ready=1
+                  env_reason='READY_PLAN_MIGRATED'
+                fi
+              elif [ "${'$'}saved_extras" != "${'$'}required_extras" ]; then
+                env_reason='PYTHON_INSTALL_EXTRAS_CHANGED'
+              elif [ "${'$'}saved_plan" != "${'$'}required_plan" ]; then
+                # PLAN_ID is diagnostic/planning identity, not the Python venv compatibility key.
+                # Rebind it in-place after manifest/runtime/requirement/extras compatibility is proven.
                 umask 077
                 migrated_ready="${'$'}ready.plan-${'$'}${'$'}"
-                printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nPLAN_ID=%s\n' \
-                  "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" "${'$'}required_plan" >"${'$'}migrated_ready"
+                printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nINSTALL_EXTRAS=%s\nPLAN_ID=%s\n' \
+                  "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
                 mv -f -- "${'$'}migrated_ready" "${'$'}ready"
                 env_ready=1
                 env_reason='READY_PLAN_MIGRATED'
-              elif [ -n "${'$'}required_plan" ] && [ "${'$'}saved_plan" != "${'$'}required_plan" ]; then
-                env_reason='ENVIRONMENT_PLAN_CHANGED'
               else
                 env_ready=1
                 env_reason='READY'
@@ -925,6 +999,18 @@ SIFTALPHA_RUNNER
           fi
         fi
     """.trimIndent()
+
+    private fun plannedPythonExtrasValue(project: RuntimeProjectSpec): String {
+        val extras = project.pythonInstallExtras
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .sorted()
+        require(extras.all { PYTHON_EXTRA_NAME.matches(it) }) {
+            "Invalid Python install extra in Environment Plan"
+        }
+        return extras.joinToString(",")
+    }
 
     private fun sh(value: String): String = host.sh(value)
 

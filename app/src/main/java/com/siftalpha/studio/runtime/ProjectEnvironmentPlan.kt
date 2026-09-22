@@ -126,7 +126,7 @@ data class ProjectEnvironmentPlan(
     }
 
     companion object {
-        const val CURRENT_SCHEMA_VERSION = 1
+        const val CURRENT_SCHEMA_VERSION = 2
         private const val MAX_DIAGNOSTIC_ISSUES = 12
     }
 }
@@ -378,11 +378,7 @@ object ProjectEnvironmentDetector {
                 dependencySource != EnvironmentDependencySource.UNSUPPORTED &&
                 issues.none { it.blocking }
 
-        val fingerprint = fingerprint(
-            normalizedPaths = normalizedPaths,
-            declaredType = input.declaredType,
-            declaredEntry = input.declaredEntry,
-            declaredRun = input.declaredRun,
+        val fingerprint = environmentInputFingerprint(
             requirementsText = input.requirementsText,
             pyprojectText = input.pyprojectText,
         )
@@ -510,20 +506,20 @@ object ProjectEnvironmentDetector {
         return null
     }
 
-    private fun fingerprint(
-        normalizedPaths: Set<String>,
-        declaredType: String?,
-        declaredEntry: String?,
-        declaredRun: String?,
+    /**
+     * Stable environment-input identity.
+     *
+     * Runtime-generated project files (for example __pycache__, logs, results or databases) must
+     * never invalidate an already prepared environment. Runtime selection and structural checks
+     * still consume the complete path snapshot above; their derived facts/issues are separately
+     * encoded into ProjectEnvironmentPlanner.planId().
+     */
+    private fun environmentInputFingerprint(
         requirementsText: String?,
         pyprojectText: String?,
     ): String {
         val canonical = buildString {
-            append("schema=1\n")
-            append("type=").append(declaredType.orEmpty().trim()).append('\n')
-            append("entry=").append(declaredEntry.orEmpty().trim()).append('\n')
-            append("run=").append(declaredRun.orEmpty().trim()).append('\n')
-            normalizedPaths.forEach { append("path=").append(it).append('\n') }
+            append("schema=2\n")
             append("requirements\n").append(normalizeText(requirementsText)).append('\n')
             append("pyproject\n").append(normalizeText(pyprojectText)).append('\n')
         }
@@ -679,6 +675,7 @@ object ProjectEnvironmentPlanner {
                 .append(detection.supplementalRuntimes.joinToString(",") { it.id })
                 .append('\n')
             append("dependency=").append(detection.dependencySource.wireValue).append('\n')
+            append("vite_components=").append(detection.viteComponentCount).append('\n')
             append("python=").append(detection.pythonRequiresVersion.orEmpty()).append('\n')
             append("python_optional_groups=")
                 .append(detection.pythonOptionalDependencyGroups.joinToString(","))

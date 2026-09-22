@@ -98,6 +98,9 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("sha256sum"))
         assertTrue(script.contains("PYTHON_VERSION=%s"))
         assertTrue(script.contains("REQUIRES_PYTHON=%s"))
+        assertTrue(script.contains("INSTALL_EXTRAS=%s"))
+        assertTrue(script.contains("SIFTALPHA_ENV_STALE_BACKUP_CLEANED=1"))
+        assertTrue(script.contains("SIFTALPHA_ENV_INTERRUPTED_PREPARE_RECOVERED=1"))
         assertTrue(script.contains("SIFTALPHA_ENV=READY"))
 
         val finalVenvCreation = script.indexOf("python3 -m venv \"${'$'}venv\"")
@@ -156,19 +159,27 @@ class PythonRuntimeAdapterTest {
     }
 
     @Test
-    fun `environment plan identity is written validated and legacy migrated`() {
+    fun `environment plan metadata is rebound only after material compatibility checks`() {
         val planned = project.copy(environmentPlanId = "sha256:plan-a")
         val prepare = adapter.prepare(planned).shellScript
         val status = adapter.status(planned).shellScript
 
         assertTrue(prepare.contains("required_plan='sha256:plan-a'"))
+        assertTrue(prepare.contains("INSTALL_EXTRAS=%s"))
         assertTrue(prepare.contains("PLAN_ID=%s"))
         assertTrue(status.contains("saved_plan="))
+        assertTrue(status.contains("saved_extras="))
+        assertTrue(status.contains("PYTHON_INSTALL_EXTRAS_UNKNOWN"))
+        assertTrue(status.contains("PYTHON_INSTALL_EXTRAS_CHANGED"))
         assertTrue(status.contains("READY_PLAN_MIGRATED"))
-        assertTrue(status.contains("ENVIRONMENT_PLAN_CHANGED"))
+        assertFalse(status.contains("env_reason='ENVIRONMENT_PLAN_CHANGED'"))
         assertTrue(
-            "plan migration must happen only after the existing Python requirement check",
+            "plan rebinding must happen only after the existing Python requirement check",
             status.indexOf("READY_PLAN_MIGRATED") > status.indexOf("PYTHON_REQUIREMENT_CHANGED"),
+        )
+        assertTrue(
+            "install extras compatibility must be proven before plan metadata rebinding",
+            status.indexOf("READY_PLAN_MIGRATED") > status.indexOf("PYTHON_INSTALL_EXTRAS_CHANGED"),
         )
     }
 
@@ -248,6 +259,8 @@ class PythonRuntimeAdapterTest {
         assertTrue(stop.contains("prepare_pid_file=\"${'$'}runtime_dir/runtime-id.prepare.pid\""))
         assertTrue(stop.contains("prepare_pgid_file=\"${'$'}runtime_dir/runtime-id.prepare.pgid\""))
         assertTrue(stop.contains("SIFTALPHA_PREPARE_STOPPED=1"))
+        assertTrue(stop.contains("SIFTALPHA_ENV_INTERRUPTED_PREPARE_RECOVERED=1"))
+        assertTrue(stop.contains("SIFTALPHA_ERROR=ENVIRONMENT_ROLLBACK_FAILED"))
         assertTrue(stop.contains("SIFTALPHA_ERROR=STOP_INCOMPLETE"))
         assertTrue("STOP must keep using the legacy host PID files", stop.contains("pid_file=\"${'$'}runtime_dir/runtime-id.pid\""))
         assertTrue("STOP must keep using the legacy host PGID files", stop.contains("pgid_file=\"${'$'}runtime_dir/runtime-id.pgid\""))
@@ -268,7 +281,9 @@ class PythonRuntimeAdapterTest {
         assertTrue(logs.contains(RuntimeIdentityStore.GUEST_RUNTIME_ROOT))
 
         assertTrue(clean.contains("/root/venvs/runtime-id"))
+        assertTrue(clean.contains("/root/venvs/runtime-id.backup-*"))
         assertTrue(clean.contains("/root/siftalpha/env-ready-runtime-id.txt"))
+        assertTrue(clean.contains("/root/siftalpha/env-ready-runtime-id.txt.backup-*"))
         assertTrue(clean.contains("SIFTALPHA_STATUS=CLEAN_BLOCKED_RUNNING_PROCESS"))
         assertTrue(clean.contains("SIFTALPHA_ENV=CLEANED"))
     }

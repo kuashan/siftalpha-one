@@ -148,8 +148,11 @@ android {
         // v219 hardens External Provider lifecycle: bridge + real proot/Ubuntu capability proof,
         // action gating before PREPARING, pending PREPARE/RUN/REFRESH recovery, and shorter external
         // control-operation deadlines while preserving the long PREPARE hard cap.
-        versionCode = 219
-        versionName = "0.8.0-alpha43-r48d7"
+        // v220 repairs Environment Plan identity so runtime-generated project files cannot invalidate
+        // prepared environments, preserves r46 Python/runtime compatibility gates, and self-heals
+        // interrupted External Python PREPARE rollback backups without touching Developer Mode source.
+        versionCode = 220
+        versionName = "0.8.0-alpha43-r48d8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
