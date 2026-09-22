@@ -77,6 +77,11 @@ object RuntimeOperationContract {
     const val STOP_TIMEOUT_MS = 45L * 1000L
     const val CLEAN_TIMEOUT_MS = 2L * 60L * 1000L
 
+    const val EXTERNAL_START_TIMEOUT_MS = 30_000L
+    const val EXTERNAL_STATUS_TIMEOUT_MS = 10_000L
+    const val EXTERNAL_LOGS_TIMEOUT_MS = 10_000L
+    const val EXTERNAL_STOP_TIMEOUT_MS = 15_000L
+
     fun timeoutMs(action: RuntimeOperationAction): Long = when (action) {
         RuntimeOperationAction.PREPARE -> PREPARE_TIMEOUT_MS
         RuntimeOperationAction.START -> START_TIMEOUT_MS
@@ -84,6 +89,21 @@ object RuntimeOperationContract {
         RuntimeOperationAction.LOGS -> LOGS_TIMEOUT_MS
         RuntimeOperationAction.STOP -> STOP_TIMEOUT_MS
         RuntimeOperationAction.CLEAN -> CLEAN_TIMEOUT_MS
+    }
+
+    fun timeoutMs(
+        provider: RuntimeOperationProvider,
+        action: RuntimeOperationAction,
+    ): Long = when (provider) {
+        RuntimeOperationProvider.INTERNAL -> timeoutMs(action)
+        RuntimeOperationProvider.EXTERNAL -> when (action) {
+            RuntimeOperationAction.PREPARE -> PREPARE_TIMEOUT_MS
+            RuntimeOperationAction.START -> EXTERNAL_START_TIMEOUT_MS
+            RuntimeOperationAction.STATUS -> EXTERNAL_STATUS_TIMEOUT_MS
+            RuntimeOperationAction.LOGS -> EXTERNAL_LOGS_TIMEOUT_MS
+            RuntimeOperationAction.STOP -> EXTERNAL_STOP_TIMEOUT_MS
+            RuntimeOperationAction.CLEAN -> CLEAN_TIMEOUT_MS
+        }
     }
 
     data class TimeoutOutcome(
@@ -127,7 +147,7 @@ object RuntimeOperationContract {
     ): Long? = when (provider) {
         RuntimeOperationProvider.INTERNAL,
         RuntimeOperationProvider.EXTERNAL,
-        -> startedAtEpochMs + timeoutMs(action)
+        -> startedAtEpochMs + timeoutMs(provider, action)
     }
 
     fun lifecycleState(action: RuntimeOperationAction): RuntimeLifecycleState = when (action) {

@@ -54,6 +54,7 @@ class ExternalProviderPreflightTest {
         val result = ExternalProviderPreflight.evaluate(
             facts = facts(
                 bridgeState = ExternalProviderBridgeState.PASS,
+                probeStage = ExternalProviderProbeStage.RUNTIME_CAPABILITY,
                 lastProbeAtEpochMs = 950L,
                 lastProbeResult = ExternalProviderProbeResult.PASS,
             ),
@@ -64,6 +65,21 @@ class ExternalProviderPreflightTest {
         assertTrue(result.ready)
         assertEquals(true, result.allowExternalApps)
         assertEquals(true, result.bridgeResponsive)
+    }
+
+    @Test
+    fun legacyBridgeOnlyPassMustBeProbedForRuntimeCapability() {
+        val result = ExternalProviderPreflight.evaluate(
+            facts = facts(
+                bridgeState = ExternalProviderBridgeState.PASS,
+                probeStage = ExternalProviderProbeStage.BRIDGE,
+                lastProbeAtEpochMs = 950L,
+                lastProbeResult = ExternalProviderProbeResult.PASS,
+            ),
+            nowEpochMs = 1_000L,
+        )
+
+        assertEquals(ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED, result.readiness)
     }
 
     @Test
@@ -90,6 +106,7 @@ class ExternalProviderPreflightTest {
         val result = ExternalProviderPreflight.evaluate(
             facts = facts(
                 bridgeState = ExternalProviderBridgeState.PASS,
+                probeStage = ExternalProviderProbeStage.RUNTIME_CAPABILITY,
                 lastProbeAtEpochMs = 1L,
                 lastProbeResult = ExternalProviderProbeResult.PASS,
             ),
@@ -103,12 +120,14 @@ class ExternalProviderPreflightTest {
         termuxInstalled: Boolean = true,
         runCommandPermissionGranted: Boolean = true,
         bridgeState: ExternalProviderBridgeState = ExternalProviderBridgeState.UNKNOWN,
+        probeStage: ExternalProviderProbeStage? = null,
         lastProbeAtEpochMs: Long? = null,
         lastProbeResult: ExternalProviderProbeResult? = null,
     ) = ExternalProviderFacts(
         termuxInstalled = termuxInstalled,
         runCommandPermissionGranted = runCommandPermissionGranted,
         bridgeState = bridgeState,
+        probeStage = probeStage,
         lastProbeAtEpochMs = lastProbeAtEpochMs,
         lastProbeResult = lastProbeResult,
     )

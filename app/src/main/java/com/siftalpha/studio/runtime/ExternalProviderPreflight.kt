@@ -32,6 +32,11 @@ enum class ExternalProviderProbeResult {
     FAIL,
 }
 
+enum class ExternalProviderProbeStage {
+    BRIDGE,
+    RUNTIME_CAPABILITY,
+}
+
 enum class ExternalProviderReadiness {
     TERMUX_NOT_INSTALLED,
     RUN_COMMAND_PERMISSION_REQUIRED,
@@ -47,6 +52,7 @@ data class ExternalProviderFacts(
     val termuxInstalled: Boolean,
     val runCommandPermissionGranted: Boolean,
     val bridgeState: ExternalProviderBridgeState,
+    val probeStage: ExternalProviderProbeStage? = null,
     val lastProbeAtEpochMs: Long? = null,
     val lastProbeExecutionId: Int? = null,
     val lastProbeResult: ExternalProviderProbeResult? = null,
@@ -95,7 +101,10 @@ object ExternalProviderPreflight {
                 val probeFresh = facts.lastProbeAtEpochMs?.let { last ->
                     nowEpochMs >= last && nowEpochMs - last <= probeMaxAgeMs
                 } == true
-                if (probeFresh) {
+                val runtimeCapabilityProven =
+                    facts.probeStage == ExternalProviderProbeStage.RUNTIME_CAPABILITY &&
+                        facts.lastProbeResult == ExternalProviderProbeResult.PASS
+                if (probeFresh && runtimeCapabilityProven) {
                     result(
                         facts = facts,
                         readiness = ExternalProviderReadiness.READY,
@@ -164,14 +173,18 @@ object ExternalProviderPreflight {
 interface ExternalProviderReadinessStateStore {
     fun read(): ExternalProviderFacts
     fun recordHostFacts(termuxInstalled: Boolean, runCommandPermissionGranted: Boolean)
-    fun markProbeDispatched(executionId: Int)
+    fun markProbeDispatched(executionId: Int, stage: ExternalProviderProbeStage)
     fun recordProbe(
         executionId: Int,
         result: ExternalProviderProbeResult,
         atEpochMs: Long,
         detail: String? = null,
     )
-    fun recordProbeDispatchFailure(atEpochMs: Long, detail: String)
+    fun recordProbeDispatchFailure(
+        atEpochMs: Long,
+        detail: String,
+        stage: ExternalProviderProbeStage,
+    )
     fun recordProbeTimeout(executionId: Int, atEpochMs: Long, detail: String)
 }
 
@@ -188,6 +201,9 @@ class ExternalProviderReadinessStore internal constructor(
         bridgeState = prefs.getString(FIELD_BRIDGE_STATE, null)?.let {
             runCatching { ExternalProviderBridgeState.valueOf(it) }.getOrNull()
         } ?: ExternalProviderBridgeState.UNKNOWN,
+        probeStage = prefs.getString(FIELD_PROBE_STAGE, null)?.let {
+            runCatching { ExternalProviderProbeStage.valueOf(it) }.getOrNull()
+        },
         lastProbeAtEpochMs = prefs.getLong(FIELD_LAST_PROBE_AT, 0L).takeIf { it > 0L },
         lastProbeExecutionId = prefs.getInt(FIELD_LAST_PROBE_ID, 0).takeIf { it > 0 },
         lastProbeResult = prefs.getString(FIELD_LAST_PROBE_RESULT, null)?.let {
@@ -206,9 +222,13 @@ class ExternalProviderReadinessStore internal constructor(
             .apply()
     }
 
-    override fun markProbeDispatched(executionId: Int) {
+    override fun markProbeDispatched(
+        executionId: Int,
+        stage: ExternalProviderProbeStage,
+    ) {
         prefs.edit()
             .putString(FIELD_BRIDGE_STATE, ExternalProviderBridgeState.CHECKING.name)
+            .putString(FIELD_PROBE_STAGE, stage.name)
             .putInt(FIELD_LAST_PROBE_ID, executionId)
             .remove(FIELD_DETAIL)
             .apply()
@@ -239,9 +259,14 @@ class ExternalProviderReadinessStore internal constructor(
             .apply()
     }
 
-    override fun recordProbeDispatchFailure(atEpochMs: Long, detail: String) {
+    override fun recordProbeDispatchFailure(
+        atEpochMs: Long,
+        detail: String,
+        stage: ExternalProviderProbeStage,
+    ) {
         prefs.edit()
             .putString(FIELD_BRIDGE_STATE, ExternalProviderBridgeState.FAIL.name)
+            .putString(FIELD_PROBE_STAGE, stage.name)
             .putString(FIELD_LAST_PROBE_RESULT, ExternalProviderProbeResult.FAIL.name)
             .putLong(FIELD_LAST_PROBE_AT, atEpochMs)
             .remove(FIELD_LAST_PROBE_ID)
@@ -271,6 +296,7 @@ class ExternalProviderReadinessStore internal constructor(
         private const val FIELD_TERMUX_INSTALLED = "termux_installed"
         private const val FIELD_PERMISSION = "run_command_permission"
         private const val FIELD_BRIDGE_STATE = "bridge_state"
+        private const val FIELD_PROBE_STAGE = "probe_stage"
         private const val FIELD_LAST_PROBE_AT = "last_probe_at"
         private const val FIELD_LAST_PROBE_ID = "last_probe_id"
         private const val FIELD_LAST_PROBE_RESULT = "last_probe_result"
@@ -317,6 +343,7 @@ class ExternalProviderProbeCoordinator internal constructor(
     private val nowEpochMs: () -> Long = { System.currentTimeMillis() },
     private val probeMaxAgeMs: Long = ExternalProviderPreflight.DEFAULT_PROBE_MAX_AGE_MS,
     private val probeResponseTimeoutMs: Long = DEFAULT_PROBE_RESPONSE_TIMEOUT_MS,
+    private val capabilityProbeResponseTimeoutMs: Long = DEFAULT_CAPABILITY_PROBE_RESPONSE_TIMEOUT_MS,
     private val timeoutScheduler: ExternalProviderProbeTimeoutScheduler =
         DefaultExternalProviderProbeTimeoutScheduler(),
 ) : ExternalProviderPreflightGate {
@@ -327,6 +354,7 @@ class ExternalProviderProbeCoordinator internal constructor(
     private var listening = false
 
     private val resultListener: (RuntimeResult) -> Unit = resultListener@{ result ->
+        var nextStage: ExternalProviderProbeStage? = null
         val accepted = synchronized(lock) {
             timeoutHandles.remove(result.executionId)?.cancel()
             if (timedOutProbeExecutions.remove(result.executionId)) {
@@ -339,26 +367,38 @@ class ExternalProviderProbeCoordinator internal constructor(
                 ) {
                     false
                 } else {
+                    val stage = facts.probeStage ?: ExternalProviderProbeStage.BRIDGE
+                    val marker = when (stage) {
+                        ExternalProviderProbeStage.BRIDGE -> "SIFTALPHA_TERMUX_BRIDGE_OK"
+                        ExternalProviderProbeStage.RUNTIME_CAPABILITY ->
+                            "SIFTALPHA_EXTERNAL_RUNTIME_OK"
+                    }
                     val passed = result.exitCode == 0 &&
                         result.internalErrorMessage.isBlank() &&
-                        "SIFTALPHA_TERMUX_BRIDGE_OK" in result.stdout
-                    val detail = if (passed) {
-                        null
+                        marker in result.stdout
+                    if (passed && stage == ExternalProviderProbeStage.BRIDGE) {
+                        nextStage = ExternalProviderProbeStage.RUNTIME_CAPABILITY
                     } else {
-                        result.internalErrorMessage
-                            .ifBlank { result.stderr }
-                            .ifBlank { "CONNECTION_TEST_FAILED(exitCode=${result.exitCode})" }
-                    }
-                    store.recordProbe(
-                        executionId = result.executionId,
-                        result = if (passed) {
-                            ExternalProviderProbeResult.PASS
+                        val detail = if (passed) {
+                            null
                         } else {
-                            ExternalProviderProbeResult.FAIL
-                        },
-                        atEpochMs = nowEpochMs(),
-                        detail = detail,
-                    )
+                            result.internalErrorMessage
+                                .ifBlank { result.stderr }
+                                .ifBlank {
+                                    "EXTERNAL_PROVIDER_PROBE_FAILED(stage=${stage.name},exitCode=${result.exitCode})"
+                                }
+                        }
+                        store.recordProbe(
+                            executionId = result.executionId,
+                            result = if (passed) {
+                                ExternalProviderProbeResult.PASS
+                            } else {
+                                ExternalProviderProbeResult.FAIL
+                            },
+                            atEpochMs = nowEpochMs(),
+                            detail = detail,
+                        )
+                    }
                     true
                 }
             }
@@ -366,7 +406,9 @@ class ExternalProviderProbeCoordinator internal constructor(
         TermuxResultBus.consume(result.executionId)
         if (!accepted) return@resultListener
 
-        val current = current()
+        val current = nextStage?.let {
+            dispatchProbeStage(it, replaceChecking = true)
+        } ?: current()
         listeners.forEach { listener -> runCatching { listener(current) } }
     }
 
@@ -389,7 +431,10 @@ class ExternalProviderProbeCoordinator internal constructor(
         return ExternalProviderPreflight.evaluate(store.read(), nowEpochMs(), probeMaxAgeMs)
     }
 
-    /** Re-evaluate and launch one shared CONNECTION_TEST when the bridge fact is missing/stale. */
+    /**
+     * Prove both layers before declaring READY:
+     * RUN_COMMAND bridge response, then real bash -> proot-distro -> Ubuntu response.
+     */
     override fun ensureReady(): ExternalProviderPreflightResult {
         val initial = current()
         if (
@@ -399,37 +444,56 @@ class ExternalProviderProbeCoordinator internal constructor(
         ) {
             return initial
         }
-        return dispatchProbe()
+        return dispatchProbeStage(ExternalProviderProbeStage.BRIDGE)
     }
 
     /** Explicit retry used after the UI asks the user to open Termux or finish setup. */
     fun probe(): ExternalProviderPreflightResult {
         val initial = current()
         if (!initial.termuxInstalled || !initial.runCommandPermissionGranted) return initial
-        return dispatchProbe()
+        return dispatchProbeStage(ExternalProviderProbeStage.BRIDGE)
     }
 
-    private fun dispatchProbe(): ExternalProviderPreflightResult {
+    private fun dispatchProbeStage(
+        stage: ExternalProviderProbeStage,
+        replaceChecking: Boolean = false,
+    ): ExternalProviderPreflightResult {
         ensureListening()
         val facts = store.read()
-        if (facts.bridgeState == ExternalProviderBridgeState.CHECKING) {
+        if (!replaceChecking && facts.bridgeState == ExternalProviderBridgeState.CHECKING) {
             return ExternalProviderPreflight.evaluate(facts, nowEpochMs(), probeMaxAgeMs)
         }
         return try {
-            val executionId = bridge.execute(TermuxBackend.CONNECTION_TEST)
-            store.markProbeDispatched(executionId)
-            scheduleProbeTimeout(executionId)
+            val command = when (stage) {
+                ExternalProviderProbeStage.BRIDGE -> TermuxBackend.CONNECTION_TEST
+                ExternalProviderProbeStage.RUNTIME_CAPABILITY ->
+                    TermuxBackend.RUNTIME_CAPABILITY_TEST
+            }
+            val executionId = bridge.execute(command)
+            store.markProbeDispatched(executionId, stage)
+            scheduleProbeTimeout(executionId, stage)
             TermuxResultBus.consume(executionId)?.let(resultListener)
             ExternalProviderPreflight.evaluate(store.read(), nowEpochMs(), probeMaxAgeMs)
         } catch (error: Throwable) {
             val detail = error.message ?: error.javaClass.simpleName
-            store.recordProbeDispatchFailure(nowEpochMs(), detail)
+            store.recordProbeDispatchFailure(nowEpochMs(), detail, stage)
             current()
         }
     }
 
-    private fun scheduleProbeTimeout(executionId: Int) {
-        val handle = timeoutScheduler.schedule(probeResponseTimeoutMs) {
+    private fun scheduleProbeTimeout(
+        executionId: Int,
+        stage: ExternalProviderProbeStage,
+    ) {
+        val timeoutMs = when (stage) {
+            ExternalProviderProbeStage.BRIDGE -> probeResponseTimeoutMs
+            ExternalProviderProbeStage.RUNTIME_CAPABILITY -> capabilityProbeResponseTimeoutMs
+        }
+        val timeoutDetail = when (stage) {
+            ExternalProviderProbeStage.BRIDGE -> PROBE_TIMEOUT_DETAIL
+            ExternalProviderProbeStage.RUNTIME_CAPABILITY -> CAPABILITY_PROBE_TIMEOUT_DETAIL
+        }
+        val handle = timeoutScheduler.schedule(timeoutMs) {
             val shouldNotify = synchronized(lock) {
                 timeoutHandles.remove(executionId)
                 val facts = store.read()
@@ -446,7 +510,7 @@ class ExternalProviderProbeCoordinator internal constructor(
                     store.recordProbeTimeout(
                         executionId = executionId,
                         atEpochMs = nowEpochMs(),
-                        detail = PROBE_TIMEOUT_DETAIL,
+                        detail = timeoutDetail,
                     )
                     true
                 }
@@ -468,7 +532,6 @@ class ExternalProviderProbeCoordinator internal constructor(
             TermuxResultBus.addListener(resultListener)
             listening = true
         }
-        // A result may have arrived while the Activity was away but is still in the shared cache.
         store.read().lastProbeExecutionId?.let { executionId ->
             TermuxResultBus.consume(executionId)?.let(resultListener)
         }
@@ -476,7 +539,10 @@ class ExternalProviderProbeCoordinator internal constructor(
 
     companion object {
         const val DEFAULT_PROBE_RESPONSE_TIMEOUT_MS = 3_000L
+        const val DEFAULT_CAPABILITY_PROBE_RESPONSE_TIMEOUT_MS = 8_000L
         const val PROBE_TIMEOUT_DETAIL = "BRIDGE_PROBE_NO_RESPONSE_WITHIN_3S"
+        const val CAPABILITY_PROBE_TIMEOUT_DETAIL =
+            "RUNTIME_CAPABILITY_PROBE_NO_RESPONSE_WITHIN_8S"
         private const val MAX_TIMED_OUT_EXECUTIONS = 32
 
         @Volatile

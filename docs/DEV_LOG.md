@@ -3254,3 +3254,29 @@ With explicit user approval, `V04Activity（开发者工作区）` receives exac
 - `ENVIRONMENT_ALREADY_READY -> runtime_policy_reason_environment_already_ready`
 
 This change only lets the Developer Mode explanation renderer localize the new Shared Core reason. It does not alter Developer Mode Prepare / Run behavior, Runtime control, lifecycle, button policy, or workflow. The Prepare button continues to consume `ProjectActionPolicy.isEnabled(PREPARE)`; the behavioral fix remains owned by Shared Core.
+
+
+## 2026-09-22 · R48-D7 v219 External Provider lifecycle hardening
+
+### Real-device finding
+When External Provider（外部运行环境）was selected while Termux was cold/backgrounded, Android could start the Termux service/notification without the real bash -> proot-distro -> Ubuntu execution path becoming usable. Normal Mode could therefore look PREPARING/CHECKING for a long time. Manually opening Termux made the same prepare/status actions work immediately.
+
+### Shared Core repair
+- External readiness now requires two proofs: a 3-second RUN_COMMAND bridge probe, followed by an 8-second real runtime capability probe that enters proot-distro Ubuntu and returns SIFTALPHA_EXTERNAL_RUNTIME_OK.
+- A bridge-only PASS from an older build is not accepted as READY after upgrade.
+- No new Developer Mode workflow is introduced; the shared provider fact becomes stricter for every consumer.
+- External control deadlines are provider-specific: START 30s, STATUS 10s, LOGS 10s, STOP 15s. PREPARE keeps its 30-minute hard cap because genuine dependency installation may be long. Internal provider deadlines are unchanged.
+
+### Normal Mode orchestration repair
+- PREPARE and RUN perform External Provider preflight before Normal UI writes busy/PREPARING/STARTING presentation state.
+- Manual REFRESH/STATUS also records a pending external intent if provider readiness must be recovered.
+- PREPARE / RUN / REFRESH are resumed only after the two-stage shared readiness proof becomes READY.
+- Returning from “Open Termux” automatically re-probes only when the current project actually uses External Provider or has a pending external action.
+- Internal R no longer causes an automatic Termux probe merely because the project page resumes.
+
+### Boundary
+No direct Developer Mode source edit is part of R48-D7. V04Activity remains unchanged from 07d2bf6; Developer consumes the stricter Shared Core readiness fact only.
+
+Target:
+- versionCode = 219
+- versionName = 0.8.0-alpha43-r48d7

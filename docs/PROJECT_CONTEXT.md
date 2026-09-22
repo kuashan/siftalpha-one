@@ -1474,3 +1474,18 @@ Confirmed example awaiting repair: `ProjectActionPolicy` currently leaves PREPAR
 The shared action invariant is now explicit and implemented: a project environment proven READY must not offer PREPARE again. `ProjectActionPolicy` is the single owner of this rule, so Developer Mode and Normal Mode consume the same corrected fact. No surface-specific READY check is permitted.
 
 ENVIRONMENT_ERROR remains a recovery condition and may still offer re-prepare; it must not be conflated with READY.
+
+
+## 2026-09-22 · R48-D7 External Provider lifecycle authority
+
+External Provider READY now means more than “Termux service was started”. Shared Core must prove both:
+1. the official RUN_COMMAND bridge responds; and
+2. the actual bash -> proot-distro -> Ubuntu runtime path responds.
+
+Normal Mode must never enter PREPARING/STARTING presentation merely because an external command was accepted for dispatch. User-visible long-operation state begins only after shared external readiness is proven.
+
+If the provider is unresponsive, Normal Mode keeps the requested PREPARE/RUN/REFRESH as a pending user intent, offers Open Termux / recheck recovery, and resumes the intent only after readiness becomes READY.
+
+External quick control deadlines are intentionally short (START 30s, STATUS/LOGS 10s, STOP 15s); PREPARE retains a 30-minute hard cap for real dependency installation. Internal provider deadlines are unchanged.
+
+Developer Mode remains frozen at the source-surface boundary. R48-D7 changes Shared Core facts and Normal orchestration only; no direct V04Activity edit is authorized or included.

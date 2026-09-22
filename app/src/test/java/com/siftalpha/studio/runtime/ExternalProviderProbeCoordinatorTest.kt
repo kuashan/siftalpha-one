@@ -6,7 +6,7 @@ import org.junit.Test
 
 class ExternalProviderProbeCoordinatorTest {
     @Test
-    fun coordinatorDispatchesTheExistingConnectionTestAndUpdatesSharedStore() {
+    fun coordinatorRequiresBridgeThenRuntimeCapabilityBeforeReady() {
         val store = MemoryReadinessStore()
         val bridge = FakeBridge()
         val coordinator = ExternalProviderProbeCoordinator(
@@ -19,12 +19,29 @@ class ExternalProviderProbeCoordinatorTest {
 
         assertEquals(ExternalProviderReadiness.BRIDGE_CHECKING, checking.readiness)
         assertEquals(TermuxBackend.CONNECTION_TEST, bridge.lastCommand)
+        assertEquals(ExternalProviderProbeStage.BRIDGE, store.read().probeStage)
         assertNotNull(store.read().lastProbeExecutionId)
+
+        val bridgeExecution = bridge.lastExecutionId
+        TermuxResultBus.publish(
+            RuntimeResult(
+                executionId = bridgeExecution,
+                stdout = "SIFTALPHA_TERMUX_BRIDGE_OK\nTERMUX_PREFIX=/data/data/com.termux/files/usr\naarch64",
+                stderr = "",
+                exitCode = 0,
+                internalErrorCode = 0,
+                internalErrorMessage = "",
+            ),
+        )
+
+        assertEquals(ExternalProviderReadiness.BRIDGE_CHECKING, coordinator.current().readiness)
+        assertEquals(TermuxBackend.RUNTIME_CAPABILITY_TEST, bridge.lastCommand)
+        assertEquals(ExternalProviderProbeStage.RUNTIME_CAPABILITY, store.read().probeStage)
 
         TermuxResultBus.publish(
             RuntimeResult(
-                executionId = bridge.nextExecutionId,
-                stdout = "SIFTALPHA_TERMUX_BRIDGE_OK\nTERMUX_PREFIX=/data/data/com.termux/files/usr\naarch64",
+                executionId = bridge.lastExecutionId,
+                stdout = "SIFTALPHA_EXTERNAL_RUNTIME_OK\n",
                 stderr = "",
                 exitCode = 0,
                 internalErrorCode = 0,
@@ -34,6 +51,7 @@ class ExternalProviderProbeCoordinatorTest {
 
         assertEquals(ExternalProviderReadiness.READY, coordinator.current().readiness)
         assertEquals(ExternalProviderProbeResult.PASS, store.read().lastProbeResult)
+        assertEquals(ExternalProviderProbeStage.RUNTIME_CAPABILITY, store.read().probeStage)
     }
 
     @Test
@@ -117,6 +135,17 @@ class ExternalProviderProbeCoordinatorTest {
                 internalErrorMessage = "",
             ),
         )
+        assertEquals(ExternalProviderReadiness.BRIDGE_CHECKING, coordinator.current().readiness)
+        TermuxResultBus.publish(
+            RuntimeResult(
+                executionId = bridge.lastExecutionId,
+                stdout = "SIFTALPHA_EXTERNAL_RUNTIME_OK",
+                stderr = "",
+                exitCode = 0,
+                internalErrorCode = 0,
+                internalErrorMessage = "",
+            ),
+        )
 
         assertEquals(ExternalProviderReadiness.READY, coordinator.current().readiness)
     }
@@ -141,6 +170,16 @@ class ExternalProviderProbeCoordinatorTest {
             RuntimeResult(
                 executionId = 6101,
                 stdout = "SIFTALPHA_TERMUX_BRIDGE_OK",
+                stderr = "",
+                exitCode = 0,
+                internalErrorCode = 0,
+                internalErrorMessage = "",
+            ),
+        )
+        TermuxResultBus.publish(
+            RuntimeResult(
+                executionId = 6102,
+                stdout = "SIFTALPHA_EXTERNAL_RUNTIME_OK",
                 stderr = "",
                 exitCode = 0,
                 internalErrorCode = 0,
@@ -178,7 +217,12 @@ class ExternalProviderProbeCoordinatorTest {
             delayMs: Long,
             task: () -> Unit,
         ): ExternalProviderProbeTimeoutHandle {
-            assertEquals(ExternalProviderProbeCoordinator.DEFAULT_PROBE_RESPONSE_TIMEOUT_MS, delayMs)
+            assertEquals(
+                true,
+                delayMs == ExternalProviderProbeCoordinator.DEFAULT_PROBE_RESPONSE_TIMEOUT_MS ||
+                    delayMs ==
+                    ExternalProviderProbeCoordinator.DEFAULT_CAPABILITY_PROBE_RESPONSE_TIMEOUT_MS,
+            )
             latest = task
             var cancelled = false
             return ExternalProviderProbeTimeoutHandle {
@@ -210,9 +254,13 @@ class ExternalProviderProbeCoordinatorTest {
             )
         }
 
-        override fun markProbeDispatched(executionId: Int) {
+        override fun markProbeDispatched(
+            executionId: Int,
+            stage: ExternalProviderProbeStage,
+        ) {
             facts = facts.copy(
                 bridgeState = ExternalProviderBridgeState.CHECKING,
+                probeStage = stage,
                 lastProbeExecutionId = executionId,
             )
         }
@@ -236,9 +284,14 @@ class ExternalProviderProbeCoordinatorTest {
             )
         }
 
-        override fun recordProbeDispatchFailure(atEpochMs: Long, detail: String) {
+        override fun recordProbeDispatchFailure(
+            atEpochMs: Long,
+            detail: String,
+            stage: ExternalProviderProbeStage,
+        ) {
             facts = facts.copy(
                 bridgeState = ExternalProviderBridgeState.FAIL,
+                probeStage = stage,
                 lastProbeAtEpochMs = atEpochMs,
                 lastProbeExecutionId = null,
                 lastProbeResult = ExternalProviderProbeResult.FAIL,

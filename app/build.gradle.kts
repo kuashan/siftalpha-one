@@ -145,8 +145,11 @@ android {
         // v214 completes the eight requested Normal Mode repairs: restore a static logo/text brand hold with no
         // code-convergence animation, simplify Home copy/colors/status/version placement, make descriptions editable,
         // compact Prepare to the current phase only, while preserving the v212 lifecycle-gated decorative motion.
-        versionCode = 218
-        versionName = "0.8.0-alpha43-r48d6"
+        // v219 hardens External Provider lifecycle: bridge + real proot/Ubuntu capability proof,
+        // action gating before PREPARING, pending PREPARE/RUN/REFRESH recovery, and shorter external
+        // control-operation deadlines while preserving the long PREPARE hard cap.
+        versionCode = 219
+        versionName = "0.8.0-alpha43-r48d7"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

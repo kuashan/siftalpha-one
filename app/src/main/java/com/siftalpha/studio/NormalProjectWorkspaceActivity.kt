@@ -177,6 +177,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     private enum class PendingUserIntent {
         PREPARE,
         RUN,
+        REFRESH,
     }
 
     private val completionListener: (ProjectOperationCoordinator.ExternalCompletion) -> Unit = { completion ->
@@ -406,7 +407,11 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         if (::prepareLiveProgress.isInitialized) prepareLiveProgress.resume()
         if (::webAvailability.isInitialized) webAvailability.resume()
         if (::project.isInitialized) {
-            refreshExternalPreflight(retryIfNeeded = false)
+            if (shouldProbeExternalProvider()) {
+                refreshExternalPreflight(retryIfNeeded = false)
+            } else {
+                screenState.value = screenState.value.copy(externalReadiness = null)
+            }
             reconcileExternalPrepareProgress()
         }
     }
@@ -414,7 +419,11 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     override fun onResume() {
         super.onResume()
         if (::project.isInitialized) {
-            refreshExternalPreflight(retryIfNeeded = true)
+            if (shouldProbeExternalProvider()) {
+                refreshExternalPreflight(retryIfNeeded = true)
+            } else {
+                screenState.value = screenState.value.copy(externalReadiness = null)
+            }
             refreshSharedState()
         }
     }
@@ -674,6 +683,52 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         screenState.value = screenState.value.copy(externalReadiness = result.readiness)
     }
 
+    private fun shouldProbeExternalProvider(): Boolean =
+        ::project.isInitialized &&
+            (
+                selectionStore.read(project.summary.documentId) == ProjectRuntimeSelection.TERMUX ||
+                    pendingUserIntent != null
+                )
+
+    private fun ensureExternalProviderFor(intent: PendingUserIntent): Boolean {
+        val selection = selectionStore.read(project.summary.documentId)
+        if (selection != ProjectRuntimeSelection.TERMUX) return true
+
+        val result = externalPreflight.ensureReady()
+        screenState.value = screenState.value.copy(externalReadiness = result.readiness)
+        if (result.ready) return true
+
+        pendingUserIntent = intent
+        when (result.readiness) {
+            ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED ->
+                requestRunCommandPermission()
+
+            ExternalProviderReadiness.TERMUX_NOT_INSTALLED,
+            ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED,
+            ExternalProviderReadiness.BRIDGE_UNRESPONSIVE,
+            -> screenState.value = screenState.value.copy(
+                externalReadiness = result.readiness,
+                message = getString(R.string.normal_external_provider_open_termux),
+            )
+
+            ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED,
+            ExternalProviderReadiness.BRIDGE_CHECKING,
+            -> screenState.value = screenState.value.copy(
+                externalReadiness = result.readiness,
+                message = getString(R.string.normal_external_provider_checking),
+            )
+
+            ExternalProviderReadiness.UNAVAILABLE ->
+                screenState.value = screenState.value.copy(
+                    externalReadiness = result.readiness,
+                    message = getString(R.string.normal_external_provider_unavailable),
+                )
+
+            ExternalProviderReadiness.READY -> Unit
+        }
+        return false
+    }
+
     private fun selectRuntime(selection: ProjectRuntimeSelection) {
         if (screenState.value.busy) return
         val projectId = project.summary.documentId
@@ -716,6 +771,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 
     private fun prepareProjectAfterGuidance() {
         if (screenState.value.busy) return
+        if (!ensureExternalProviderFor(PendingUserIntent.PREPARE)) return
         val selection = selectionStore.read(project.summary.documentId)
         screenState.value = screenState.value.copy(
             busy = true,
@@ -975,6 +1031,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 
     private fun runProjectAfterGuidance() {
         if (screenState.value.busy) return
+        if (!ensureExternalProviderFor(PendingUserIntent.RUN)) return
         val configuration = configurationUi.snapshot(
             project.summary.documentId,
             project.folderName,
@@ -1300,6 +1357,8 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             return
         }
 
+        if (!ensureExternalProviderFor(PendingUserIntent.REFRESH)) return
+
         val state = lifecycleStore.read(projectId).runtimeState
         val step = RuntimeAutoObservationPolicy.decide(
             RuntimeAutoObservationPolicy.Input(
@@ -1328,6 +1387,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     ): Boolean {
         if (action != RuntimeOperationAction.STATUS && action != RuntimeOperationAction.LOGS) return false
         if (!externalPreflight.current().ready) {
+            if (manual) pendingUserIntent = PendingUserIntent.REFRESH
             refreshExternalPreflight(retryIfNeeded = true)
             refreshSharedState()
             return false
@@ -1641,8 +1701,9 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         if (!externalPreflight.current().ready) return
         pendingUserIntent = null
         when (intent) {
-            PendingUserIntent.PREPARE -> prepareProject()
-            PendingUserIntent.RUN -> runProject()
+            PendingUserIntent.PREPARE -> prepareProjectAfterGuidance()
+            PendingUserIntent.RUN -> runProjectAfterGuidance()
+            PendingUserIntent.REFRESH -> refreshProject()
         }
     }
 

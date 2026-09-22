@@ -74,7 +74,10 @@ class ProjectOperationCoordinatorTest {
             provider = RuntimeOperationProvider.EXTERNAL,
             action = RuntimeOperationAction.STOP,
         )!!
-        assertEquals(now + RuntimeOperationContract.STOP_TIMEOUT_MS, stop.deadlineAtEpochMs)
+        assertEquals(
+            now + RuntimeOperationContract.EXTERNAL_STOP_TIMEOUT_MS,
+            stop.deadlineAtEpochMs,
+        )
     }
 
     @Test

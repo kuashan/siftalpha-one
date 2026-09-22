@@ -90,6 +90,26 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
             description = "验证 SiftAlpha Studio 是否可以通过官方 RUN_COMMAND 接口调用 Termux。",
         )
 
+        val RUNTIME_CAPABILITY_TEST = RuntimeCommand(
+            shellScript = """
+                set -eu
+                command -v bash >/dev/null 2>&1 || {
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=BASH' >&2
+                  exit 31
+                }
+                command -v proot-distro >/dev/null 2>&1 || {
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=PROOT_DISTRO' >&2
+                  exit 32
+                }
+                proot-distro login ubuntu -- bash -lc '
+                  printf "SIFTALPHA_EXTERNAL_RUNTIME_OK\\n"
+                  uname -m >/dev/null
+                '
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux 后台命令能够真正进入 proot-distro Ubuntu 并返回。",
+        )
+
         val ENVIRONMENT_PROBE = RuntimeCommand(
             shellScript = """
                 echo '=== SiftAlpha Runtime Probe ==='

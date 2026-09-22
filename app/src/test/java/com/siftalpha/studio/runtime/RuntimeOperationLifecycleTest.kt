@@ -140,7 +140,10 @@ class RuntimeOperationLifecycleTest {
                 ),
             )
             assertEquals(
-                startedAt + RuntimeOperationContract.timeoutMs(action),
+                startedAt + RuntimeOperationContract.timeoutMs(
+                    RuntimeOperationProvider.EXTERNAL,
+                    action,
+                ),
                 RuntimeOperationContract.deadlineAtEpochMs(
                     provider = RuntimeOperationProvider.EXTERNAL,
                     action = action,
@@ -173,16 +176,51 @@ class RuntimeOperationLifecycleTest {
     @Test
     fun externalStopUsesTheShortStopDeadline() {
         assertEquals(
-            45_000L,
-            RuntimeOperationContract.timeoutMs(RuntimeOperationAction.STOP),
+            15_000L,
+            RuntimeOperationContract.timeoutMs(
+                RuntimeOperationProvider.EXTERNAL,
+                RuntimeOperationAction.STOP,
+            ),
         )
         assertEquals(
-            45_000L,
+            15_000L,
             RuntimeOperationContract.deadlineAtEpochMs(
                 provider = RuntimeOperationProvider.EXTERNAL,
                 action = RuntimeOperationAction.STOP,
                 startedAtEpochMs = 1_000L,
             )!! - 1_000L,
+        )
+    }
+
+    @Test
+    fun externalQuickControlsUseShortFailureDetectionWindows() {
+        assertEquals(
+            30_000L,
+            RuntimeOperationContract.timeoutMs(
+                RuntimeOperationProvider.EXTERNAL,
+                RuntimeOperationAction.START,
+            ),
+        )
+        assertEquals(
+            10_000L,
+            RuntimeOperationContract.timeoutMs(
+                RuntimeOperationProvider.EXTERNAL,
+                RuntimeOperationAction.STATUS,
+            ),
+        )
+        assertEquals(
+            10_000L,
+            RuntimeOperationContract.timeoutMs(
+                RuntimeOperationProvider.EXTERNAL,
+                RuntimeOperationAction.LOGS,
+            ),
+        )
+        assertEquals(
+            RuntimeOperationContract.PREPARE_TIMEOUT_MS,
+            RuntimeOperationContract.timeoutMs(
+                RuntimeOperationProvider.EXTERNAL,
+                RuntimeOperationAction.PREPARE,
+            ),
         )
     }
 

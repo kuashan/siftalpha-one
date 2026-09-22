@@ -1758,3 +1758,24 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Normal Mode source | NormalProjectWorkspaceActivity / SiftAlphaNormalUi unchanged | PASS REQUIRED |
 | W0 / unit tests / assembleDebug | cloud build | PENDING |
 | Internal Alpine Probe | cloud probe | PENDING |
+
+
+### R48-D7 v219 — External Provider lifecycle hardening
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Bridge probe | RUN_COMMAND marker returns within 3s | PASS REQUIRED |
+| Runtime capability probe | proot-distro Ubuntu returns SIFTALPHA_EXTERNAL_RUNTIME_OK within 8s | PASS REQUIRED |
+| Legacy bridge-only PASS | does not become READY without runtime capability proof | PASS REQUIRED |
+| Cold/background Termux | no PREPARING state before provider readiness is proven | PASS REQUIRED |
+| Open Termux recovery | returning to SiftAlpha re-probes and resumes pending PREPARE/RUN/REFRESH | PASS REQUIRED |
+| Internal R | page resume does not auto-probe Termux | PASS REQUIRED |
+| External STATUS | timeout deadline = 10s | PASS REQUIRED |
+| External LOGS | timeout deadline = 10s | PASS REQUIRED |
+| External STOP | timeout deadline = 15s | PASS REQUIRED |
+| External START | timeout deadline = 30s | PASS REQUIRED |
+| External PREPARE | hard cap remains 30min | PASS REQUIRED |
+| Internal deadlines | unchanged | PASS REQUIRED |
+| Developer Mode source | V04Activity unchanged | PASS REQUIRED |
+| W0 / unit tests / assembleDebug | cloud build | PENDING |
+| Internal Alpine Probe | cloud probe | PENDING |
