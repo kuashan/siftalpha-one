@@ -77,3 +77,44 @@ Animation sequence:
 
 Hard rule:
 The launch animation may animate data, glow, opacity and scale around the logo, but it must never substitute another logo or redraw the logo geometry.
+
+
+## R48-D3 v203 — Approved Four-Scene Sequence
+
+The launch experience is now defined by the approved four-scene storyboard and must be implemented as live Compose motion rather than as a static image.
+
+### 01 起始 / FROM THE EDGES
+- code/data enter from both sides;
+- upper stream originates from the right;
+- lower stream originates from the left;
+- streams remain broad and separated around the center.
+
+### 02 汇聚 / FLOW TOGETHER
+- paths become more strongly curved;
+- both sides visually create an S-shaped flow;
+- moving highlights and code fragments communicate direction and speed.
+
+### 03 成形 / SHAPE THE FUTURE
+- stream fragments detach and assemble into an S;
+- the S is made from luminous fragments and code/data energy;
+- no substitute final logo is shown at this stage.
+
+### 04 完成 / READY FOR WHAT'S NEXT
+- the actual app logo asset resolves;
+- final halo, SiftAlpha X wordmark and INTELLIGENCE IN MOTION appear;
+- generated/reference artwork is never used as the final logo.
+
+### Layout lock
+Every scene keeps:
+- top brand header: SiftAlpha X;
+- FROM CODE TO POSSIBILITY;
+- Intelligence Converges. A Smarter Tomorrow.;
+- numbered stage heading;
+- bottom localized caption + English microcopy.
+
+### Motion lock
+- continuous spatial continuity between scenes;
+- no hard-cut stream resets;
+- no layout-shifting animations;
+- Reduced Motion presents the completed frame without decorative travel;
+- total perceived launch duration remains approximately 5 seconds.

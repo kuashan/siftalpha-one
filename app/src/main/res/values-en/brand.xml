@@ -76,4 +76,12 @@
     <string name="brand_action_run">Start running →</string>
     <string name="brand_action_stop">Stop running</string>
     <string name="brand_action_refresh">Refresh status</string>
+    <string name="brand_launch_phase_1_title">Start</string>
+    <string name="brand_launch_phase_1_caption">Code and data begin flowing inward from both sides</string>
+    <string name="brand_launch_phase_2_title">Converge</string>
+    <string name="brand_launch_phase_2_caption">Data follows the flow and meets at the center</string>
+    <string name="brand_launch_phase_3_title">Form</string>
+    <string name="brand_launch_phase_3_caption">Code and intelligence merge to shape SiftAlpha X</string>
+    <string name="brand_launch_phase_4_title">Complete</string>
+    <string name="brand_launch_phase_4_caption">The logo fully emerges and new possibilities begin</string>
 </resources>

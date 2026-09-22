@@ -76,4 +76,12 @@
     <string name="brand_action_run">실행 시작 →</string>
     <string name="brand_action_stop">실행 중지</string>
     <string name="brand_action_refresh">상태 새로고침</string>
+    <string name="brand_launch_phase_1_title">시작</string>
+    <string name="brand_launch_phase_1_caption">양쪽의 코드와 데이터가 중앙으로 모이기 시작합니다</string>
+    <string name="brand_launch_phase_2_title">수렴</string>
+    <string name="brand_launch_phase_2_caption">데이터가 궤적을 따라 흐르며 중앙에서 만납니다</string>
+    <string name="brand_launch_phase_3_title">형성</string>
+    <string name="brand_launch_phase_3_caption">코드와 지능이 결합되어 SiftAlpha X를 형성합니다</string>
+    <string name="brand_launch_phase_4_title">완성</string>
+    <string name="brand_launch_phase_4_caption">로고가 완전히 나타나며 새로운 가능성이 시작됩니다</string>
 </resources>

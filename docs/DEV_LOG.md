@@ -2745,3 +2745,50 @@ Presentation-only repair:
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `202`.
+
+
+## 2026-09-22 · R48-D3 v203 approved four-scene launch storyboard
+
+User approved the four-panel launch concept and requested the actual app opening sequence to reproduce that design, not just approximate the galaxy flow.
+
+Implementation is code-driven Compose animation, not a static storyboard image.
+
+Sequence:
+1. **01 起始 / FROM THE EDGES**
+   - wide code/data streams enter from upper-right and lower-left;
+   - center remains intentionally open;
+   - bottom copy: code/data begin converging from both sides.
+2. **02 汇聚 / FLOW TOGETHER**
+   - both streams bend into an S-shaped convergence;
+   - moving highlight waves travel along dense curved strands;
+   - code fragments remain visible inside the flow.
+3. **03 成形 / SHAPE THE FUTURE**
+   - moving fragments peel away from the streams;
+   - 184 deterministic luminous fragments assemble into an S silhouette;
+   - a faint transitional ribbon underlay improves shape legibility;
+   - the real application logo is still hidden.
+4. **04 完成 / READY FOR WHAT'S NEXT**
+   - fragment S fades out;
+   - the unchanged real app logo asset appears with blue/cyan/violet halo;
+   - SiftAlpha X wordmark + INTELLIGENCE IN MOTION complete the frame.
+
+Persistent visual chrome now follows the approved concept:
+- SiftAlpha X
+- FROM CODE TO POSSIBILITY
+- Intelligence Converges. A Smarter Tomorrow.
+- numbered phase header
+- localized phase caption + English microcopy
+
+Timing:
+- 4.4 s continuous choreography + 0.26 s final hold + exit fade, approximately 5 s total.
+- Reduced Motion skips decorative movement and presents the completed real-logo frame.
+
+Boundary:
+- `baseline/r48d2` untouched;
+- no Runtime / Environment / Open / Stop / result semantics changed;
+- no generated storyboard image is bundled into the app;
+- final mark continues to use `R.drawable.siftalpha_launcher_art`.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `203`.

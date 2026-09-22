@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -79,10 +80,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -147,18 +151,17 @@ internal fun SiftAlphaNormalTheme(content: @Composable () -> Unit) {
 internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
     val motion = remember { ValueAnimator.areAnimatorsEnabled() }
     var visible by rememberSaveable { mutableStateOf(true) }
-    val assembly = remember { Animatable(if (motion) 0f else 1f) }
+    val timeline = remember { Animatable(if (motion) 0f else 1f) }
 
     LaunchedEffect(Unit) {
         if (motion) {
-            // Full launch choreography:
-            // 0..0.62  : dense code/data streams travel in from both sides.
-            // 0.44..0.90: the real app logo resolves at the convergence point.
-            // 0.72..1.0 : product wordmark/taglines settle into the final frame.
-            assembly.animateTo(1f, tween(3000, easing = LinearEasing))
-            delay(650)
+            // Four continuous scenes from the approved concept:
+            // 01 edges -> 02 convergence -> 03 fragment formation -> 04 real logo.
+            timeline.animateTo(1f, tween(4400, easing = LinearEasing))
+            delay(260)
         } else {
-            assembly.snapTo(1f)
+            // Reduced-motion presents the completed real logo without auto-running decorative motion.
+            timeline.snapTo(1f)
             delay(3600)
         }
         visible = false
@@ -168,11 +171,11 @@ internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
         content()
         AnimatedVisibility(
             visible = visible,
-            enter = fadeIn(tween(150)),
-            exit = fadeOut(tween(if (motion) 420 else 120)),
+            enter = fadeIn(tween(140)),
+            exit = fadeOut(tween(if (motion) 320 else 120)),
         ) {
-            BrandLaunchScene(
-                progress = assembly.value,
+            BrandLaunchSequence(
+                progress = timeline.value,
                 motion = motion,
             )
         }
@@ -192,14 +195,14 @@ private data class BrandCodeParticle(
     val delay: Float,
 )
 
-private val BrandCodeParticles = List(64) { index ->
-    val upper = index < 32
-    val local = if (upper) index else index - 32
+private val BrandCodeParticles = List(72) { index ->
+    val upper = index < 36
+    val local = if (upper) index else index - 36
     BrandCodeParticle(
         text = BrandCodeLexicon[index % BrandCodeLexicon.size],
         upper = upper,
-        lane = local / 31f,
-        delay = (local % 10) * .012f + if (upper) 0f else .025f,
+        lane = local / 35f,
+        delay = (local % 12) * .010f + if (upper) 0f else .021f,
     )
 }
 
@@ -223,31 +226,57 @@ private fun smoothStep(value: Float): Float {
 }
 
 private fun flowEnvelope(phase: Float): Float {
-    val enter = smoothStep((phase / .20f).coerceIn(0f, 1f))
+    val enter = smoothStep((phase / .18f).coerceIn(0f, 1f))
     val exit = 1f - smoothStep(((phase - .86f) / .14f).coerceIn(0f, 1f))
     return enter * exit
 }
 
+private fun sceneAlpha(
+    progress: Float,
+    start: Float,
+    inEnd: Float,
+    outStart: Float,
+    end: Float,
+): Float {
+    val fadeIn = if (inEnd <= start) {
+        1f
+    } else {
+        smoothStep(((progress - start) / (inEnd - start)).coerceIn(0f, 1f))
+    }
+    val fadeOut = if (end <= outStart) {
+        1f
+    } else {
+        1f -
+            smoothStep(
+                ((progress - outStart) / (end - outStart)).coerceIn(0f, 1f),
+            )
+    }
+    return fadeIn * fadeOut
+}
+
+private fun finalSceneAlpha(progress: Float): Float =
+    smoothStep(((progress - .72f) / .16f).coerceIn(0f, 1f))
 
 @Composable
-private fun BrandLaunchScene(
+private fun BrandLaunchSequence(
     progress: Float,
     motion: Boolean,
 ) {
-    val resolved = progress.coerceIn(0f, 1f)
+    val p = progress.coerceIn(0f, 1f)
+    val scene1 = sceneAlpha(p, 0f, .045f, .20f, .31f)
+    val scene2 = sceneAlpha(p, .16f, .27f, .47f, .59f)
+    val scene3 = sceneAlpha(p, .45f, .56f, .73f, .84f)
+    val scene4 = finalSceneAlpha(p)
 
-    // Independent flow clocks keep both streams moving continuously instead of tying every
-    // token to the one-shot launch progress. Different durations prevent mirrored/mechanical
-    // synchronization while LinearEasing preserves constant travel between curve samples.
-    val flowTransition = rememberInfiniteTransition(label = "brand-code-flow")
+    val flowTransition = rememberInfiniteTransition(label = "launch-flow")
     val upperClock by if (motion) {
         flowTransition.animateFloat(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(2200, easing = LinearEasing),
+                animation = tween(2050, easing = LinearEasing),
             ),
-            label = "brand-code-upper-flow",
+            label = "launch-upper-clock",
         )
     } else {
         remember { mutableStateOf(.56f) }
@@ -257,27 +286,12 @@ private fun BrandLaunchScene(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(2480, easing = LinearEasing),
+                animation = tween(2310, easing = LinearEasing),
             ),
-            label = "brand-code-lower-flow",
+            label = "launch-lower-clock",
         )
     } else {
-        remember { mutableStateOf(.48f) }
-    }
-    val logoAlpha = if (motion) {
-        ((resolved - .44f) / .40f).coerceIn(0f, 1f)
-    } else {
-        1f
-    }
-    val textAlpha = if (motion) {
-        ((resolved - .70f) / .22f).coerceIn(0f, 1f)
-    } else {
-        1f
-    }
-    val particleFade = if (motion) {
-        (1f - ((resolved - .76f) / .22f).coerceIn(0f, 1f))
-    } else {
-        0f
+        remember { mutableStateOf(.49f) }
     }
 
     BoxWithConstraints(
@@ -286,9 +300,10 @@ private fun BrandLaunchScene(
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        Color(0xFF03102B),
+                        Color(0xFF020A1B),
+                        Color(0xFF03102A),
                         Ink,
-                        Color(0xFF020817),
+                        Color(0xFF010615),
                     ),
                 ),
             ),
@@ -296,370 +311,555 @@ private fun BrandLaunchScene(
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            val logoCenter = Offset(w * .50f, h * .445f)
+            val center = Offset(w * .50f, h * .48f)
 
-            // The two stream targets are the visible upper-right and lower-left ends of the
-            // actual S mark inside the 128dp logo. They are intentionally NOT the logo center.
-            // All strand radius/orbit terms collapse to zero at t=1 so the flow lands exactly
-            // on these two S endpoints rather than on an approximate central rail.
-            val upperSTarget = Offset(
-                logoCenter.x + 34.dp.toPx(),
-                logoCenter.y - 36.dp.toPx(),
+            // Subtle deep-space glow shared by all four scenes.
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(
+                        Color(0xFF123D8C).copy(alpha = .22f),
+                        Color.Transparent,
+                    ),
+                    center = Offset(w * .78f, h * .18f),
+                    radius = size.maxDimension * .58f,
+                ),
+                radius = size.maxDimension * .56f,
+                center = Offset(w * .78f, h * .18f),
             )
-            val lowerSTarget = Offset(
-                logoCenter.x - 34.dp.toPx(),
-                logoCenter.y + 36.dp.toPx(),
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(
+                        Color(0xFF541A8B).copy(alpha = .17f),
+                        Color.Transparent,
+                    ),
+                    center = Offset(w * .15f, h * .80f),
+                    radius = size.maxDimension * .46f,
+                ),
+                radius = size.maxDimension * .44f,
+                center = Offset(w * .15f, h * .80f),
             )
 
-            fun galaxyPoint(
+            fun edgePoint(
                 upper: Boolean,
                 lane: Float,
                 t: Float,
                 clock: Float,
-                target: Offset,
             ): Offset {
                 val eased = smoothStep(t)
-                val taper = (1f - eased) * (1f - eased)
+                val laneSigned = lane * 2f - 1f
+                val edgeTaper = (1f - eased) * (1f - eased)
+                val end = if (upper) {
+                    Offset(w * .57f, h * .43f)
+                } else {
+                    Offset(w * .43f, h * .57f)
+                }
 
                 val baseX = if (upper) {
-                    cubicBezier(
-                        w * 1.10f,
-                        w * .92f,
-                        w * .67f,
-                        target.x,
-                        eased,
-                    )
+                    cubicBezier(w * 1.12f, w * .94f, w * .76f, end.x, eased)
                 } else {
-                    cubicBezier(
-                        w * -.10f,
-                        w * .08f,
-                        w * .34f,
-                        target.x,
-                        eased,
-                    )
+                    cubicBezier(w * -.12f, w * .06f, w * .24f, end.x, eased)
                 }
                 val baseY = if (upper) {
                     cubicBezier(
-                        h * (.015f + .23f * lane),
-                        h * (.06f + .14f * lane),
-                        h * (.27f + .09f * lane),
+                        h * (.14f + .19f * lane),
+                        h * (.17f + .15f * lane),
+                        h * (.31f + .10f * lane),
+                        end.y,
+                        eased,
+                    )
+                } else {
+                    cubicBezier(
+                        h * (.67f + .19f * lane),
+                        h * (.74f - .12f * lane),
+                        h * (.67f - .10f * lane),
+                        end.y,
+                        eased,
+                    )
+                }
+
+                val angle =
+                    clock * 2f * PI.toFloat() +
+                        eased * 1.15f * PI.toFloat() +
+                        laneSigned * 1.2f
+
+                return Offset(
+                    x = baseX +
+                        kotlin.math.cos(angle) * w * .020f * edgeTaper +
+                        laneSigned * w * .028f * edgeTaper,
+                    y = baseY +
+                        sin(angle) * h * .013f * edgeTaper +
+                        laneSigned * h * .031f * edgeTaper,
+                )
+            }
+
+            fun convergencePoint(
+                upper: Boolean,
+                lane: Float,
+                t: Float,
+                clock: Float,
+            ): Offset {
+                val eased = smoothStep(t)
+                val laneSigned = lane * 2f - 1f
+                val taper = (1f - eased) * (1f - eased)
+                val target = if (upper) {
+                    Offset(center.x + 4.dp.toPx(), center.y - 3.dp.toPx())
+                } else {
+                    Offset(center.x - 4.dp.toPx(), center.y + 3.dp.toPx())
+                }
+
+                val baseX = if (upper) {
+                    cubicBezier(w * 1.08f, w * .83f, w * .35f, target.x, eased)
+                } else {
+                    cubicBezier(w * -.08f, w * .17f, w * .65f, target.x, eased)
+                }
+                val baseY = if (upper) {
+                    cubicBezier(
+                        h * (.16f + .15f * lane),
+                        h * (.19f + .11f * lane),
+                        h * (.40f - .04f * lane),
                         target.y,
                         eased,
                     )
                 } else {
                     cubicBezier(
-                        h * (.72f + .22f * lane),
-                        h * (.82f - .12f * lane),
-                        h * (.64f - .08f * lane),
+                        h * (.69f + .15f * lane),
+                        h * (.73f - .11f * lane),
+                        h * (.56f + .04f * lane),
                         target.y,
                         eased,
                     )
                 }
 
-                // Wide galaxy fan at the edge -> increasingly tight spiral -> exact S endpoint.
-                val laneSigned = lane * 2f - 1f
-                val orbitRadius =
-                    w * (.045f + .018f * kotlin.math.abs(laneSigned)) *
-                        taper
-                val turns = 2.15f
                 val direction = if (upper) 1f else -1f
                 val angle =
                     direction *
                         (
-                            eased * turns * 2f * PI.toFloat() +
+                            eased * 1.78f * PI.toFloat() +
                                 clock * 2f * PI.toFloat()
                             ) +
-                        laneSigned * 1.35f
+                        laneSigned * 1.25f
+                val radius =
+                    w * (.036f + .014f * kotlin.math.abs(laneSigned)) * taper
 
                 return Offset(
                     x = baseX +
-                        kotlin.math.cos(angle) * orbitRadius +
-                        laneSigned * w * .032f * taper,
+                        kotlin.math.cos(angle) * radius +
+                        laneSigned * w * .022f * taper,
                     y = baseY +
-                        sin(angle) * orbitRadius * .72f +
-                        laneSigned * h * .038f * taper,
+                        sin(angle) * radius * .78f +
+                        laneSigned * h * .027f * taper,
                 )
             }
 
-            fun drawGalaxyBundle(
-                upper: Boolean,
-                clock: Float,
-                target: Offset,
+            fun drawBundle(
+                alpha: Float,
+                convergence: Boolean,
             ) {
-                val strandCount = 24
-                val samples = 22
+                if (alpha <= .005f) return
+                val strands = if (convergence) 26 else 24
+                val samples = if (convergence) 24 else 20
 
-                repeat(strandCount) { strand ->
-                    val lane = strand / (strandCount - 1f)
-                    val strandPhase =
-                        (clock +
-                            strand * .043f +
-                            lane * if (upper) .17f else .21f) % 1f
+                repeat(2) { side ->
+                    val upper = side == 0
+                    val clock = if (upper) upperClock else lowerClock
+                    repeat(strands) { strand ->
+                        val lane = strand / (strands - 1f)
+                        val highlightPhase =
+                            (
+                                clock +
+                                    strand * if (upper) .041f else .046f
+                                ) % 1f
 
-                    var previous = galaxyPoint(
-                        upper = upper,
-                        lane = lane,
-                        t = 0f,
-                        clock = clock,
-                        target = target,
-                    )
+                        fun point(t: Float): Offset =
+                            if (convergence) {
+                                convergencePoint(upper, lane, t, clock)
+                            } else {
+                                edgePoint(upper, lane, t, clock)
+                            }
 
-                    for (sample in 1..samples) {
-                        val t = sample / samples.toFloat()
-                        val point = galaxyPoint(
-                            upper = upper,
-                            lane = lane,
-                            t = t,
-                            clock = clock,
-                            target = target,
-                        )
-
-                        // A moving brightness wave travels down every strand. The strand itself
-                        // remains curved and continuous, while its ends fade so nothing looks cut.
-                        val rawDistance =
-                            kotlin.math.abs(t - strandPhase)
-                        val wrappedDistance =
-                            kotlin.math.min(rawDistance, 1f - rawDistance)
-                        val highlight =
-                            (1f - (wrappedDistance / .16f).coerceIn(0f, 1f))
-                        val edgeEnvelope =
-                            smoothStep((t / .08f).coerceIn(0f, 1f)) *
-                                (
-                                    1f -
-                                        smoothStep(
-                                            ((t - .94f) / .06f).coerceIn(0f, 1f),
+                        var previous = point(0f)
+                        for (sample in 1..samples) {
+                            val t = sample / samples.toFloat()
+                            val current = point(t)
+                            val distance =
+                                kotlin.math.abs(t - highlightPhase)
+                            val wrapped =
+                                kotlin.math.min(distance, 1f - distance)
+                            val pulse =
+                                1f - (wrapped / .17f).coerceIn(0f, 1f)
+                            val edgeFade =
+                                smoothStep((t / .07f).coerceIn(0f, 1f)) *
+                                    (
+                                        1f -
+                                            smoothStep(
+                                                ((t - .96f) / .04f)
+                                                    .coerceIn(0f, 1f),
+                                            )
                                         )
-                                    )
-                        val alpha =
-                            edgeEnvelope *
-                                (.10f + .36f * highlight) *
-                                (1f - .25f * kotlin.math.abs(lane * 2f - 1f))
-                        val color = if (upper) {
-                            when (strand % 4) {
-                                0 -> Cyan
-                                1 -> ElectricBlue
-                                2 -> Blue
-                                else -> Color.White
+                            val color = if (upper) {
+                                when (strand % 4) {
+                                    0 -> Cyan
+                                    1 -> ElectricBlue
+                                    2 -> Blue
+                                    else -> Color.White
+                                }
+                            } else {
+                                when (strand % 4) {
+                                    0 -> Violet
+                                    1 -> Cyan
+                                    2 -> ElectricBlue
+                                    else -> Color.White
+                                }
                             }
-                        } else {
-                            when (strand % 4) {
-                                0 -> Violet
-                                1 -> Cyan
-                                2 -> ElectricBlue
-                                else -> Color.White
-                            }
-                        }
 
-                        drawLine(
-                            color = color.copy(alpha = alpha),
-                            start = previous,
-                            end = point,
-                            strokeWidth =
-                                (.55f + (strand % 5) * .13f).dp.toPx(),
-                            cap = StrokeCap.Round,
-                        )
-                        previous = point
+                            drawLine(
+                                color = color.copy(
+                                    alpha =
+                                        alpha *
+                                            edgeFade *
+                                            (.08f + .34f * pulse),
+                                ),
+                                start = previous,
+                                end = current,
+                                strokeWidth =
+                                    (.52f + (strand % 5) * .12f).dp.toPx(),
+                                cap = StrokeCap.Round,
+                            )
+                            previous = current
+                        }
                     }
                 }
             }
 
-            // Many curved strands rotate inward from both sides. Unlike v201, the visual is
-            // intentionally a dense bundle, not a few sparse streaks.
-            drawGalaxyBundle(
-                upper = true,
-                clock = upperClock,
-                target = upperSTarget,
-            )
-            drawGalaxyBundle(
-                upper = false,
-                clock = lowerClock,
-                target = lowerSTarget,
-            )
+            // 01: broad streams remain separated around the center.
+            drawBundle(alpha = scene1, convergence = false)
+            // 02: the same visual language curls into a luminous S-shaped convergence.
+            drawBundle(alpha = scene2, convergence = true)
 
-            // A cloud of luminous data points rides the same funnel so the line bundle feels
-            // like a galaxy/data stream rather than a wireframe.
-            val galaxyParticlesPerSide = 72
-            repeat(galaxyParticlesPerSide) { index ->
-                val lane = (index % 36) / 35f
-                val upperRaw =
-                    (upperClock + index * .029f + lane * .11f) % 1f
-                val lowerRaw =
-                    (lowerClock + index * .031f + lane * .13f) % 1f
-                val upperT = smoothStep(upperRaw)
-                val lowerT = smoothStep(lowerRaw)
-                val upperLife = flowEnvelope(upperRaw)
-                val lowerLife = flowEnvelope(lowerRaw)
+            // 03: deterministic code/data fragments assemble into a luminous S silhouette.
+            if (scene3 > .005f) {
+                val assembly =
+                    smoothStep(((p - .48f) / .26f).coerceIn(0f, 1f))
+                val fragmentCount = 184
+                repeat(fragmentCount) { index ->
+                    val u = index / (fragmentCount - 1f)
+                    val segment = when {
+                        u < .34f -> 0
+                        u < .68f -> 1
+                        else -> 2
+                    }
+                    val local = when (segment) {
+                        0 -> u / .34f
+                        1 -> (u - .34f) / .34f
+                        else -> (u - .68f) / .32f
+                    }
 
-                val upperPoint = galaxyPoint(
-                    upper = true,
-                    lane = lane,
-                    t = upperT,
-                    clock = upperClock,
-                    target = upperSTarget,
-                )
-                val lowerPoint = galaxyPoint(
-                    upper = false,
-                    lane = lane,
-                    t = lowerT,
-                    clock = lowerClock,
-                    target = lowerSTarget,
-                )
+                    val targetX = when (segment) {
+                        0 -> cubicBezier(
+                            w * .66f,
+                            w * .47f,
+                            w * .34f,
+                            w * .42f,
+                            local,
+                        )
+                        1 -> cubicBezier(
+                            w * .42f,
+                            w * .36f,
+                            w * .68f,
+                            w * .61f,
+                            local,
+                        )
+                        else -> cubicBezier(
+                            w * .61f,
+                            w * .72f,
+                            w * .52f,
+                            w * .35f,
+                            local,
+                        )
+                    }
+                    val targetY = when (segment) {
+                        0 -> cubicBezier(
+                            h * .36f,
+                            h * .31f,
+                            h * .39f,
+                            h * .45f,
+                            local,
+                        )
+                        1 -> cubicBezier(
+                            h * .45f,
+                            h * .49f,
+                            h * .51f,
+                            h * .56f,
+                            local,
+                        )
+                        else -> cubicBezier(
+                            h * .56f,
+                            h * .61f,
+                            h * .68f,
+                            h * .66f,
+                            local,
+                        )
+                    }
+
+                    val scatterAngle = index * 2.399963f
+                    val scatterRadius =
+                        size.minDimension *
+                            (.08f + (index % 13) / 13f * .27f)
+                    val scatterX =
+                        center.x + kotlin.math.cos(scatterAngle) * scatterRadius
+                    val scatterY =
+                        center.y + sin(scatterAngle) * scatterRadius
+
+                    val thickness =
+                        size.minDimension *
+                            (.012f + (index % 7) * .0024f)
+                    val normalX = kotlin.math.cos(index * 1.73f) * thickness
+                    val normalY = sin(index * 1.91f) * thickness
+
+                    val x =
+                        scatterX * (1f - assembly) +
+                            (targetX + normalX) * assembly
+                    val y =
+                        scatterY * (1f - assembly) +
+                            (targetY + normalY) * assembly
+
+                    val flicker =
+                        .55f +
+                            .45f *
+                                kotlin.math.abs(
+                                    sin(
+                                        upperClock * 2f * PI.toFloat() +
+                                            index * .37f,
+                                    ),
+                                )
+                    val color = when (index % 5) {
+                        0 -> Color.White
+                        1 -> Cyan
+                        2 -> ElectricBlue
+                        3 -> Violet
+                        else -> Blue
+                    }
+
+                    if (index % 3 == 0) {
+                        drawRoundRect(
+                            color = color.copy(
+                                alpha = scene3 * (.30f + .45f * flicker),
+                            ),
+                            topLeft = Offset(x, y),
+                            size = Size(
+                                width = (2.6f + (index % 4) * .9f).dp.toPx(),
+                                height = (2.6f + (index % 3) * .8f).dp.toPx(),
+                            ),
+                            cornerRadius = CornerRadius(
+                                1.2.dp.toPx(),
+                                1.2.dp.toPx(),
+                            ),
+                        )
+                    } else {
+                        drawCircle(
+                            color = color.copy(
+                                alpha = scene3 * (.24f + .48f * flicker),
+                            ),
+                            radius = (.9f + (index % 4) * .38f).dp.toPx(),
+                            center = Offset(x, y),
+                        )
+                    }
+                }
 
                 drawCircle(
-                    color = when (index % 3) {
-                        0 -> Cyan.copy(alpha = .62f * upperLife)
-                        1 -> ElectricBlue.copy(alpha = .50f * upperLife)
-                        else -> Color.White.copy(alpha = .34f * upperLife)
-                    },
-                    radius = (.8f + (index % 4) * .34f).dp.toPx(),
-                    center = upperPoint,
-                )
-                drawCircle(
-                    color = when (index % 3) {
-                        0 -> Violet.copy(alpha = .60f * lowerLife)
-                        1 -> Cyan.copy(alpha = .48f * lowerLife)
-                        else -> ElectricBlue.copy(alpha = .36f * lowerLife)
-                    },
-                    radius = (.8f + ((index + 2) % 4) * .34f).dp.toPx(),
-                    center = lowerPoint,
+                    brush = Brush.radialGradient(
+                        listOf(
+                            Cyan.copy(alpha = .22f * scene3),
+                            Violet.copy(alpha = .13f * scene3),
+                            Color.Transparent,
+                        ),
+                        center = center,
+                        radius = size.minDimension * .34f,
+                    ),
+                    radius = size.minDimension * .30f,
+                    center = center,
                 )
             }
 
-            // Endpoint glows are tiny and local to the actual S ends. There is deliberately no
-            // long central filament or direct line that can look sliced/cut.
-            drawCircle(
-                color = Cyan.copy(alpha = .18f + .24f * logoAlpha),
-                radius = 5.5.dp.toPx(),
-                center = upperSTarget,
-            )
-            drawCircle(
-                color = Violet.copy(alpha = .16f + .22f * logoAlpha),
-                radius = 5.5.dp.toPx(),
-                center = lowerSTarget,
-            )
-
-            val glow = (.28f + .55f * logoAlpha).coerceIn(0f, .86f)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        Cyan.copy(alpha = glow * .46f),
-                        Blue.copy(alpha = glow * .28f),
-                        Violet.copy(alpha = glow * .18f),
-                        Color.Transparent,
+            // 04: final halo and lower-stage light under the real logo.
+            if (scene4 > .005f) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        listOf(
+                            Cyan.copy(alpha = .28f * scene4),
+                            Blue.copy(alpha = .18f * scene4),
+                            Violet.copy(alpha = .12f * scene4),
+                            Color.Transparent,
+                        ),
+                        center = Offset(w * .5f, h * .49f),
+                        radius = size.minDimension * .44f,
                     ),
-                    center = logoCenter,
-                    radius = size.minDimension * .35f,
-                ),
-                radius = size.minDimension * .28f,
-                center = logoCenter,
-            )
+                    radius = size.minDimension * .40f,
+                    center = Offset(w * .5f, h * .49f),
+                )
+                drawOval(
+                    brush = Brush.radialGradient(
+                        listOf(
+                            Cyan.copy(alpha = .46f * scene4),
+                            Blue.copy(alpha = .18f * scene4),
+                            Color.Transparent,
+                        ),
+                        center = Offset(w * .5f, h * .735f),
+                        radius = w * .30f,
+                    ),
+                    topLeft = Offset(w * .23f, h * .715f),
+                    size = Size(w * .54f, h * .045f),
+                )
+            }
         }
 
-        if (motion && particleFade > .01f) {
+        // Code glyphs travel with scenes 01/02, then peel into the scene-03 S formation.
+        if (motion && p < .86f) {
+            val convergeBlend =
+                smoothStep(((p - .17f) / .34f).coerceIn(0f, 1f))
+            val formationBlend =
+                smoothStep(((p - .49f) / .25f).coerceIn(0f, 1f))
+            val streamAlpha =
+                kotlin.math.max(scene1, scene2) *
+                    (1f - smoothStep(((p - .58f) / .17f).coerceIn(0f, 1f)))
+
             BrandCodeParticles.forEachIndexed { index, particle ->
-                val lane = particle.lane
-                val sourceClock = if (particle.upper) upperClock else lowerClock
-                val rawPhase = if (motion) {
+                val clock = if (particle.upper) upperClock else lowerClock
+                val rawPhase =
                     (
-                        sourceClock +
-                            index * .071f +
-                            lane * .137f +
+                        clock +
+                            index * .057f +
+                            particle.lane * .129f +
                             particle.delay
                         ) % 1f
-                } else {
-                    .58f
-                }
-                val localProgress = smoothStep(rawPhase)
-                val particleAlpha = flowEnvelope(rawPhase)
-                val taper = (1f - localProgress) * (1f - localProgress)
-                val angle =
-                    rawPhase * 2f * PI.toFloat() +
-                        index * if (particle.upper) .73f else .79f
-                val laneOffset = lane * 2f - 1f
+                val t = smoothStep(rawPhase)
+                val life = flowEnvelope(rawPhase)
+                val lane = particle.lane
+                val laneSigned = lane * 2f - 1f
 
-                val startX = if (particle.upper) {
-                    .82f + .18f * lane
+                val edgeX = if (particle.upper) {
+                    cubicBezier(1.08f, .92f, .73f, .57f, t)
                 } else {
-                    -.01f + .18f * lane
+                    cubicBezier(-.08f, .08f, .27f, .43f, t)
                 }
-                val startY = if (particle.upper) {
-                    .045f + .20f * lane
+                val edgeY = if (particle.upper) {
+                    cubicBezier(
+                        .14f + .19f * lane,
+                        .17f + .15f * lane,
+                        .31f + .10f * lane,
+                        .43f,
+                        t,
+                    )
                 } else {
-                    .73f + .18f * lane
-                }
-                val control1X = if (particle.upper) .91f else .11f
-                val control1Y = if (particle.upper) {
-                    .10f + .09f * lane
-                } else {
-                    .78f - .08f * lane
-                }
-                val control2X = if (particle.upper) .66f else .36f
-                val control2Y = if (particle.upper) {
-                    .31f + .04f * lane
-                } else {
-                    .60f - .045f * lane
+                    cubicBezier(
+                        .67f + .19f * lane,
+                        .74f - .12f * lane,
+                        .67f - .10f * lane,
+                        .57f,
+                        t,
+                    )
                 }
 
-                val endpointX =
-                    if (particle.upper) {
-                        .50f + 34.dp.value / maxWidth.value
-                    } else {
-                        .50f - 34.dp.value / maxWidth.value
-                    }
-                val endpointY =
-                    if (particle.upper) {
-                        .445f - 36.dp.value / maxHeight.value
-                    } else {
-                        .445f + 36.dp.value / maxHeight.value
-                    }
+                val convX = if (particle.upper) {
+                    cubicBezier(1.06f, .82f, .37f, .505f, t)
+                } else {
+                    cubicBezier(-.06f, .18f, .63f, .495f, t)
+                }
+                val convY = if (particle.upper) {
+                    cubicBezier(
+                        .16f + .15f * lane,
+                        .19f + .11f * lane,
+                        .40f - .04f * lane,
+                        .477f,
+                        t,
+                    )
+                } else {
+                    cubicBezier(
+                        .69f + .15f * lane,
+                        .73f - .11f * lane,
+                        .56f + .04f * lane,
+                        .483f,
+                        t,
+                    )
+                }
 
-                // Code collapses to the same two visible S endpoints as the curved line bundles.
-                val x = cubicBezier(
-                    startX,
-                    control1X,
-                    control2X,
-                    endpointX,
-                    localProgress,
-                ) +
-                    sin(angle) * .022f * taper +
-                    laneOffset * .012f * taper
-                val y = cubicBezier(
-                    startY,
-                    control1Y,
-                    control2Y,
-                    endpointY,
-                    localProgress,
-                ) +
-                    kotlin.math.cos(angle) * .013f * taper +
-                    laneOffset * .017f * taper
+                val streamX =
+                    edgeX * (1f - convergeBlend) + convX * convergeBlend
+                val streamY =
+                    edgeY * (1f - convergeBlend) + convY * convergeBlend
+
+                val formationU = index / (BrandCodeParticles.size - 1f)
+                val formationSegment = when {
+                    formationU < .34f -> 0
+                    formationU < .68f -> 1
+                    else -> 2
+                }
+                val formationLocal = when (formationSegment) {
+                    0 -> formationU / .34f
+                    1 -> (formationU - .34f) / .34f
+                    else -> (formationU - .68f) / .32f
+                }
+                val formX = when (formationSegment) {
+                    0 -> cubicBezier(.66f, .47f, .34f, .42f, formationLocal)
+                    1 -> cubicBezier(.42f, .36f, .68f, .61f, formationLocal)
+                    else -> cubicBezier(.61f, .72f, .52f, .35f, formationLocal)
+                } +
+                    kotlin.math.cos(index * 1.61f) *
+                        (.018f + (index % 5) * .002f)
+                val formY = when (formationSegment) {
+                    0 -> cubicBezier(.36f, .31f, .39f, .45f, formationLocal)
+                    1 -> cubicBezier(.45f, .49f, .51f, .56f, formationLocal)
+                    else -> cubicBezier(.56f, .61f, .68f, .66f, formationLocal)
+                } +
+                    sin(index * 1.91f) *
+                        (.012f + (index % 4) * .002f)
+
+                val x =
+                    streamX * (1f - formationBlend) +
+                        formX * formationBlend
+                val y =
+                    streamY * (1f - formationBlend) +
+                        formY * formationBlend
+
+                val streamOrbit =
+                    (1f - t) *
+                        (
+                            kotlin.math.cos(
+                                rawPhase * 2f * PI.toFloat() + index * .51f,
+                            ) *
+                                .010f +
+                                laneSigned * .006f
+                            )
+                val displayX = x + streamOrbit * (1f - formationBlend)
 
                 Text(
                     text = particle.text,
-                    color = when (index % 3) {
-                        0 -> Cyan
-                        1 -> ElectricBlue
+                    color = when (index % 4) {
+                        0 -> Color.White
+                        1 -> Cyan
+                        2 -> ElectricBlue
                         else -> Violet
                     },
                     fontSize = when {
-                        particle.text.length >= 4 -> 8.sp
-                        particle.text.length == 3 -> 9.sp
-                        else -> 11.sp
+                        particle.text.length >= 4 -> 7.sp
+                        particle.text.length == 3 -> 8.sp
+                        else -> 10.sp
                     },
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .offset(
-                            x = maxWidth * x - 16.dp,
-                            y = maxHeight * y - 8.dp,
+                            x = maxWidth * displayX - 15.dp,
+                            y = maxHeight * y - 7.dp,
                         )
                         .alpha(
-                            particleFade *
-                                particleAlpha *
-                                (.34f + .66f * localProgress),
+                            (
+                                streamAlpha * life * (1f - formationBlend) +
+                                    scene3 * formationBlend * .88f
+                                ).coerceIn(0f, 1f),
                         )
                         .graphicsLayer {
-                            // Code becomes slightly smaller as it is absorbed by the logo.
                             val scale =
-                                .94f - .12f * localProgress
+                                1f - .14f * formationBlend
                             scaleX = scale
                             scaleY = scale
                         },
@@ -667,105 +867,280 @@ private fun BrandLaunchScene(
             }
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset(y = (-24).dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(
-                modifier = Modifier.size(168.dp),
-                contentAlignment = Alignment.Center,
+        // Scene 03 gets a faint ribbon silhouette so fragments read as an S before the real
+        // app logo appears. It is transitional only; the final mark remains the actual asset.
+        if (scene3 > .01f) {
+            SiftRibbonMark(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(y = 6.dp)
+                    .size(236.dp)
+                    .alpha(scene3 * .22f),
+                reveal = smoothStep(((p - .52f) / .20f).coerceIn(0f, 1f)),
+            )
+        }
+
+        // Scene 04 uses only the actual application logo asset.
+        if (scene4 > .005f) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(y = 18.dp)
+                    .alpha(scene4),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Canvas(Modifier.fillMaxSize()) {
-                    drawCircle(
-                        color = Cyan.copy(alpha = .12f + .18f * logoAlpha),
-                        radius = size.minDimension * .49f,
-                        center = center,
-                        style = Stroke(1.2.dp.toPx()),
-                    )
-                    drawCircle(
-                        color = Violet.copy(alpha = .08f + .13f * logoAlpha),
-                        radius = size.minDimension * .44f,
-                        center = center,
-                        style = Stroke(.8.dp.toPx()),
+                Box(
+                    modifier = Modifier.size(244.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        drawCircle(
+                            color = Cyan.copy(alpha = .22f * scene4),
+                            radius = size.minDimension * .50f,
+                            center = center,
+                            style = Stroke(1.3.dp.toPx()),
+                        )
+                        drawCircle(
+                            color = Violet.copy(alpha = .13f * scene4),
+                            radius = size.minDimension * .44f,
+                            center = center,
+                            style = Stroke(.8.dp.toPx()),
+                        )
+                    }
+                    OriginalLogoMark(
+                        modifier = Modifier
+                            .size(204.dp)
+                            .graphicsLayer {
+                                val scale =
+                                    .90f + .10f * scene4
+                                scaleX = scale
+                                scaleY = scale
+                            },
+                        alpha = scene4,
                     )
                 }
-                OriginalLogoMark(
-                    modifier = Modifier
-                        .size(128.dp)
-                        .graphicsLayer {
-                            val scale = .92f + .08f * logoAlpha
-                            scaleX = scale
-                            scaleY = scale
-                        },
-                    alpha = logoAlpha,
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = buildAnnotatedString {
+                        append("SiftAlpha ")
+                        pushStyle(SpanStyle(color = Cyan))
+                        append("X")
+                        pop()
+                    },
+                    color = TextPrimary,
+                    fontSize = 38.sp,
+                    lineHeight = 44.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                Spacer(Modifier.height(15.dp))
+                Text(
+                    text = "INTELLIGENCE\nIN MOTION",
+                    color = Muted,
+                    fontSize = 12.sp,
+                    lineHeight = 19.sp,
+                    letterSpacing = 4.6.sp,
+                    textAlign = TextAlign.Center,
                 )
             }
-
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = stringResource(R.string.app_name),
-                color = TextPrimary,
-                fontSize = 36.sp,
-                lineHeight = 42.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.alpha(textAlpha),
-            )
-            Spacer(Modifier.height(13.dp))
-            Text(
-                text = stringResource(R.string.brand_tagline_primary),
-                color = TextPrimary,
-                fontSize = 17.sp,
-                lineHeight = 25.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.alpha(textAlpha),
-            )
-            Spacer(Modifier.height(7.dp))
-            Text(
-                text = stringResource(R.string.brand_tagline_secondary),
-                color = Muted,
-                fontSize = 12.sp,
-                letterSpacing = 1.4.sp,
-                modifier = Modifier.alpha(textAlpha),
-            )
         }
 
+        BrandLaunchChrome(
+            scene1 = scene1,
+            scene2 = scene2,
+            scene3 = scene3,
+            scene4 = scene4,
+        )
+    }
+}
+
+@Composable
+private fun BrandLaunchChrome(
+    scene1: Float,
+    scene2: Float,
+    scene3: Float,
+    scene4: Float,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(horizontal = 24.dp),
+    ) {
         Column(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 34.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .align(Alignment.TopStart)
+                .padding(top = 18.dp),
         ) {
-            Canvas(
-                modifier = Modifier.size(width = 180.dp, height = 8.dp),
-            ) {
-                val y = size.height / 2f
-                drawLine(
-                    color = Blue.copy(alpha = .45f),
-                    start = Offset(0f, y),
-                    end = Offset(size.width, y),
-                    strokeWidth = 1.dp.toPx(),
-                )
-                drawLine(
-                    brush = Brush.horizontalGradient(
-                        listOf(Cyan, ElectricBlue, Violet),
-                    ),
-                    start = Offset(size.width * .35f, y),
-                    end = Offset(size.width * .65f, y),
-                    strokeWidth = 2.dp.toPx(),
-                    cap = StrokeCap.Round,
-                )
-            }
-            Spacer(Modifier.height(7.dp))
             Text(
-                text = "INTELLIGENCE IN MOTION",
-                color = MutedDeep,
-                fontSize = 9.sp,
-                letterSpacing = 2.4.sp,
-                modifier = Modifier.alpha(textAlpha),
+                text = buildAnnotatedString {
+                    append("SiftAlpha ")
+                    pushStyle(SpanStyle(color = Cyan))
+                    append("X")
+                    pop()
+                },
+                color = TextPrimary,
+                fontSize = 32.sp,
+                lineHeight = 38.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "FROM CODE TO POSSIBILITY",
+                color = Color(0xFFA6A8E8),
+                fontSize = 10.sp,
+                letterSpacing = 4.3.sp,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Intelligence Converges. A Smarter Tomorrow.",
+                color = Muted,
+                fontSize = 10.sp,
+                letterSpacing = .2.sp,
             )
         }
+
+        BrandPhaseHeader(
+            number = "01",
+            title = stringResource(R.string.brand_launch_phase_1_title),
+            english = "FROM THE EDGES",
+            alpha = scene1,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(top = 122.dp),
+        )
+        BrandPhaseHeader(
+            number = "02",
+            title = stringResource(R.string.brand_launch_phase_2_title),
+            english = "FLOW TOGETHER",
+            alpha = scene2,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(top = 122.dp),
+        )
+        BrandPhaseHeader(
+            number = "03",
+            title = stringResource(R.string.brand_launch_phase_3_title),
+            english = "SHAPE THE FUTURE",
+            alpha = scene3,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(top = 122.dp),
+        )
+        BrandPhaseHeader(
+            number = "04",
+            title = stringResource(R.string.brand_launch_phase_4_title),
+            english = "READY FOR WHAT'S NEXT",
+            alpha = scene4,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(top = 122.dp),
+        )
+
+        BrandPhaseCaption(
+            main = stringResource(R.string.brand_launch_phase_1_caption),
+            english = "CODE FLOWS IN FROM BOTH SIDES",
+            alpha = scene1,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+        BrandPhaseCaption(
+            main = stringResource(R.string.brand_launch_phase_2_caption),
+            english = "FRAGMENTS TRAVEL AND CONVERGE",
+            alpha = scene2,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+        BrandPhaseCaption(
+            main = stringResource(R.string.brand_launch_phase_3_caption),
+            english = "FRAGMENTS ASSEMBLE INTO A HIGHER INTELLIGENCE",
+            alpha = scene3,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+        BrandPhaseCaption(
+            main = stringResource(R.string.brand_launch_phase_4_caption),
+            english = "THE LOGO EMERGES. A BRIGHTER TOMORROW BEGINS",
+            alpha = scene4,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
+}
+
+@Composable
+private fun BrandPhaseHeader(
+    number: String,
+    title: String,
+    english: String,
+    alpha: Float,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.alpha(alpha),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = number,
+            color = Blue,
+            fontSize = 29.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.width(12.dp))
+        Surface(
+            modifier = Modifier.size(width = 1.dp, height = 33.dp),
+            color = Color(0xFF7789C2).copy(alpha = .65f),
+        ) {}
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = title,
+            color = TextPrimary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = "·",
+            color = Muted,
+            fontSize = 13.sp,
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = english,
+            color = Color(0xFFA6A8E8),
+            fontSize = 9.sp,
+            letterSpacing = 2.4.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun BrandPhaseCaption(
+    main: String,
+    english: String,
+    alpha: Float,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = 20.dp)
+            .alpha(alpha),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = main,
+            color = TextPrimary,
+            fontSize = 13.sp,
+            lineHeight = 19.sp,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(7.dp))
+        Text(
+            text = english,
+            color = Color(0xFFA6A8E8),
+            fontSize = 8.sp,
+            lineHeight = 12.sp,
+            letterSpacing = 2.1.sp,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

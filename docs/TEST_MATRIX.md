@@ -1486,3 +1486,23 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Logo/layout/text/timing | unchanged | PASS REQUIRED |
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v203 — Four-scene approved launch storyboard
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Scope | launch presentation only | PASS REQUIRED |
+| 01 Start | broad two-sided code/data flow, open center | PASS REQUIRED |
+| 02 Converge | dense curved S-like convergence | PASS REQUIRED |
+| 03 Form | fragment field visibly assembles into S | PASS REQUIRED |
+| 04 Complete | actual app logo revealed, not substituted | PASS REQUIRED |
+| Header | phase number + localized title + English microcopy | PASS REQUIRED |
+| Bottom copy | localized caption + English microcopy | PASS REQUIRED |
+| Brand header | SiftAlpha X + FROM CODE TO POSSIBILITY | PASS REQUIRED |
+| Final wordmark | SiftAlpha X + INTELLIGENCE IN MOTION | PASS REQUIRED |
+| Launch timing | approximately 5 seconds incl. exit | PASS REQUIRED |
+| Reduced motion | no continuous decorative animation | PASS REQUIRED |
+| Localization keys | identical across 5 locales | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |
