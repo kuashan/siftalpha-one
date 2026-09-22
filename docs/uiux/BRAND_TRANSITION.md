@@ -185,3 +185,13 @@ Current authority:
 - do not use a generic particle cloud or unrelated intermediate object;
 - the code-built state uses the final logo geometry itself: rounded-square shell + thick S ribbon + >_;
 - only after that code-built logo is readable may the real launcher logo resolve in place.
+
+
+## R48-D3 v209 Override — Pure code-S intermediate
+
+The intermediate formation must match the approved reference:
+- code converges directly into a dense S made from code characters;
+- no rounded-square shell in the code-built stage;
+- no >_ terminal in the code-built stage;
+- no generic cloud/blob around the S;
+- the code-S must remain visually readable before the real launcher logo resolves in place.

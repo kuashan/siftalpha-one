@@ -1379,3 +1379,12 @@ The required intermediate launch state is now explicitly:
 
 A generic code/particle blob is not an acceptable intermediate state.
 The R48-D2 baseline remains untouched.
+
+
+## 2026-09-22 · R48-D3 v209 launch authority
+
+Required launch chain:
+**incoming code -> clean code-built S -> real app logo**.
+
+The code-built intermediate is the S only, matching the approved reference image. No shell/terminal/cloud is allowed before the real logo.
+R48-D2 remains untouched.

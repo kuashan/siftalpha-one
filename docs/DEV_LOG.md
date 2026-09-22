@@ -2946,3 +2946,26 @@ v208 fixes only that launch-formation presentation:
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `208`.
+
+
+## 2026-09-22 · R48-D3 v209 pure code-S intermediate
+
+Real-device feedback on v208:
+- the convergence still did not read like the approved reference;
+- the first settled state must be a clean **S made from code**, not a full code-shell/logo composition and not a code blob;
+- only after that code-S is clearly visible should the real app logo appear.
+
+v209 changes only the launch formation target:
+- removes rounded-square shell from the code-built intermediate;
+- removes code-built `>_` terminal from the intermediate;
+- removes all code-stage halo/cloud effects that could blur the silhouette;
+- increases visible code population to 252;
+- lays all settled glyphs into a deterministic **9-band thick S ribbon**;
+- upper S region is cyan/white, waist is cyan/blue/violet, lower S region is blue/violet;
+- incoming code tokens physically travel into their exact S slots;
+- the fully formed code-S is held clearly before the real logo begins resolving;
+- final real app logo, final copy, background, and R48-D2 functionality remain unchanged.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `209`.

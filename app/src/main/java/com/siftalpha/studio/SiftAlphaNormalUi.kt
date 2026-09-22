@@ -190,13 +190,13 @@ private data class BrandCodeParticle(
     val delay: Float,
 )
 
-private val BrandCodeParticles = List(216) { index ->
-    val upper = index < 108
-    val local = if (upper) index else index - 108
+private val BrandCodeParticles = List(252) { index ->
+    val upper = index < 126
+    val local = if (upper) index else index - 126
     BrandCodeParticle(
         text = BrandCodeLexicon[index % BrandCodeLexicon.size],
         upper = upper,
-        lane = local / 107f,
+        lane = local / 125f,
         delay = (local % 18) * .006f + if (upper) 0f else .015f,
     )
 }
@@ -257,24 +257,24 @@ private fun SiftAlphaLaunchMotion(
     val inflowAlpha =
         1f -
             smoothStep(
-                ((p - .42f) / .24f).coerceIn(0f, 1f),
+                ((p - .38f) / .22f).coerceIn(0f, 1f),
             )
     val logoBuild =
         smoothStep(
-            ((p - .24f) / .46f).coerceIn(0f, 1f),
+            ((p - .20f) / .42f).coerceIn(0f, 1f),
         )
     val codeLogoAlpha =
         logoBuild *
             (
                 1f -
                     smoothStep(
-                        ((p - .86f) / .12f).coerceIn(0f, 1f),
+                        ((p - .88f) / .10f).coerceIn(0f, 1f),
                     )
                 )
     val realLogoAlpha =
         if (motion) {
             smoothStep(
-                ((p - .80f) / .16f).coerceIn(0f, 1f),
+                ((p - .84f) / .13f).coerceIn(0f, 1f),
             )
         } else {
             1f
@@ -446,132 +446,66 @@ private fun SiftAlphaLaunchMotion(
             }
         }
 
-        fun logoGlyphTarget(index: Int, total: Int): Offset {
-            val borderCount = 52
-            val terminalCount = 24
-            val sCount = (total - borderCount - terminalCount).coerceAtLeast(1)
-            return when {
-                index < borderCount -> {
-                    // Evenly spaced code glyphs create a clean rounded-square shell.
-                    roundedSquarePoint(
-                        index.toFloat() / borderCount.toFloat(),
-                    )
-                }
-                index < borderCount + sCount -> {
-                    // A true thick ribbon: glyph rows are placed across the normal of the S curve,
-                    // so the code itself reads as the S rather than as a noisy cloud.
-                    val local = index - borderCount
-                    val bands = 7
-                    val sampleIndex = local / bands
-                    val bandIndex = local % bands
-                    val sampleCount =
-                        ((sCount + bands - 1) / bands).coerceAtLeast(2)
-                    val u =
-                        (
-                            sampleIndex.toFloat() /
-                                (sampleCount - 1).toFloat()
-                            ).coerceIn(0f, 1f)
-                    val epsilon = .006f
-                    val prev = codeSPoint((u - epsilon).coerceAtLeast(0f))
-                    val next = codeSPoint((u + epsilon).coerceAtMost(1f))
-                    val tx = next.x - prev.x
-                    val ty = next.y - prev.y
-                    val length =
-                        kotlin.math.sqrt(tx * tx + ty * ty)
-                            .coerceAtLeast(.0001f)
-                    val nx = -ty / length
-                    val ny = tx / length
-                    val band =
-                        (bandIndex - (bands - 1) / 2f) /
-                            ((bands - 1) / 2f)
-                    val ribbonHalfWidth =
-                        logoHalfW *
-                            (
-                                .18f -
-                                    .035f *
-                                        kotlin.math.abs(u * 2f - 1f)
-                                )
-                    Offset(
-                        codeSPoint(u).x + nx * band * ribbonHalfWidth,
-                        codeSPoint(u).y + ny * band * ribbonHalfWidth,
-                    )
-                }
-                else -> {
-                    // Explicit >_ terminal geometry, also made from code glyphs.
-                    val local = index - borderCount - sCount
-                    when {
-                        local < 8 -> {
-                            val q = local / 7f
-                            Offset(
-                                mixFloat(
-                                    cx - logoHalfW * .20f,
-                                    cx + logoHalfW * .02f,
-                                    q,
-                                ),
-                                mixFloat(
-                                    cy - logoHalfH * .15f,
-                                    cy,
-                                    q,
-                                ),
-                            )
-                        }
-                        local < 16 -> {
-                            val q = (local - 8) / 7f
-                            Offset(
-                                mixFloat(
-                                    cx - logoHalfW * .20f,
-                                    cx + logoHalfW * .02f,
-                                    q,
-                                ),
-                                mixFloat(
-                                    cy + logoHalfH * .15f,
-                                    cy,
-                                    q,
-                                ),
-                            )
-                        }
-                        else -> {
-                            val q = (local - 16) / 7f
-                            Offset(
-                                mixFloat(
-                                    cx + logoHalfW * .08f,
-                                    cx + logoHalfW * .34f,
-                                    q,
-                                ),
-                                cy + logoHalfH * .16f,
-                            )
-                        }
-                    }
-                }
-            }
+        fun codeLogoTarget(index: Int, total: Int): Offset {
+            // The intermediate object is ONLY the S itself, built from real code glyphs.
+            // No rounded-square shell, no >_ terminal, no random fragment cloud.
+            // A 9-band lattice across the S normal gives the dense, readable code-built S
+            // seen in the approved reference image.
+            val bands = 9
+            val sampleIndex = index / bands
+            val bandIndex = index % bands
+            val sampleCount =
+                ((total + bands - 1) / bands).coerceAtLeast(2)
+            val u =
+                (
+                    sampleIndex.toFloat() /
+                        (sampleCount - 1).toFloat()
+                    ).coerceIn(0f, 1f)
+
+            val epsilon = .0045f
+            val base = codeSPoint(u)
+            val prev = codeSPoint((u - epsilon).coerceAtLeast(0f))
+            val next = codeSPoint((u + epsilon).coerceAtMost(1f))
+            val tx = next.x - prev.x
+            val ty = next.y - prev.y
+            val length =
+                kotlin.math.sqrt(tx * tx + ty * ty)
+                    .coerceAtLeast(.0001f)
+            val nx = -ty / length
+            val ny = tx / length
+            val band =
+                (bandIndex - (bands - 1) / 2f) /
+                    ((bands - 1) / 2f)
+
+            // Slightly thicker upper/lower lobes, tighter waist — matching the reference S.
+            val waist =
+                kotlin.math.abs(u - .50f) * 2f
+            val ribbonHalfWidth =
+                logoHalfW *
+                    (.215f - .055f * (1f - waist))
+
+            // Tiny deterministic jitter prevents a sterile grid while preserving the S silhouette.
+            val jitter =
+                logoHalfW * .012f
+            val jx = kotlin.math.cos(index * 1.73f) * jitter
+            val jy = sin(index * 2.11f) * jitter * .72f
+
+            return Offset(
+                base.x + nx * band * ribbonHalfWidth + jx,
+                base.y + ny * band * ribbonHalfWidth + jy,
+            )
         }
 
-        fun logoGlyphText(index: Int, total: Int, fallback: String): String {
-            val borderCount = 52
-            val terminalCount = 24
-            val sCount = (total - borderCount - terminalCount).coerceAtLeast(1)
-            val local = index - borderCount - sCount
-            return when {
-                local in 0..15 -> ">"
-                local in 16..23 -> "_"
-                else -> fallback
+        fun codeLogoColor(target: Offset, index: Int): Color =
+            when {
+                target.y < cy - logoHalfH * .18f ->
+                    if (index % 4 == 0) Color.White else Cyan
+                target.y > cy + logoHalfH * .18f ->
+                    if (index % 5 == 0) ElectricBlue else Violet
+                index % 3 == 0 -> Cyan
+                index % 3 == 1 -> ElectricBlue
+                else -> Violet
             }
-        }
-
-        fun logoGlyphColor(index: Int, total: Int, target: Offset): Color {
-            val borderCount = 52
-            val terminalCount = 24
-            val sCount = (total - borderCount - terminalCount).coerceAtLeast(1)
-            return when {
-                index < borderCount ->
-                    if (index < borderCount / 2) Cyan else Violet
-                index >= borderCount + sCount -> Color.White
-                target.y < cy - logoHalfH * .10f -> Cyan
-                target.y > cy + logoHalfH * .10f -> Violet
-                index % 2 == 0 -> ElectricBlue
-                else -> Blue
-            }
-        }
 
         fun inflowPoint(
             upper: Boolean,
@@ -672,7 +606,7 @@ private fun SiftAlphaLaunchMotion(
                     val clock = if (upper) upperClock else lowerClock
                     repeat(strandsPerSide) { strand ->
                         val lane = strand / (strandsPerSide - 1f)
-                        val target = logoGlyphTarget(
+                        val target = codeLogoTarget(
                             strand + side * strandsPerSide,
                             strandsPerSide * 2,
                         )
@@ -755,7 +689,7 @@ private fun SiftAlphaLaunchMotion(
                     val raw =
                         (clock + index * .024f + lane * .11f) % 1f
                     val t = smoothStep(raw)
-                    val target = logoGlyphTarget(index, particleCount)
+                    val target = codeLogoTarget(index, particleCount)
                     val n = inflowPoint(
                         upper,
                         lane,
@@ -779,23 +713,8 @@ private fun SiftAlphaLaunchMotion(
                 }
             }
 
-            // The code-logo silhouette is defined by the Text glyphs below.
-            // Canvas contributes only a subtle halo, never a noisy intermediate object.
-            if (codeLogoAlpha > .004f) {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        listOf(
-                            Cyan.copy(alpha = .10f * codeLogoAlpha),
-                            Violet.copy(alpha = .07f * codeLogoAlpha),
-                            Color.Transparent,
-                        ),
-                        center = center,
-                        radius = size.minDimension * .24f,
-                    ),
-                    radius = size.minDimension * .22f,
-                    center = center,
-                )
-            }
+            // Intentionally no code-stage halo/cloud: the intermediate shape must read
+            // as a clean S made from code, not as a glowing blob.
 
             if (realLogoAlpha > .004f) {
                 val pulse = .72f + .28f * breathe
@@ -826,19 +745,13 @@ private fun SiftAlphaLaunchMotion(
                 val raw =
                     (
                         clock +
-                            index * .057f +
-                            lane * .127f +
+                            index * .053f +
+                            lane * .123f +
                             particle.delay
                         ) % 1f
                 val t = smoothStep(raw)
                 val life = flowEnvelope(raw)
-                val target = logoGlyphTarget(index, BrandCodeParticles.size)
-                val displayedText =
-                    logoGlyphText(
-                        index,
-                        BrandCodeParticles.size,
-                        particle.text,
-                    )
+                val target = codeLogoTarget(index, BrandCodeParticles.size)
                 val stream = inflowPoint(
                     particle.upper,
                     lane,
@@ -847,9 +760,10 @@ private fun SiftAlphaLaunchMotion(
                     target,
                 )
 
+                // Spatial continuity: each code token physically travels into its final S slot.
                 val morph =
                     smoothStep(
-                        ((p - .27f) / .42f)
+                        ((p - .22f) / .42f)
                             .coerceIn(0f, 1f),
                     )
                 val x =
@@ -858,41 +772,44 @@ private fun SiftAlphaLaunchMotion(
                 val y =
                     stream.y * (1f - morph) +
                         target.y * morph
+
+                // Once the S is built, glyphs stay crisp and fully readable before real-logo reveal.
+                val settledAlpha =
+                    .92f +
+                        .08f *
+                            kotlin.math.abs(
+                                sin(
+                                    lowerClock * 2f * PI.toFloat() +
+                                        index * .23f,
+                                ),
+                            )
                 val alpha =
                     (
                         inflowAlpha * life * (1f - morph) +
-                            codeLogoAlpha *
-                                morph *
-                                (.88f + .12f * life)
+                            codeLogoAlpha * morph * settledAlpha
                         ).coerceIn(0f, 1f)
 
                 Text(
-                    text = displayedText,
-                    color =
-                        logoGlyphColor(
-                            index,
-                            BrandCodeParticles.size,
-                            target,
-                        ),
+                    text = particle.text,
+                    color = codeLogoColor(target, index),
                     fontSize =
                         when {
-                            displayedText == ">" || displayedText == "_" -> 9.sp
-                            displayedText.length >= 4 -> 6.5.sp
-                            displayedText.length == 3 -> 7.5.sp
-                            else -> 8.5.sp
+                            particle.text.length >= 4 -> 6.2.sp
+                            particle.text.length == 3 -> 7.2.sp
+                            else -> 8.2.sp
                         },
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .offset(
-                            x = maxWidth * x - 16.dp,
-                            y = maxHeight * y - 8.dp,
+                            x = maxWidth * x - 14.dp,
+                            y = maxHeight * y - 7.dp,
                         )
                         .alpha(alpha)
                         .graphicsLayer {
                             val scale =
                                 .98f -
-                                    .16f * morph -
-                                    .10f * realLogoAlpha
+                                    .08f * morph -
+                                    .08f * realLogoAlpha
                             scaleX = scale
                             scaleY = scale
                         },

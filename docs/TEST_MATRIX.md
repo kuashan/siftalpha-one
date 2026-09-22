@@ -1590,3 +1590,20 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Real logo asset | unchanged | PASS REQUIRED |
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v209 — Pure code-S -> real logo
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Intermediate object | clean S made from code | PASS REQUIRED |
+| Rounded-square code shell | absent | PASS REQUIRED |
+| Code terminal >_ | absent in intermediate | PASS REQUIRED |
+| Particle/cloud blob | absent | PASS REQUIRED |
+| Code glyph count | 252 | PASS REQUIRED |
+| S lattice | 9-band thick ribbon | PASS REQUIRED |
+| Inflow continuity | glyphs travel directly into S slots | PASS REQUIRED |
+| Code-S hold | clearly visible before real-logo reveal | PASS REQUIRED |
+| Real logo asset | unchanged | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |

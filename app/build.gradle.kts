@@ -128,7 +128,10 @@ android {
         // v208 removes the noisy particle-cloud intermediate and makes the first settled form readable
         // as a true code-built logo: 216 code glyphs are laid out deterministically on the rounded-square
         // shell, seven-row S ribbon, and explicit >_ terminal before morphing into the real logo asset.
-        versionCode = 208
+        // v209 follows the real-device correction: the intermediate state is ONLY a dense code-built S,
+        // matching the approved reference image. No shell, no terminal, no particle cloud. Incoming code
+        // converges into a 9-band S glyph lattice, holds clearly, then the unchanged real app logo resolves.
+        versionCode = 209
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
