@@ -1333,3 +1333,30 @@ R48-0C is cloud-verified but not yet an accepted/frozen baseline.
 | APK（安装包） | r48d2 / versionCode 192 | PASS — cloud artifact |
 | Real-device acceptance（真机验收） | reminder routing + indicator lifecycle | PENDING |
 
+
+
+### R48-D2 UI Baseline Parity Gate（R48-D2 界面基线等价门禁）
+
+This gate is mandatory for every post-R48-D2 Normal Mode UI APK.
+
+| Area | Required parity with R48-D2 | Result |
+| --- | --- | --- |
+| Baseline immutability（基线不可变） | `baseline/r48d2` remains at `729659c345e19d249de44fdb6492c47d811701cd` | REQUIRED |
+| Primary action mapping（主操作映射） | Prepare / Configure / Run / Stop use existing Shared Core semantics | REQUIRED |
+| Open（打开） | preserved as project-page secondary action with R48-D2 enablement semantics | REQUIRED |
+| Refresh（刷新） | preserved as project-page secondary action with R48-D2 enablement semantics | REQUIRED |
+| Runtime location（运行位置） | Internal / External selection preserved | REQUIRED |
+| External recovery（外部恢复） | permission / Open Termux / Re-check preserved | REQUIRED |
+| Import（导入） | local Python / ZIP / GitHub capabilities preserved | REQUIRED |
+| New Project（新建项目） | preserved | REQUIRED |
+| Project Location（项目位置） | preserved | REQUIRED |
+| Project List（项目列表） | preserved | REQUIRED |
+| Search / Filter（搜索 / 筛选） | R48-D2 capability preserved | REQUIRED |
+| More（更多） | Refresh Projects / New Project / Runtime Storage / Settings preserved | REQUIRED |
+| Background reliability（后台可靠性） | R48-D2 guidance behavior preserved | REQUIRED |
+| Activity indicator（活动指示条） | R48-D2 state/timeout behavior preserved; no fake percent | REQUIRED |
+| Runtime / Environment semantics（运行时 / 环境语义） | no UI-driven behavior changes | REQUIRED |
+| Developer Mode（开发者模式） | unchanged by Normal Mode redesign | REQUIRED |
+| Visual redesign（视觉重设计） | may change presentation only after all parity rows pass | REQUIRED |
+
+Failure of any REQUIRED row = UI regression（界面回归）. Do not present the build as an accepted design delivery.

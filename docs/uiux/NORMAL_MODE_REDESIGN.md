@@ -8,6 +8,28 @@ Status: APPROVED DIRECTION / DESIGN FIDELITY CORRECTION
 - Normal Mode（普通用户模式）首页只保留右上角 More（更多），**不使用 Bottom Navigation（底部导航）**。
 - Developer Mode（开发者模式）不在本轮重设计范围内。
 
+## R48-D2 Functional Baseline（R48-D2 功能基线）
+
+This redesign is a Presentation Layer（表现层）redesign over the frozen R48-D2 baseline.
+
+Reference:
+- `baseline/r48d2`
+- `729659c345e19d249de44fdb6492c47d811701cd`
+- `0.8.0-alpha43-r48d2` / versionCode `192`
+
+The redesign must preserve the complete R48-D2 capability surface. In particular:
+- Prepare / Configure / Run / Stop remain state-driven;
+- **Open（打开）and Refresh（刷新）remain visible secondary project actions**;
+- Project Location, Import, New Project, Project List, search/filter and More remain available;
+- Runtime Location selection and External Provider recovery remain available;
+- no Runtime / Environment / lifecycle / timeout semantics are changed;
+- Developer Mode（开发者模式）remains unchanged.
+
+“One Primary Action（单一主操作）” controls visual hierarchy only. It is never permission to remove secondary actions.
+
+Full hard boundary:
+`docs/uiux/R48D2_BASELINE_CONTRACT.md`.
+
 ## North Star
 让一个完全不懂 Runtime（运行时）、Python 环境和 Termux 的普通用户，也能自然完成：
 

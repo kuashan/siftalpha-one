@@ -4,6 +4,30 @@ Scope: Normal Mode（普通用户模式）only
 Brand hierarchy（品牌层级）: **SiftAlpha X 是软件正式名称。Normal Mode（普通用户模式）统一显示 SiftAlpha X；Logo（标志）恢复并保持项目原始 Logo（标志），不再用新绘制图形替代。**
 Repository skill: .agents/skills/ui-ux-pro-max/
 
+## 0. R48-D2 Baseline Lock（R48-D2 基线锁）
+
+All Normal Mode（普通用户模式）design work is subordinate to:
+`docs/uiux/R48D2_BASELINE_CONTRACT.md`.
+
+Frozen reference:
+- branch: `baseline/r48d2`
+- snapshot: `729659c345e19d249de44fdb6492c47d811701cd`
+- functional source: `ab0b5fcad8402dcddb1f0986bcd7dbb2400017fb`
+- version: `0.8.0-alpha43-r48d2` / versionCode `192`
+
+Hard rule:
+**R48-D2 determines the capability set and behavior. This Design System only changes presentation.**
+
+Therefore:
+- do not modify the baseline branch or baseline source;
+- do not delete R48-D2 buttons / entries / workflows for visual simplicity;
+- One Primary Action（单一主操作）means one visually dominant action, not one available action;
+- Project Workspace（项目页）must retain **Open（打开） + Refresh（刷新）** as secondary actions while Prepare / Configure / Run / Stop remains state-driven;
+- Home（首页）must retain R48-D2 import, new project, project location, project list, search/filter and More capabilities;
+- Runtime selection, External Provider recovery, timeout/lifecycle facts and Developer Mode（开发者模式）must remain behaviorally intact.
+
+Any conflict between visual design and R48-D2 functionality is resolved in favor of R48-D2 unless the user explicitly authorizes a functional change.
+
 ## 1. Product Design Thesis
 SiftAlpha X 的普通用户体验围绕：
 

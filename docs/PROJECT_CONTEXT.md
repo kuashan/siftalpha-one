@@ -1290,3 +1290,34 @@ Cloud evidence:
 CODE/CLOUD COMPLETE（代码 / 云端完成）。
 REAL DEVICE ACCEPTANCE（真机验收）= PENDING（待测试）。
 
+
+
+## 2026-09-22 · R48-D2 UI / Functional Baseline Lock（R48-D2 界面 / 功能基线锁）
+
+User decision is now frozen as a project-level hard boundary:
+
+`R48-D2 = functional + Normal Mode capability baseline`.
+
+Immutable reference:
+- branch: `baseline/r48d2`
+- snapshot commit: `729659c345e19d249de44fdb6492c47d811701cd`
+- functional source: `ab0b5fcad8402dcddb1f0986bcd7dbb2400017fb`
+- version: `0.8.0-alpha43-r48d2`
+- versionCode: `192`
+- W0: #599 PASS
+- artifact: `siftalpha-w0-599` / ID `10652097606`
+- APK SHA-256: `3acf37223d7a5ec7708215d851bf513ec403c2942c46f8cd026958b4aca12a4f`
+
+Rules:
+- do not modify / merge into / rebase / reset / force-push / delete `baseline/r48d2`;
+- future UI work happens only on derived working branches;
+- R48-D2 decides which capabilities exist and how their state/enablement semantics behave;
+- UI redesign may change appearance and hierarchy only;
+- One Primary Action means visual priority, not deleting secondary controls;
+- Project Workspace must retain R48-D2 Open + Refresh secondary actions in addition to state-driven Prepare / Configure / Run / Stop;
+- Home must retain R48-D2 import, new project, location, project list, search/filter and More capabilities;
+- Runtime location selection, External Provider recovery, background reliability guidance and activity indicator remain intact;
+- Developer Mode remains frozen.
+
+Canonical contract:
+`docs/uiux/R48D2_BASELINE_CONTRACT.md`.

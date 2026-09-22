@@ -2532,3 +2532,47 @@ Final functional commit `ab0b5fcad8402dcddb1f0986bcd7dbb2400017fb` 增加 Normal
 CODE/CLOUD COMPLETE（代码 / 云端完成）。
 REAL DEVICE ACCEPTANCE（真机验收）= PENDING（待测试）。
 
+
+
+## 2026-09-22 · Freeze R48-D2 as UI / Functional Baseline（冻结 R48-D2 为界面 / 功能基线）
+
+### User boundary（用户边界）
+
+All future SiftAlpha X Normal Mode（普通用户模式）UI/UX work must be based on R48-D2 and may not break its functional surface.
+
+Frozen baseline:
+- branch: `baseline/r48d2`
+- snapshot: `729659c345e19d249de44fdb6492c47d811701cd`
+- functional source: `ab0b5fcad8402dcddb1f0986bcd7dbb2400017fb`
+- version: `0.8.0-alpha43-r48d2` / versionCode `192`
+- W0 #599 PASS
+- APK SHA-256: `3acf37223d7a5ec7708215d851bf513ec403c2942c46f8cd026958b4aca12a4f`
+
+### Design rule correction（设计规则修正）
+
+`One Primary Action（单一主操作）` is now explicitly defined as visual hierarchy only.
+
+It does NOT authorize removing R48-D2 secondary controls.
+
+Project page parity requirement:
+- state-driven Primary: Prepare / Configure / Run / Stop
+- preserved Secondary: **Open / Refresh**
+
+Home parity requirement:
+- Import Project
+- New Project
+- Project Location
+- Project List
+- search/filter
+- More actions
+
+Runtime location selection, External Provider recovery, timeout/lifecycle behavior, Background Reliability Guidance and Runtime Activity Indicator are also baseline behavior.
+
+### Source protection（源码保护）
+
+No changes are to be committed to `baseline/r48d2`.
+All UI experiments and implementation occur on separate branches.
+The baseline is a read-only rollback and comparison reference.
+
+Canonical contract:
+`docs/uiux/R48D2_BASELINE_CONTRACT.md`.
