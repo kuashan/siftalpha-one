@@ -1,8 +1,16 @@
 package com.siftalpha.studio
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.text.InputType
+import android.widget.ArrayAdapter
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -63,13 +71,17 @@ import com.siftalpha.studio.runtime.RuntimeWebAvailabilityTracker
 import com.siftalpha.studio.runtime.RuntimeWebDiscoveryScopePolicy
 import com.siftalpha.studio.runtime.RuntimeWebHintPolicy
 import com.siftalpha.studio.runtime.RuntimeWebLearnedEndpointStore
+import com.siftalpha.studio.runtime.RuntimeWebLearnedLaunchStore
 import com.siftalpha.studio.runtime.RuntimeWebStateStore
+import com.siftalpha.studio.runtime.RuntimeConfigurationDiscoveryStore
 import com.siftalpha.studio.runtime.RuntimeWebUiStatus
 import com.siftalpha.studio.runtime.EmbeddedPythonRuntimeStateMapping
 import com.siftalpha.studio.runtime.ProjectControlHub
 import com.siftalpha.studio.runtime.ProjectOperationCoordinator
 import com.siftalpha.studio.runtime.ProjectRuntimeControlExecutor
 import com.siftalpha.studio.runtime.ProjectRuntimeController
+import com.siftalpha.studio.runtime.ProjectRunRecoveryStore
+import com.siftalpha.studio.runtime.ProjectRunWorkflowCoordinator
 import com.siftalpha.studio.runtime.ProjectRuntimeSelection
 import com.siftalpha.studio.runtime.ProjectRuntimeSelectionStore
 import com.siftalpha.studio.runtime.ProjectRuntimeSelectionChangePolicy
@@ -146,6 +158,8 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     private lateinit var prepareLiveProgress: PrepareLiveProgressController
     private lateinit var configurationUi: ProjectConfigurationUiController
     private lateinit var secretStore: ProjectSecretStore
+    private lateinit var runRecoveryStore: ProjectRunRecoveryStore
+    private lateinit var runWorkflow: ProjectRunWorkflowCoordinator
     private lateinit var webInspector: WebProjectInspector
     private lateinit var webStateStore: RuntimeWebStateStore
     private lateinit var webAvailability: RuntimeWebAvailabilityTracker
@@ -179,6 +193,17 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             }
 
             captureExternalEvidence(completion.action, completion.result)
+            val runtimeFinding = if (
+                completion.action == RuntimeOperationAction.START &&
+                ::runWorkflow.isInitialized
+            ) {
+                runWorkflow.observeRuntimeOutput(
+                    project = project,
+                    output = combinedRuntimeOutput(completion.result.stdout, completion.result.stderr),
+                )
+            } else {
+                null
+            }
 
             val wasManualRefresh = manualRefreshExecutions.remove(completion.result.executionId)
             if (completion.action == RuntimeOperationAction.STATUS && wasManualRefresh) {
@@ -206,6 +231,13 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                     screenState.value.message
                 },
             )
+            if (
+                runtimeFinding?.recoveryReason == ProjectRunRecoveryStore.Reason.CLI_ARGUMENTS &&
+                runtimeFinding.finding.missingEnvironmentNames.isEmpty() &&
+                !runtimeFinding.finding.unnamedCredentialRequired
+            ) {
+                runProject()
+            }
         }
     }
 
@@ -276,12 +308,13 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             internalAlpineSession = InternalAlpineSession.shared(this),
         )
         secretStore = ProjectSecretStore(this)
+        runRecoveryStore = ProjectRunRecoveryStore(this)
         configurationUi = ProjectConfigurationUiController(
             activity = this,
             inspector = ProjectConfigurationInspector(this),
             store = secretStore,
         ) {
-            refreshSharedState()
+            handleConfigurationControllerChanged()
         }
         externalBackend = TermuxBackend(this)
         externalPreflight = ExternalProviderProbeCoordinator.shared(this)
@@ -291,6 +324,13 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         webLearnedEndpointStore = RuntimeWebLearnedEndpointStore(this)
         resultWebStore = ResultWebStore(this)
         resultWebRef = resultWebStore.latest(project.summary.documentId)
+        runWorkflow = ProjectRunWorkflowCoordinator(
+            runtime = runtime,
+            webInspector = webInspector,
+            learnedWebLaunchStore = RuntimeWebLearnedLaunchStore(this),
+            configurationDiscoveryStore = RuntimeConfigurationDiscoveryStore(this),
+            recoveryStore = runRecoveryStore,
+        )
         webAvailability = RuntimeWebAvailabilityTracker {
             if (::project.isInitialized) runOnUiThread { refreshSharedState() }
         }
@@ -408,11 +448,25 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 .getOrNull()
                 ?.let { snapshot ->
                     val current = lifecycleStore.read(projectId)
+                    val mappedState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot)
+                    if (
+                        mappedState == RuntimeState.EXITED_ERROR &&
+                        ::runWorkflow.isInitialized
+                    ) {
+                        runWorkflow.observeRuntimeOutput(
+                            project = project,
+                            output = combinedRuntimeOutput(snapshot.stdout, snapshot.stderr),
+                        )
+                    }
                     lifecycleStore.write(
                         projectKey = projectId,
                         environmentReady = current.environmentReadyFor(selection),
-                        runtimeState = EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot),
-                        failureReason = null,
+                        runtimeState = mappedState,
+                        failureReason = if (mappedState == RuntimeState.EXITED_ERROR) {
+                            snapshot.stderr.ifBlank { snapshot.stdout }.trim().take(240)
+                        } else {
+                            null
+                        },
                         runtimeSelection = selection,
                     )
                 }
@@ -484,7 +538,23 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             failureReason = lifecycle.failureReason,
         )
         val policy = ProjectActionPolicy.resolve(snapshot, selection)
-        val primaryAction = NormalProjectPrimaryActionPolicy.resolve(policy)
+        val pendingRunRecovery = if (::runWorkflow.isInitialized) {
+            runWorkflow.pendingRecovery(projectId)
+        } else {
+            null
+        }
+        val primaryAction = if (
+            pendingRunRecovery?.reason == ProjectRunRecoveryStore.Reason.CONFIGURATION &&
+            lifecycle.runtimeState !in setOf(
+                RuntimeState.PREPARING,
+                RuntimeState.STARTING,
+                RuntimeState.RUNNING,
+            )
+        ) {
+            NormalProjectPrimaryActionPolicy.Action.CONFIGURE
+        } else {
+            NormalProjectPrimaryActionPolicy.resolve(policy)
+        }
         val activityIndicatorVisible = RuntimeActivityIndicatorPolicy.shouldAnimate(
             RuntimeActivityIndicatorPolicy.Input(
                 lifecycleState = lifecycleState,
@@ -816,6 +886,20 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         }
     }
 
+    private fun handleConfigurationControllerChanged() {
+        refreshSharedState(getString(R.string.normal_project_configuration_saved))
+        if (!::runWorkflow.isInitialized || !::project.isInitialized) return
+        val pending = runWorkflow.pendingRecovery(project.summary.documentId) ?: return
+        if (pending.reason != ProjectRunRecoveryStore.Reason.CONFIGURATION) return
+        val refreshed = configurationUi.snapshot(
+            project.summary.documentId,
+            project.folderName,
+        )
+        if (refreshed.preflight.missingRequired.isEmpty() && !screenState.value.busy) {
+            runProject()
+        }
+    }
+
     private fun configureProject() {
         if (screenState.value.busy) return
         configurationUi.showConfiguration(
@@ -865,7 +949,11 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         }
 
         refreshSharedState(getString(R.string.normal_project_configuration_saved))
-        if (!runAfterSave) return
+        val resumePendingRun =
+            runAfterSave ||
+                (::runWorkflow.isInitialized &&
+                    runWorkflow.pendingRecovery(project.summary.documentId) != null)
+        if (!resumePendingRun) return
 
         val refreshed = configurationUi.snapshot(
             project.summary.documentId,
@@ -897,21 +985,210 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             activityIndicatorVisible = true,
         )
         actionExecutor.execute {
-            val result = controlHub.run(
+            val preparation = runWorkflow.prepare(
                 project = project,
-                request = ProjectControlHub.RunRequest(
-                    requiredConfiguration = configuration.preflight.missingRequired.isNotEmpty(),
-                    webLogDiscoveryAllowed = webInspector.inspect(project.summary.documentId).enabled,
-                    webHintPorts = webHintPorts(),
+                configuration = ProjectRunWorkflowCoordinator.ConfigurationFacts(
+                    missingRequiredNames = configuration.preflight.missingRequired.map { it.name },
+                    cliRequirements = configuration.cliRequirements,
                 ),
+                webHintPorts = webHintPorts(),
             )
-            runOnUiThread {
-                screenState.value = screenState.value.copy(busy = false)
-                handleActionRequirement(result, PendingUserIntent.RUN)
-                refreshSharedState(resultMessage(result))
+            when (preparation) {
+                is ProjectRunWorkflowCoordinator.Preparation.Ready ->
+                    dispatchPreparedRun(preparation.request)
+
+                is ProjectRunWorkflowCoordinator.Preparation.NeedsConfiguration ->
+                    runOnUiThread {
+                        screenState.value = screenState.value.copy(busy = false)
+                        refreshSharedState(getString(R.string.runtime_policy_configuration_required))
+                    }
+
+                is ProjectRunWorkflowCoordinator.Preparation.NeedsLaunchInput ->
+                    runOnUiThread {
+                        screenState.value = screenState.value.copy(busy = false)
+                        showRunInputDialog(preparation.plan)
+                    }
+
+                is ProjectRunWorkflowCoordinator.Preparation.Rejected ->
+                    runOnUiThread {
+                        screenState.value = screenState.value.copy(busy = false)
+                        val message = when (preparation.reason) {
+                            ProjectRunWorkflowCoordinator.RejectReason.PYTHON_LAUNCH_MISSING ->
+                                getString(R.string.runtime_cli_missing)
+                            ProjectRunWorkflowCoordinator.RejectReason.PYTHON_LAUNCH_INVALID ->
+                                getString(R.string.runtime_cli_unsupported)
+                        }
+                        refreshSharedState(message)
+                    }
             }
         }
     }
+
+    private fun dispatchPreparedRun(request: ProjectControlHub.RunRequest) {
+        val result = controlHub.run(project = project, request = request)
+        val dispatched = result as? ProjectControlHub.Result.Dispatched
+        if (dispatched?.action == ProjectControlHub.Action.RUN) {
+            runWorkflow.completeRunDispatch(project.summary.documentId)
+        }
+        val internalFinding = inspectImmediateInternalRunFailure(dispatched)
+        runOnUiThread {
+            screenState.value = screenState.value.copy(busy = false)
+            handleActionRequirement(result, PendingUserIntent.RUN)
+            refreshSharedState(resultMessage(result))
+            if (
+                internalFinding?.recoveryReason == ProjectRunRecoveryStore.Reason.CLI_ARGUMENTS &&
+                internalFinding.finding.missingEnvironmentNames.isEmpty() &&
+                !internalFinding.finding.unnamedCredentialRequired
+            ) {
+                runProject()
+            }
+        }
+    }
+
+    private fun inspectImmediateInternalRunFailure(
+        dispatched: ProjectControlHub.Result.Dispatched?,
+    ): ProjectRunWorkflowCoordinator.RuntimeFinding? {
+        if (
+            dispatched?.action != ProjectControlHub.Action.RUN ||
+            dispatched.provider != RuntimeOperationProvider.INTERNAL
+        ) {
+            return null
+        }
+        val snapshot = runCatching {
+            runtime.embeddedPythonSnapshotFor(project.summary.documentId)
+        }.getOrNull() ?: return null
+        if (EmbeddedPythonRuntimeStateMapping.toRuntimeState(snapshot) != RuntimeState.EXITED_ERROR) {
+            return null
+        }
+        return runWorkflow.observeRuntimeOutput(
+            project = project,
+            output = combinedRuntimeOutput(snapshot.stdout, snapshot.stderr),
+        )
+    }
+
+    private fun showRunInputDialog(plan: ProjectRunWorkflowCoordinator.LaunchInputPlan) {
+        if (isFinishing || isDestroyed) return
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dialogDp(20), dialogDp(4), dialogDp(20), dialogDp(4))
+        }
+
+        var targetSpinner: Spinner? = null
+        if (plan.targets.size > 1) {
+            content.addView(TextView(this@NormalProjectWorkspaceActivity).apply {
+                text = getString(R.string.runtime_cli_select_entry)
+                textSize = 14f
+                setPadding(0, dialogDp(6), 0, dialogDp(4))
+            })
+            targetSpinner = Spinner(this@NormalProjectWorkspaceActivity).apply {
+                adapter = ArrayAdapter(
+                    this@NormalProjectWorkspaceActivity,
+                    android.R.layout.simple_spinner_dropdown_item,
+                    plan.targets.map { it.label },
+                )
+            }
+            content.addView(targetSpinner)
+        }
+
+        val argumentInputs = linkedMapOf<String, EditText>()
+        plan.requiredArguments.forEach { requirement ->
+            content.addView(TextView(this@NormalProjectWorkspaceActivity).apply {
+                text = requirement.token + " *"
+                textSize = 14f
+                setPadding(0, dialogDp(8), 0, dialogDp(2))
+            })
+            val input = EditText(this@NormalProjectWorkspaceActivity).apply {
+                hint = getString(R.string.runtime_cli_required_value_hint, requirement.token)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                setSingleLine(true)
+            }
+            argumentInputs[requirement.token] = input
+            content.addView(input)
+        }
+
+        content.addView(TextView(this@NormalProjectWorkspaceActivity).apply {
+            text = getString(R.string.runtime_cli_additional_arguments)
+            textSize = 14f
+            setPadding(0, dialogDp(8), 0, dialogDp(2))
+        })
+        val additionalInput = EditText(this@NormalProjectWorkspaceActivity).apply {
+            hint = getString(R.string.runtime_cli_arguments_hint)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            setSingleLine(false)
+        }
+        content.addView(additionalInput)
+
+        val scroll = ScrollView(this@NormalProjectWorkspaceActivity).apply { addView(content) }
+        lateinit var dialog: AlertDialog
+        dialog = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.runtime_cli_arguments))
+            .setView(scroll)
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .setPositiveButton(getString(R.string.runtime_button_run), null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val selectedTargetId = when {
+                    plan.targets.size == 1 -> plan.targets.single().id
+                    else -> targetSpinner
+                        ?.selectedItemPosition
+                        ?.takeIf { it in plan.targets.indices }
+                        ?.let { plan.targets[it].id }
+                }
+                val values = argumentInputs.mapValues { it.value.text?.toString().orEmpty() }
+                when (
+                    val resolved = runWorkflow.resolveInput(
+                        plan = plan,
+                        selectedTargetId = selectedTargetId,
+                        values = values,
+                        additionalArguments = additionalInput.text?.toString().orEmpty(),
+                    )
+                ) {
+                    is ProjectRunWorkflowCoordinator.InputResolution.Invalid -> {
+                        val token = resolved.token
+                        if (token != null) {
+                            Toast.makeText(
+                                this,
+                                getString(R.string.runtime_cli_required_blank, token),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                            argumentInputs[token]?.requestFocus()
+                        } else {
+                            Toast.makeText(
+                                this,
+                                getString(R.string.runtime_cli_arguments_invalid),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    }
+
+                    is ProjectRunWorkflowCoordinator.InputResolution.Ready -> {
+                        dialog.dismiss()
+                        screenState.value = screenState.value.copy(
+                            busy = true,
+                            message = getString(R.string.normal_project_starting),
+                            activityIndicatorVisible = true,
+                        )
+                        actionExecutor.execute {
+                            dispatchPreparedRun(resolved.request)
+                        }
+                    }
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun combinedRuntimeOutput(stdout: String, stderr: String): String = buildString {
+        append(stdout)
+        if (stderr.isNotBlank()) {
+            if (isNotEmpty()) append('\n')
+            append(stderr)
+        }
+    }
+
+    private fun dialogDp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 
     private fun stopProject() {
         val selection = selectionStore.read(project.summary.documentId)

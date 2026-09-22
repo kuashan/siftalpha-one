@@ -1722,3 +1722,21 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Home tagline spacing | content top padding = 0dp; visually close to enlarged brand row | PASS REQUIRED |
 | Developer Mode | UI and runtime behavior unchanged | PASS REQUIRED |
 | W0 / tests / APK | cloud build must pass | PENDING |
+
+
+### R48-D5 v217 — Shared Run Workflow repair
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Shared launch resolution | Normal Mode uses existing Python native-Web / CLI / file launch resolvers before ProjectControlHub RUN | PASS REQUIRED |
+| Runtime configuration discovery | External START stdout+stderr and failed Internal R snapshots feed existing RuntimeConfigurationDiagnostic | PASS REQUIRED |
+| Shared configuration facts | discovered env / CLI hints persist in existing siftalpha_runtime_configuration_discovery_v1 contract | PASS REQUIRED |
+| Configuration recovery | runtime-discovered named env requirement changes Normal Mode to Configure without a second config model | PASS REQUIRED |
+| CLI recovery | runtime-discovered CLI arguments produce entry/argument input and structured PythonLaunchInvocation | PASS REQUIRED |
+| Pending RUN retry | save resumes RUN only when a pending recovery intent exists | PASS REQUIRED |
+| Project isolation | pending recovery keyed by project id only | PASS REQUIRED |
+| ProjectControlHub boundary | still owns dispatch only; no second runtime state machine | PASS REQUIRED |
+| Developer Mode | V04Activity source unchanged | PASS REQUIRED |
+| Existing diagnostic tests | RuntimeConfigurationDiagnostic / PythonCliLaunchResolver regressions remain green | PASS REQUIRED |
+| W0 / unit tests / assembleDebug | cloud build | PENDING |
+| Internal Alpine Probe | cloud probe | PENDING |

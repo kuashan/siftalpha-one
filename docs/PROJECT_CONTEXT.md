@@ -1444,3 +1444,15 @@ Developer Mode remains frozen against baseline/r48d2. Shared code may only recei
 Cold launch must present only one visible SiftAlpha brand composition. Android 12+ still owns a mandatory system starting window, but its icon is transparent and its background matches the Normal Mode brand page, so it must not appear as a separate visual stage. The app-owned ~3 second static brand page remains the first visible branded screen.
 
 Normal Home top-left brand identity is intentionally larger and sits close to the retained secondary tagline. Developer Mode remains frozen.
+
+
+## 2026-09-22 · R48-D5 Shared Run Workflow
+
+RUN architecture is now explicitly:
+Normal Mode / Developer Mode -> shared M-layer workflow facts -> ProjectControlHub -> Runtime Core.
+
+The new ProjectRunWorkflowCoordinator owns only RUN orchestration decisions: action-time Python/Web/CLI launch preparation, runtime configuration discovery handoff, and pending-run recovery intent. It does not own lifecycle, generation, provider execution, Web verification, result stores or Runtime state.
+
+Runtime-discovered configuration continues to use the existing v1 discovery preference contract consumed by ProjectConfigurationUiController, preserving one configuration fact model. Pending RUN recovery is stored separately and contains only reason + timestamp, never credentials or argument values.
+
+Developer Mode remains frozen; no V04Activity UI/workflow edits are part of R48-D5.

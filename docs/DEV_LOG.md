@@ -3133,3 +3133,24 @@ Target:
 - Normal Home content top padding is reduced from 6dp to 0dp, tightening the gap between the enlarged top-left brand row and the retained secondary tagline.
 - No Developer Mode UI, project execution semantics, Runtime behavior, or shared Developer Home scaffold was changed.
 - versionCode = 216; versionName = 0.8.0-alpha43-r48d4.
+
+
+## 2026-09-22 · R48-D5 v217 Shared Run Workflow repair
+
+### Audit result
+Shared Core already owned project identity, lifecycle, operation ownership, provider preflight, PREPARE/RUN/STOP dispatch and result stores, but the mature RUN orchestration was still split: Developer Workspace owned Python/Web/CLI launch resolution plus runtime configuration recovery, while Normal Mode called ProjectControlHub directly.
+
+### Repair
+- Added ProjectRunWorkflowCoordinator as an M-layer workflow coordinator above ProjectControlHub. It does not own Runtime state and does not render UI.
+- Added shared Python/Web/CLI action-time launch preparation for Normal Mode using the existing ProjectRuntimeController resolvers, RuntimeWebLearnedLaunchStore and PythonLaunchInvocation contract.
+- Added RuntimeConfigurationDiscoveryStore using the existing siftalpha_runtime_configuration_discovery_v1 persistence contract, so runtime-discovered environment names and CLI tokens remain the same configuration facts already consumed by R48-D2 configuration UI.
+- Added ProjectRunRecoveryStore for project-scoped pending RUN intent only; it stores no secret values and no Runtime state.
+- Normal Mode now inspects both External START completion output and Internal R failed snapshots with the existing RuntimeConfigurationDiagnostic.
+- Named runtime configuration findings route Normal Mode into its existing Configuration surface; CLI findings route into an argument/entry prompt and then reuse the same ProjectControlHub RUN dispatch.
+- Saving configuration resumes the interrupted RUN only when a shared pending-run recovery exists. Proactive configuration saves do not start a project.
+- Developer Mode UI and V04Activity workflow source were not modified.
+- ProjectControlHub remains a low-level action boundary and does not become a second state machine or a UI workflow owner.
+
+Target:
+- versionCode = 217
+- versionName = 0.8.0-alpha43-r48d5
