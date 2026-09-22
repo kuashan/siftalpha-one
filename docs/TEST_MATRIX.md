@@ -1555,3 +1555,21 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Reduced motion | completed-frame fallback | PASS REQUIRED |
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v207 — Code directly constructs final logo geometry
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Scope | launch presentation only | PASS REQUIRED |
+| Inflow | lower-left + upper-right remain | PASS REQUIRED |
+| Generic large-S rail | removed as formation target | PASS REQUIRED |
+| Logo shell | code/fragments form rounded-square shell | PASS REQUIRED |
+| S ribbon | code/fragments form central S | PASS REQUIRED |
+| Terminal mark | code/fragments include >_ region | PASS REQUIRED |
+| Direct convergence | flow strands terminate across logo geometry | PASS REQUIRED |
+| Code-logo -> real-logo | continuous overlap/morph, no hard cut | PASS REQUIRED |
+| Real logo source | unchanged launcher asset | PASS REQUIRED |
+| Stage labels/captions | absent | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |

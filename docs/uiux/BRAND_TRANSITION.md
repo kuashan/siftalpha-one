@@ -164,3 +164,15 @@ Do not render:
 - storyboard cards.
 
 The real launcher logo remains the final mark.
+
+
+## R48-D3 v207 Override — Direct code-to-logo formation
+
+Current opening-motion authority:
+
+- code enters from lower-left and upper-right;
+- code does **not** first form a separate oversized S path;
+- incoming code directly occupies the final logo geometry:
+  rounded-square shell + S ribbon + terminal >_;
+- that code-built logo then resolves into the real app logo asset in place;
+- no hard cut and no extra storyboard UI.

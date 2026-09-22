@@ -122,7 +122,10 @@ android {
         // v206 implements the final approved four-stage opening motion without any stage titles,
         // numbers or explanatory captions: chaotic edge inflow -> S-shaped convergence ->
         // code/nebula S formation -> breathing reveal of the unchanged real app logo.
-        versionCode = 206
+        // v207 changes the formation target from a generic S path to the actual logo geometry:
+        // incoming code now settles directly onto the rounded-square shell, S ribbon and >_ terminal,
+        // then the code-built logo continuously resolves into the unchanged real application logo.
+        versionCode = 207
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

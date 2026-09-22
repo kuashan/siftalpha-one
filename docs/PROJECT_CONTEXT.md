@@ -1359,3 +1359,14 @@ Current launch-page authority:
 - both streams wrap around the logo rather than crossing through its center;
 - code fragments visibly fill the S before the real app logo resolves;
 - `baseline/r48d2` remains untouched.
+
+
+## 2026-09-22 · R48-D3 v207 opening-motion authority
+
+Current Normal Mode launch motion:
+- retain upper-right / lower-left inward code flow;
+- remove generic oversized-S formation as an intermediate target;
+- code directly constructs the final logo geometry: rounded-square shell + S ribbon + >_ terminal;
+- code-built logo then resolves in place into the real launcher logo;
+- no added stage titles, numbers or explanatory captions;
+- R48-D2 baseline remains untouched.

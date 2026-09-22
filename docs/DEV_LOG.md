@@ -2888,3 +2888,34 @@ R48-D2 baseline/runtime/functionality remains untouched.
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `206`.
+
+
+## 2026-09-22 · R48-D3 v207 code directly builds the app logo
+
+Real-device feedback on v206:
+- the inward code flow direction is acceptable;
+- the code should no longer first create a generic large S-shaped path;
+- the convergence should directly construct the application's logo, then transition into the real logo asset.
+
+Presentation-only repair:
+- retained the lower-left / upper-right inflow and dark neon visual system;
+- increased active code glyph population to 144;
+- each incoming code token is assigned a deterministic target on the **actual logo composition**:
+  - rounded-square outer shell;
+  - central S ribbon;
+  - terminal `>_` detail;
+- 42 curved flow strands per side now terminate on distributed logo targets instead of on one S rail;
+- 220 luminous particles travel on the same direct-to-logo paths;
+- 420 data fragments settle onto the same logo geometry, producing a clearly readable “code-built logo”;
+- code and fragments fade/compact while the unchanged real launcher logo appears in the exact same center position;
+- final SiftAlpha X + INTELLIGENCE IN MOTION copy remains unchanged;
+- no stage titles, numbers, captions or storyboard chrome were added.
+
+Boundary:
+- R48-D2 baseline untouched;
+- no Runtime / Environment / Open / Stop / result semantics changed;
+- final logo continues to use `R.drawable.siftalpha_launcher_art`.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `207`.

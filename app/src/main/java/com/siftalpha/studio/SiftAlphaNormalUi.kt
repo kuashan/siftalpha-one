@@ -190,14 +190,14 @@ private data class BrandCodeParticle(
     val delay: Float,
 )
 
-private val BrandCodeParticles = List(112) { index ->
-    val upper = index < 56
-    val local = if (upper) index else index - 56
+private val BrandCodeParticles = List(144) { index ->
+    val upper = index < 72
+    val local = if (upper) index else index - 72
     BrandCodeParticle(
         text = BrandCodeLexicon[index % BrandCodeLexicon.size],
         upper = upper,
-        lane = local / 55f,
-        delay = (local % 14) * .009f + if (upper) 0f else .019f,
+        lane = local / 71f,
+        delay = (local % 18) * .007f + if (upper) 0f else .017f,
     )
 }
 
@@ -251,20 +251,49 @@ private fun SiftAlphaLaunchMotion(
     motion: Boolean,
 ) {
     val p = progress.coerceIn(0f, 1f)
-    val stage1Alpha = sceneAlpha(p, 0f, .025f, .21f, .31f)
-    val stage2Alpha = sceneAlpha(p, .18f, .27f, .48f, .59f)
-    val stage3Alpha = sceneAlpha(p, .46f, .55f, .76f, .86f)
-    val stage4Alpha = smoothStep(((p - .73f) / .18f).coerceIn(0f, 1f))
+    val inflowAlpha =
+        1f -
+            smoothStep(
+                ((p - .42f) / .24f).coerceIn(0f, 1f),
+            )
+    val logoBuild =
+        smoothStep(
+            ((p - .24f) / .46f).coerceIn(0f, 1f),
+        )
+    val codeLogoAlpha =
+        logoBuild *
+            (
+                1f -
+                    smoothStep(
+                        ((p - .83f) / .14f).coerceIn(0f, 1f),
+                    )
+                )
+    val realLogoAlpha =
+        if (motion) {
+            smoothStep(
+                ((p - .78f) / .18f).coerceIn(0f, 1f),
+            )
+        } else {
+            1f
+        }
+    val copyAlpha =
+        if (motion) {
+            smoothStep(
+                ((p - .86f) / .10f).coerceIn(0f, 1f),
+            )
+        } else {
+            1f
+        }
 
-    val flowTransition = rememberInfiniteTransition(label = "siftalpha-launch-flow")
+    val flowTransition = rememberInfiniteTransition(label = "siftalpha-logo-build-flow")
     val upperClock by if (motion) {
         flowTransition.animateFloat(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(2050, easing = LinearEasing),
+                animation = tween(1950, easing = LinearEasing),
             ),
-            label = "launch-upper",
+            label = "logo-build-upper",
         )
     } else {
         remember { mutableStateOf(.54f) }
@@ -274,9 +303,9 @@ private fun SiftAlphaLaunchMotion(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(2320, easing = LinearEasing),
+                animation = tween(2240, easing = LinearEasing),
             ),
-            label = "launch-lower",
+            label = "logo-build-lower",
         )
     } else {
         remember { mutableStateOf(.48f) }
@@ -289,7 +318,7 @@ private fun SiftAlphaLaunchMotion(
                 animation = tween(1050),
                 repeatMode = RepeatMode.Reverse,
             ),
-            label = "launch-logo-breathe",
+            label = "logo-build-breathe",
         )
     } else {
         remember { mutableStateOf(.5f) }
@@ -308,29 +337,33 @@ private fun SiftAlphaLaunchMotion(
                 ),
             ),
     ) {
-        val upperEndpointX = .50f + 34.dp.value / maxWidth.value
-        val upperEndpointY = .445f - 36.dp.value / maxHeight.value
-        val lowerEndpointX = .50f - 34.dp.value / maxWidth.value
-        val lowerEndpointY = .445f + 36.dp.value / maxHeight.value
+        val cx = .50f
+        val cy = .445f
+        val logoHalfW = 76.dp.value / maxWidth.value
+        val logoHalfH = 76.dp.value / maxHeight.value
 
         fun codeSPoint(u: Float): Offset {
             val t = u.coerceIn(0f, 1f)
+            val left = cx - logoHalfW * .67f
+            val right = cx + logoHalfW * .67f
+            val top = cy - logoHalfH * .68f
+            val bottom = cy + logoHalfH * .68f
             return when {
                 t < .34f -> {
                     val q = t / .34f
                     Offset(
                         cubicBezier(
-                            upperEndpointX,
-                            .50f,
-                            .405f,
-                            .425f,
+                            right,
+                            cx + logoHalfW * .08f,
+                            left - logoHalfW * .15f,
+                            left,
                             q,
                         ),
                         cubicBezier(
-                            upperEndpointY,
-                            .355f,
-                            .365f,
-                            .430f,
+                            top,
+                            top - logoHalfH * .04f,
+                            cy - logoHalfH * .24f,
+                            cy - logoHalfH * .05f,
                             q,
                         ),
                     )
@@ -339,17 +372,17 @@ private fun SiftAlphaLaunchMotion(
                     val q = (t - .34f) / .34f
                     Offset(
                         cubicBezier(
-                            .425f,
-                            .385f,
-                            .615f,
-                            .575f,
+                            left,
+                            left - logoHalfW * .10f,
+                            right + logoHalfW * .12f,
+                            right,
                             q,
                         ),
                         cubicBezier(
-                            .430f,
-                            .455f,
-                            .480f,
-                            .505f,
+                            cy - logoHalfH * .05f,
+                            cy + logoHalfH * .08f,
+                            cy + logoHalfH * .12f,
+                            cy + logoHalfH * .20f,
                             q,
                         ),
                     )
@@ -358,17 +391,17 @@ private fun SiftAlphaLaunchMotion(
                     val q = (t - .68f) / .32f
                     Offset(
                         cubicBezier(
-                            .575f,
-                            .600f,
-                            .500f,
-                            lowerEndpointX,
+                            right,
+                            right + logoHalfW * .12f,
+                            cx - logoHalfW * .10f,
+                            left,
                             q,
                         ),
                         cubicBezier(
-                            .505f,
-                            .545f,
-                            .565f,
-                            lowerEndpointY,
+                            cy + logoHalfH * .20f,
+                            cy + logoHalfH * .40f,
+                            bottom + logoHalfH * .05f,
+                            bottom,
                             q,
                         ),
                     )
@@ -376,134 +409,157 @@ private fun SiftAlphaLaunchMotion(
             }
         }
 
-        fun stage1Point(
-            upper: Boolean,
-            lane: Float,
-            t: Float,
-            clock: Float,
-        ): Offset {
-            val eased = smoothStep(t)
-            val laneSigned = lane * 2f - 1f
-            val startX = if (upper) 1.10f else -.10f
-            val startY =
-                if (upper) .02f + lane * .34f
-                else .64f + lane * .34f
-            val endX = if (upper) .57f else .43f
-            val endY = if (upper) .44f else .56f
-            val chaos = (1f - eased)
-            val angle =
-                clock * 2f * PI.toFloat() +
-                    lane * 7.4f +
-                    eased * 2.2f
-
-            return Offset(
-                cubicBezier(
-                    startX,
-                    if (upper) .91f else .09f,
-                    if (upper) .70f else .30f,
-                    endX,
-                    eased,
-                ) +
-                    kotlin.math.cos(angle) *
-                        (.045f + .025f * kotlin.math.abs(laneSigned)) *
-                        chaos,
-                cubicBezier(
-                    startY,
-                    if (upper) .10f + lane * .26f else .88f - lane * .26f,
-                    if (upper) .34f + lane * .10f else .66f - lane * .10f,
-                    endY,
-                    eased,
-                ) +
-                    sin(angle) * .033f * chaos +
-                    laneSigned * .026f * chaos,
-            )
+        fun roundedSquarePoint(t: Float): Offset {
+            val u = (t % 1f + 1f) % 1f
+            val left = cx - logoHalfW
+            val right = cx + logoHalfW
+            val top = cy - logoHalfH
+            val bottom = cy + logoHalfH
+            val cornerX = logoHalfW * .28f
+            val cornerY = logoHalfH * .28f
+            val seg = u * 8f
+            val q = seg % 1f
+            return when (seg.toInt().coerceIn(0, 7)) {
+                0 -> Offset(lerp(left + cornerX, right - cornerX, q), top)
+                1 -> Offset(
+                    right - cornerX + cornerX * q,
+                    top + cornerY * (1f - kotlin.math.cos(q * PI.toFloat() / 2f)),
+                )
+                2 -> Offset(right, lerp(top + cornerY, bottom - cornerY, q))
+                3 -> Offset(
+                    right - cornerX * (1f - kotlin.math.sin(q * PI.toFloat() / 2f)),
+                    bottom - cornerY + cornerY * q,
+                )
+                4 -> Offset(lerp(right - cornerX, left + cornerX, q), bottom)
+                5 -> Offset(
+                    left + cornerX * (1f - q),
+                    bottom - cornerY * (1f - kotlin.math.cos(q * PI.toFloat() / 2f)),
+                )
+                6 -> Offset(left, lerp(bottom - cornerY, top + cornerY, q))
+                else -> Offset(
+                    left + cornerX * (1f - kotlin.math.sin(q * PI.toFloat() / 2f)),
+                    top + cornerY * (1f - q),
+                )
+            }
         }
 
-        fun stage2Point(
-            upper: Boolean,
-            lane: Float,
-            t: Float,
-            clock: Float,
-        ): Offset {
-            val eased = smoothStep(t)
-            val laneSigned = lane * 2f - 1f
-            val targetX = if (upper) lowerEndpointX else upperEndpointX
-            val targetY = if (upper) lowerEndpointY else upperEndpointY
-
-            // Cross-target S flow: upper-right wraps around right/bottom to the lower S end;
-            // lower-left wraps around left/top to the upper S end.
-            val split = .56f
-            val base =
-                if (eased < split) {
-                    val q = eased / split
-                    if (upper) {
+        fun logoTarget(index: Int, total: Int): Offset {
+            val r = (index * 37) % 100
+            val seed =
+                ((index * .6180339f) % 1f + 1f) % 1f
+            return when {
+                r < 24 -> {
+                    val border = roundedSquarePoint(seed)
+                    val jitterX =
+                        kotlin.math.cos(index * 1.37f) *
+                            logoHalfW * .022f
+                    val jitterY =
+                        sin(index * 1.71f) *
+                            logoHalfH * .022f
+                    Offset(border.x + jitterX, border.y + jitterY)
+                }
+                r < 80 -> {
+                    val u =
+                        ((index * 13) % total).toFloat() /
+                            (total - 1).coerceAtLeast(1).toFloat()
+                    val base = codeSPoint(u)
+                    val width =
+                        logoHalfW *
+                            (.08f + (index % 7) * .010f)
+                    val angle = index * 2.399963f
+                    Offset(
+                        base.x + kotlin.math.cos(angle) * width,
+                        base.y + sin(angle) * width * .72f,
+                    )
+                }
+                r < 92 -> {
+                    val local = ((r - 80) / 12f).coerceIn(0f, 1f)
+                    val x0 = cx - logoHalfW * .26f
+                    val x1 = cx - logoHalfW * .05f
+                    val y0 = cy - logoHalfH * .11f
+                    val y1 = cy + logoHalfH * .11f
+                    if (index % 2 == 0) {
                         Offset(
-                            cubicBezier(1.10f, .98f, .84f, .665f, q),
-                            cubicBezier(
-                                .03f + .22f * lane,
-                                .10f + .11f * lane,
-                                .49f + .07f * lane,
-                                .615f + .025f * laneSigned,
-                                q,
-                            ),
+                            lerp(x0, x1, local),
+                            lerp(y0, cy, local),
                         )
                     } else {
                         Offset(
-                            cubicBezier(-.10f, .02f, .16f, .335f, q),
-                            cubicBezier(
-                                .73f + .20f * lane,
-                                .80f - .10f * lane,
-                                .40f - .06f * lane,
-                                .275f - .025f * laneSigned,
-                                q,
-                            ),
-                        )
-                    }
-                } else {
-                    val q = (eased - split) / (1f - split)
-                    if (upper) {
-                        Offset(
-                            cubicBezier(.665f, .625f, .485f, targetX, q),
-                            cubicBezier(
-                                .615f + .025f * laneSigned,
-                                .675f,
-                                .635f,
-                                targetY,
-                                q,
-                            ),
-                        )
-                    } else {
-                        Offset(
-                            cubicBezier(.335f, .375f, .515f, targetX, q),
-                            cubicBezier(
-                                .275f - .025f * laneSigned,
-                                .215f,
-                                .255f,
-                                targetY,
-                                q,
-                            ),
+                            lerp(x0, x1, local),
+                            lerp(y1, cy, local),
                         )
                     }
                 }
+                else -> {
+                    val local = ((r - 92) / 8f).coerceIn(0f, 1f)
+                    Offset(
+                        lerp(
+                            cx + logoHalfW * .02f,
+                            cx + logoHalfW * .25f,
+                            local,
+                        ),
+                        cy + logoHalfH * .10f,
+                    )
+                }
+            }
+        }
+
+        fun inflowPoint(
+            upper: Boolean,
+            lane: Float,
+            t: Float,
+            clock: Float,
+            target: Offset,
+        ): Offset {
+            val eased = smoothStep(t)
+            val laneSigned = lane * 2f - 1f
+            val start =
+                if (upper) {
+                    Offset(
+                        1.10f,
+                        .02f + lane * .34f,
+                    )
+                } else {
+                    Offset(
+                        -.10f,
+                        .64f + lane * .34f,
+                    )
+                }
+            val control1 =
+                if (upper) {
+                    Offset(.94f, .10f + lane * .22f)
+                } else {
+                    Offset(.06f, .84f - lane * .22f)
+                }
+            val control2 =
+                if (upper) {
+                    Offset(.73f, .33f + lane * .13f)
+                } else {
+                    Offset(.27f, .58f - lane * .13f)
+                }
+            val base = Offset(
+                cubicBezier(start.x, control1.x, control2.x, target.x, eased),
+                cubicBezier(start.y, control1.y, control2.y, target.y, eased),
+            )
 
             val taper = (1f - eased) * (1f - eased)
             val direction = if (upper) 1f else -1f
             val angle =
                 direction *
                     (
-                        eased * 1.64f * PI.toFloat() +
+                        eased * 1.45f * PI.toFloat() +
                             clock * 2f * PI.toFloat()
                         ) +
-                    laneSigned * 1.28f
+                    laneSigned * 1.35f
             val orbit =
-                (.034f + .014f * kotlin.math.abs(laneSigned)) * taper
+                (.032f + .015f * kotlin.math.abs(laneSigned)) * taper
 
             return Offset(
                 base.x +
                     kotlin.math.cos(angle) * orbit +
                     laneSigned * .020f * taper,
                 base.y +
-                    sin(angle) * orbit * .68f +
+                    sin(angle) * orbit * .70f +
                     laneSigned * .022f * taper,
             )
         }
@@ -511,9 +567,8 @@ private fun SiftAlphaLaunchMotion(
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            val center = Offset(w * .50f, h * .445f)
+            val center = Offset(w * cx, h * cy)
 
-            // Deep-space glow shared by all stages.
             drawCircle(
                 brush = Brush.radialGradient(
                     listOf(
@@ -540,45 +595,32 @@ private fun SiftAlphaLaunchMotion(
                 center = Offset(w * .18f, h * .82f),
             )
 
-            fun drawFlowBundle(
-                alpha: Float,
-                convergence: Boolean,
-            ) {
-                if (alpha <= .004f) return
-                val strands = if (convergence) 38 else 32
-                val samples = if (convergence) 30 else 24
-
+            if (inflowAlpha > .004f) {
+                val strandsPerSide = 42
+                val samples = 28
                 repeat(2) { side ->
                     val upper = side == 0
                     val clock = if (upper) upperClock else lowerClock
-
-                    repeat(strands) { strand ->
-                        val lane = strand / (strands - 1f)
-                        val highlightPhase =
+                    repeat(strandsPerSide) { strand ->
+                        val lane = strand / (strandsPerSide - 1f)
+                        val target = logoTarget(
+                            strand + side * strandsPerSide,
+                            strandsPerSide * 2,
+                        )
+                        val phase =
                             (
                                 clock +
-                                    strand *
-                                        if (upper) .037f else .043f +
-                                    lane * if (upper) .15f else .19f
+                                    strand * if (upper) .037f else .043f
                                 ) % 1f
 
                         fun point(t: Float): Offset {
-                            val n =
-                                if (convergence) {
-                                    stage2Point(
-                                        upper,
-                                        lane,
-                                        t,
-                                        clock,
-                                    )
-                                } else {
-                                    stage1Point(
-                                        upper,
-                                        lane,
-                                        t,
-                                        clock,
-                                    )
-                                }
+                            val n = inflowPoint(
+                                upper,
+                                lane,
+                                t,
+                                clock,
+                                target,
+                            )
                             return Offset(n.x * w, n.y * h)
                         }
 
@@ -586,8 +628,7 @@ private fun SiftAlphaLaunchMotion(
                         for (sample in 1..samples) {
                             val t = sample / samples.toFloat()
                             val current = point(t)
-                            val distance =
-                                kotlin.math.abs(t - highlightPhase)
+                            val distance = kotlin.math.abs(t - phase)
                             val wrapped =
                                 kotlin.math.min(distance, 1f - distance)
                             val pulse =
@@ -622,129 +663,106 @@ private fun SiftAlphaLaunchMotion(
                             drawLine(
                                 color = color.copy(
                                     alpha =
-                                        alpha *
+                                        inflowAlpha *
                                             edgeFade *
-                                            (.055f + .40f * pulse),
+                                            (.050f + .40f * pulse),
                                 ),
                                 start = previous,
                                 end = current,
                                 strokeWidth =
-                                    (.42f + (strand % 6) * .10f).dp.toPx(),
+                                    (.40f + (strand % 6) * .09f).dp.toPx(),
                                 cap = StrokeCap.Round,
                             )
                             previous = current
                         }
                     }
                 }
-            }
 
-            drawFlowBundle(stage1Alpha, convergence = false)
-            drawFlowBundle(stage2Alpha, convergence = true)
-
-            // High-speed glowing points with short tails for stage 1.
-            if (stage1Alpha > .004f) {
-                val count = 156
-                repeat(count) { index ->
+                val particleCount = 220
+                repeat(particleCount) { index ->
                     val upper = index % 2 == 0
-                    val lane = (index % 52) / 51f
+                    val lane = (index % 55) / 54f
+                    val clock = if (upper) upperClock else lowerClock
                     val raw =
-                        (
-                            (if (upper) upperClock else lowerClock) +
-                                index * .027f +
-                                lane * .13f
-                            ) % 1f
+                        (clock + index * .024f + lane * .11f) % 1f
                     val t = smoothStep(raw)
-                    val n = stage1Point(
+                    val target = logoTarget(index, particleCount)
+                    val n = inflowPoint(
                         upper,
                         lane,
                         t,
-                        if (upper) upperClock else lowerClock,
+                        clock,
+                        target,
                     )
-                    val prior = stage1Point(
-                        upper,
-                        lane,
-                        (t - .025f).coerceAtLeast(0f),
-                        if (upper) upperClock else lowerClock,
-                    )
-                    val life = flowEnvelope(raw) * stage1Alpha
+                    val life = flowEnvelope(raw) * inflowAlpha
+                    val point = Offset(n.x * w, n.y * h)
                     val color =
                         if (upper) {
                             if (index % 3 == 0) Cyan else ElectricBlue
                         } else {
                             if (index % 3 == 0) Violet else Cyan
                         }
-                    val point = Offset(n.x * w, n.y * h)
-                    val tail = Offset(prior.x * w, prior.y * h)
-
-                    drawLine(
-                        color = color.copy(alpha = .23f * life),
-                        start = tail,
-                        end = point,
-                        strokeWidth = .85.dp.toPx(),
-                        cap = StrokeCap.Round,
-                    )
                     drawCircle(
-                        color = color.copy(alpha = .70f * life),
-                        radius = (.75f + (index % 4) * .28f).dp.toPx(),
+                        color = color.copy(alpha = .68f * life),
+                        radius = (.65f + (index % 4) * .25f).dp.toPx(),
                         center = point,
                     )
                 }
             }
 
-            // Stage 3: dense nebula/data fragments build a volumetric S.
-            if (stage3Alpha > .004f) {
-                val fragmentCount = 330
+            // The center is now a code-built version of the actual app logo:
+            // rounded square shell + S ribbon + >_ terminal details.
+            if (codeLogoAlpha > .004f) {
+                val fragmentCount = 420
                 repeat(fragmentCount) { index ->
-                    val u = index / (fragmentCount - 1f)
-                    val base = codeSPoint(u)
-                    val rotation =
+                    val target = logoTarget(index, fragmentCount)
+                    val settle = logoBuild
+                    val scatterRadius =
+                        (1f - settle) *
+                            (.030f + (index % 11) * .0022f)
+                    val angle =
                         index * 2.399963f +
-                            upperClock * 2f * PI.toFloat() *
-                                (.35f + (index % 5) * .04f)
-                    val depth =
-                        sin(index * 1.27f) * .5f + .5f
-                    val thickness =
-                        (
-                            .010f +
-                                (index % 9) * .0017f
-                            ) *
-                            (.72f + .36f * depth)
+                            upperClock * 2f * PI.toFloat() * .30f
                     val x =
-                        (base.x +
-                            kotlin.math.cos(rotation) * thickness) * w
+                        (
+                            target.x +
+                                kotlin.math.cos(angle) * scatterRadius
+                            ) * w
                     val y =
-                        (base.y +
-                            sin(rotation) * thickness * .72f) * h
-                    val twinkle =
-                        .48f +
-                            .52f *
+                        (
+                            target.y +
+                                sin(angle) * scatterRadius * .78f
+                            ) * h
+                    val shimmer =
+                        .50f +
+                            .50f *
                                 kotlin.math.abs(
                                     sin(
                                         lowerClock * 2f * PI.toFloat() +
-                                            index * .31f,
+                                            index * .29f,
                                     ),
                                 )
+                    val localX = target.x - cx
+                    val localY = target.y - cy
                     val color =
                         when {
-                            u < .43f ->
-                                if (index % 3 == 0) Cyan else ElectricBlue
-                            u < .62f ->
-                                if (index % 2 == 0) ElectricBlue else Violet
-                            else ->
-                                if (index % 3 == 0) Blue else Violet
+                            localY < -logoHalfH * .15f -> Cyan
+                            localX > 0f && localY > 0f -> Violet
+                            index % 3 == 0 -> ElectricBlue
+                            else -> Blue
                         }
 
                     if (index % 4 == 0) {
                         drawRoundRect(
                             color = color.copy(
                                 alpha =
-                                    stage3Alpha *
-                                        (.27f + .55f * twinkle),
+                                    codeLogoAlpha *
+                                        (.24f + .56f * shimmer),
                             ),
                             topLeft = Offset(x, y),
                             size = Size(
-                                (2.2f + (index % 5) * .72f).dp.toPx(),
-                                (1.9f + (index % 4) * .62f).dp.toPx(),
+                                (2.1f + (index % 5) * .68f).dp.toPx(),
+                                (1.8f + (index % 4) * .58f).dp.toPx(),
                             ),
                             cornerRadius = CornerRadius(
                                 1.0.dp.toPx(),
@@ -755,68 +773,39 @@ private fun SiftAlphaLaunchMotion(
                         drawCircle(
                             color = color.copy(
                                 alpha =
-                                    stage3Alpha *
-                                        (.24f + .52f * twinkle),
+                                    codeLogoAlpha *
+                                        (.22f + .52f * shimmer),
                             ),
                             radius =
-                                (.72f + (index % 5) * .31f).dp.toPx(),
+                                (.68f + (index % 5) * .29f).dp.toPx(),
                             center = Offset(x, y),
                         )
                     }
                 }
 
-                // Sparse orbiting dust makes the S feel like a small galaxy/nebula.
-                repeat(76) { index ->
-                    val angle =
-                        index * .83f +
-                            upperClock * 2f * PI.toFloat() *
-                                if (index % 2 == 0) 1f else -1f
-                    val radius =
-                        size.minDimension *
-                            (.11f + (index % 13) / 13f * .15f)
-                    val x =
-                        center.x +
-                            kotlin.math.cos(angle) * radius
-                    val y =
-                        center.y +
-                            sin(angle) * radius * .78f
-                    val color = if (index % 2 == 0) Cyan else Violet
-                    drawCircle(
-                        color = color.copy(
-                            alpha =
-                                stage3Alpha *
-                                    (.08f + (index % 5) * .018f),
-                        ),
-                        radius = (.45f + (index % 4) * .18f).dp.toPx(),
-                        center = Offset(x, y),
-                    )
-                }
-
                 drawCircle(
                     brush = Brush.radialGradient(
                         listOf(
-                            Cyan.copy(alpha = .18f * stage3Alpha),
-                            Violet.copy(alpha = .12f * stage3Alpha),
+                            Cyan.copy(alpha = .14f * codeLogoAlpha),
+                            Violet.copy(alpha = .10f * codeLogoAlpha),
                             Color.Transparent,
                         ),
                         center = center,
-                        radius = size.minDimension * .31f,
+                        radius = size.minDimension * .26f,
                     ),
-                    radius = size.minDimension * .29f,
+                    radius = size.minDimension * .24f,
                     center = center,
                 )
             }
 
-            // Stage 4 final breathing halo behind the real app logo.
-            if (stage4Alpha > .004f) {
-                val breath =
-                    .72f + .28f * breathe
+            if (realLogoAlpha > .004f) {
+                val pulse = .72f + .28f * breathe
                 drawCircle(
                     brush = Brush.radialGradient(
                         listOf(
-                            Cyan.copy(alpha = .28f * breath * stage4Alpha),
-                            Blue.copy(alpha = .17f * breath * stage4Alpha),
-                            Violet.copy(alpha = .13f * breath * stage4Alpha),
+                            Cyan.copy(alpha = .28f * pulse * realLogoAlpha),
+                            Blue.copy(alpha = .17f * pulse * realLogoAlpha),
+                            Violet.copy(alpha = .13f * pulse * realLogoAlpha),
                             Color.Transparent,
                         ),
                         center = center,
@@ -830,87 +819,56 @@ private fun SiftAlphaLaunchMotion(
             }
         }
 
-        // Required code glyphs ride stages 1/2 and then become part of the stage-3 S.
-        if (motion && p < .88f) {
+        // The visible code itself converges directly onto the final logo geometry.
+        if (motion && (inflowAlpha > .01f || codeLogoAlpha > .01f)) {
             BrandCodeParticles.forEachIndexed { index, particle ->
                 val lane = particle.lane
                 val clock = if (particle.upper) upperClock else lowerClock
-                val rawPhase =
+                val raw =
                     (
                         clock +
-                            index * .061f +
-                            lane * .131f +
+                            index * .057f +
+                            lane * .127f +
                             particle.delay
                         ) % 1f
-                val t = smoothStep(rawPhase)
-                val life = flowEnvelope(rawPhase)
+                val t = smoothStep(raw)
+                val life = flowEnvelope(raw)
+                val target = logoTarget(index, BrandCodeParticles.size)
+                val stream = inflowPoint(
+                    particle.upper,
+                    lane,
+                    t,
+                    clock,
+                    target,
+                )
 
-                val startN =
-                    stage1Point(
-                        particle.upper,
-                        lane,
-                        t,
-                        clock,
+                val morph =
+                    smoothStep(
+                        ((p - .27f) / .42f)
+                            .coerceIn(0f, 1f),
                     )
-                val convN =
-                    stage2Point(
-                        particle.upper,
-                        lane,
-                        t,
-                        clock,
-                    )
-                val convergenceBlend =
-                    smoothStep(((p - .18f) / .32f).coerceIn(0f, 1f))
-                val streamX =
-                    startN.x * (1f - convergenceBlend) +
-                        convN.x * convergenceBlend
-                val streamY =
-                    startN.y * (1f - convergenceBlend) +
-                        convN.y * convergenceBlend
-
-                val u =
-                    index.toFloat() /
-                        (BrandCodeParticles.size - 1).toFloat()
-                val sBase = codeSPoint(u)
-                val formAngle =
-                    index * 1.81f +
-                        clock * 2f * PI.toFloat() * .42f
-                val spread =
-                    .008f + (index % 7) * .00155f
-                val formX =
-                    sBase.x + kotlin.math.cos(formAngle) * spread
-                val formY =
-                    sBase.y + sin(formAngle) * spread * .72f
-                val formationBlend =
-                    smoothStep(((p - .43f) / .30f).coerceIn(0f, 1f))
-
                 val x =
-                    streamX * (1f - formationBlend) +
-                        formX * formationBlend
+                    stream.x * (1f - morph) +
+                        target.x * morph
                 val y =
-                    streamY * (1f - formationBlend) +
-                        formY * formationBlend
+                    stream.y * (1f - morph) +
+                        target.y * morph
                 val alpha =
                     (
-                        kotlin.math.max(stage1Alpha, stage2Alpha) *
-                            life *
-                            (1f - formationBlend) +
-                            stage3Alpha *
-                                formationBlend *
-                                (.60f + .40f * life)
+                        inflowAlpha * life * (1f - morph) +
+                            codeLogoAlpha *
+                                morph *
+                                (.62f + .38f * life)
                         ).coerceIn(0f, 1f)
 
                 Text(
                     text = particle.text,
-                    color =
-                        when {
-                            u < .43f ->
-                                if (index % 3 == 0) Cyan else ElectricBlue
-                            u < .62f ->
-                                if (index % 2 == 0) ElectricBlue else Violet
-                            else ->
-                                if (index % 3 == 0) Blue else Violet
-                        },
+                    color = when {
+                        target.y < cy - logoHalfH * .15f -> Cyan
+                        target.x > cx && target.y > cy -> Violet
+                        index % 3 == 0 -> ElectricBlue
+                        else -> Blue
+                    },
                     fontSize =
                         when {
                             particle.text.length >= 4 -> 7.sp
@@ -926,7 +884,9 @@ private fun SiftAlphaLaunchMotion(
                         .alpha(alpha)
                         .graphicsLayer {
                             val scale =
-                                .96f - .14f * formationBlend
+                                .98f -
+                                    .16f * morph -
+                                    .10f * realLogoAlpha
                             scaleX = scale
                             scaleY = scale
                         },
@@ -934,13 +894,12 @@ private fun SiftAlphaLaunchMotion(
             }
         }
 
-        // Only the final stage shows brand copy. No stage titles, sequence numbers or captions.
-        if (stage4Alpha > .004f) {
+        if (realLogoAlpha > .004f) {
             Column(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .offset(y = (-10).dp)
-                    .alpha(stage4Alpha),
+                    .alpha(realLogoAlpha),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box(
@@ -951,7 +910,7 @@ private fun SiftAlphaLaunchMotion(
                         val pulse = .70f + .30f * breathe
                         drawRoundRect(
                             color = Cyan.copy(
-                                alpha = .24f * pulse * stage4Alpha,
+                                alpha = .24f * pulse * realLogoAlpha,
                             ),
                             topLeft = Offset(
                                 6.dp.toPx(),
@@ -977,7 +936,7 @@ private fun SiftAlphaLaunchMotion(
                                 scaleX = scale
                                 scaleY = scale
                             },
-                        alpha = stage4Alpha,
+                        alpha = realLogoAlpha,
                     )
                 }
                 Spacer(Modifier.height(16.dp))
@@ -987,6 +946,7 @@ private fun SiftAlphaLaunchMotion(
                     fontSize = 34.sp,
                     lineHeight = 40.sp,
                     fontWeight = FontWeight.Medium,
+                    modifier = Modifier.alpha(copyAlpha),
                 )
                 Spacer(Modifier.height(10.dp))
                 Text(
@@ -994,6 +954,7 @@ private fun SiftAlphaLaunchMotion(
                     color = Color(0xFFB8C3E4),
                     fontSize = 10.sp,
                     letterSpacing = 3.8.sp,
+                    modifier = Modifier.alpha(copyAlpha),
                 )
             }
         }
