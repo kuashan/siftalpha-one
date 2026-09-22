@@ -1438,3 +1438,18 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Reduced motion | static equivalent without continuous decorative motion | PASS REQUIRED |
 | R48-D2 baseline | baseline branch/source unchanged | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v200 — Launch code/data flow motion only
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Scope | only launch code/data motion changed | PASS REQUIRED |
+| Upper/lower flow | independent non-mirrored continuous motion | PASS REQUIRED |
+| Token staggering | code elements do not move as one synchronized block | PASS REQUIRED |
+| Loop reset | entry/exit fade hides wrap/reset | PASS REQUIRED |
+| Curve movement | subtle drift follows approved stream paths | PASS REQUIRED |
+| Logo/layout/text | identical to v199 approved composition | PASS REQUIRED |
+| Launch timing | unchanged from v199 | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |

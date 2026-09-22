@@ -2670,3 +2670,29 @@ Boundary:
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `199`
+
+
+## 2026-09-22 · R48-D3 v200 launch code-flow motion refinement
+
+Scope is intentionally limited to the launch page code/data motion.
+
+Unchanged:
+- approved full-screen composition;
+- real app logo and its source asset;
+- SiftAlpha X wordmark and taglines;
+- launch dwell timing;
+- background, convergence point and layout;
+- R48-D2 functional baseline.
+
+Motion repair:
+- upper and lower code streams now use independent continuous clocks rather than the single one-shot launch progress;
+- upper/lower durations are intentionally different to avoid mirrored synchronization;
+- code tokens use staggered phase offsets so they no longer move as one rigid block;
+- each token/data packet uses a soft fade-in / fade-out envelope at the path edges, preventing visible teleport/reset;
+- subtle curve drift creates organic motion without changing the approved paths;
+- packet movement and code-token movement remain coordinated but not mechanically locked together;
+- Reduced Motion behavior remains unchanged.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `200`.

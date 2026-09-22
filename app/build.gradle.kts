@@ -103,7 +103,10 @@ android {
         // v199 rebuilds the Normal Mode launch page in code to match the approved full-screen concept:
         // dense curved code/data streams from top-right and bottom-left converge into the unchanged
         // real app logo, with SiftAlpha X wordmark, Chinese tagline, and restrained bottom accent.
-        versionCode = 199
+        // v200 changes only code/data flow motion: independent upper/lower clocks, staggered token phases,
+        // soft entry/exit envelopes and subtle curve drift remove the rigid synchronized movement while
+        // preserving the approved launch composition, timing, logo, text and R48-D2 functionality.
+        versionCode = 200
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

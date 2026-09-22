@@ -93,6 +93,8 @@ import com.siftalpha.studio.runtime.ProjectRuntimeSelection
 import com.siftalpha.studio.runtime.RuntimeState
 import com.siftalpha.studio.ui.theme.StudioTheme
 import kotlinx.coroutines.delay
+import kotlin.math.PI
+import kotlin.math.sin
 
 private val Ink = Color(0xFF040817)
 private val InkSoft = Color(0xFF071027)
@@ -215,12 +217,53 @@ private fun cubicBezier(
         t * t * t * end
 }
 
+private fun smoothStep(value: Float): Float {
+    val t = value.coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
+}
+
+private fun flowEnvelope(phase: Float): Float {
+    val enter = smoothStep((phase / .16f).coerceIn(0f, 1f))
+    val exit = 1f - smoothStep(((phase - .82f) / .18f).coerceIn(0f, 1f))
+    return enter * exit
+}
+
+
 @Composable
 private fun BrandLaunchScene(
     progress: Float,
     motion: Boolean,
 ) {
     val resolved = progress.coerceIn(0f, 1f)
+
+    // Independent flow clocks keep both streams moving continuously instead of tying every
+    // token to the one-shot launch progress. Different durations prevent mirrored/mechanical
+    // synchronization while LinearEasing preserves constant travel between curve samples.
+    val flowTransition = rememberInfiniteTransition(label = "brand-code-flow")
+    val upperClock by if (motion) {
+        flowTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2200, easing = LinearEasing),
+            ),
+            label = "brand-code-upper-flow",
+        )
+    } else {
+        remember { mutableStateOf(.56f) }
+    }
+    val lowerClock by if (motion) {
+        flowTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2480, easing = LinearEasing),
+            ),
+            label = "brand-code-lower-flow",
+        )
+    } else {
+        remember { mutableStateOf(.48f) }
+    }
     val logoAlpha = if (motion) {
         ((resolved - .44f) / .40f).coerceIn(0f, 1f)
     } else {
@@ -330,28 +373,47 @@ private fun BrandLaunchScene(
 
                 // Short luminous packets make the streams feel like actual data lanes.
                 repeat(4) { packet ->
-                    val phase = if (motion) {
-                        ((resolved * 1.42f + laneRatio * .27f + packet * .21f) % 1f)
+                    val topRawPhase = if (motion) {
+                        (upperClock + laneRatio * .19f + packet * .237f) % 1f
                     } else {
                         (packet + 1) / 5f
                     }
+                    val bottomRawPhase = if (motion) {
+                        (lowerClock + laneRatio * .23f + packet * .219f) % 1f
+                    } else {
+                        (packet + 1) / 5f
+                    }
+                    val topPhase = smoothStep(topRawPhase)
+                    val bottomPhase = smoothStep(bottomRawPhase)
+                    val topPacketAlpha = flowEnvelope(topRawPhase)
+                    val bottomPacketAlpha = flowEnvelope(bottomRawPhase)
                     val topX = cubicBezier(
                         w * 1.06f,
                         w * (.88f - .02f * laneRatio),
                         w * (.71f - .09f * laneRatio),
                         w * (.53f + .015f * (laneRatio - .5f)),
-                        phase,
+                        topPhase,
                     )
                     val topY = cubicBezier(
                         h * (.035f + .245f * laneRatio),
                         h * (.08f + .10f * laneRatio),
                         h * (.29f + .08f * laneRatio),
                         h * (.395f + .055f * (laneRatio - .5f)),
-                        phase,
+                        topPhase,
                     )
                     drawRoundRect(
-                        color = if (packet % 2 == 0) Cyan.copy(alpha = .52f) else ElectricBlue.copy(alpha = .46f),
-                        topLeft = Offset(topX, topY),
+                        color = if (packet % 2 == 0) {
+                            Cyan.copy(alpha = .58f * topPacketAlpha)
+                        } else {
+                            ElectricBlue.copy(alpha = .50f * topPacketAlpha)
+                        },
+                        topLeft = Offset(
+                            topX,
+                            topY + sin(
+                                (topRawPhase * 2f * PI.toFloat()) +
+                                    laneRatio * 3.2f,
+                            ) * 2.2.dp.toPx(),
+                        ),
                         size = Size(
                             width = (5f + (lane % 3) * 2f).dp.toPx(),
                             height = 1.5.dp.toPx(),
@@ -364,18 +426,28 @@ private fun BrandLaunchScene(
                         w * (.16f + .03f * laneRatio),
                         w * (.33f + .07f * laneRatio),
                         w * (.47f - .015f * (laneRatio - .5f)),
-                        phase,
+                        bottomPhase,
                     )
                     val bottomY = cubicBezier(
                         h * (.69f + .23f * laneRatio),
                         h * (.78f - .10f * laneRatio),
                         h * (.67f - .11f * laneRatio),
                         h * (.535f + .055f * (laneRatio - .5f)),
-                        phase,
+                        bottomPhase,
                     )
                     drawRoundRect(
-                        color = if (packet % 2 == 0) Violet.copy(alpha = .52f) else Cyan.copy(alpha = .42f),
-                        topLeft = Offset(bottomX, bottomY),
+                        color = if (packet % 2 == 0) {
+                            Violet.copy(alpha = .56f * bottomPacketAlpha)
+                        } else {
+                            Cyan.copy(alpha = .48f * bottomPacketAlpha)
+                        },
+                        topLeft = Offset(
+                            bottomX,
+                            bottomY + sin(
+                                (bottomRawPhase * 2f * PI.toFloat()) +
+                                    laneRatio * 3.6f,
+                            ) * 2.0.dp.toPx(),
+                        ),
                         size = Size(
                             width = (5f + ((lane + 1) % 3) * 2f).dp.toPx(),
                             height = 1.5.dp.toPx(),
@@ -405,11 +477,26 @@ private fun BrandLaunchScene(
 
         if (motion && particleFade > .01f) {
             BrandCodeParticles.forEachIndexed { index, particle ->
-                val localProgress =
-                    ((resolved - particle.delay) / (1f - particle.delay))
-                        .coerceIn(0f, 1f)
-
                 val lane = particle.lane
+                val sourceClock = if (particle.upper) upperClock else lowerClock
+                val rawPhase = if (motion) {
+                    (
+                        sourceClock +
+                            index * .071f +
+                            lane * .137f +
+                            particle.delay
+                        ) % 1f
+                } else {
+                    .58f
+                }
+                val localProgress = smoothStep(rawPhase)
+                val particleAlpha = flowEnvelope(rawPhase)
+                val drift =
+                    sin(
+                        rawPhase * 2f * PI.toFloat() +
+                            index * .73f,
+                    ) * if (particle.upper) .0045f else .0040f
+
                 val startX = if (particle.upper) {
                     .80f + .20f * lane
                 } else {
@@ -454,13 +541,15 @@ private fun BrandLaunchScene(
                     modifier = Modifier
                         .offset(
                             x = maxWidth * x - 16.dp,
-                            y = maxHeight * y - 8.dp,
+                            y = maxHeight * (y + drift) - 8.dp,
                         )
                         .alpha(
-                            particleFade * (.34f + .66f * localProgress),
+                            particleFade *
+                                particleAlpha *
+                                (.38f + .62f * localProgress),
                         )
                         .graphicsLayer {
-                            val scale = .84f + .18f * localProgress
+                            val scale = .88f + .12f * localProgress
                             scaleX = scale
                             scaleY = scale
                         },
