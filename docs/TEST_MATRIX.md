@@ -1839,5 +1839,5 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Developer Mode | External PREPARE / START | minimal V04 gate wiring resumes original dispatch once |
 | Developer boundaries | layout/Web Discovery/auto observation/log/result/runtime-control | unchanged |
 | version | installable build | 0.8.0-alpha43-r48d10 / versionCode 222 |
-| W0 / unit tests / assembleDebug | cloud build | PENDING |
-| Internal Alpine Probe | cloud probe after version bump | PENDING |
+| W0 / unit tests / assembleDebug | cloud build | PASS — Run #658 on `2ff4dac58730681e5e1e7d5f86dcf7e6b01c78a1`; artifact `siftalpha-w0-658`; APK SHA-256 `7b317eed6e945bffd02fbb9f291da35fb60c9533eeabff06d4130b891143e184` |
+| Internal Alpine Probe | cloud probe after version bump | PASS — Run #112 |
