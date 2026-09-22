@@ -176,3 +176,12 @@ Current opening-motion authority:
   rounded-square shell + S ribbon + terminal >_;
 - that code-built logo then resolves into the real app logo asset in place;
 - no hard cut and no extra storyboard UI.
+
+
+## R48-D3 v208 Override — Code-built logo must already read as the logo
+
+Current authority:
+- converging code must settle directly into a recognisable code-built version of the app logo;
+- do not use a generic particle cloud or unrelated intermediate object;
+- the code-built state uses the final logo geometry itself: rounded-square shell + thick S ribbon + >_;
+- only after that code-built logo is readable may the real launcher logo resolve in place.

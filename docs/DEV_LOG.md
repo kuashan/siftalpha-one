@@ -2919,3 +2919,30 @@ Boundary:
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `207`.
+
+
+## 2026-09-22 · R48-D3 v208 code-built logo readability repair
+
+Real-device evidence from v207 showed the actual problem clearly:
+- the streams converged correctly;
+- however, the intermediate result read as an amorphous code/particle blob instead of the application logo;
+- the subsequent real-logo reveal therefore looked like a separate object appearing from that blob.
+
+Root cause:
+- v207 mixed a random-looking 420-fragment field with code glyphs;
+- target allocation distributed too few text glyphs across several logo regions;
+- the S ribbon did not have a thick, structured glyph lattice, so its silhouette was not visually dominant.
+
+v208 fixes only that launch-formation presentation:
+- removes the 420-fragment intermediate cloud entirely;
+- increases actual visible code glyphs from 144 to 216;
+- reserves 52 evenly spaced glyphs for the rounded-square shell;
+- builds the S as a deterministic **seven-row thick code ribbon**, using perpendicular offsets from the S centerline;
+- reserves 24 code glyphs for an explicit white `>_` terminal structure;
+- all incoming streams terminate directly on those exact glyph targets;
+- at full convergence the screen now holds a clean code-built logo before the real logo begins to resolve;
+- final real logo asset, background, timing family, copy, and R48-D2 functionality remain unchanged.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `208`.

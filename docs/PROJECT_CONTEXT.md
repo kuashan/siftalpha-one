@@ -1370,3 +1370,12 @@ Current Normal Mode launch motion:
 - code-built logo then resolves in place into the real launcher logo;
 - no added stage titles, numbers or explanatory captions;
 - R48-D2 baseline remains untouched.
+
+
+## 2026-09-22 · R48-D3 v208 launch correction
+
+The required intermediate launch state is now explicitly:
+**incoming code -> readable code-built app logo -> real app logo**.
+
+A generic code/particle blob is not an acceptable intermediate state.
+The R48-D2 baseline remains untouched.

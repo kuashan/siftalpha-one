@@ -1573,3 +1573,20 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Stage labels/captions | absent | PASS REQUIRED |
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v208 — Readable code-built logo before real logo
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Inflow | converges directly into logo targets | PASS REQUIRED |
+| Intermediate form | visually reads as SiftAlpha X logo, not a blob | PASS REQUIRED |
+| Code glyph population | 216 | PASS REQUIRED |
+| Rounded-square shell | 52 evenly spaced code glyphs | PASS REQUIRED |
+| S ribbon | seven-row thick glyph lattice | PASS REQUIRED |
+| Terminal | explicit white >_ glyph structure | PASS REQUIRED |
+| Generic fragment cloud | removed | PASS REQUIRED |
+| Code-logo hold | visible before real-logo reveal | PASS REQUIRED |
+| Real logo asset | unchanged | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |

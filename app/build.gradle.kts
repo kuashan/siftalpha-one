@@ -125,7 +125,10 @@ android {
         // v207 changes the formation target from a generic S path to the actual logo geometry:
         // incoming code now settles directly onto the rounded-square shell, S ribbon and >_ terminal,
         // then the code-built logo continuously resolves into the unchanged real application logo.
-        versionCode = 207
+        // v208 removes the noisy particle-cloud intermediate and makes the first settled form readable
+        // as a true code-built logo: 216 code glyphs are laid out deterministically on the rounded-square
+        // shell, seven-row S ribbon, and explicit >_ terminal before morphing into the real logo asset.
+        versionCode = 208
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
