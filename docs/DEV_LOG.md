@@ -2792,3 +2792,32 @@ Boundary:
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `203`.
+
+
+## 2026-09-22 · R48-D3 v204 restore v202 launch composition; convergence density only
+
+User correction: v203 added launch-stage chrome/content that was not requested.
+
+v204 therefore restores the **v202 launch composition exactly** and changes only the existing code/data convergence density.
+
+Only visual-flow changes from v202:
+- curved strands: 24 -> 40 per side;
+- visible code tokens: 64 -> 120 total;
+- luminous data particles: 72 -> 144 per side;
+- strand stroke is slightly thinner to support higher density;
+- moving highlight contrast is slightly increased so the dense stream resembles the approved concept image.
+
+Explicitly unchanged from v202:
+- launch layout;
+- launch text;
+- background;
+- logo and logo timing;
+- convergence targets at the S endpoints;
+- total launch timing;
+- Runtime / Environment / Open / Stop / result semantics.
+
+The v203 four-stage headings/captions are not part of the v204 app presentation.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `204`.

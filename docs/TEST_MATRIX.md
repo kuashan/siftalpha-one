@@ -1506,3 +1506,18 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Localization keys | identical across 5 locales | PASS REQUIRED |
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v204 — v202 launch + convergence density only
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Launch composition | same as v202 | PASS REQUIRED |
+| Extra v203 stage chrome | absent from app presentation | PASS REQUIRED |
+| Curved strands | 40 per side | PASS REQUIRED |
+| Code tokens | 120 total | PASS REQUIRED |
+| Luminous particles | 144 per side | PASS REQUIRED |
+| S endpoint targets | unchanged from v202 | PASS REQUIRED |
+| Logo/text/background/timing | unchanged from v202 | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |

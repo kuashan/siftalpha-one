@@ -118,3 +118,16 @@ Every scene keeps:
 - no layout-shifting animations;
 - Reduced Motion presents the completed frame without decorative travel;
 - total perceived launch duration remains approximately 5 seconds.
+
+
+## R48-D3 v204 Override — Current authority
+
+The v203 four-scene page chrome is **not** part of the current app presentation.
+
+Current launch authority is:
+- restore the v202 composition, layout, copy, logo, background and timing;
+- modify only the convergence density to better match the approved visual reference;
+- keep the same two curved flow directions and the same S-endpoint targets;
+- use 40 curved strands per side, 120 code tokens, and 144 luminous particles per side.
+
+No extra stage headings, captions, or storyboard chrome may be added unless explicitly requested again.

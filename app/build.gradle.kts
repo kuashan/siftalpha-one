@@ -112,10 +112,10 @@ android {
         // v202 increases the galaxy density and replaces sparse streaks with 24 curved rotating strands
         // per side plus denser code/data particles. Upper-right flow now lands on the visible upper S end
         // and lower-left flow lands on the visible lower S end instead of converging on the logo center.
-        // v203 reproduces the approved four-scene launch storyboard in Compose: 01 From the Edges,
-        // 02 Flow Together, 03 Shape the Future, and 04 Ready for What's Next. The real app logo is
-        // revealed only in the final scene; R48-D2 functional/runtime semantics remain unchanged.
-        versionCode = 203
+        // v204 intentionally restores the v202 launch composition and changes only convergence density:
+        // 40 curved strands per side, 120 code tokens, and 144 luminous particles per side. No phase
+        // headers, extra launch copy, layout changes, logo changes, or R48-D2 functional changes.
+        versionCode = 204
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

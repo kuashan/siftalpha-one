@@ -76,12 +76,4 @@
     <string name="brand_action_run">開始執行 →</string>
     <string name="brand_action_stop">停止執行</string>
     <string name="brand_action_refresh">重新整理狀態</string>
-    <string name="brand_launch_phase_1_title">起始</string>
-    <string name="brand_launch_phase_1_caption">來自兩側的程式碼與資料，開始向中心匯聚</string>
-    <string name="brand_launch_phase_2_title">匯聚</string>
-    <string name="brand_launch_phase_2_caption">資料沿著軌跡流動，在中心相遇</string>
-    <string name="brand_launch_phase_3_title">成形</string>
-    <string name="brand_launch_phase_3_caption">程式碼與智慧在此融合，逐漸構建出 SiftAlpha X</string>
-    <string name="brand_launch_phase_4_title">完成</string>
-    <string name="brand_launch_phase_4_caption">標誌完整呈現，開啟無限可能</string>
 </resources>
