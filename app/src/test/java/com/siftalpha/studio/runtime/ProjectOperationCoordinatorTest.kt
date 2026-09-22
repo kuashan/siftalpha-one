@@ -260,6 +260,46 @@ class ProjectOperationCoordinatorTest {
     }
 
     @Test
+    fun successfulExternalPrepareRefreshesRuntimeCapabilityProof() {
+        val readinessStore = ExternalProviderReadinessStore(MemorySharedPreferences())
+        readinessStore.recordHostFacts(
+            termuxInstalled = true,
+            runCommandPermissionGranted = true,
+        )
+        val coordinator = ProjectOperationCoordinator(
+            operationStore = MemoryOperationStore(),
+            lifecycleStore = RuntimeLifecycleStore(MemorySharedPreferences()),
+            nowEpochMs = { 42_000L },
+            listenForExternalResults = true,
+            watchdog = ManualWatchdog(),
+            externalReadinessStore = readinessStore,
+        )
+        coordinator.begin(
+            projectId = "project-prepare-proof",
+            provider = RuntimeOperationProvider.EXTERNAL,
+            action = RuntimeOperationAction.PREPARE,
+            executionId = 7791,
+        )!!
+
+        TermuxResultBus.publish(
+            RuntimeResult(
+                executionId = 7791,
+                stdout = "SIFTALPHA_PREPARE_COMMITTED=1\nSIFTALPHA_ENV=READY",
+                stderr = "",
+                exitCode = 0,
+                internalErrorCode = 0,
+                internalErrorMessage = "",
+            ),
+        )
+
+        val facts = readinessStore.read()
+        assertEquals(ExternalProviderBridgeState.PASS, facts.bridgeState)
+        assertEquals(ExternalProviderProbeStage.RUNTIME_CAPABILITY, facts.probeStage)
+        assertEquals(ExternalProviderProbeResult.PASS, facts.lastProbeResult)
+        assertEquals(42_000L, facts.lastProbeAtEpochMs)
+    }
+
+    @Test
     fun failedExternalPrepareLeavesPreparingFailedAndNoActiveOperation() {
         val lifecycle = RuntimeLifecycleStore(MemorySharedPreferences())
         val coordinator = coordinator(
