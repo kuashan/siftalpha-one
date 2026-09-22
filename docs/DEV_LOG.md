@@ -3071,3 +3071,45 @@ v213:
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `213`.
+
+
+## 2026-09-22 · R48-D3 v214 eight Normal Mode repairs
+
+This round implements the user's eight requested Normal Mode presentation/usability repairs while preserving R48-D2 functional behavior.
+
+1. Launch brand surface:
+   - removed the experimental code-convergence motion;
+   - restored a static 3-second brand hold containing the unchanged real app logo, SiftAlpha X name, approved Chinese taglines, bottom accent, and INTELLIGENCE IN MOTION;
+   - no infinite or code-flow animation runs on the brand hold.
+2. Home greeting:
+   - removed “你好 / 让想法变成看得见的结果” and its secondary tagline block.
+3. Project Location:
+   - title now explicitly uses the Normal Mode primary text token instead of inheriting dark/black text.
+4. My Projects runtime status:
+   - Home now reads each project's existing shared RuntimeLifecycleStore snapshot;
+   - project cards show Preparing / Starting / Running / Completed / Failed / Stopped / Not running with Normal Mode status-chip styling;
+   - MainActivity refreshes those snapshots on Home resume, so returning from a running project shows Running without introducing a second runtime state source.
+5. Editable project description:
+   - Normal project Details dialog now exposes an editable multi-line description field plus Save;
+   - ProjectStore persists the description back to .project.json (or creates metadata when absent);
+   - Home search already indexes ProjectSummary.description, so saved description text is searchable after refresh.
+6. Version placement:
+   - removed version text from the bottom of Normal Home;
+   - Settings > About remains the single visible version location.
+7. Prepare layout:
+   - replaced the six vertically stacked phase rows with one compact card;
+   - only the current phase title/detail plus x/6 position is shown.
+8. Empty-filter state:
+   - “no matching projects” title now explicitly uses the primary Normal Mode text token, fixing black text on the dark surface.
+
+Decorative motion lifecycle:
+- v212 shared lifecycle gate remains intact;
+- AuroraBackdrop, RunOrb, and DotPulse stop their infinite decorative animation whenever the Activity is no longer STARTED or Android system animations are disabled;
+- project execution, preparation, downloads, local web services, logs, Open/Refresh/Stop semantics remain unaffected.
+
+Frozen baseline:
+- baseline/r48d2 unchanged at 729659c345e19d249de44fdb6492c47d811701cd.
+
+Target:
+- versionName `0.8.0-alpha43-r48d3`
+- versionCode `214`.

@@ -1416,3 +1416,18 @@ Current launch/UI authority:
 - backgrounding the Activity stops Aurora / RunOrb / DotPulse animation composition;
 - project/runtime/background work is explicitly outside this gate and continues according to existing R48-D2/shared-core rules;
 - `baseline/r48d2` remains untouched.
+
+
+## 2026-09-22 · R48-D3 v214 Normal Mode UI authority
+
+Current Normal Mode opening and Home rules:
+- custom code-convergence opening is removed;
+- opening keeps the real SiftAlpha X logo and approved brand text as a static 3-second brand hold;
+- Home has no greeting/idea-result slogan block;
+- project location and empty/search state text must use Normal dark-theme tokens;
+- project cards show shared RuntimeLifecycleStore status; no duplicate runtime state model is allowed;
+- project description is editable from Details and persisted to project metadata;
+- version belongs in Settings > About, not Home;
+- Prepare shows only the current one of six phases in one compact card;
+- decorative infinite animation remains lifecycle-gated and must stop in background;
+- baseline/r48d2 remains read-only.

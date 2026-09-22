@@ -142,7 +142,10 @@ android {
         // their Activity is no longer STARTED or Android system animations are disabled. Runtime work is unchanged.
         // v213 is the installable verification build for that motion-lifecycle change and restores the shared
         // Compose geometry Size import required by existing non-launch Normal Mode drawing code.
-        versionCode = 213
+        // v214 completes the eight requested Normal Mode repairs: restore a static logo/text brand hold with no
+        // code-convergence animation, simplify Home copy/colors/status/version placement, make descriptions editable,
+        // compact Prepare to the current phase only, while preserving the v212 lifecycle-gated decorative motion.
+        versionCode = 214
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

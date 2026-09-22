@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.siftalpha.studio.project.ProjectStore
+import com.siftalpha.studio.runtime.RuntimeState
 import com.siftalpha.studio.ui.components.StudioPrimaryAction
 import com.siftalpha.studio.ui.components.StudioSectionCard
 import com.siftalpha.studio.ui.components.StudioStatusBadge
@@ -69,6 +70,7 @@ data class HomeState(
     val rootSelected: Boolean = false,
     val rootName: String? = null,
     val projects: List<ProjectStore.ProjectSummary> = emptyList(),
+    val projectRuntimeStates: Map<String, RuntimeState> = emptyMap(),
     val projectError: String? = null,
     val termuxInstalled: Boolean = false,
     val permissionGranted: Boolean = false,
@@ -103,6 +105,7 @@ fun HomeScreen(
     onCreateProjectNormal: (String, String) -> Unit,
     onImportGitHubNormal: (String, String, String) -> Unit,
     onDeleteProjectNormal: (ProjectStore.ProjectSummary) -> Unit,
+    onUpdateProjectDescriptionNormal: (ProjectStore.ProjectSummary, String) -> Unit,
     onUserStorage: () -> Unit,
     onRefreshProjects: () -> Unit,
     onOpenProject: (ProjectStore.ProjectSummary) -> Unit,
@@ -439,6 +442,10 @@ fun HomeScreen(
             SiftAlphaNormalProjectDetailsDialog(
                 project = project,
                 onDismiss = { normalDetailsProject = null },
+                onSaveDescription = { description ->
+                    normalDetailsProject = null
+                    onUpdateProjectDescriptionNormal(project, description)
+                },
             )
         }
 
@@ -461,7 +468,6 @@ fun HomeScreen(
             query = query,
             filterIndex = filterIndex,
             projectDirectoryReady = projectDirectoryReady,
-            versionName = versionName,
             onQueryChange = { query = it },
             onFilterChange = { filterIndex = it },
             onImport = { importOpen = true },

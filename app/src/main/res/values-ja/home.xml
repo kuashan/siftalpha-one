@@ -128,4 +128,13 @@
     <string name="home_import_failed">インポート失敗</string>
     <string name="home_import_github">GitHub リンクからインポート</string>
     <string name="home_user_storage">実行用ストレージ</string>
+    <string name="home_project_details_without_description">エントリ：%1$s\n実行：%2$s\nソース：%3$s</string>
+    <string name="home_project_description_save">保存</string>
+    <string name="home_project_status_preparing">準備中</string>
+    <string name="home_project_status_starting">起動中</string>
+    <string name="home_project_status_running">実行中</string>
+    <string name="home_project_status_completed">完了</string>
+    <string name="home_project_status_failed">実行失敗</string>
+    <string name="home_project_status_stopped">停止済み</string>
+    <string name="home_project_status_idle">未実行</string>
 </resources>

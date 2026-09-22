@@ -229,3 +229,19 @@ Current authority:
 - decorative infinite motion elsewhere is allowed only while the owning Activity is foreground-visible and system animations are enabled;
 - backgrounding the app must dispose those decorative infinite transitions;
 - this UI-motion lifecycle rule must never stop project/runtime work.
+
+
+## R48-D3 v214 Override — Static brand hold, no code convergence
+
+The experimental code-convergence opening is retired.
+
+Current launch presentation:
+- deep navy/black brand background;
+- unchanged original app logo;
+- SiftAlpha X;
+- approved primary/secondary brand copy;
+- restrained static halo rings and bottom accent;
+- approximately 3-second hold before Home;
+- no code particles, code streams, logo-building sequence, breathing loop, or other infinite launch motion.
+
+All other decorative infinite Normal Mode motion remains subject to the shared Activity lifecycle gate.

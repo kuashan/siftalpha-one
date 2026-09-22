@@ -28,6 +28,7 @@ import com.siftalpha.studio.runtime.ExternalProviderProbeCoordinator
 import com.siftalpha.studio.runtime.ExternalProviderReadiness
 import com.siftalpha.studio.runtime.ProjectRuntimeController
 import com.siftalpha.studio.runtime.RuntimeCommand
+import com.siftalpha.studio.runtime.RuntimeLifecycleStore
 import com.siftalpha.studio.runtime.RuntimeResult
 import com.siftalpha.studio.runtime.TermuxBackend
 import com.siftalpha.studio.runtime.TermuxContract
@@ -47,6 +48,7 @@ class MainActivity : StudioComposeActivity() {
     private lateinit var projectStore: ProjectStore
     private lateinit var projectGateway: V04ProjectGateway
     private lateinit var projectRuntime: ProjectRuntimeController
+    private lateinit var runtimeLifecycleStore: RuntimeLifecycleStore
     private lateinit var externalPreflight: ExternalProviderProbeCoordinator
     private val homeState = mutableStateOf(HomeState())
     private var autoBridgeProbeStarted = false
@@ -98,6 +100,7 @@ class MainActivity : StudioComposeActivity() {
         projectStore = ProjectStore(this)
         projectGateway = V04ProjectGateway(this)
         projectRuntime = ProjectRuntimeController(projectGateway)
+        runtimeLifecycleStore = RuntimeLifecycleStore(this)
         externalPreflight = ExternalProviderProbeCoordinator.shared(this)
         refreshDeveloperMode()
         enableEdgeToEdge()
@@ -129,6 +132,9 @@ class MainActivity : StudioComposeActivity() {
                     },
                     onDeleteProjectNormal = { project ->
                         deleteNormalProject(project)
+                    },
+                    onUpdateProjectDescriptionNormal = { project, description ->
+                        updateNormalProjectDescription(project, description)
                     },
                     onUserStorage = {
                         startActivity(Intent(this, NormalRuntimeStorageActivity::class.java))
@@ -585,16 +591,28 @@ class MainActivity : StudioComposeActivity() {
                 rootSelected = false,
                 rootName = null,
                 projects = emptyList(),
+                projectRuntimeStates = emptyMap(),
                 projectError = null,
             )
             return
         }
 
         try {
+            val projects = projectStore.listProjects()
+            val runtimeStates =
+                if (::runtimeLifecycleStore.isInitialized) {
+                    projects.associate { project ->
+                        project.documentId to
+                            runtimeLifecycleStore.read(project.documentId).runtimeState
+                    }
+                } else {
+                    emptyMap()
+                }
             homeState.value = homeState.value.copy(
                 rootSelected = true,
                 rootName = projectStore.rootDisplayName(),
-                projects = projectStore.listProjects(),
+                projects = projects,
+                projectRuntimeStates = runtimeStates,
                 projectError = null,
             )
         } catch (error: Throwable) {
@@ -602,6 +620,7 @@ class MainActivity : StudioComposeActivity() {
                 rootSelected = true,
                 rootName = null,
                 projects = emptyList(),
+                projectRuntimeStates = emptyMap(),
                 projectError = error.message ?: error.javaClass.simpleName,
             )
         }
@@ -701,6 +720,19 @@ class MainActivity : StudioComposeActivity() {
                     error.message ?: error.javaClass.simpleName,
                 ),
             )
+        }
+    }
+
+    private fun updateNormalProjectDescription(
+        project: ProjectStore.ProjectSummary,
+        description: String,
+    ) {
+        runCatching {
+            projectStore.updateProjectDescription(project, description)
+        }.onSuccess {
+            refreshProjects()
+        }.onFailure { error ->
+            toast(error.message ?: getString(R.string.home_create_failed))
         }
     }
 

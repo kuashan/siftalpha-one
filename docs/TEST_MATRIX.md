@@ -1671,3 +1671,23 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Runtime/project background work | unaffected | PASS REQUIRED |
 | Existing Normal Mode Canvas Size usage | compiles | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v214 — Eight Normal Mode repairs
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Launch | no code-convergence motion; real logo + SiftAlpha X + approved text retained | PASS REQUIRED |
+| Home greeting | hello/idea-result copy absent | PASS REQUIRED |
+| Project Location text | primary light text on dark theme | PASS REQUIRED |
+| Project card status | shared runtime lifecycle state shown after Home resume | PASS REQUIRED |
+| Description edit | Details allows edit/save and persistence to project metadata | PASS REQUIRED |
+| Description search | saved description is searchable by existing Home search | PASS REQUIRED |
+| Home version | absent from Home; remains in Settings > About | PASS REQUIRED |
+| Prepare phases | one compact current-phase card, not six stacked rows | PASS REQUIRED |
+| No-match text | primary light text on dark theme | PASS REQUIRED |
+| Decorative motion lifecycle | Aurora/RunOrb/DotPulse gated while backgrounded | PASS REQUIRED |
+| Runtime semantics | execution/prepare/Open/Refresh/Stop unchanged | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| Localization parity | all five locale home.xml key sets remain aligned | PASS REQUIRED |
+| W0 validators/tests/APK | cloud build must pass | PENDING |

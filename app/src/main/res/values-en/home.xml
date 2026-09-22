@@ -128,4 +128,13 @@ Confirm the project name.</string>
     <string name="home_import_failed">Import failed</string>
     <string name="home_import_github">Import from GitHub link</string>
     <string name="home_user_storage">Runtime storage</string>
+    <string name="home_project_details_without_description">Entry: %1$s\nRun: %2$s\nSource: %3$s</string>
+    <string name="home_project_description_save">Save</string>
+    <string name="home_project_status_preparing">Preparing</string>
+    <string name="home_project_status_starting">Starting</string>
+    <string name="home_project_status_running">Running</string>
+    <string name="home_project_status_completed">Completed</string>
+    <string name="home_project_status_failed">Run failed</string>
+    <string name="home_project_status_stopped">Stopped</string>
+    <string name="home_project_status_idle">Not running</string>
 </resources>

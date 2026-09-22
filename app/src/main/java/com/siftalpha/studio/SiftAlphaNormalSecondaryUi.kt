@@ -430,12 +430,27 @@ internal fun SiftAlphaNormalGitHubImportDialog(
 internal fun SiftAlphaNormalProjectDetailsDialog(
     project: ProjectStore.ProjectSummary,
     onDismiss: () -> Unit,
+    onSaveDescription: (String) -> Unit,
 ) {
+    var description by remember(project.documentId, project.description) {
+        mutableStateOf(project.description)
+    }
+
     NormalSecondaryDialog(
         title = project.name,
         subtitle = stringResource(R.string.home_details),
         onDismiss = onDismiss,
     ) {
+        OutlinedTextField(
+            value = description,
+            onValueChange = { description = it.take(1000) },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.home_project_description_hint)) },
+            minLines = 3,
+            maxLines = 6,
+            shape = RoundedCornerShape(14.dp),
+        )
+
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -444,8 +459,7 @@ internal fun SiftAlphaNormalProjectDetailsDialog(
         ) {
             Text(
                 text = stringResource(
-                    R.string.home_project_details,
-                    project.description.ifBlank { stringResource(R.string.home_none) },
+                    R.string.home_project_details_without_description,
                     project.entry.ifBlank { stringResource(R.string.home_none) },
                     project.run.ifBlank { stringResource(R.string.home_none) },
                     project.source,
@@ -454,6 +468,21 @@ internal fun SiftAlphaNormalProjectDetailsDialog(
                 fontSize = 12.sp,
                 lineHeight = 18.sp,
                 modifier = Modifier.padding(15.dp),
+            )
+        }
+
+        Button(
+            onClick = { onSaveDescription(description.trim()) },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            shape = RoundedCornerShape(15.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = SecondaryBlue,
+                contentColor = Color.White,
+            ),
+        ) {
+            Text(
+                text = stringResource(R.string.home_project_description_save),
+                fontWeight = FontWeight.Bold,
             )
         }
     }

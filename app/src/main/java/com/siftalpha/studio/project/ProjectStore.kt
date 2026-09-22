@@ -138,6 +138,57 @@ if __name__ == "__main__":
         check(DocumentsContract.deleteDocument(resolver, uri)) { "删除失败" }
     }
 
+    fun updateProjectDescription(
+        project: ProjectSummary,
+        description: String,
+    ): ProjectSummary {
+        val treeUri = rootUri() ?: error("项目目录不可用")
+        val children = listChildren(treeUri, project.documentId)
+        val metadataDocument =
+            children.firstOrNull { it.name == ".project.json" }
+                ?: children.firstOrNull { it.name == ".project.json.txt" }
+
+        val metadata = metadataDocument
+            ?.let { readText(treeUri, it.documentId) }
+            ?.let { runCatching { JSONObject(it) }.getOrNull() }
+            ?: JSONObject().apply {
+                put("name", project.name)
+                if (project.entry.isNotBlank()) put("entry", project.entry)
+                if (project.run.isNotBlank()) put("run", project.run)
+                put(
+                    "source",
+                    JSONObject().apply {
+                        put("type", "local")
+                        put("label", project.source.ifBlank { "SiftAlpha X" })
+                    },
+                )
+            }
+
+        metadata.put("description", description.trim())
+        val text = metadata.toString(2) + "\n"
+
+        if (metadataDocument == null) {
+            createTextFile(
+                treeUri = treeUri,
+                parentId = project.documentId,
+                name = ".project.json",
+                content = text,
+            )
+        } else {
+            val uri =
+                DocumentsContract.buildDocumentUriUsingTree(
+                    treeUri,
+                    metadataDocument.documentId,
+                )
+            resolver.openOutputStream(uri, "wt")?.use { stream ->
+                stream.write(text.toByteArray(Charsets.UTF_8))
+                stream.flush()
+            } ?: error("无法保存项目说明")
+        }
+
+        return project.copy(description = description.trim())
+    }
+
     /**
      * 只读取一个目录的直接子项。文件树 UI 必须优先使用这个接口，禁止首屏递归整个项目。
      */

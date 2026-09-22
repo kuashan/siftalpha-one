@@ -128,4 +128,13 @@
     <string name="home_import_failed">匯入失敗</string>
     <string name="home_import_github">從 GitHub 連結匯入</string>
     <string name="home_user_storage">執行空間</string>
+    <string name="home_project_details_without_description">入口：%1$s\n執行：%2$s\n來源：%3$s</string>
+    <string name="home_project_description_save">儲存</string>
+    <string name="home_project_status_preparing">準備中</string>
+    <string name="home_project_status_starting">啟動中</string>
+    <string name="home_project_status_running">執行中</string>
+    <string name="home_project_status_completed">已完成</string>
+    <string name="home_project_status_failed">執行失敗</string>
+    <string name="home_project_status_stopped">已停止</string>
+    <string name="home_project_status_idle">未執行</string>
 </resources>

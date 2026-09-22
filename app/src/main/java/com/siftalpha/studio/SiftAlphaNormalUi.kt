@@ -52,6 +52,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -90,6 +91,7 @@ import com.siftalpha.studio.ui.theme.StudioTheme
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import kotlinx.coroutines.delay
 
 private val Ink = Color(0xFF040817)
 private val InkSoft = Color(0xFF071027)
@@ -184,9 +186,133 @@ private fun rememberDecorativeMotionEnabled(): Boolean {
 
 @Composable
 internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
-    // v212: no custom animated opening. Android's normal system splash is followed
-    // directly by Normal Mode. This eliminates the launch animation's frame work.
-    content()
+    var showBrand by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        // Static brand hold only. No code-convergence or decorative loop is scheduled.
+        delay(3000)
+        showBrand = false
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        content()
+        if (showBrand) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color(0xFF03102B),
+                                Ink,
+                                Color(0xFF020817),
+                            ),
+                        ),
+                    ),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(y = (-18).dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        modifier = Modifier.size(184.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            drawCircle(
+                                color = Cyan.copy(alpha = .20f),
+                                radius = size.minDimension * .49f,
+                                center = center,
+                                style = Stroke(1.2.dp.toPx()),
+                            )
+                            drawCircle(
+                                color = Violet.copy(alpha = .12f),
+                                radius = size.minDimension * .43f,
+                                center = center,
+                                style = Stroke(.8.dp.toPx()),
+                            )
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    listOf(
+                                        Cyan.copy(alpha = .15f),
+                                        Violet.copy(alpha = .09f),
+                                        Color.Transparent,
+                                    ),
+                                    center = center,
+                                    radius = size.minDimension * .52f,
+                                ),
+                                radius = size.minDimension * .50f,
+                                center = center,
+                            )
+                        }
+                        OriginalLogoMark(
+                            modifier = Modifier.size(142.dp),
+                        )
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        text = stringResource(R.string.app_name),
+                        color = TextPrimary,
+                        fontSize = 36.sp,
+                        lineHeight = 42.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.brand_tagline_primary),
+                        color = TextPrimary,
+                        fontSize = 17.sp,
+                        lineHeight = 24.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        text = stringResource(R.string.brand_tagline_secondary),
+                        color = Muted,
+                        fontSize = 12.sp,
+                        letterSpacing = 1.4.sp,
+                    )
+                }
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 34.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Canvas(
+                        modifier = Modifier.size(width = 180.dp, height = 8.dp),
+                    ) {
+                        val y = size.height / 2f
+                        drawLine(
+                            color = Blue.copy(alpha = .45f),
+                            start = Offset(0f, y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 1.dp.toPx(),
+                        )
+                        drawLine(
+                            brush = Brush.horizontalGradient(
+                                listOf(Cyan, ElectricBlue, Violet),
+                            ),
+                            start = Offset(size.width * .35f, y),
+                            end = Offset(size.width * .65f, y),
+                            strokeWidth = 2.dp.toPx(),
+                            cap = StrokeCap.Round,
+                        )
+                    }
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        text = "INTELLIGENCE IN MOTION",
+                        color = MutedDeep,
+                        fontSize = 9.sp,
+                        letterSpacing = 2.4.sp,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -334,7 +460,6 @@ internal fun SiftAlphaNormalHomeScreen(
     query: String,
     filterIndex: Int,
     projectDirectoryReady: Boolean,
-    versionName: String,
     onQueryChange: (String) -> Unit,
     onFilterChange: (Int) -> Unit,
     onImport: () -> Unit,
@@ -381,31 +506,6 @@ internal fun SiftAlphaNormalHomeScreen(
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
-                item {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.brand_home_hello),
-                            color = TextPrimary,
-                            fontSize = 27.sp,
-                            lineHeight = 34.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = stringResource(R.string.brand_normal_intro),
-                            color = TextPrimary,
-                            fontSize = 25.sp,
-                            lineHeight = 33.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Spacer(Modifier.height(9.dp))
-                        Text(
-                            text = stringResource(R.string.brand_tagline_secondary),
-                            color = Muted,
-                            fontSize = 13.sp,
-                        )
-                    }
-                }
-
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -535,6 +635,8 @@ internal fun SiftAlphaNormalHomeScreen(
                     else -> items(visibleProjects, key = { it.documentId }) { project ->
                         ProjectCardNormal(
                             project = project,
+                            runtimeState = state.projectRuntimeStates[project.documentId]
+                                ?: RuntimeState.UNKNOWN,
                             onOpen = { onOpenProject(project) },
                             onDetails = { onShowDetails(project) },
                             onDelete = { onDeleteProject(project) },
@@ -542,14 +644,6 @@ internal fun SiftAlphaNormalHomeScreen(
                     }
                 }
 
-                item {
-                    Text(
-                        text = versionName,
-                        color = MutedDeep,
-                        fontSize = 11.sp,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
             }
         }
     }
@@ -605,7 +699,12 @@ private fun LocationPrompt(rootName: String?, error: String?, onClick: () -> Uni
             LocationGlyph(Modifier.size(22.dp), if (error != null) Red else Cyan)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.home_project_location_title), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = stringResource(R.string.home_project_location_title),
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
                 Text(
                     text = when {
                         error != null -> error
@@ -626,6 +725,7 @@ private fun LocationPrompt(rootName: String?, error: String?, onClick: () -> Uni
 @Composable
 private fun ProjectCardNormal(
     project: ProjectStore.ProjectSummary,
+    runtimeState: RuntimeState,
     onOpen: () -> Unit,
     onDetails: () -> Unit,
     onDelete: () -> Unit,
@@ -685,6 +785,8 @@ private fun ProjectCardNormal(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    Spacer(Modifier.height(7.dp))
+                    ProjectRuntimeStatusBadge(runtimeState)
                 }
                 Spacer(Modifier.width(8.dp))
                 ChevronGlyph(Modifier.size(18.dp), Muted)
@@ -736,6 +838,41 @@ private fun ProjectCardNormal(
 }
 
 @Composable
+private fun ProjectRuntimeStatusBadge(runtimeState: RuntimeState) {
+    val (label, tone) = when (runtimeState) {
+        RuntimeState.PREPARING ->
+            stringResource(R.string.home_project_status_preparing) to Violet
+        RuntimeState.STARTING ->
+            stringResource(R.string.home_project_status_starting) to ElectricBlue
+        RuntimeState.RUNNING ->
+            stringResource(R.string.home_project_status_running) to Cyan
+        RuntimeState.EXITED_SUCCESS ->
+            stringResource(R.string.home_project_status_completed) to Green
+        RuntimeState.EXITED_ERROR,
+        RuntimeState.ENVIRONMENT_ERROR ->
+            stringResource(R.string.home_project_status_failed) to Red
+        RuntimeState.STOPPED_BY_USER ->
+            stringResource(R.string.home_project_status_stopped) to Muted
+        RuntimeState.UNKNOWN ->
+            stringResource(R.string.home_project_status_idle) to MutedDeep
+    }
+
+    Surface(
+        color = tone.copy(alpha = .12f),
+        shape = RoundedCornerShape(999.dp),
+        border = BorderStroke(1.dp, tone.copy(alpha = .35f)),
+    ) {
+        Text(
+            text = label,
+            color = tone,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
+    }
+}
+
+@Composable
 private fun EmptyProjectCard(
     title: String,
     detail: String,
@@ -748,7 +885,11 @@ private fun EmptyProjectCard(
             TinyBrandMark(Modifier.size(46.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.Bold)
+                Text(
+                    text = title,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                )
                 Spacer(Modifier.height(3.dp))
                 Text(detail, color = if (error) Red else Muted, fontSize = 12.sp, lineHeight = 17.sp)
             }
@@ -1114,42 +1255,50 @@ private fun PrepareStepper(activeIndex: Int, active: Boolean) {
         stringResource(R.string.normal_prepare_verifying_detail),
         stringResource(R.string.normal_prepare_ready_detail),
     )
+    val index = activeIndex.coerceIn(0, labels.lastIndex)
+    val tone = when {
+        index >= labels.lastIndex -> Green
+        active -> Cyan
+        else -> Muted
+    }
+
     GlowCard {
-        labels.forEachIndexed { index, label ->
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    StepBubble(index = index, activeIndex = activeIndex, active = active)
-                    if (index < labels.lastIndex) {
-                        Box(
-                            Modifier.width(2.dp).height(26.dp).background(
-                                if (index < activeIndex) Green.copy(.55f) else Border,
-                            ),
-                        )
-                    }
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f).padding(top = 2.dp, bottom = 7.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                modifier = Modifier.size(42.dp),
+                color = tone.copy(alpha = .15f),
+                shape = CircleShape,
+                border = BorderStroke(1.dp, tone.copy(alpha = .42f)),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
                     Text(
-                        label,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (index <= activeIndex) TextPrimary else Muted,
+                        text = "${index + 1}/6",
+                        color = tone,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
                     )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        subtitles[index],
-                        fontSize = 11.sp,
-                        color = if (index == activeIndex) Cyan else MutedDeep,
-                    )
-                    if (index == activeIndex && active) {
-                        Spacer(Modifier.height(7.dp))
-                        LinearProgressIndicator(
-                            modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(3.dp)),
-                            color = Cyan,
-                            trackColor = Color.White.copy(.07f),
-                        )
-                    }
                 }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = labels[index],
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = subtitles[index],
+                    color = Muted,
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
