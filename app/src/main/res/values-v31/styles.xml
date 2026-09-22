@@ -10,7 +10,7 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowSplashScreenBackground">#040817</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/siftalpha_launcher</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/siftalpha_splash_transparent</item>
         <item name="android:windowSplashScreenIconBackgroundColor">#040817</item>
         <item name="android:windowSplashScreenAnimationDuration">0</item>
     </style>

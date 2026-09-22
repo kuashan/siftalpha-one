@@ -489,11 +489,11 @@ internal fun SiftAlphaNormalHomeScreen(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            TinyBrandMark(Modifier.size(34.dp))
-                            Spacer(Modifier.width(10.dp))
+                            TinyBrandMark(Modifier.size(44.dp))
+                            Spacer(Modifier.width(11.dp))
                             Text(
                                 text = stringResource(R.string.app_name),
-                                fontSize = 19.sp,
+                                fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold,
                             )
                         }
@@ -512,7 +512,7 @@ internal fun SiftAlphaNormalHomeScreen(
         ) { pad ->
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(pad),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 28.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 0.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
                 item {

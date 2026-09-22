@@ -1437,3 +1437,10 @@ Current Normal Mode opening and Home rules:
 
 Normal Mode owns its launch brand, Home presentation, project-card badges, and compact prepare-progress presentation.
 Developer Mode remains frozen against baseline/r48d2. Shared code may only receive behavior-neutral, opt-in plumbing needed by Normal Mode; the v215 internal-prepare progress callback defaults to null and therefore does not alter Developer Mode execution or UI. The static brand hold is cold-launch-only and must not replay when switching modes.
+
+
+## 2026-09-22 · R48-D4 v216 launch rule
+
+Cold launch must present only one visible SiftAlpha brand composition. Android 12+ still owns a mandatory system starting window, but its icon is transparent and its background matches the Normal Mode brand page, so it must not appear as a separate visual stage. The app-owned ~3 second static brand page remains the first visible branded screen.
+
+Normal Home top-left brand identity is intentionally larger and sits close to the retained secondary tagline. Developer Mode remains frozen.

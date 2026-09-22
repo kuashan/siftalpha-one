@@ -1708,3 +1708,17 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Developer Mode Home | shared scaffold remains byte-identical to baseline/r48d2 segment | PASS REQUIRED |
 | Developer shared import copy | restored to baseline/r48d2 wording | PASS REQUIRED |
 | W0 / tests / APK | cloud build must pass | PENDING |
+
+
+### R48-D4 v216 — Direct brand launch + Home header spacing
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Android 12+ cold launch | no visible separate system-logo page before app brand page | PASS REQUIRED |
+| System starting window | #040817 background + transparent icon | PASS REQUIRED |
+| App brand page | existing static real logo + text remains ~3 seconds | PASS REQUIRED |
+| Home brand mark | top-left logo = 44dp | PASS REQUIRED |
+| Home wordmark | top-left SiftAlpha = 22sp | PASS REQUIRED |
+| Home tagline spacing | content top padding = 0dp; visually close to enlarged brand row | PASS REQUIRED |
+| Developer Mode | UI and runtime behavior unchanged | PASS REQUIRED |
+| W0 / tests / APK | cloud build must pass | PENDING |

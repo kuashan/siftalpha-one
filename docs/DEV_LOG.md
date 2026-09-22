@@ -3124,3 +3124,12 @@ Target:
 - Internal PREPARE progress is wired read-only into Normal Mode through an opt-in ProjectRuntimeControlExecutor callback. The compact six-phase card now advances from actual resolution/runtime/install/verify boundaries instead of remaining at step 1 until completion.
 - Shared Developer Mode Home scaffold remains frozen against baseline/r48d2. The previously changed shared import subtitle is restored to the R48-D2 wording; Normal Mode now owns a separate import subtitle resource.
 - versionCode = 215; versionName remains 0.8.0-alpha43-r48d3.
+
+
+## 2026-09-22 · R48-D4 v216 launch handoff + Home brand spacing
+
+- Removed the visible Android 12+ system-splash logo stage. The unavoidable platform starting window now uses the same #040817 brand background with a transparent icon, so cold launch visually hands directly into the existing ~3 second static SiftAlpha brand page instead of showing a separate oversized logo page first.
+- Normal Home top-left brand mark grows from 34dp to 44dp and the SiftAlpha wordmark from 19sp to 22sp.
+- Normal Home content top padding is reduced from 6dp to 0dp, tightening the gap between the enlarged top-left brand row and the retained secondary tagline.
+- No Developer Mode UI, project execution semantics, Runtime behavior, or shared Developer Home scaffold was changed.
+- versionCode = 216; versionName = 0.8.0-alpha43-r48d4.
