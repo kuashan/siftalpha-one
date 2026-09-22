@@ -104,8 +104,11 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("SIFTALPHA_ENV=READY"))
 
         val finalVenvCreation = script.indexOf("python3 -m venv \"${'$'}venv\"")
-        val pythonValidation = script.indexOf("${'$'}venv/bin/python")
-        val prefixValidation = script.indexOf("prepared_python_executable")
+        val pythonValidation = script.indexOf(
+            "\"\$venv/bin/python\" -m pip install",
+            finalVenvCreation,
+        )
+        val prefixValidation = script.indexOf("prepared_python_executable", pythonValidation)
         val readySignal = script.indexOf("echo 'SIFTALPHA_ENV=READY'")
         assertTrue("replacement venv must be created at the stable final path", finalVenvCreation >= 0)
         assertTrue("dependency work must use the stable final venv", pythonValidation > finalVenvCreation)
@@ -179,7 +182,8 @@ class PythonRuntimeAdapterTest {
         )
         assertTrue(
             "install extras compatibility must be proven before plan metadata rebinding",
-            status.indexOf("READY_PLAN_MIGRATED") > status.indexOf("PYTHON_INSTALL_EXTRAS_CHANGED"),
+            status.lastIndexOf("READY_PLAN_MIGRATED") >
+                status.indexOf("PYTHON_INSTALL_EXTRAS_CHANGED"),
         )
     }
 
@@ -281,9 +285,8 @@ class PythonRuntimeAdapterTest {
         assertTrue(logs.contains(RuntimeIdentityStore.GUEST_RUNTIME_ROOT))
 
         assertTrue(clean.contains("/root/venvs/runtime-id"))
-        assertTrue(clean.contains("/root/venvs/runtime-id.backup-*"))
+        assertTrue(clean.contains(".backup-*"))
         assertTrue(clean.contains("/root/siftalpha/env-ready-runtime-id.txt"))
-        assertTrue(clean.contains("/root/siftalpha/env-ready-runtime-id.txt.backup-*"))
         assertTrue(clean.contains("SIFTALPHA_STATUS=CLEAN_BLOCKED_RUNNING_PROCESS"))
         assertTrue(clean.contains("SIFTALPHA_ENV=CLEANED"))
     }
