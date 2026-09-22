@@ -13,7 +13,7 @@
     <string name="brand_no_projects_title">还没有项目</string>
     <string name="brand_project_ready">已配置</string>
     <string name="brand_project_needs_setup">需要配置</string>
-    <string name="brand_mark_content_description">SiftAlpha 品牌标志</string>
+    <string name="brand_mark_content_description">SiftAlpha X 品牌标志</string>
     <string name="brand_nav_home">首页</string>
     <string name="brand_nav_projects">项目</string>
     <string name="brand_nav_tools">工具</string>
@@ -31,9 +31,9 @@
     <string name="brand_prepare_step_config_detail">验证环境并进入下一步</string>
     <string name="brand_run_location">运行位置</string>
     <string name="brand_external_attention">需要完成外部执行设置</string>
-    <string name="brand_external_attention_detail">完成设置后返回 SiftAlpha，系统会继续检查当前项目的运行条件。</string>
+    <string name="brand_external_attention_detail">完成设置后返回 SiftAlpha X，系统会继续检查当前项目的运行条件。</string>
     <string name="brand_configuration_title">配置项目</string>
-    <string name="brand_configuration_intro">SiftAlpha 已识别项目需要的配置。只填写真正需要的内容即可开始运行。</string>
+    <string name="brand_configuration_intro">SiftAlpha X 已识别项目需要的配置。只填写真正需要的内容即可开始运行。</string>
     <string name="brand_configuration_required">必要配置</string>
     <string name="brand_configuration_required_detail">缺少这些内容时，项目无法正常运行</string>
     <string name="brand_configuration_optional">可选配置</string>
@@ -42,13 +42,13 @@
     <string name="brand_configuration_keep_existing">留空则保留现有配置</string>
     <string name="brand_configuration_save_run">保存并开始运行 →</string>
     <string name="brand_configuration_none">暂时没有需要填写的配置</string>
-    <string name="brand_configuration_none_detail">如果项目在运行时发现新的必要配置，SiftAlpha 会在这里提示你。</string>
+    <string name="brand_configuration_none_detail">如果项目在运行时发现新的必要配置，SiftAlpha X 会在这里提示你。</string>
     <string name="brand_run_title">运行中</string>
     <string name="brand_run_starting">正在启动项目</string>
     <string name="brand_run_running">项目正在运行</string>
     <string name="brand_run_starting_short">启动中</string>
     <string name="brand_run_live">运行中</string>
-    <string name="brand_run_task_active">SiftAlpha 正在执行任务</string>
+    <string name="brand_run_task_active">SiftAlpha X 正在执行任务</string>
     <string name="brand_run_phase_start">初始化任务环境</string>
     <string name="brand_run_phase_execute">执行项目任务</string>
     <string name="brand_run_phase_result">等待项目结果</string>
@@ -59,7 +59,7 @@
     <string name="brand_result_title">项目结果</string>
     <string name="brand_result_completed">项目已完成！</string>
     <string name="brand_result_ready_title">结果已准备好</string>
-    <string name="brand_result_ready_detail">SiftAlpha 已完成处理，你可以直接查看结果。</string>
+    <string name="brand_result_ready_detail">SiftAlpha X 已完成处理，你可以直接查看结果。</string>
     <string name="brand_result_primary_item">项目结果</string>
     <string name="brand_result_status_item">执行状态</string>
     <string name="brand_result_open">打开结果</string>

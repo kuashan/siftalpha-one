@@ -1,10 +1,12 @@
-# SiftAlpha Normal Mode（普通用户模式）UI/UX（用户界面 / 用户体验）Redesign（重设计）
-Status: DESIGN DIRECTION UPDATED — SIFTALPHA-FIRST / IMPLEMENTATION NOT STARTED
+# SiftAlpha X Normal Mode（普通用户模式）UI/UX（用户界面 / 用户体验）Redesign（重设计）
+Status: APPROVED DIRECTION / DESIGN FIDELITY CORRECTION
 
 ## Brand Rule（品牌规则）
-- 普通用户看到的主品牌统一为 **SiftAlpha**。
-- **X 不作为 Logo（标志）、Wordmark（品牌字标）、首页标题或启动品牌动画的视觉中心。**
-- X 只保留在 Architecture（架构）、Developer Mode（开发者模式）、诊断文档或内部系统命名中。
+- 软件正式名称统一为 **SiftAlpha X**。
+- App Icon（应用图标）、Brand Transition（品牌过渡）和 Home（首页）品牌位统一使用项目原始 Logo（标志）。
+- 不再用新绘制的近似 Logo（标志）替代原始 Logo。
+- Normal Mode（普通用户模式）首页只保留右上角 More（更多），**不使用 Bottom Navigation（底部导航）**。
+- Developer Mode（开发者模式）不在本轮重设计范围内。
 
 ## North Star
 让一个完全不懂 Runtime（运行时）、Python 环境和 Termux 的普通用户，也能自然完成：

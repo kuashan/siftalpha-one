@@ -13,7 +13,7 @@
     <string name="brand_no_projects_title">아직 프로젝트가 없습니다</string>
     <string name="brand_project_ready">설정 완료</string>
     <string name="brand_project_needs_setup">설정 필요</string>
-    <string name="brand_mark_content_description">SiftAlpha 브랜드 마크</string>
+    <string name="brand_mark_content_description">SiftAlpha X 브랜드 마크</string>
     <string name="brand_nav_home">홈</string>
     <string name="brand_nav_projects">프로젝트</string>
     <string name="brand_nav_tools">도구</string>
@@ -31,9 +31,9 @@
     <string name="brand_prepare_step_config_detail">환경을 확인하고 다음 단계로 이동</string>
     <string name="brand_run_location">실행 위치</string>
     <string name="brand_external_attention">외부 실행 설정이 필요합니다</string>
-    <string name="brand_external_attention_detail">설정을 마친 뒤 SiftAlpha로 돌아오면 이 프로젝트의 실행 조건을 계속 확인합니다.</string>
+    <string name="brand_external_attention_detail">설정을 마친 뒤 SiftAlpha X로 돌아오면 이 프로젝트의 실행 조건을 계속 확인합니다.</string>
     <string name="brand_configuration_title">프로젝트 설정</string>
-    <string name="brand_configuration_intro">SiftAlpha가 필요한 설정을 확인했습니다. 실제로 필요한 값만 입력하면 됩니다.</string>
+    <string name="brand_configuration_intro">SiftAlpha X가 필요한 설정을 확인했습니다. 실제로 필요한 값만 입력하면 됩니다.</string>
     <string name="brand_configuration_required">필수 설정</string>
     <string name="brand_configuration_required_detail">이 값이 없으면 프로젝트가 정상적으로 실행되지 않습니다</string>
     <string name="brand_configuration_optional">선택 설정</string>
@@ -48,7 +48,7 @@
     <string name="brand_run_running">프로젝트 실행 중</string>
     <string name="brand_run_starting_short">시작 중</string>
     <string name="brand_run_live">실행 중</string>
-    <string name="brand_run_task_active">SiftAlpha가 작업을 실행하고 있습니다</string>
+    <string name="brand_run_task_active">SiftAlpha X가 작업을 실행하고 있습니다</string>
     <string name="brand_run_phase_start">작업 환경 초기화</string>
     <string name="brand_run_phase_execute">프로젝트 작업 실행</string>
     <string name="brand_run_phase_result">프로젝트 결과 대기</string>
@@ -59,7 +59,7 @@
     <string name="brand_result_title">프로젝트 결과</string>
     <string name="brand_result_completed">프로젝트가 완료되었습니다!</string>
     <string name="brand_result_ready_title">결과가 준비되었습니다</string>
-    <string name="brand_result_ready_detail">SiftAlpha 처리가 완료되었습니다. 결과를 바로 열 수 있습니다.</string>
+    <string name="brand_result_ready_detail">SiftAlpha X 처리가 완료되었습니다. 결과를 바로 열 수 있습니다.</string>
     <string name="brand_result_primary_item">프로젝트 결과</string>
     <string name="brand_result_status_item">실행 상태</string>
     <string name="brand_result_open">결과 열기</string>

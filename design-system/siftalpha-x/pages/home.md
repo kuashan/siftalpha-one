@@ -8,7 +8,7 @@
 
 ## Layout
 1. SiftTopBar
-   - SiftAlpha S mark（S 标志）+ “SiftAlpha” wordmark（品牌字标）
+   - 原始 SiftAlpha X Logo（标志）+ “SiftAlpha X”
    - More（更多）
 2. Hero action
    - Primary: 导入项目
@@ -35,5 +35,5 @@
 
 ## Forbidden
 - Runtime / Termux / PID / logs（运行时 / Termux / PID / 日志）
-- Bottom Navigation（底部导航）
+- Bottom Navigation（底部导航）——普通用户模式明确禁止
 - Developer diagnostics（开发者诊断）

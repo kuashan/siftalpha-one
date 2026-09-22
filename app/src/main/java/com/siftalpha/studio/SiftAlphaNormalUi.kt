@@ -6,13 +6,13 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -34,7 +34,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -58,7 +57,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -72,6 +70,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -88,7 +88,6 @@ import com.siftalpha.studio.runtime.ProjectRuntimeSelection
 import com.siftalpha.studio.runtime.RuntimeState
 import com.siftalpha.studio.ui.theme.StudioTheme
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 private val Ink = Color(0xFF040817)
 private val InkSoft = Color(0xFF071027)
@@ -168,9 +167,9 @@ internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
                     modifier = Modifier.align(Alignment.Center).padding(horizontal = 28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    SiftRibbonMark(
+                    OriginalLogoMark(
                         modifier = Modifier.size(126.dp),
-                        reveal = reveal.value,
+                        alpha = reveal.value,
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
@@ -419,15 +418,21 @@ private fun GradientPrimaryButton(
 }
 
 @Composable
+private fun OriginalLogoMark(
+    modifier: Modifier = Modifier,
+    alpha: Float = 1f,
+) {
+    Image(
+        painter = painterResource(R.drawable.siftalpha_launcher_art),
+        contentDescription = stringResource(R.string.brand_mark_content_description),
+        modifier = modifier.alpha(alpha.coerceIn(0f, 1f)).clip(RoundedCornerShape(24.dp)),
+        contentScale = ContentScale.Fit,
+    )
+}
+
+@Composable
 private fun TinyBrandMark(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF183E8B), Color(0xFF2C155D)))),
-        contentAlignment = Alignment.Center,
-    ) {
-        SiftRibbonMark(Modifier.size(28.dp))
-    }
+    OriginalLogoMark(modifier = modifier)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -441,10 +446,6 @@ internal fun SiftAlphaNormalHomeScreen(
     onOpenProject: (ProjectStore.ProjectSummary) -> Unit,
     onMore: () -> Unit,
 ) {
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    val projectSectionIndex = 4
-
     Box(Modifier.fillMaxSize()) {
         AuroraBackdrop(Modifier.fillMaxSize())
         Scaffold(
@@ -465,30 +466,18 @@ internal fun SiftAlphaNormalHomeScreen(
                         }
                     },
                     actions = {
-                        Surface(
-                            modifier = Modifier.padding(end = 10.dp).size(42.dp).clickable(role = Role.Button, onClick = onMore),
-                            shape = CircleShape,
-                            color = PanelStrong.copy(alpha = .86f),
-                            border = BorderStroke(1.dp, Border),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                PersonGlyph(Modifier.size(20.dp), Muted)
-                            }
+                        TextButton(onClick = onMore) {
+                            Text(
+                                text = stringResource(R.string.home_more_title),
+                                color = Cyan,
+                                fontWeight = FontWeight.SemiBold,
+                            )
                         }
                     },
                 )
             },
-            bottomBar = {
-                NormalBottomBar(
-                    onHome = { scope.launch { listState.animateScrollToItem(0) } },
-                    onProjects = { scope.launch { listState.animateScrollToItem(projectSectionIndex) } },
-                    onTools = onMore,
-                    onProfile = onMore,
-                )
-            },
         ) { pad ->
             LazyColumn(
-                state = listState,
                 modifier = Modifier.fillMaxSize().padding(pad),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
@@ -540,14 +529,12 @@ internal fun SiftAlphaNormalHomeScreen(
                     }
                 }
 
-                if (!state.rootSelected || state.projectError != null) {
-                    item {
-                        LocationPrompt(
-                            rootName = state.rootName,
-                            error = state.projectError,
-                            onClick = onProjectLocation,
-                        )
-                    }
+                item {
+                    LocationPrompt(
+                        rootName = state.rootName,
+                        error = state.projectError,
+                        onClick = onProjectLocation,
+                    )
                 }
 
                 item {
@@ -559,11 +546,7 @@ internal fun SiftAlphaNormalHomeScreen(
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f),
                         )
-                        if (state.projects.isNotEmpty()) {
-                            TextButton(onClick = { scope.launch { listState.animateScrollToItem(projectSectionIndex) } }) {
-                                Text(stringResource(R.string.brand_view_all), color = Cyan, fontSize = 12.sp)
-                            }
-                        }
+
                     }
                 }
 
@@ -700,7 +683,14 @@ private fun ProjectCardNormal(project: ProjectStore.ProjectSummary, onOpen: () -
             }
             Spacer(Modifier.width(13.dp))
             Column(Modifier.weight(1f)) {
-                Text(project.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    project.name,
+                    color = TextPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Spacer(Modifier.height(3.dp))
                 Text(
                     text = project.description.ifBlank {
@@ -738,48 +728,6 @@ private fun EmptyProjectCard(
         }
         Spacer(Modifier.height(14.dp))
         GradientPrimaryButton(action, onAction)
-    }
-}
-
-@Composable
-private fun NormalBottomBar(
-    onHome: () -> Unit,
-    onProjects: () -> Unit,
-    onTools: () -> Unit,
-    onProfile: () -> Unit,
-) {
-    Surface(
-        color = Color(0xFF071126).copy(alpha = .97f),
-        border = BorderStroke(1.dp, Border.copy(alpha = .7f)),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 10.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            BottomNavItem(stringResource(R.string.brand_nav_home), true, onHome) { HomeGlyph(it, Cyan) }
-            BottomNavItem(stringResource(R.string.brand_nav_projects), false, onProjects) { FolderGlyph(it, Muted) }
-            BottomNavItem(stringResource(R.string.brand_nav_tools), false, onTools) { ToolsGlyph(it, Muted) }
-            BottomNavItem(stringResource(R.string.brand_nav_profile), false, onProfile) { PersonGlyph(it, Muted) }
-        }
-    }
-}
-
-@Composable
-private fun BottomNavItem(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    icon: @Composable (Modifier) -> Unit,
-) {
-    Column(
-        modifier = Modifier.width(68.dp).heightIn(min = 50.dp).clickable(role = Role.Button, onClick = onClick).padding(vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        icon(Modifier.size(20.dp))
-        Spacer(Modifier.height(3.dp))
-        Text(label, color = if (selected) Cyan else Muted, fontSize = 10.sp)
     }
 }
 
@@ -866,7 +814,14 @@ private fun NormalTopBar(title: String, onBack: () -> Unit) {
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
         title = {
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                title,
+                color = TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         },
         navigationIcon = {
             Surface(
@@ -884,23 +839,71 @@ private fun NormalTopBar(title: String, onBack: () -> Unit) {
 
 @Composable
 private fun ProjectIdentityCard(state: NormalProjectWorkspaceActivity.ScreenState) {
+    val accent = when (state.runtimeState) {
+        RuntimeState.RUNNING -> Cyan
+        RuntimeState.EXITED_SUCCESS -> Green
+        RuntimeState.EXITED_ERROR, RuntimeState.ENVIRONMENT_ERROR -> Red
+        RuntimeState.PREPARING, RuntimeState.STARTING -> Violet
+        RuntimeState.STOPPED_BY_USER -> Amber
+        RuntimeState.UNKNOWN -> Blue
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = PanelStrong.copy(alpha = .88f),
-        shape = RoundedCornerShape(15.dp),
-        border = BorderStroke(1.dp, Border),
+        color = PanelStrong.copy(alpha = .92f),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = .45f)),
     ) {
-        Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(44.dp).background(Brush.linearGradient(listOf(Color(0xFF315AE6), Color(0xFF6532D8))), RoundedCornerShape(11.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                TinyBrandMark(Modifier.size(32.dp))
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    modifier = Modifier.size(46.dp),
+                    shape = CircleShape,
+                    color = accent.copy(alpha = .16f),
+                    border = BorderStroke(1.dp, accent.copy(alpha = .34f)),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (state.activityIndicatorVisible) {
+                            DotPulse(Modifier.size(12.dp))
+                        } else if (state.runtimeState == RuntimeState.EXITED_SUCCESS) {
+                            CheckGlyph(Modifier.size(22.dp), accent)
+                        } else {
+                            TinyBrandMark(Modifier.size(34.dp))
+                        }
+                    }
+                }
+                Spacer(Modifier.width(13.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        state.statusLabel,
+                        color = TextPrimary,
+                        fontSize = 20.sp,
+                        lineHeight = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        state.projectName,
+                        color = Muted,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(state.projectName, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(state.statusLabel, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            state.message
+                ?.takeUnless { it.contains("SIFTALPHA_") }
+                ?.takeIf { it.isNotBlank() }
+                ?.let { message ->
+                    Spacer(Modifier.height(10.dp))
+                    Text(message, color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+                }
+            if (state.activityIndicatorVisible) {
+                Spacer(Modifier.height(12.dp))
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(3.dp)),
+                    color = accent,
+                    trackColor = Color.White.copy(alpha = .07f),
+                )
             }
         }
     }
@@ -926,9 +929,11 @@ private fun PrepareProjectScreen(
     val phaseIndex = when (state.preparePhaseTitle) {
         detecting -> 0
         compatibility -> 1
-        environment, installing -> 2
-        verifying, ready -> 3
-        else -> if (state.runtimeState == RuntimeState.PREPARING) 1 else 0
+        environment -> 2
+        installing -> 3
+        verifying -> 4
+        ready -> 5
+        else -> if (state.runtimeState == RuntimeState.PREPARING) 0 else 0
     }
 
     Scaffold(
@@ -1008,16 +1013,20 @@ private fun PrepareProjectScreen(
 @Composable
 private fun PrepareStepper(activeIndex: Int, active: Boolean) {
     val labels = listOf(
-        stringResource(R.string.brand_prepare_step_detect),
-        stringResource(R.string.brand_prepare_step_analyze),
-        stringResource(R.string.brand_prepare_step_build),
-        stringResource(R.string.brand_prepare_step_config),
+        stringResource(R.string.normal_prepare_phase_detecting),
+        stringResource(R.string.normal_prepare_phase_compatibility),
+        stringResource(R.string.normal_prepare_phase_environment),
+        stringResource(R.string.normal_prepare_phase_installing),
+        stringResource(R.string.normal_prepare_phase_verifying),
+        stringResource(R.string.normal_prepare_phase_ready),
     )
     val subtitles = listOf(
-        stringResource(R.string.brand_prepare_step_detect_detail),
+        stringResource(R.string.normal_prepare_detecting_detail),
         stringResource(R.string.brand_prepare_step_analyze_detail),
-        stringResource(R.string.brand_prepare_step_build_detail),
-        stringResource(R.string.brand_prepare_step_config_detail),
+        stringResource(R.string.normal_prepare_environment_detail),
+        stringResource(R.string.normal_prepare_installing_detail),
+        stringResource(R.string.normal_prepare_verifying_detail),
+        stringResource(R.string.normal_prepare_ready_detail),
     )
     GlowCard {
         labels.forEachIndexed { index, label ->
@@ -1025,16 +1034,29 @@ private fun PrepareStepper(activeIndex: Int, active: Boolean) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     StepBubble(index = index, activeIndex = activeIndex, active = active)
                     if (index < labels.lastIndex) {
-                        Box(Modifier.width(2.dp).height(28.dp).background(if (index < activeIndex) Green.copy(.55f) else Border))
+                        Box(
+                            Modifier.width(2.dp).height(26.dp).background(
+                                if (index < activeIndex) Green.copy(.55f) else Border,
+                            ),
+                        )
                     }
                 }
                 Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f).padding(top = 2.dp, bottom = 8.dp)) {
-                    Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (index <= activeIndex) TextPrimary else Muted)
+                Column(Modifier.weight(1f).padding(top = 2.dp, bottom = 7.dp)) {
+                    Text(
+                        label,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (index <= activeIndex) TextPrimary else Muted,
+                    )
                     Spacer(Modifier.height(2.dp))
-                    Text(subtitles[index], fontSize = 11.sp, color = if (index == activeIndex) Cyan else MutedDeep)
+                    Text(
+                        subtitles[index],
+                        fontSize = 11.sp,
+                        color = if (index == activeIndex) Cyan else MutedDeep,
+                    )
                     if (index == activeIndex && active) {
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(7.dp))
                         LinearProgressIndicator(
                             modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(3.dp)),
                             color = Cyan,
@@ -1049,7 +1071,7 @@ private fun PrepareStepper(activeIndex: Int, active: Boolean) {
 
 @Composable
 private fun StepBubble(index: Int, activeIndex: Int, active: Boolean) {
-    val completed = index < activeIndex || (!active && index <= activeIndex && activeIndex >= 3)
+    val completed = index < activeIndex || (!active && index <= activeIndex && activeIndex >= 5)
     val current = index == activeIndex
     val bg = when {
         completed -> Green
@@ -1166,7 +1188,7 @@ private fun ConfigurationProjectScreen(
                         TinyBrandMark(Modifier.size(44.dp))
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(state.projectName, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(state.projectName, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(3.dp))
                             Text(stringResource(R.string.brand_configuration_intro), color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
                         }

@@ -1,11 +1,11 @@
-# SiftAlpha — Normal Mode Design System
-Version: 1.1 / S-first Brand Correction
+# SiftAlpha X — Normal Mode Design System
+Version: 1.2 / Design Fidelity Correction
 Scope: Normal Mode（普通用户模式）only
-Brand hierarchy（品牌层级）: **SiftAlpha 是唯一主品牌；X 是内部系统/架构代号，不进入普通用户主品牌视觉。**
+Brand hierarchy（品牌层级）: **SiftAlpha X 是软件正式名称。Normal Mode（普通用户模式）统一显示 SiftAlpha X；Logo（标志）恢复并保持项目原始 Logo（标志），不再用新绘制图形替代。**
 Repository skill: .agents/skills/ui-ux-pro-max/
 
 ## 1. Product Design Thesis
-SiftAlpha 的普通用户体验围绕：
+SiftAlpha X 的普通用户体验围绕：
 
 **Project-first + State-driven + One Primary Action**
 （项目优先 + 状态驱动 + 单一主操作）
@@ -107,7 +107,12 @@ Recommended scale:
 - Body Small: 14sp / 20sp / 400
 - Label: 13sp / 18sp / 500
 
-Logo wordmark（品牌字标）可以独立采用更几何的字形气质，但 App UI（应用界面）不依赖特殊字体包。
+正式软件名称使用 **SiftAlpha X**。App UI（应用界面）不依赖特殊字体包。
+
+### Original Logo Lock（原始 Logo 锁定）
+- App Icon（应用图标）、Brand Transition（品牌过渡）、Home（首页）品牌位统一使用仓库原始 Logo（标志）资产。
+- 不再用重新绘制的 Ribbon S（带状 S）或其他近似图形替换原始 Logo。
+- 动画只能改变原始 Logo 的 opacity / scale / position（透明度 / 缩放 / 位置），不能改 Logo 几何。
 
 ## 6. Shape & Elevation
 - Hero / Status Card（主状态卡）: 20dp radius
@@ -161,9 +166,10 @@ Core semantics:
 
 ## 10. Component System
 ### SiftTopBar
-- Leading: compact SiftAlpha **S mark（S 标志）** or back
-- Title: page title
-- Trailing: More（更多）only on Normal Home
+- Home（首页）Leading：原始 SiftAlpha X Logo（标志）+ “SiftAlpha X”
+- Project pages（项目页）：Back（返回）+ page title（页面标题）
+- Trailing：Normal Home（普通首页）只保留 More（更多）
+- **Normal Mode 禁止 Bottom Navigation（底部导航）**
 
 ### ProjectCard
 只显示：

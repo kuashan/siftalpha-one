@@ -13,7 +13,7 @@
     <string name="brand_no_projects_title">No projects yet</string>
     <string name="brand_project_ready">Configured</string>
     <string name="brand_project_needs_setup">Needs configuration</string>
-    <string name="brand_mark_content_description">SiftAlpha brand mark</string>
+    <string name="brand_mark_content_description">SiftAlpha X brand mark</string>
     <string name="brand_nav_home">Home</string>
     <string name="brand_nav_projects">Projects</string>
     <string name="brand_nav_tools">Tools</string>
@@ -31,9 +31,9 @@
     <string name="brand_prepare_step_config_detail">Verify the environment and continue</string>
     <string name="brand_run_location">Run location</string>
     <string name="brand_external_attention">External execution needs setup</string>
-    <string name="brand_external_attention_detail">Finish setup, return to SiftAlpha, and the app will continue checking this project.</string>
+    <string name="brand_external_attention_detail">Finish setup, return to SiftAlpha X, and the app will continue checking this project.</string>
     <string name="brand_configuration_title">Configure project</string>
-    <string name="brand_configuration_intro">SiftAlpha identified what this project needs. Fill in only the values that are actually required.</string>
+    <string name="brand_configuration_intro">SiftAlpha X identified what this project needs. Fill in only the values that are actually required.</string>
     <string name="brand_configuration_required">Required configuration</string>
     <string name="brand_configuration_required_detail">The project cannot run correctly without these values</string>
     <string name="brand_configuration_optional">Optional configuration</string>
@@ -42,13 +42,13 @@
     <string name="brand_configuration_keep_existing">Leave blank to keep the existing value</string>
     <string name="brand_configuration_save_run">Save and run →</string>
     <string name="brand_configuration_none">No values are required right now</string>
-    <string name="brand_configuration_none_detail">If the project discovers another required value at runtime, SiftAlpha will show it here.</string>
+    <string name="brand_configuration_none_detail">If the project discovers another required value at runtime, SiftAlpha X will show it here.</string>
     <string name="brand_run_title">Running</string>
     <string name="brand_run_starting">Starting project</string>
     <string name="brand_run_running">Project is running</string>
     <string name="brand_run_starting_short">Starting</string>
     <string name="brand_run_live">Running</string>
-    <string name="brand_run_task_active">SiftAlpha is executing the task</string>
+    <string name="brand_run_task_active">SiftAlpha X is executing the task</string>
     <string name="brand_run_phase_start">Initialize task environment</string>
     <string name="brand_run_phase_execute">Execute project task</string>
     <string name="brand_run_phase_result">Wait for project result</string>
@@ -59,7 +59,7 @@
     <string name="brand_result_title">Project result</string>
     <string name="brand_result_completed">Project complete!</string>
     <string name="brand_result_ready_title">Your result is ready</string>
-    <string name="brand_result_ready_detail">SiftAlpha has finished processing. Open the result when you are ready.</string>
+    <string name="brand_result_ready_detail">SiftAlpha X has finished processing. Open the result when you are ready.</string>
     <string name="brand_result_primary_item">Project result</string>
     <string name="brand_result_status_item">Execution status</string>
     <string name="brand_result_open">Open result</string>

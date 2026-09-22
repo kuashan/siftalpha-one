@@ -91,9 +91,10 @@ android {
         // the shared External Provider preflight/bridge readiness contract.
         // R48-D2 adds the explicitly authorized shared background-reliability reminder
         // and indeterminate Runtime activity indicator without changing Runtime deadlines.
-        // R48-D3 implements the SiftAlpha-first Normal Mode visual system, S-mark launch
-        // transition and state-driven presentation without changing Shared Core semantics.
-        versionCode = 194
+        // R48-D3 implements the approved SiftAlpha X Normal Mode visual system.
+        // This fidelity correction restores the original logo, removes Normal Mode bottom
+        // navigation, and aligns project-state presentation without changing Shared Core semantics.
+        versionCode = 195
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

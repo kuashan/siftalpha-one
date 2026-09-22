@@ -1,40 +1,30 @@
-# R48-D3 — SiftAlpha Normal Mode Design Fidelity Implementation
+# R48-D3 — SiftAlpha X Normal Mode Design Fidelity Implementation
 
-Status: DESIGN FIDELITY REBUILD / CLOUD GATE REQUIRED
+Status: CORRECTED / CLOUD GATE REQUIRED
 
-## Scope
-This rebuild reproduces the approved SiftAlpha Normal Mode（普通用户模式）concept as the implementation source of truth.
+## Correction scope
+This correction follows the approved UI/UX Pro Max Skill（UI/UX 专业设计技能）direction and the user-approved Normal Mode（普通用户模式）scheme.
 
-Developer Mode（开发者模式）is intentionally unchanged. Runtime（运行时）, Environment（环境）, Shared Core（共享核心）, Prepare / Run / Stop semantics（准备 / 运行 / 停止语义）, ownership（归属）and lifecycle（生命周期）are not redesigned.
+Corrected:
+- software name restored to **SiftAlpha X**;
+- original repository Logo（标志）restored for Launcher（启动图标）, Brand Transition（品牌过渡）and Home（首页）brand position;
+- removed Bottom Navigation（底部导航）from Normal Mode;
+- Home（首页）keeps only More（更多）at the top right;
+- project names and key project titles use explicit dark-mode foreground colors instead of inheriting an incorrect black text color;
+- Project Location（项目位置）is always visible on Home;
+- ProjectStatusCard（项目状态卡）makes current state visually dominant;
+- Prepare（准备）uses the approved six truthful phases:
+  检测项目 → 检查兼容性 → 准备运行环境 → 安装依赖 → 验证环境 → 准备完成;
+- Configuration（配置）, Run（运行）, Result（结果）remain Normal Mode product pages;
+- no fake percentage is introduced.
 
-## Implemented fidelity targets
-- Ribbon S（带状 S）brand mark and SiftAlpha-only brand hierarchy.
-- Cold-start Brand Transition（品牌过渡）with reduced-motion fallback.
-- Dark navy / blue / cyan / violet animated wave background.
-- Home（首页）with two large project-entry cards, project list and the approved bottom navigation layout.
-- Prepare（准备）with the approved vertical phase-stepper and truthful indeterminate progress.
-- Configuration（配置）as a real Normal Mode page using the existing project configuration snapshot and existing protected value store.
-- Run（运行）with the approved large animated execution ring, phase presentation and Stop（停止）action.
-- Result（结果）with the approved completion treatment and Open Result（打开结果）primary action.
-- Recovery（恢复）screen that avoids raw internal diagnostics in Normal Mode.
-- Vector-drawn functional glyphs and >=48dp Android touch targets.
-
-## Product boundaries
-- SiftAlpha is the only Normal Mode primary brand; X remains internal architecture terminology.
-- No fake percentage is shown. Motion represents real lifecycle state only.
-- Normal Mode consumes shared state and invokes existing shared actions.
-- Developer Workspace（开发者工作区）code and behavior are not redesigned by this pass.
+## Frozen boundaries
+Developer Mode（开发者模式）, Runtime（运行时）, Environment（环境）, Shared Core（共享核心）, lifecycle（生命周期）and Prepare / Run / Stop semantics（准备 / 运行 / 停止语义）remain unchanged.
 
 ## Version
 - versionName: 0.8.0-alpha43-r48d3
-- versionCode: 194
+- versionCode: 195
 - rollback baseline: baseline/r48d2 @ 729659c345e19d249de44fdb6492c47d811701cd
 
 ## Verification gate
-W0 Cloud Build（W0 云端构建）must pass:
-- launcher validation
-- localization validation
-- localized UI source validation
-- unit tests
-- assembleDebug
-- stable test signing / APK verification
+W0 Cloud Build（W0 云端构建）must pass repository validators, unit tests, assembleDebug（调试构建）, stable test signing（稳定测试签名）and APK evidence collection.
