@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -99,6 +100,9 @@ fun HomeScreen(
     onNewProject: () -> Unit,
     onImportProject: () -> Unit,
     onImportGitHub: () -> Unit,
+    onCreateProjectNormal: (String, String) -> Unit,
+    onImportGitHubNormal: (String, String, String) -> Unit,
+    onDeleteProjectNormal: (ProjectStore.ProjectSummary) -> Unit,
     onUserStorage: () -> Unit,
     onRefreshProjects: () -> Unit,
     onOpenProject: (ProjectStore.ProjectSummary) -> Unit,
@@ -120,6 +124,10 @@ fun HomeScreen(
     var projectManagementOpen by rememberSaveable { mutableStateOf(false) }
     var importOpen by rememberSaveable { mutableStateOf(false) }
     var moreOpen by rememberSaveable { mutableStateOf(false) }
+    var normalCreateProjectOpen by rememberSaveable { mutableStateOf(false) }
+    var normalGitHubImportOpen by rememberSaveable { mutableStateOf(false) }
+    var normalDetailsProject by remember { mutableStateOf<ProjectStore.ProjectSummary?>(null) }
+    var normalDeleteProject by remember { mutableStateOf<ProjectStore.ProjectSummary?>(null) }
     val selectedFilter = ProjectFilter.entries.getOrElse(filterIndex) { ProjectFilter.ALL }
     val visibleProjects = state.projects.filter { project ->
         matchesProject(project, selectedFilter, query)
@@ -141,7 +149,7 @@ fun HomeScreen(
         else -> StudioStatusTone.Neutral
     }
 
-    if (projectManagementOpen) {
+    if (projectManagementOpen && state.developerModeEnabled) {
         val rootLabel = when {
             !state.rootSelected -> stringResource(R.string.home_project_root_unselected)
             state.projectError != null -> stringResource(R.string.home_root_access_failed)
@@ -239,7 +247,7 @@ fun HomeScreen(
         )
     }
 
-    if (importOpen) {
+    if (importOpen && state.developerModeEnabled) {
         AlertDialog(
             onDismissRequest = { importOpen = false },
             title = {
@@ -294,7 +302,7 @@ fun HomeScreen(
         )
     }
 
-    if (moreOpen && !state.developerModeEnabled) {
+    if (moreOpen && state.developerModeEnabled) {
         AlertDialog(
             onDismissRequest = { moreOpen = false },
             title = {
@@ -352,13 +360,116 @@ fun HomeScreen(
     }
 
     if (!state.developerModeEnabled) {
+        if (projectManagementOpen) {
+            SiftAlphaNormalProjectLocationDialog(
+                state = state,
+                onDismiss = { projectManagementOpen = false },
+                onConnectAcode = {
+                    projectManagementOpen = false
+                    onConnectAcode()
+                },
+                onChooseRoot = {
+                    projectManagementOpen = false
+                    onChooseRoot()
+                },
+            )
+        }
+
+        if (importOpen) {
+            SiftAlphaNormalImportDialog(
+                onDismiss = { importOpen = false },
+                onChooseFile = {
+                    importOpen = false
+                    onImportProject()
+                },
+                onGitHub = {
+                    importOpen = false
+                    normalGitHubImportOpen = true
+                },
+                onNewProject = {
+                    importOpen = false
+                    normalCreateProjectOpen = true
+                },
+            )
+        }
+
+        if (moreOpen) {
+            SiftAlphaNormalMoreDialog(
+                onDismiss = { moreOpen = false },
+                onRefreshProjects = {
+                    moreOpen = false
+                    onRefreshProjects()
+                },
+                onNewProject = {
+                    moreOpen = false
+                    normalCreateProjectOpen = true
+                },
+                onUserStorage = {
+                    moreOpen = false
+                    onUserStorage()
+                },
+                onSettings = {
+                    moreOpen = false
+                    onSettings()
+                },
+            )
+        }
+
+        if (normalCreateProjectOpen) {
+            SiftAlphaNormalCreateProjectDialog(
+                onDismiss = { normalCreateProjectOpen = false },
+                onCreate = { name, description ->
+                    normalCreateProjectOpen = false
+                    onCreateProjectNormal(name, description)
+                },
+            )
+        }
+
+        if (normalGitHubImportOpen) {
+            SiftAlphaNormalGitHubImportDialog(
+                onDismiss = { normalGitHubImportOpen = false },
+                onImport = { url, branch, name ->
+                    normalGitHubImportOpen = false
+                    onImportGitHubNormal(url, branch, name)
+                },
+            )
+        }
+
+        normalDetailsProject?.let { project ->
+            SiftAlphaNormalProjectDetailsDialog(
+                project = project,
+                onDismiss = { normalDetailsProject = null },
+            )
+        }
+
+        normalDeleteProject?.let { project ->
+            SiftAlphaNormalDeleteProjectDialog(
+                project = project,
+                onDismiss = { normalDeleteProject = null },
+                onConfirm = {
+                    normalDeleteProject = null
+                    onDeleteProjectNormal(project)
+                },
+            )
+        }
+    }
+
+    if (!state.developerModeEnabled) {
         SiftAlphaNormalHomeScreen(
             state = state,
+            visibleProjects = visibleProjects,
+            query = query,
+            filterIndex = filterIndex,
+            projectDirectoryReady = projectDirectoryReady,
             versionName = versionName,
+            onQueryChange = { query = it },
+            onFilterChange = { filterIndex = it },
             onImport = { importOpen = true },
-            onNewProject = onNewProject,
+            onNewProject = { normalCreateProjectOpen = true },
             onProjectLocation = { projectManagementOpen = true },
             onOpenProject = onOpenProject,
+            onShowDetails = { project -> normalDetailsProject = project },
+            onDeleteProject = { project -> normalDeleteProject = project },
             onMore = { moreOpen = true },
         )
         return

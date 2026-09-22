@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,11 +25,12 @@ class SettingsActivity : StudioComposeActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val normalMode = intent.getBooleanExtra(EXTRA_NORMAL_MODE, false)
         setContent {
             var developerModeEnabled by remember {
                 mutableStateOf(DeveloperModeStore(this@SettingsActivity).isEnabled())
             }
-            StudioTheme {
+            val screen: @Composable () -> Unit = {
                 SettingsScreen(
                     currentLanguage = StudioLanguage.current(this@SettingsActivity).selfName,
                     currentBrowser = StudioBrowser.selectedLabel(this@SettingsActivity),
@@ -43,6 +45,11 @@ class SettingsActivity : StudioComposeActivity() {
                         developerModeEnabled = enabled
                     },
                 )
+            }
+            if (normalMode) {
+                SiftAlphaNormalTheme { screen() }
+            } else {
+                StudioTheme { screen() }
             }
         }
     }
@@ -78,4 +85,8 @@ class SettingsActivity : StudioComposeActivity() {
             .getOrNull()
             .orEmpty()
             .ifBlank { "?" }
+
+    companion object {
+        const val EXTRA_NORMAL_MODE = "settings.extra.NORMAL_MODE"
+    }
 }

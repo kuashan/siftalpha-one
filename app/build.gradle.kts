@@ -92,9 +92,9 @@ android {
         // R48-D2 adds the explicitly authorized shared background-reliability reminder
         // and indeterminate Runtime activity indicator without changing Runtime deadlines.
         // R48-D3 implements the approved SiftAlpha X Normal Mode visual system.
-        // This fidelity correction restores the original logo, removes Normal Mode bottom
-        // navigation, and aligns project-state presentation without changing Shared Core semantics.
-        versionCode = 195
+        // v196 adds the mandatory R48-D2 parity repair: no baseline capability may be removed
+        // or merged by presentation work; secondary Normal Mode routes receive the same design system.
+        versionCode = 196
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

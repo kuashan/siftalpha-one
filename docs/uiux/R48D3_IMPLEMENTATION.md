@@ -28,3 +28,21 @@ Developer Mode（开发者模式）, Runtime（运行时）, Environment（环�
 
 ## Verification gate
 W0 Cloud Build（W0 云端构建）must pass repository validators, unit tests, assembleDebug（调试构建）, stable test signing（稳定测试签名）and APK evidence collection.
+
+
+## v196 — R48-D2 parity + secondary-path repair
+
+R48-D3 is now explicitly constrained by `R48D2_BASELINE_CONTRACT.md`.
+
+Repaired capability regressions:
+- Home search/filter restored;
+- project Details/Delete restored;
+- Open/Refresh retained throughout the project workflow;
+- Runtime Location restored across project states;
+- External Provider recovery restored to R48-D2 action parity;
+- Configuration no longer merges Save + Run.
+
+Secondary Normal Mode routes now receive the D3 visual system:
+Import, Project Location, More, New Project, GitHub Import, Project Details, Delete confirmation, Runtime Storage, and the Normal Settings entry.
+
+VersionCode for this correction: `196`.

@@ -40,6 +40,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -439,11 +440,19 @@ private fun TinyBrandMark(modifier: Modifier = Modifier) {
 @Composable
 internal fun SiftAlphaNormalHomeScreen(
     state: HomeState,
+    visibleProjects: List<ProjectStore.ProjectSummary>,
+    query: String,
+    filterIndex: Int,
+    projectDirectoryReady: Boolean,
     versionName: String,
+    onQueryChange: (String) -> Unit,
+    onFilterChange: (Int) -> Unit,
     onImport: () -> Unit,
     onNewProject: () -> Unit,
     onProjectLocation: () -> Unit,
     onOpenProject: (ProjectStore.ProjectSummary) -> Unit,
+    onShowDetails: (ProjectStore.ProjectSummary) -> Unit,
+    onDeleteProject: (ProjectStore.ProjectSummary) -> Unit,
     onMore: () -> Unit,
 ) {
     Box(Modifier.fillMaxSize()) {
@@ -538,6 +547,55 @@ internal fun SiftAlphaNormalHomeScreen(
                 }
 
                 item {
+                    GlowCard {
+                        Text(
+                            text = stringResource(R.string.home_all_projects, state.projects.size),
+                            color = TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = onQueryChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.home_project_search_hint)) },
+                            singleLine = true,
+                            enabled = projectDirectoryReady,
+                            shape = RoundedCornerShape(14.dp),
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            listOf(
+                                R.string.home_filter_all,
+                                R.string.home_filter_python,
+                                R.string.home_filter_node,
+                            ).forEachIndexed { index, labelRes ->
+                                FilterChip(
+                                    selected = filterIndex == index,
+                                    onClick = { onFilterChange(index) },
+                                    enabled = projectDirectoryReady,
+                                    label = { Text(stringResource(labelRes), fontSize = 11.sp) },
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(
+                                R.string.home_project_count_filtered,
+                                visibleProjects.size,
+                                state.projects.size,
+                            ),
+                            color = Muted,
+                            fontSize = 11.sp,
+                        )
+                    }
+                }
+
+                item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = stringResource(R.string.brand_my_projects),
@@ -576,8 +634,21 @@ internal fun SiftAlphaNormalHomeScreen(
                             onAction = onImport,
                         )
                     }
-                    else -> items(state.projects, key = { it.documentId }) { project ->
-                        ProjectCardNormal(project = project, onOpen = { onOpenProject(project) })
+                    visibleProjects.isEmpty() -> item {
+                        EmptyProjectCard(
+                            title = stringResource(R.string.home_no_matching_projects),
+                            detail = stringResource(R.string.home_project_count_filtered, 0, state.projects.size),
+                            action = stringResource(R.string.home_refresh_projects),
+                            onAction = { onQueryChange("") },
+                        )
+                    }
+                    else -> items(visibleProjects, key = { it.documentId }) { project ->
+                        ProjectCardNormal(
+                            project = project,
+                            onOpen = { onOpenProject(project) },
+                            onDetails = { onShowDetails(project) },
+                            onDelete = { onDeleteProject(project) },
+                        )
                     }
                 }
 
@@ -663,47 +734,113 @@ private fun LocationPrompt(rootName: String?, error: String?, onClick: () -> Uni
 }
 
 @Composable
-private fun ProjectCardNormal(project: ProjectStore.ProjectSummary, onOpen: () -> Unit) {
+private fun ProjectCardNormal(
+    project: ProjectStore.ProjectSummary,
+    onOpen: () -> Unit,
+    onDetails: () -> Unit,
+    onDelete: () -> Unit,
+) {
     val ready = project.run.isNotBlank()
     Surface(
-        modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onOpen),
+        modifier = Modifier.fillMaxWidth(),
         color = PanelSoft.copy(.95f),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, Border.copy(alpha = .92f)),
     ) {
-        Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(46.dp).background(
-                    brush = Brush.linearGradient(if (ready) listOf(Color(0xFF0C6B50), Green) else listOf(Color(0xFF5633C5), Violet)),
-                    shape = RoundedCornerShape(12.dp),
-                ),
-                contentAlignment = Alignment.Center,
+        Column(Modifier.padding(13.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(role = Role.Button, onClick = onOpen),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                FolderGlyph(Modifier.size(24.dp), Color.White)
+                Box(
+                    modifier = Modifier.size(46.dp).background(
+                        brush = Brush.linearGradient(
+                            if (ready) {
+                                listOf(Color(0xFF0C6B50), Green)
+                            } else {
+                                listOf(Color(0xFF5633C5), Violet)
+                            },
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                    ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    FolderGlyph(Modifier.size(24.dp), Color.White)
+                }
+                Spacer(Modifier.width(13.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        project.name,
+                        color = TextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text = project.description.ifBlank {
+                            stringResource(
+                                if (ready) {
+                                    R.string.brand_project_ready
+                                } else {
+                                    R.string.brand_project_needs_setup
+                                },
+                            )
+                        },
+                        color = Muted,
+                        fontSize = 11.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                ChevronGlyph(Modifier.size(18.dp), Muted)
             }
-            Spacer(Modifier.width(13.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    project.name,
-                    color = TextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    text = project.description.ifBlank {
-                        stringResource(if (ready) R.string.brand_project_ready else R.string.brand_project_needs_setup)
-                    },
-                    color = Muted,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+
+            Spacer(Modifier.height(11.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Button(
+                    onClick = onOpen,
+                    modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Blue,
+                        contentColor = Color.White,
+                    ),
+                ) {
+                    Text(stringResource(R.string.home_open), fontSize = 11.sp)
+                }
+                OutlinedButton(
+                    onClick = onDetails,
+                    modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Border),
+                ) {
+                    Text(
+                        stringResource(R.string.home_details),
+                        color = TextPrimary,
+                        fontSize = 11.sp,
+                    )
+                }
+                OutlinedButton(
+                    onClick = onDelete,
+                    modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Red.copy(alpha = .42f)),
+                ) {
+                    Text(
+                        stringResource(R.string.home_delete),
+                        color = Red,
+                        fontSize = 11.sp,
+                    )
+                }
             }
-            Spacer(Modifier.width(8.dp))
-            ChevronGlyph(Modifier.size(18.dp), Muted)
         }
     }
 }
@@ -749,8 +886,11 @@ internal fun SiftAlphaNormalWorkspaceScreen(
     onOpenTermux: () -> Unit,
     onRecheckExternal: () -> Unit,
 ) {
-    val resultReady = state.openEnabled && state.runtimeState == RuntimeState.EXITED_SUCCESS
-    val errorState = state.runtimeState == RuntimeState.EXITED_ERROR || state.runtimeState == RuntimeState.ENVIRONMENT_ERROR
+    val resultReady =
+        state.openEnabled && state.runtimeState == RuntimeState.EXITED_SUCCESS
+    val errorState =
+        state.runtimeState == RuntimeState.EXITED_ERROR ||
+            state.runtimeState == RuntimeState.ENVIRONMENT_ERROR
 
     Box(Modifier.fillMaxSize()) {
         AuroraBackdrop(Modifier.fillMaxSize())
@@ -759,50 +899,91 @@ internal fun SiftAlphaNormalWorkspaceScreen(
                 state = state,
                 onBack = onBack,
                 onStop = onStop,
+                onOpen = onOpen,
+                onRefresh = onRefresh,
                 onSelectRuntime = onSelectRuntime,
                 onRequestPermission = onRequestPermission,
                 onOpenTermux = onOpenTermux,
                 onRecheckExternal = onRecheckExternal,
             )
-            state.runtimeState == RuntimeState.STARTING || state.runtimeState == RuntimeState.RUNNING -> RunProjectScreen(
+
+            state.runtimeState == RuntimeState.STARTING ||
+                state.runtimeState == RuntimeState.RUNNING ||
+                state.primaryAction == NormalProjectPrimaryActionPolicy.Action.STOP -> RunProjectScreen(
                 state = state,
                 onBack = onBack,
                 onStop = onStop,
+                onOpen = onOpen,
+                onRefresh = onRefresh,
+                onSelectRuntime = onSelectRuntime,
+                onRequestPermission = onRequestPermission,
+                onOpenTermux = onOpenTermux,
+                onRecheckExternal = onRecheckExternal,
             )
+
             resultReady -> ResultProjectScreen(
                 state = state,
                 onBack = onBack,
                 onOpen = onOpen,
                 onRun = onRun,
                 onRefresh = onRefresh,
-            )
-            errorState -> RecoveryProjectScreen(
-                state = state,
-                onBack = onBack,
-                onPrepare = onPrepare,
-                onRun = onRun,
-                onRefresh = onRefresh,
-            )
-            state.primaryAction == NormalProjectPrimaryActionPolicy.Action.CONFIGURE -> ConfigurationProjectScreen(
-                state = state,
-                onBack = onBack,
-                onSaveConfiguration = onSaveConfiguration,
-                onFallbackConfigure = onConfigure,
-            )
-            state.primaryAction == NormalProjectPrimaryActionPolicy.Action.PREPARE_PROJECT -> PrepareProjectScreen(
-                state = state,
-                onBack = onBack,
-                onPrepare = onPrepare,
                 onSelectRuntime = onSelectRuntime,
                 onRequestPermission = onRequestPermission,
                 onOpenTermux = onOpenTermux,
                 onRecheckExternal = onRecheckExternal,
             )
+
+            errorState -> RecoveryProjectScreen(
+                state = state,
+                onBack = onBack,
+                onPrepare = onPrepare,
+                onRun = onRun,
+                onOpen = onOpen,
+                onRefresh = onRefresh,
+                onSelectRuntime = onSelectRuntime,
+                onRequestPermission = onRequestPermission,
+                onOpenTermux = onOpenTermux,
+                onRecheckExternal = onRecheckExternal,
+            )
+
+            state.primaryAction == NormalProjectPrimaryActionPolicy.Action.CONFIGURE ->
+                ConfigurationProjectScreen(
+                    state = state,
+                    onBack = onBack,
+                    onSaveConfiguration = onSaveConfiguration,
+                    onFallbackConfigure = onConfigure,
+                    onOpen = onOpen,
+                    onRefresh = onRefresh,
+                    onSelectRuntime = onSelectRuntime,
+                    onRequestPermission = onRequestPermission,
+                    onOpenTermux = onOpenTermux,
+                    onRecheckExternal = onRecheckExternal,
+                )
+
+            state.primaryAction == NormalProjectPrimaryActionPolicy.Action.PREPARE_PROJECT ->
+                PrepareProjectScreen(
+                    state = state,
+                    onBack = onBack,
+                    onPrepare = onPrepare,
+                    onOpen = onOpen,
+                    onRefresh = onRefresh,
+                    onSelectRuntime = onSelectRuntime,
+                    onRequestPermission = onRequestPermission,
+                    onOpenTermux = onOpenTermux,
+                    onRecheckExternal = onRecheckExternal,
+                )
+
             else -> ReadyProjectScreen(
                 state = state,
                 onBack = onBack,
                 onRun = onRun,
+                onOpen = onOpen,
+                onRefresh = onRefresh,
+                onSelectRuntime = onSelectRuntime,
                 onOpenDeveloper = onOpenDeveloper,
+                onRequestPermission = onRequestPermission,
+                onOpenTermux = onOpenTermux,
+                onRecheckExternal = onRecheckExternal,
             )
         }
     }
@@ -915,6 +1096,8 @@ private fun PrepareProjectScreen(
     onBack: () -> Unit,
     onPrepare: (() -> Unit)? = null,
     onStop: (() -> Unit)? = null,
+    onOpen: () -> Unit,
+    onRefresh: () -> Unit,
     onSelectRuntime: (ProjectRuntimeSelection) -> Unit,
     onRequestPermission: () -> Unit,
     onOpenTermux: () -> Unit,
@@ -933,7 +1116,7 @@ private fun PrepareProjectScreen(
         installing -> 3
         verifying -> 4
         ready -> 5
-        else -> if (state.runtimeState == RuntimeState.PREPARING) 0 else 0
+        else -> 0
     }
 
     Scaffold(
@@ -953,6 +1136,7 @@ private fun PrepareProjectScreen(
                     active = state.runtimeState == RuntimeState.PREPARING,
                 )
             }
+
             if (state.runtimeState == RuntimeState.PREPARING) {
                 item {
                     GlowCard {
@@ -961,13 +1145,16 @@ private fun PrepareProjectScreen(
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(
-                                    text = state.preparePhaseTitle ?: stringResource(R.string.brand_prepare_working),
+                                    text = state.preparePhaseTitle
+                                        ?: stringResource(R.string.brand_prepare_working),
+                                    color = TextPrimary,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                 )
                                 Spacer(Modifier.height(4.dp))
                                 Text(
-                                    text = state.preparePhaseDetail ?: stringResource(R.string.brand_prepare_working_detail),
+                                    text = state.preparePhaseDetail
+                                        ?: stringResource(R.string.brand_prepare_working_detail),
                                     color = Muted,
                                     fontSize = 11.sp,
                                     lineHeight = 16.sp,
@@ -976,35 +1163,44 @@ private fun PrepareProjectScreen(
                         }
                         Spacer(Modifier.height(12.dp))
                         LinearProgressIndicator(
-                            modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(4.dp)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(4.dp)),
                             color = Cyan,
                             trackColor = Color.White.copy(alpha = .08f),
                         )
                     }
                 }
                 if (onStop != null) {
-                    item { GradientPrimaryButton(stringResource(R.string.brand_action_stop), onStop, danger = true) }
+                    item {
+                        GradientPrimaryButton(
+                            stringResource(R.string.brand_action_stop),
+                            onStop,
+                            danger = true,
+                        )
+                    }
                 }
             } else if (onPrepare != null) {
                 item {
-                    RuntimeLocationCompact(
-                        selection = state.runtimeSelection,
-                        enabled = state.runtimeSelectionCanChange,
-                        onSelect = onSelectRuntime,
+                    GradientPrimaryButton(
+                        stringResource(R.string.brand_action_prepare),
+                        onPrepare,
+                        enabled = !state.busy,
                     )
                 }
-                item { GradientPrimaryButton(stringResource(R.string.brand_action_prepare), onPrepare) }
             }
 
-            if (state.runtimeSelection == ProjectRuntimeSelection.TERMUX && state.externalReadiness != null && state.externalReadiness != ExternalProviderReadiness.READY) {
-                item {
-                    ExternalRecoveryCard(
-                        readiness = state.externalReadiness,
-                        onRequestPermission = onRequestPermission,
-                        onOpenTermux = onOpenTermux,
-                        onRecheck = onRecheckExternal,
-                    )
-                }
+            item {
+                ProjectBaselineUtilities(
+                    state = state,
+                    onOpen = onOpen,
+                    onRefresh = onRefresh,
+                    onSelectRuntime = onSelectRuntime,
+                    onRequestPermission = onRequestPermission,
+                    onOpenTermux = onOpenTermux,
+                    onRecheckExternal = onRecheckExternal,
+                )
             }
         }
     }
@@ -1104,15 +1300,24 @@ private fun RuntimeLocationCompact(
             RuntimeChoice(
                 label = stringResource(R.string.normal_runtime_internal_short),
                 selected = selection == ProjectRuntimeSelection.EMBEDDED_R,
-                enabled = enabled,
+                enabled = enabled && selection != ProjectRuntimeSelection.EMBEDDED_R,
                 modifier = Modifier.weight(1f),
             ) { onSelect(ProjectRuntimeSelection.EMBEDDED_R) }
             RuntimeChoice(
                 label = stringResource(R.string.normal_runtime_external_short),
                 selected = selection == ProjectRuntimeSelection.TERMUX,
-                enabled = enabled,
+                enabled = enabled && selection != ProjectRuntimeSelection.TERMUX,
                 modifier = Modifier.weight(1f),
             ) { onSelect(ProjectRuntimeSelection.TERMUX) }
+        }
+        if (!enabled) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.normal_runtime_selection_locked),
+                color = MutedDeep,
+                fontSize = 10.sp,
+                lineHeight = 14.sp,
+            )
         }
     }
 }
@@ -1145,17 +1350,203 @@ private fun ExternalRecoveryCard(
     onRecheck: () -> Unit,
 ) {
     GlowCard {
-        Text(stringResource(R.string.brand_external_attention), color = Amber, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Text(
+            stringResource(R.string.brand_external_attention),
+            color = Amber,
+            fontWeight = FontWeight.Bold,
+            fontSize = 13.sp,
+        )
         Spacer(Modifier.height(5.dp))
-        Text(stringResource(R.string.brand_external_attention_detail), color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+        Text(
+            stringResource(R.string.brand_external_attention_detail),
+            color = Muted,
+            fontSize = 11.sp,
+            lineHeight = 16.sp,
+        )
         Spacer(Modifier.height(12.dp))
+
         when (readiness) {
-            ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED -> GradientPrimaryButton(stringResource(R.string.normal_external_provider_allow), onRequestPermission)
+            ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED -> {
+                GradientPrimaryButton(
+                    stringResource(R.string.normal_external_provider_allow),
+                    onRequestPermission,
+                )
+            }
+
             ExternalProviderReadiness.TERMUX_NOT_INSTALLED,
             ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED,
-            ExternalProviderReadiness.BRIDGE_UNRESPONSIVE,
-            -> GradientPrimaryButton(stringResource(R.string.normal_external_provider_open_termux_action), onOpenTermux)
-            else -> GradientPrimaryButton(stringResource(R.string.normal_external_provider_recheck), onRecheck)
+            -> {
+                OutlinedButton(
+                    onClick = onOpenTermux,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, Border),
+                ) {
+                    Text(
+                        stringResource(R.string.normal_external_provider_open_termux_action),
+                        color = TextPrimary,
+                    )
+                }
+            }
+
+            ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED -> {
+                Text(
+                    stringResource(R.string.normal_external_provider_check_required),
+                    color = Muted,
+                    fontSize = 11.sp,
+                )
+            }
+
+            ExternalProviderReadiness.BRIDGE_CHECKING -> {
+                Text(
+                    stringResource(R.string.normal_external_provider_checking),
+                    color = Muted,
+                    fontSize = 11.sp,
+                )
+                Spacer(Modifier.height(9.dp))
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = Cyan,
+                    trackColor = Color.White.copy(alpha = .08f),
+                )
+            }
+
+            ExternalProviderReadiness.BRIDGE_UNRESPONSIVE -> {
+                Text(
+                    stringResource(R.string.normal_external_provider_no_response),
+                    color = Muted,
+                    fontSize = 11.sp,
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = onOpenTermux,
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, Border),
+                    ) {
+                        Text(
+                            stringResource(R.string.normal_external_provider_open_termux_action),
+                            color = TextPrimary,
+                            fontSize = 11.sp,
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onRecheck,
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, Border),
+                    ) {
+                        Text(
+                            stringResource(R.string.normal_external_provider_recheck),
+                            color = TextPrimary,
+                            fontSize = 11.sp,
+                        )
+                    }
+                }
+            }
+
+            ExternalProviderReadiness.UNAVAILABLE -> {
+                Text(
+                    stringResource(R.string.normal_external_provider_unavailable),
+                    color = Muted,
+                    fontSize = 11.sp,
+                )
+            }
+
+            ExternalProviderReadiness.READY -> Unit
+        }
+    }
+}
+
+@Composable
+private fun ProjectBaselineUtilities(
+    state: NormalProjectWorkspaceActivity.ScreenState,
+    onOpen: () -> Unit,
+    onRefresh: () -> Unit,
+    onSelectRuntime: (ProjectRuntimeSelection) -> Unit,
+    onRequestPermission: () -> Unit,
+    onOpenTermux: () -> Unit,
+    onRecheckExternal: () -> Unit,
+    includeOpen: Boolean = true,
+    includeRefresh: Boolean = true,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (includeOpen || includeRefresh) {
+            GlowCard {
+                Text(
+                    text = stringResource(R.string.normal_project_actions_title),
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    if (includeOpen) {
+                        OutlinedButton(
+                            onClick = onOpen,
+                            enabled = state.openEnabled && !state.busy,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            border = BorderStroke(1.dp, Border),
+                        ) {
+                            Text(
+                                stringResource(R.string.normal_project_open_action),
+                                color = if (state.openEnabled && !state.busy) {
+                                    TextPrimary
+                                } else {
+                                    MutedDeep
+                                },
+                            )
+                        }
+                    }
+                    if (includeRefresh) {
+                        OutlinedButton(
+                            onClick = onRefresh,
+                            enabled = !state.busy,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            border = BorderStroke(1.dp, Border),
+                        ) {
+                            Text(
+                                stringResource(R.string.normal_project_refresh_action),
+                                color = if (!state.busy) TextPrimary else MutedDeep,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        RuntimeLocationCompact(
+            selection = state.runtimeSelection,
+            enabled = state.runtimeSelectionCanChange && !state.busy,
+            onSelect = onSelectRuntime,
+        )
+
+        if (
+            state.runtimeSelection == ProjectRuntimeSelection.TERMUX &&
+            state.externalReadiness != null &&
+            state.externalReadiness != ExternalProviderReadiness.READY
+        ) {
+            ExternalRecoveryCard(
+                readiness = state.externalReadiness,
+                onRequestPermission = onRequestPermission,
+                onOpenTermux = onOpenTermux,
+                onRecheck = onRecheckExternal,
+            )
         }
     }
 }
@@ -1166,10 +1557,20 @@ private fun ConfigurationProjectScreen(
     onBack: () -> Unit,
     onSaveConfiguration: (Map<String, String>, Boolean) -> Unit,
     onFallbackConfigure: () -> Unit,
+    onOpen: () -> Unit,
+    onRefresh: () -> Unit,
+    onSelectRuntime: (ProjectRuntimeSelection) -> Unit,
+    onRequestPermission: () -> Unit,
+    onOpenTermux: () -> Unit,
+    onRecheckExternal: () -> Unit,
 ) {
-    val edits = remember(state.projectName, state.configurationFields) { mutableStateMapOf<String, String>() }
+    val edits = remember(state.projectName, state.configurationFields) {
+        mutableStateMapOf<String, String>()
+    }
     val requiredMissing = state.configurationFields.any { field ->
-        field.required && !field.configured && edits[field.key].orEmpty().isBlank()
+        field.required &&
+            !field.configured &&
+            edits[field.key].orEmpty().isBlank()
     }
 
     Scaffold(
@@ -1183,27 +1584,39 @@ private fun ConfigurationProjectScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
+                ProjectIdentityCard(state)
+            }
+
+            item {
                 GlowCard {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TinyBrandMark(Modifier.size(44.dp))
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(state.projectName, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(3.dp))
-                            Text(stringResource(R.string.brand_configuration_intro), color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
-                        }
-                    }
+                    Text(
+                        stringResource(R.string.brand_configuration_intro),
+                        color = Muted,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                    )
                 }
             }
 
             if (state.configurationFields.isEmpty()) {
                 item {
                     GlowCard {
-                        Text(stringResource(R.string.brand_configuration_none), fontWeight = FontWeight.Bold)
+                        Text(
+                            stringResource(R.string.brand_configuration_none),
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                        )
                         Spacer(Modifier.height(5.dp))
-                        Text(stringResource(R.string.brand_configuration_none_detail), color = Muted, fontSize = 11.sp)
+                        Text(
+                            stringResource(R.string.brand_configuration_none_detail),
+                            color = Muted,
+                            fontSize = 11.sp,
+                        )
                         Spacer(Modifier.height(12.dp))
-                        OutlinedButton(onClick = onFallbackConfigure, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                        OutlinedButton(
+                            onClick = onFallbackConfigure,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        ) {
                             Text(stringResource(R.string.brand_action_configure))
                         }
                     }
@@ -1211,25 +1624,58 @@ private fun ConfigurationProjectScreen(
             } else {
                 val requiredFields = state.configurationFields.filter { it.required }
                 val optionalFields = state.configurationFields.filterNot { it.required }
+
                 if (requiredFields.isNotEmpty()) {
-                    item { SectionHeader(stringResource(R.string.brand_configuration_required), stringResource(R.string.brand_configuration_required_detail)) }
+                    item {
+                        SectionHeader(
+                            stringResource(R.string.brand_configuration_required),
+                            stringResource(R.string.brand_configuration_required_detail),
+                        )
+                    }
                     items(requiredFields, key = { "required:${it.key}" }) { field ->
-                        ConfigurationFieldCard(field = field, value = edits[field.key].orEmpty(), onValueChange = { edits[field.key] = it })
+                        ConfigurationFieldCard(
+                            field = field,
+                            value = edits[field.key].orEmpty(),
+                            onValueChange = { edits[field.key] = it },
+                        )
                     }
                 }
+
                 if (optionalFields.isNotEmpty()) {
-                    item { SectionHeader(stringResource(R.string.brand_configuration_optional), stringResource(R.string.brand_configuration_optional_detail)) }
+                    item {
+                        SectionHeader(
+                            stringResource(R.string.brand_configuration_optional),
+                            stringResource(R.string.brand_configuration_optional_detail),
+                        )
+                    }
                     items(optionalFields, key = { "optional:${it.key}" }) { field ->
-                        ConfigurationFieldCard(field = field, value = edits[field.key].orEmpty(), onValueChange = { edits[field.key] = it })
+                        ConfigurationFieldCard(
+                            field = field,
+                            value = edits[field.key].orEmpty(),
+                            onValueChange = { edits[field.key] = it },
+                        )
                     }
                 }
+
                 item {
                     GradientPrimaryButton(
-                        label = stringResource(R.string.brand_configuration_save_run),
-                        onClick = { onSaveConfiguration(edits.toMap(), true) },
-                        enabled = !requiredMissing,
+                        label = stringResource(R.string.brand_configuration_save),
+                        onClick = { onSaveConfiguration(edits.toMap(), false) },
+                        enabled = !requiredMissing && !state.busy,
                     )
                 }
+            }
+
+            item {
+                ProjectBaselineUtilities(
+                    state = state,
+                    onOpen = onOpen,
+                    onRefresh = onRefresh,
+                    onSelectRuntime = onSelectRuntime,
+                    onRequestPermission = onRequestPermission,
+                    onOpenTermux = onOpenTermux,
+                    onRecheckExternal = onRecheckExternal,
+                )
             }
         }
     }
@@ -1314,6 +1760,12 @@ private fun RunProjectScreen(
     state: NormalProjectWorkspaceActivity.ScreenState,
     onBack: () -> Unit,
     onStop: () -> Unit,
+    onOpen: () -> Unit,
+    onRefresh: () -> Unit,
+    onSelectRuntime: (ProjectRuntimeSelection) -> Unit,
+    onRequestPermission: () -> Unit,
+    onOpenTermux: () -> Unit,
+    onRecheckExternal: () -> Unit,
 ) {
     Scaffold(
         containerColor = Color.Transparent,
@@ -1326,12 +1778,16 @@ private fun RunProjectScreen(
             verticalArrangement = Arrangement.spacedBy(18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            item { Spacer(Modifier.height(6.dp)) }
+            item { ProjectIdentityCard(state) }
             item { RunOrb(running = state.runtimeState == RuntimeState.RUNNING) }
             item {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = if (state.runtimeState == RuntimeState.STARTING) stringResource(R.string.brand_run_starting) else stringResource(R.string.brand_run_running),
+                        text = if (state.runtimeState == RuntimeState.STARTING) {
+                            stringResource(R.string.brand_run_starting)
+                        } else {
+                            stringResource(R.string.brand_run_running)
+                        },
                         color = TextPrimary,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
@@ -1341,7 +1797,25 @@ private fun RunProjectScreen(
                 }
             }
             item { RunPhaseList(starting = state.runtimeState == RuntimeState.STARTING) }
-            item { GradientPrimaryButton(stringResource(R.string.brand_action_stop), onStop, danger = true) }
+            item {
+                GradientPrimaryButton(
+                    stringResource(R.string.brand_action_stop),
+                    onStop,
+                    enabled = !state.busy || state.runtimeState == RuntimeState.RUNNING,
+                    danger = true,
+                )
+            }
+            item {
+                ProjectBaselineUtilities(
+                    state = state,
+                    onOpen = onOpen,
+                    onRefresh = onRefresh,
+                    onSelectRuntime = onSelectRuntime,
+                    onRequestPermission = onRequestPermission,
+                    onOpenTermux = onOpenTermux,
+                    onRecheckExternal = onRecheckExternal,
+                )
+            }
             item {
                 Text(
                     text = stringResource(R.string.brand_run_background_hint),
@@ -1462,6 +1936,10 @@ private fun ResultProjectScreen(
     onOpen: () -> Unit,
     onRun: () -> Unit,
     onRefresh: () -> Unit,
+    onSelectRuntime: (ProjectRuntimeSelection) -> Unit,
+    onRequestPermission: () -> Unit,
+    onOpenTermux: () -> Unit,
+    onRecheckExternal: () -> Unit,
 ) {
     Scaffold(
         containerColor = Color.Transparent,
@@ -1474,26 +1952,51 @@ private fun ResultProjectScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            item { Spacer(Modifier.height(10.dp)) }
+            item { ProjectIdentityCard(state) }
             item { ResultCelebrationIcon() }
             item {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.brand_result_completed), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        stringResource(R.string.brand_result_completed),
+                        color = TextPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
                     Spacer(Modifier.height(5.dp))
-                    Text(stringResource(R.string.brand_result_ready_detail), color = Muted, fontSize = 12.sp, lineHeight = 17.sp)
+                    Text(
+                        stringResource(R.string.brand_result_ready_detail),
+                        color = Muted,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                    )
                 }
             }
             item {
                 GlowCard {
-                    ResultRow(title = stringResource(R.string.brand_result_primary_item), subtitle = state.projectName, tone = Blue)
+                    ResultRow(
+                        title = stringResource(R.string.brand_result_primary_item),
+                        subtitle = state.projectName,
+                        tone = Blue,
+                    )
                     Spacer(Modifier.height(10.dp))
-                    ResultRow(title = stringResource(R.string.brand_result_status_item), subtitle = state.statusLabel, tone = Green)
+                    ResultRow(
+                        title = stringResource(R.string.brand_result_status_item),
+                        subtitle = state.statusLabel,
+                        tone = Green,
+                    )
                 }
             }
-            item { GradientPrimaryButton(stringResource(R.string.brand_result_open), onOpen) }
+            item {
+                GradientPrimaryButton(
+                    stringResource(R.string.brand_result_open),
+                    onOpen,
+                    enabled = state.openEnabled && !state.busy,
+                )
+            }
             item {
                 OutlinedButton(
                     onClick = onRun,
+                    enabled = !state.busy,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
                     shape = RoundedCornerShape(15.dp),
                     border = BorderStroke(1.dp, Border),
@@ -1502,7 +2005,16 @@ private fun ResultProjectScreen(
                 }
             }
             item {
-                TextButton(onClick = onRefresh) { Text(stringResource(R.string.brand_action_refresh), color = Muted) }
+                ProjectBaselineUtilities(
+                    state = state,
+                    onOpen = onOpen,
+                    onRefresh = onRefresh,
+                    onSelectRuntime = onSelectRuntime,
+                    onRequestPermission = onRequestPermission,
+                    onOpenTermux = onOpenTermux,
+                    onRecheckExternal = onRecheckExternal,
+                    includeOpen = false,
+                )
             }
         }
     }
@@ -1565,57 +2077,12 @@ private fun RecoveryProjectScreen(
     onBack: () -> Unit,
     onPrepare: () -> Unit,
     onRun: () -> Unit,
+    onOpen: () -> Unit,
     onRefresh: () -> Unit,
-) {
-    Scaffold(
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets.safeDrawing,
-        topBar = { NormalTopBar(state.projectName, onBack) },
-    ) { pad ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(pad),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item {
-                GlowCard {
-                    Surface(Modifier.size(48.dp), shape = CircleShape, color = Red.copy(.17f)) {
-                        Box(contentAlignment = Alignment.Center) { WarningGlyph(Modifier.size(25.dp), Red) }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Text(stringResource(R.string.brand_recovery_title), fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        state.message
-                            ?.takeUnless { it.contains("SIFTALPHA_") }
-                            ?: stringResource(R.string.brand_recovery_detail),
-                        color = Muted,
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp,
-                    )
-                }
-            }
-            item {
-                GradientPrimaryButton(
-                    label = stringResource(if (state.runtimeState == RuntimeState.ENVIRONMENT_ERROR) R.string.brand_action_prepare else R.string.brand_recovery_retry),
-                    onClick = if (state.runtimeState == RuntimeState.ENVIRONMENT_ERROR) onPrepare else onRun,
-                )
-            }
-            item {
-                OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(15.dp)) {
-                    Text(stringResource(R.string.brand_action_refresh))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReadyProjectScreen(
-    state: NormalProjectWorkspaceActivity.ScreenState,
-    onBack: () -> Unit,
-    onRun: () -> Unit,
-    onOpenDeveloper: () -> Unit,
+    onSelectRuntime: (ProjectRuntimeSelection) -> Unit,
+    onRequestPermission: () -> Unit,
+    onOpenTermux: () -> Unit,
+    onRecheckExternal: () -> Unit,
 ) {
     Scaffold(
         containerColor = Color.Transparent,
@@ -1629,24 +2096,168 @@ private fun ReadyProjectScreen(
         ) {
             item { ProjectIdentityCard(state) }
             item {
-                GlowCard(prominent = true) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(Modifier.size(46.dp), shape = CircleShape, color = Green.copy(.18f)) {
-                            Box(contentAlignment = Alignment.Center) { CheckGlyph(Modifier.size(24.dp), Green) }
+                GlowCard {
+                    Surface(
+                        Modifier.size(48.dp),
+                        shape = CircleShape,
+                        color = Red.copy(.17f),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            WarningGlyph(Modifier.size(25.dp), Red)
                         }
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.brand_ready_title), fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(3.dp))
-                            Text(stringResource(R.string.brand_ready_detail), color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        stringResource(R.string.brand_recovery_title),
+                        color = TextPrimary,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        state.message
+                            ?.takeUnless { it.contains("SIFTALPHA_") }
+                            ?: stringResource(R.string.brand_recovery_detail),
+                        color = Muted,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                    )
+                }
+            }
+            item {
+                GradientPrimaryButton(
+                    label = stringResource(
+                        if (state.runtimeState == RuntimeState.ENVIRONMENT_ERROR) {
+                            R.string.brand_action_prepare
+                        } else {
+                            R.string.brand_recovery_retry
+                        },
+                    ),
+                    onClick = if (state.runtimeState == RuntimeState.ENVIRONMENT_ERROR) {
+                        onPrepare
+                    } else {
+                        onRun
+                    },
+                    enabled = !state.busy,
+                )
+            }
+            item {
+                ProjectBaselineUtilities(
+                    state = state,
+                    onOpen = onOpen,
+                    onRefresh = onRefresh,
+                    onSelectRuntime = onSelectRuntime,
+                    onRequestPermission = onRequestPermission,
+                    onOpenTermux = onOpenTermux,
+                    onRecheckExternal = onRecheckExternal,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReadyProjectScreen(
+    state: NormalProjectWorkspaceActivity.ScreenState,
+    onBack: () -> Unit,
+    onRun: () -> Unit,
+    onOpen: () -> Unit,
+    onRefresh: () -> Unit,
+    onSelectRuntime: (ProjectRuntimeSelection) -> Unit,
+    onOpenDeveloper: () -> Unit,
+    onRequestPermission: () -> Unit,
+    onOpenTermux: () -> Unit,
+    onRecheckExternal: () -> Unit,
+) {
+    Scaffold(
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = { NormalTopBar(state.projectName, onBack) },
+    ) { pad ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(pad),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item { ProjectIdentityCard(state) }
+
+            if (state.primaryAction == NormalProjectPrimaryActionPolicy.Action.RUN) {
+                item {
+                    GlowCard(prominent = true) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                Modifier.size(46.dp),
+                                shape = CircleShape,
+                                color = Green.copy(.18f),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    CheckGlyph(Modifier.size(24.dp), Green)
+                                }
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(R.string.brand_ready_title),
+                                    color = TextPrimary,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Spacer(Modifier.height(3.dp))
+                                Text(
+                                    stringResource(R.string.brand_ready_detail),
+                                    color = Muted,
+                                    fontSize = 11.sp,
+                                    lineHeight = 16.sp,
+                                )
+                            }
                         }
                     }
                 }
+                item {
+                    GradientPrimaryButton(
+                        stringResource(R.string.brand_action_run),
+                        onRun,
+                        enabled = !state.busy,
+                    )
+                }
+            } else {
+                item {
+                    GlowCard {
+                        Text(
+                            state.statusLabel,
+                            color = TextPrimary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            state.message ?: stringResource(R.string.normal_project_waiting_action),
+                            color = Muted,
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp,
+                        )
+                    }
+                }
             }
-            item { GradientPrimaryButton(stringResource(R.string.brand_action_run), onRun) }
+
+            item {
+                ProjectBaselineUtilities(
+                    state = state,
+                    onOpen = onOpen,
+                    onRefresh = onRefresh,
+                    onSelectRuntime = onSelectRuntime,
+                    onRequestPermission = onRequestPermission,
+                    onOpenTermux = onOpenTermux,
+                    onRecheckExternal = onRecheckExternal,
+                )
+            }
+
             if (state.developerModeEnabled) {
                 item {
-                    TextButton(onClick = onOpenDeveloper, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(
+                        onClick = onOpenDeveloper,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Text(stringResource(R.string.normal_project_open_developer), color = Muted)
                     }
                 }
@@ -1655,7 +2266,7 @@ private fun ReadyProjectScreen(
     }
 }
 
-// --- Small vector glyphs ----------------------------------------------------
+// --- Small vector glyphs// --- Small vector glyphs ----------------------------------------------------
 
 @Composable
 private fun FolderGlyph(modifier: Modifier, color: Color) {

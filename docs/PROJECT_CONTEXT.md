@@ -1321,3 +1321,29 @@ Rules:
 
 Canonical contract:
 `docs/uiux/R48D2_BASELINE_CONTRACT.md`.
+
+
+## 2026-09-22 · R48-D3 parity repair execution（R48-D3 等价修复执行）
+
+R48-D3 was re-audited against frozen R48-D2 before further visual work.
+
+Functional drift found in the prior D3 presentation:
+- Home search/filter missing;
+- project Details/Delete missing;
+- Open/Refresh hidden in multiple project states;
+- Runtime Location hidden outside Prepare;
+- External Provider recovery actions incomplete;
+- Configuration merged Save + Run.
+
+Repair rule:
+`R48-D2 capability semantics > R48-D3 visual convenience`.
+
+The repaired D3 source restores those capabilities and applies the D3 design system to the main Normal Mode secondary paths:
+Import, Project Location, More, New Project, GitHub Import, Project Details, Delete confirmation, Runtime Storage and Normal Settings entry.
+
+Developer Mode remains unchanged.
+`baseline/r48d2` remains untouched.
+
+Target version:
+- `0.8.0-alpha43-r48d3`
+- versionCode `196`

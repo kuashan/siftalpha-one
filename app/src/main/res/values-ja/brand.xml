@@ -41,6 +41,7 @@
     <string name="brand_configuration_enter_value">値を入力</string>
     <string name="brand_configuration_keep_existing">空欄なら現在の値を保持</string>
     <string name="brand_configuration_save_run">保存して実行 →</string>
+    <string name="brand_configuration_save">設定を保存</string>
     <string name="brand_configuration_none">現在入力が必要な設定はありません</string>
     <string name="brand_configuration_none_detail">実行時に新しい必須設定が見つかれば、ここに表示されます。</string>
     <string name="brand_run_title">実行中</string>

@@ -41,6 +41,7 @@
     <string name="brand_configuration_enter_value">请输入配置值</string>
     <string name="brand_configuration_keep_existing">留空则保留现有配置</string>
     <string name="brand_configuration_save_run">保存并开始运行 →</string>
+    <string name="brand_configuration_save">保存配置</string>
     <string name="brand_configuration_none">暂时没有需要填写的配置</string>
     <string name="brand_configuration_none_detail">如果项目在运行时发现新的必要配置，SiftAlpha X 会在这里提示你。</string>
     <string name="brand_run_title">运行中</string>

@@ -37,3 +37,14 @@
 - Runtime / Termux / PID / logs（运行时 / Termux / PID / 日志）
 - Bottom Navigation（底部导航）——普通用户模式明确禁止
 - Developer diagnostics（开发者诊断）
+
+
+## R48-D2 Parity（R48-D2 等价要求）
+Home（首页）视觉重设计必须保留：
+- Project search（项目搜索）
+- All / Python / Node filters（全部 / Python / Node 筛选）
+- Project Open（打开）
+- Project Details（详情）
+- Project Delete（删除）
+
+ProjectCard（项目卡片）可以重新排版，但不能把 Details / Delete 功能删除或藏成不可发现的能力。

@@ -1360,3 +1360,28 @@ This gate is mandatory for every post-R48-D2 Normal Mode UI APK.
 | Visual redesign（视觉重设计） | may change presentation only after all parity rows pass | REQUIRED |
 
 Failure of any REQUIRED row = UI regression（界面回归）. Do not present the build as an accepted design delivery.
+
+
+### R48-D3 v196 — Baseline parity + secondary-path design
+
+| Area | Verification | Result |
+| --- | --- | --- |
+| Baseline branch | `baseline/r48d2` unchanged | REQUIRED |
+| Home search/filter | R48-D2 capability visible in D3 | SOURCE READY |
+| Project Open | visible / enabled by R48-D2 rules | SOURCE READY |
+| Project Refresh | visible / enabled by R48-D2 rules | SOURCE READY |
+| Project Details/Delete | restored in D3 project cards | SOURCE READY |
+| Runtime Location | visible across project states | SOURCE READY |
+| External recovery | permission / Open Termux / Re-check parity | SOURCE READY |
+| Configuration flow | Save and Run are separate steps | SOURCE READY |
+| Import secondary route | D3-designed | SOURCE READY |
+| Project Location secondary route | D3-designed | SOURCE READY |
+| More secondary route | D3-designed | SOURCE READY |
+| New Project secondary route | D3-designed | SOURCE READY |
+| GitHub Import secondary route | D3-designed | SOURCE READY |
+| Project Details/Delete dialogs | D3-designed | SOURCE READY |
+| Runtime Storage | D3-designed presentation, same controllers | SOURCE READY |
+| Normal Settings entry | D3 theme; Developer entry unchanged | SOURCE READY |
+| Developer Mode | unchanged | REQUIRED |
+| Runtime / Environment semantics | unchanged | REQUIRED |
+| W0 Cloud Build | validators + tests + APK | PENDING |

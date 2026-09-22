@@ -57,3 +57,21 @@ Primary：最合理恢复动作，例如重新尝试 / 完成配置。
 - Termux 外部运行
 
 不要把 Internal / External Runtime（内部 / 外部运行时）作为主状态。
+
+
+## R48-D2 Persistent Secondary Actions（R48-D2 持续次操作）
+
+One Primary Action（单一主操作）只定义视觉优先级。
+
+Project Workspace（项目页）必须持续保留：
+- Open（打开）
+- Refresh（刷新）
+
+它们按照 R48-D2 的真实 enabled / disabled（可用 / 不可用）规则显示。
+
+Runtime Location（运行位置）也必须保持可见；不可切换时显示锁定状态，而不是从页面删除。
+
+External Provider（外部执行环境）恢复必须保持 R48-D2 行为：
+- permission（权限）
+- Open Termux（打开 Termux）
+- BRIDGE_UNRESPONSIVE（桥无响应）时同时保留 Open Termux + Re-check（重新检测）

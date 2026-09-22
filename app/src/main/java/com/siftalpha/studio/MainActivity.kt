@@ -107,13 +107,29 @@ class MainActivity : StudioComposeActivity() {
                     state = homeState.value,
                     versionName = appVersionName(),
                     onSettings = {
-                        startActivity(Intent(this, SettingsActivity::class.java))
+                        startActivity(
+                            Intent(this, SettingsActivity::class.java).apply {
+                                putExtra(
+                                    SettingsActivity.EXTRA_NORMAL_MODE,
+                                    !homeState.value.developerModeEnabled,
+                                )
+                            },
+                        )
                     },
                     onConnectAcode = { chooseProjectRoot(preferAcodeProjects = true) },
                     onChooseRoot = { chooseProjectRoot(preferAcodeProjects = false) },
                     onNewProject = { showCreateProjectDialog() },
                     onImportProject = { chooseUnifiedImportFile() },
                     onImportGitHub = { showGitHubImportDialog() },
+                    onCreateProjectNormal = { name, description ->
+                        createNormalProject(name, description)
+                    },
+                    onImportGitHubNormal = { url, branch, name ->
+                        importNormalGitHub(url, branch, name)
+                    },
+                    onDeleteProjectNormal = { project ->
+                        deleteNormalProject(project)
+                    },
                     onUserStorage = {
                         startActivity(Intent(this, NormalRuntimeStorageActivity::class.java))
                     },
@@ -587,6 +603,103 @@ class MainActivity : StudioComposeActivity() {
                 rootName = null,
                 projects = emptyList(),
                 projectError = error.message ?: error.javaClass.simpleName,
+            )
+        }
+    }
+
+    private fun createNormalProject(
+        rawName: String,
+        rawDescription: String,
+    ) {
+        if (projectStore.rootUri() == null) {
+            toast(getString(R.string.home_select_root_first))
+            return
+        }
+        val name = rawName.trim()
+        val description = rawDescription.trim()
+        try {
+            projectStore.createProject(name, description)
+            toast(getString(R.string.home_project_created, name))
+            refreshProjects()
+        } catch (error: Throwable) {
+            toast(error.message ?: getString(R.string.home_create_failed))
+        }
+    }
+
+    private fun importNormalGitHub(
+        rawUrl: String,
+        rawBranch: String,
+        rawName: String,
+    ) {
+        if (projectStore.rootUri() == null) {
+            toast(getString(R.string.home_import_select_location_first))
+            return
+        }
+        if (!ensureGitHubExternalProviderReady()) return
+
+        val spec = runCatching {
+            SharedGitHubImportService.parse(
+                raw = rawUrl,
+                rawBranch = rawBranch,
+                rawName = rawName,
+            ) { reason ->
+                when (reason) {
+                    SharedGitHubImportService.ParseError.ENTER_ADDRESS ->
+                        getString(R.string.runtime_github_enter_address)
+                    SharedGitHubImportService.ParseError.ONLY_GITHUB_SUPPORTED ->
+                        getString(R.string.runtime_github_only_supported)
+                    SharedGitHubImportService.ParseError.ADDRESS_RULE ->
+                        getString(R.string.runtime_github_address_rule)
+                    SharedGitHubImportService.ParseError.PROJECT_NAME_RULE ->
+                        getString(R.string.runtime_project_name_rule)
+                }
+            }
+        }.getOrElse { error ->
+            AlertDialog.Builder(this)
+                .setTitle(getString(R.string.runtime_github_parameters_invalid))
+                .setMessage(error.message ?: getString(R.string.runtime_github_cannot_import))
+                .setPositiveButton(getString(R.string.common_confirm), null)
+                .show()
+            return
+        }
+
+        if (projectGateway.folderExists(spec.projectName)) {
+            toast(getString(R.string.runtime_github_project_exists, spec.projectName))
+            return
+        }
+
+        runCatching {
+            val id = backend.execute(projectRuntime.cloneGitHub(spec))
+            pendingGitHubImports[id] = spec
+            homeState.value = homeState.value.copy(
+                commandOutput = getString(
+                    R.string.runtime_github_importing_detail,
+                    spec.sourceUrl,
+                    spec.branch,
+                ),
+                bridgeState = HomeBridgeState.RUNNING,
+            )
+            TermuxResultBus.consume(id)?.let(resultListener)
+        }.onFailure { error ->
+            AlertDialog.Builder(this)
+                .setTitle(getString(R.string.runtime_github_import_failed))
+                .setMessage(error.message ?: getString(R.string.runtime_github_cannot_import))
+                .setPositiveButton(getString(R.string.common_confirm), null)
+                .show()
+        }
+    }
+
+    private fun deleteNormalProject(project: ProjectStore.ProjectSummary) {
+        try {
+            projectStore.deleteProject(project)
+            toast(getString(R.string.home_project_deleted, project.name))
+            refreshProjects()
+        } catch (error: Throwable) {
+            toast(
+                getString(
+                    R.string.home_delete_failed,
+                    error.message ?: error.javaClass.simpleName,
+                ),
             )
         }
     }

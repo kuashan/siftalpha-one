@@ -2576,3 +2576,25 @@ The baseline is a read-only rollback and comparison reference.
 
 Canonical contract:
 `docs/uiux/R48D2_BASELINE_CONTRACT.md`.
+
+
+## 2026-09-22 · R48-D3 baseline-parity + secondary-route repair
+
+Compared the current R48-D3 presentation directly against frozen R48-D2.
+
+Found and repaired UI-driven functional drift:
+- missing Home search/filter;
+- missing Project Details/Delete;
+- Open/Refresh hidden by state-specific D3 screens;
+- Runtime Location hidden outside Prepare;
+- incomplete External Provider recovery actions;
+- Configuration merged Save + Run.
+
+Also redesigned the main Normal Mode secondary routes while leaving Developer Mode unchanged.
+
+No changes were made to `baseline/r48d2`.
+
+Target:
+- versionName `0.8.0-alpha43-r48d3`
+- versionCode `196`
+- cloud gate pending.

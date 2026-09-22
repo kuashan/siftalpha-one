@@ -41,6 +41,7 @@
     <string name="brand_configuration_enter_value">Enter value</string>
     <string name="brand_configuration_keep_existing">Leave blank to keep the existing value</string>
     <string name="brand_configuration_save_run">Save and run →</string>
+    <string name="brand_configuration_save">Save configuration</string>
     <string name="brand_configuration_none">No values are required right now</string>
     <string name="brand_configuration_none_detail">If the project discovers another required value at runtime, SiftAlpha X will show it here.</string>
     <string name="brand_run_title">Running</string>
