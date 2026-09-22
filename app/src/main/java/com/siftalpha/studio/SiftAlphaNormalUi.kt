@@ -807,7 +807,7 @@ private fun ProjectCardNormal(
             ) {
                 Button(
                     onClick = onOpen,
-                    modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Blue,
@@ -818,7 +818,7 @@ private fun ProjectCardNormal(
                 }
                 OutlinedButton(
                     onClick = onDetails,
-                    modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, Border),
                 ) {
@@ -830,7 +830,7 @@ private fun ProjectCardNormal(
                 }
                 OutlinedButton(
                     onClick = onDelete,
-                    modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, Red.copy(alpha = .42f)),
                 ) {
