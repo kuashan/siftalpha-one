@@ -76,6 +76,7 @@
     <string name="runtime_policy_reason_unknown_runtime_state">the runtime state has not been confirmed</string>
     <string name="runtime_policy_reason_environment_unknown">the runtime environment state has not been confirmed</string>
     <string name="runtime_policy_reason_environment_not_ready">the runtime environment is not prepared</string>
+    <string name="runtime_policy_reason_environment_already_ready">the runtime environment is already prepared</string>
     <string name="runtime_policy_reason_required_configuration_missing">required configuration is missing</string>
     <string name="runtime_policy_reason_web_not_available">the Web endpoint is not verified as available</string>
     <string name="runtime_policy_reason_source_not_available">no source link is available</string>

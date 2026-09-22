@@ -1467,3 +1467,10 @@ Developer Mode exposes more of the shared controls and diagnostics directly. Nor
 When a behavior defect appears in only one visible surface, first determine where the incorrect fact is owned. If the wrong rule is in a shared policy/service, fix the Shared Core once; do not hide it with a surface-specific UI condition.
 
 Confirmed example awaiting repair: `ProjectActionPolicy` currently leaves PREPARE enabled even when Environment readiness is READY. The intended shared invariant is READY -> PREPARE disabled + START enabled. Normal Mode's ENVIRONMENT_ERROR recovery path remains a separate valid case where re-prepare is allowed.
+
+
+## 2026-09-22 · READY/PREPARE invariant enforced in Shared Core
+
+The shared action invariant is now explicit and implemented: a project environment proven READY must not offer PREPARE again. `ProjectActionPolicy` is the single owner of this rule, so Developer Mode and Normal Mode consume the same corrected fact. No surface-specific READY check is permitted.
+
+ENVIRONMENT_ERROR remains a recovery condition and may still offer re-prepare; it must not be conflated with READY.

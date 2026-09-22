@@ -1740,3 +1740,21 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Existing diagnostic tests | RuntimeConfigurationDiagnostic / PythonCliLaunchResolver regressions remain green | PASS REQUIRED |
 | W0 / unit tests / assembleDebug | cloud build | PENDING |
 | Internal Alpine Probe | cloud probe | PENDING |
+
+
+### R48-D6 v218 — Shared PREPARE readiness invariant
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Shared READY policy | READY -> START enabled + PREPARE disabled | PASS REQUIRED |
+| Disable reason | READY PREPARE -> ENVIRONMENT_ALREADY_READY | PASS REQUIRED |
+| External provider surface | Developer Prepare button consumes shared disabled decision | PASS REQUIRED |
+| Internal R surface | READY invariant identical without external host | PASS REQUIRED |
+| NOT_READY | PREPARE remains enabled and START disabled | PASS REQUIRED |
+| UNKNOWN | existing STATUS / PREPARE recovery policy unchanged | PASS REQUIRED |
+| Normal Mode projection | shared READY/START -> Normal RUN, never PREPARE_PROJECT | PASS REQUIRED |
+| ENVIRONMENT_ERROR recovery | Normal re-prepare path remains available | PASS REQUIRED |
+| Developer Mode source | V04Activity unchanged | PASS REQUIRED |
+| Normal Mode source | NormalProjectWorkspaceActivity / SiftAlphaNormalUi unchanged | PASS REQUIRED |
+| W0 / unit tests / assembleDebug | cloud build | PENDING |
+| Internal Alpine Probe | cloud probe | PENDING |

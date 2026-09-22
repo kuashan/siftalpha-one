@@ -59,6 +59,7 @@ object ProjectActionPolicy {
         UNKNOWN_RUNTIME_STATE("runtime_policy_reason_unknown_runtime_state"),
         ENVIRONMENT_UNKNOWN("runtime_policy_reason_environment_unknown"),
         ENVIRONMENT_NOT_READY("runtime_policy_reason_environment_not_ready"),
+        ENVIRONMENT_ALREADY_READY("runtime_policy_reason_environment_already_ready"),
         REQUIRED_CONFIGURATION_MISSING("runtime_policy_reason_required_configuration_missing"),
         WEB_NOT_AVAILABLE("runtime_policy_reason_web_not_available"),
         SOURCE_NOT_AVAILABLE("runtime_policy_reason_source_not_available"),
@@ -253,6 +254,12 @@ object ProjectActionPolicy {
             disableReason = null
         } else {
             actions[Action.STOP] = disabled(DisableReason.PROCESS_NOT_ACTIVE)
+            if (
+                selectionReason == null &&
+                snapshot.environment.readiness == ProjectUiSnapshot.Readiness.READY
+            ) {
+                actions[Action.PREPARE] = disabled(DisableReason.ENVIRONMENT_ALREADY_READY)
+            }
             when {
                 selectionReason != null -> {
                     primaryAction = if (actions.getValue(Action.STATUS).enabled) Action.STATUS else null

@@ -3212,3 +3212,34 @@ At minimum add tests proving:
 DISCUSSION + SOURCE AUDIT COMPLETE.
 The READY/PREPARE defect is confirmed but has NOT yet been repaired in this documentation-only commit.
 Developer Mode source, Normal Mode source, Shared Core behavior and Runtime behavior are unchanged by this entry.
+
+
+## 2026-09-22 · R48-D6 v218 Shared PREPARE readiness invariant repair
+
+### Fixed defect
+The previously confirmed Shared Core defect is repaired: Environment = READY no longer leaves PREPARE enabled.
+
+### Shared policy change
+`ProjectActionPolicy（项目动作策略）` now enforces:
+
+- Environment = NOT_READY -> PREPARE enabled, START disabled.
+- Environment = UNKNOWN -> existing STATUS / PREPARE recovery behavior is preserved.
+- Environment = READY -> PREPARE disabled with `ENVIRONMENT_ALREADY_READY`; START remains enabled when configuration/runtime constraints allow it.
+- Active / pending / runtime-recovery restrictions keep their existing stronger precedence.
+
+This is a Shared Core repair, not a Developer Mode UI patch. `V04Activity（开发者工作区）` and Normal Mode UI/workspace source are not modified.
+
+### Product-surface effect
+- Developer Mode: after the environment is READY, the secondary Prepare button becomes disabled automatically because it already reads `ProjectActionPolicy.isEnabled(PREPARE)`.
+- Normal Mode: the same READY shared policy maps to RUN through `NormalProjectPrimaryActionPolicy`; no duplicated readiness rule is added.
+- Normal Mode ENVIRONMENT_ERROR recovery still allows re-prepare through its existing recovery workflow; READY and ERROR remain distinct facts.
+
+### Regression coverage
+- External/shared READY state asserts START enabled + PREPARE disabled + ENVIRONMENT_ALREADY_READY reason.
+- Internal R READY state asserts the same invariant without depending on the external host.
+- NOT_READY still asserts PREPARE enabled.
+- Normal Mode projection test proves the corrected shared READY decision maps to RUN and not PREPARE_PROJECT.
+
+Target:
+- versionCode = 218
+- versionName = 0.8.0-alpha43-r48d6

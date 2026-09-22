@@ -82,6 +82,11 @@ class ProjectActionPolicyTest {
 
         assertEquals(ProjectActionPolicy.Action.START, policy.primaryAction)
         assertTrue(policy.isEnabled(ProjectActionPolicy.Action.START))
+        assertFalse(policy.isEnabled(ProjectActionPolicy.Action.PREPARE))
+        assertEquals(
+            ProjectActionPolicy.DisableReason.ENVIRONMENT_ALREADY_READY,
+            policy.reasonFor(ProjectActionPolicy.Action.PREPARE),
+        )
         assertTrue(policy.isEnabled(ProjectActionPolicy.Action.CONFIGURE))
     }
 
@@ -95,6 +100,7 @@ class ProjectActionPolicyTest {
         )
 
         assertEquals(ProjectActionPolicy.Action.PREPARE, policy.primaryAction)
+        assertTrue(policy.isEnabled(ProjectActionPolicy.Action.PREPARE))
         assertFalse(policy.isEnabled(ProjectActionPolicy.Action.START))
         assertTrue(policy.isEnabled(ProjectActionPolicy.Action.CONFIGURE))
     }
@@ -445,6 +451,11 @@ class ProjectActionPolicyTest {
 
         assertEquals(ProjectActionPolicy.Action.START, policy.primaryAction)
         assertTrue(policy.isEnabled(ProjectActionPolicy.Action.START))
+        assertFalse(policy.isEnabled(ProjectActionPolicy.Action.PREPARE))
+        assertEquals(
+            ProjectActionPolicy.DisableReason.ENVIRONMENT_ALREADY_READY,
+            policy.reasonFor(ProjectActionPolicy.Action.PREPARE),
+        )
     }
 
     @Test

@@ -145,8 +145,8 @@ android {
         // v214 completes the eight requested Normal Mode repairs: restore a static logo/text brand hold with no
         // code-convergence animation, simplify Home copy/colors/status/version placement, make descriptions editable,
         // compact Prepare to the current phase only, while preserving the v212 lifecycle-gated decorative motion.
-        versionCode = 217
-        versionName = "0.8.0-alpha43-r48d5"
+        versionCode = 218
+        versionName = "0.8.0-alpha43-r48d6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

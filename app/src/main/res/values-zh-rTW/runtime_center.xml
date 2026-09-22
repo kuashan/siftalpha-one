@@ -76,6 +76,7 @@
     <string name="runtime_policy_reason_unknown_runtime_state">執行狀態尚未確認</string>
     <string name="runtime_policy_reason_environment_unknown">執行環境狀態尚未確認</string>
     <string name="runtime_policy_reason_environment_not_ready">執行環境尚未準備</string>
+    <string name="runtime_policy_reason_environment_already_ready">執行環境已準備，無需重複準備</string>
     <string name="runtime_policy_reason_required_configuration_missing">缺少必要設定</string>
     <string name="runtime_policy_reason_web_not_available">Web 端點尚未確認可用</string>
     <string name="runtime_policy_reason_source_not_available">沒有可用的來源連結</string>
