@@ -1819,3 +1819,25 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Developer source boundary | V04Activity.kt | unchanged |
 | W0 / unit tests / assembleDebug | cloud build | PASS — Run #642 on 086ce75316263bca21a132d09a68e86294d98f87 |
 | Internal Alpine Probe | cloud probe | PASS — Run #111 on production implementation 242273366504106e039e9417ba003823a0b282a8 |
+
+### R48-D10 v222 — Shared External Action Gate
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Save-before-check | Normal/Developer external action starts while readiness is stale | gate request exists before probe dispatch |
+| Immediate READY race | cached/fast probe completes during request call | action proceeds exactly once; no lost continuation |
+| Async READY | two-stage check finishes later | original PREPARE/RUN/REFRESH resumes automatically |
+| Duplicate click | same project/action clicked repeatedly while checking | one generation / one continuation only |
+| Late callback | stale READY/result arrives after newer generation | cannot start superseded action |
+| STOP priority | project has deferred PREPARE/RUN | only that project's deferred request is cancelled/fenced |
+| Project isolation | another project has deferred/active work | unaffected by STOP on first project |
+| Probe failure/timeout | provider becomes FAIL/UNRESPONSIVE/UNAVAILABLE | pending action cleared; no false STARTING/PREPARING |
+| Freshness expiry | readiness older than 60s | re-probe transparently while retaining original user action |
+| PREPARE runtime proof | successful External PREPARE emits SIFTALPHA_ENV=READY | shared Runtime Capability proof timestamp refreshed |
+| Immediate RUN after PREPARE | RUN pressed inside fresh window | no redundant external probe |
+| Normal Mode | PREPARE / RUN / manual REFRESH | all use shared gate; local pendingUserIntent removed |
+| Developer Mode | External PREPARE / START | minimal V04 gate wiring resumes original dispatch once |
+| Developer boundaries | layout/Web Discovery/auto observation/log/result/runtime-control | unchanged |
+| version | installable build | 0.8.0-alpha43-r48d10 / versionCode 222 |
+| W0 / unit tests / assembleDebug | cloud build | PENDING |
+| Internal Alpine Probe | cloud probe after version bump | PENDING |
