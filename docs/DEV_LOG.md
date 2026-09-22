@@ -3436,4 +3436,13 @@ Target:
 - versionCode = 222
 - versionName = 0.8.0-alpha43-r48d10
 
-Cloud verification and APK evidence follow after the final W0 run.
+Cloud verification:
+- W0 Cloud Build #658: PASS on `2ff4dac58730681e5e1e7d5f86dcf7e6b01c78a1`.
+- `testDebugUnitTest` + `assembleDebug` + APK evidence + stable signing: PASS.
+- Internal Alpine Probe #112: PASS.
+- Artifact: `siftalpha-w0-658` / artifact ID `10714242842` / artifact digest `sha256:27a957b0f59f98049656d925c8bcf79a21c404ac18be0b4132931fce4c43d978`.
+- APK SHA-256: `7b317eed6e945bffd02fbb9f291da35fb60c9533eeabff06d4130b891143e184`.
+- APK package/version: `com.siftalpha.studio` / `0.8.0-alpha43-r48d10` / `versionCode 222`.
+- Signer certificate SHA-256 remains `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`.
+
+Real-device acceptance target: with stale External Provider readiness, one PREPARE/RUN click must check and then continue automatically; STOP must cancel only the same project's deferred action.
