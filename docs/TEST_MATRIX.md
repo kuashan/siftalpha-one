@@ -1812,7 +1812,10 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Cleanup over budget | backup still contains files after bound | PREPARE remains success; emits cleanup deferred |
 | Failure before commit | install / validation fails | existing rollback remains armed and restores old environment |
 | Stale backup on next PREPARE | valid final env plus old backup | bounded cleanup; must not block PREPARE for minutes |
-| Shared lifecycle | committed External PREPARE | main operation leaves PREPARING after real callback |\n| PREPARE success terminal path | PREPARING -> External READY callback | environmentReady=true; coordinator current/persisted operation cleared |\n| PREPARE failure terminal path | PREPARING -> failed External callback | ENVIRONMENT_ERROR; coordinator current/persisted operation cleared |\n| PREPARE STOP terminal path | PREPARING superseded by project STOP | STOPPED_BY_USER; old PREPARE callback fenced; no active operation residue |
+| Shared lifecycle | committed External PREPARE | main operation leaves PREPARING after real callback |
+| PREPARE success terminal path | PREPARING -> External READY callback | environmentReady=true; coordinator current/persisted operation cleared |
+| PREPARE failure terminal path | PREPARING -> failed External callback | ENVIRONMENT_ERROR; coordinator current/persisted operation cleared |
+| PREPARE STOP terminal path | PREPARING superseded by project STOP | STOPPED_BY_USER; old PREPARE callback fenced; no active operation residue |
 | Developer source boundary | V04Activity.kt | unchanged |
 | W0 / unit tests / assembleDebug | cloud build | PASS — Run #642 on 086ce75316263bca21a132d09a68e86294d98f87 |
 | Internal Alpine Probe | cloud probe | PASS — Run #111 on production implementation 242273366504106e039e9417ba003823a0b282a8 |
