@@ -163,7 +163,7 @@ class PythonRuntimeAdapterTest {
         assertTrue("pip must install into the final stable prefix", installFinal > createFinal)
         assertFalse(
             "a completed venv must never be renamed from a temporary prefix",
-            script.contains("mv -- \"${'
+            script.contains("mv -- \"\$candidate\" \"\$venv\""),
         )
         assertTrue("rollback stays armed until the new READY marker is committed", disableRollback > readyWrite)
         assertTrue("backup cleanup must not delay the transaction commit", cleanupAfterCommit > disableRollback)

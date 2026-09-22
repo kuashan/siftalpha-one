@@ -3367,3 +3367,10 @@ Target:
 - W0 #635 confirmed the first follow-up still emitted Kotlin interpolation for the shell placeholders.
 - The regression assertion now preserves the intended literal shell text `${'$'}candidate` / `${'$'}venv`.
 - Test/documentation-only follow-up; production repair remains unchanged.
+
+
+## 2026-09-23 · R48-D9 W0 assertion literal repair
+
+- W0 #636 confirmed the previous test-only escape fix was malformed in source serialization.
+- Replaced the affected assertion block with valid Kotlin literal escapes: `\$candidate` and `\$venv`.
+- Production Runtime repair is unchanged from `242273366504106e039e9417ba003823a0b282a8`.
