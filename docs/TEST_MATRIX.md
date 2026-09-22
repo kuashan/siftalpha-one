@@ -1639,3 +1639,21 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Real logo | unchanged final asset | PASS REQUIRED |
 | R48-D2 baseline | unchanged | PASS REQUIRED |
 | W0 validators/tests/APK | cloud build must pass | PENDING |
+
+
+### R48-D3 v212 — Decorative-motion lifecycle gate
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Custom code opening | removed | PASS REQUIRED |
+| Android system splash | unchanged/native | PASS REQUIRED |
+| Motion policy | foreground + system animations => enabled | PASS REQUIRED |
+| Background lifecycle | decorative infinite animations disabled below STARTED | PASS REQUIRED |
+| System animations disabled | decorative infinite animations disabled | PASS REQUIRED |
+| AuroraBackdrop | lifecycle gated | PASS REQUIRED |
+| RunOrb | lifecycle gated | PASS REQUIRED |
+| DotPulse | lifecycle gated | PASS REQUIRED |
+| Runtime execution | unaffected by UI motion gate | PASS REQUIRED |
+| Prepare/download/Web/log activity | unaffected by UI motion gate | PASS REQUIRED |
+| R48-D2 baseline | unchanged | PASS REQUIRED |
+| Unit tests / assembleDebug | cloud build must pass | PENDING |

@@ -1405,3 +1405,14 @@ v210 mask geometry is retained, but v211 renders every accepted mask cell as cod
 This specifically fixes the real-device disconnected-island failure.
 Required chain:
 **incoming code -> continuous dense code-S -> real app logo**.
+
+
+## 2026-09-22 · R48-D3 v212 UI-motion lifecycle boundary
+
+Current launch/UI authority:
+- custom code-built opening removed;
+- Android system splash only, then direct Normal Mode;
+- all current Normal Mode decorative infinite animations use a shared foreground/system-animation gate;
+- backgrounding the Activity stops Aurora / RunOrb / DotPulse animation composition;
+- project/runtime/background work is explicitly outside this gate and continues according to existing R48-D2/shared-core rules;
+- `baseline/r48d2` remains untouched.

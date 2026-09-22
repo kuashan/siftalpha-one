@@ -219,3 +219,13 @@ Required visual:
 - no disconnected islands;
 - no generic particle cloud;
 - after the S is fully readable, the real logo resolves in the same location.
+
+
+## R48-D3 v212 Override — Custom animated opening removed
+
+Current authority:
+- do not show the experimental code-convergence / code-S / custom logo opening;
+- after Android's normal system splash, enter Normal Mode directly;
+- decorative infinite motion elsewhere is allowed only while the owning Activity is foreground-visible and system animations are enabled;
+- backgrounding the app must dispose those decorative infinite transitions;
+- this UI-motion lifecycle rule must never stop project/runtime work.

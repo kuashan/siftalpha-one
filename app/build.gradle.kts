@@ -137,7 +137,10 @@ android {
         // v211 fixes the remaining sparse-island failure: every accepted S-mask cell is now rendered as
         // a real code glyph directly on Canvas, so the intermediate reads as one continuous dense S instead
         // of several disconnected code clusters.
-        versionCode = 211
+        // v212 removes the experimental custom code-opening sequence entirely and adds one lifecycle-aware
+        // decorative-motion gate: Aurora, RunOrb and DotPulse leave infinite animation composition whenever
+        // their Activity is no longer STARTED or Android system animations are disabled. Runtime work is unchanged.
+        versionCode = 212
         versionName = "0.8.0-alpha43-r48d3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

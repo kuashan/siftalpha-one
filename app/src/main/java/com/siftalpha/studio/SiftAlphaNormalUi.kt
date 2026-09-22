@@ -1,18 +1,13 @@
 package com.siftalpha.studio
 
 import android.animation.ValueAnimator
-import android.graphics.Paint as AndroidPaint
-import android.graphics.Typeface
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animatable
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
@@ -20,7 +15,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -57,28 +51,23 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -90,15 +79,16 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.siftalpha.studio.presentation.DecorativeMotionPolicy
 import com.siftalpha.studio.presentation.NormalProjectPrimaryActionPolicy
 import com.siftalpha.studio.project.ProjectStore
 import com.siftalpha.studio.runtime.ExternalProviderReadiness
 import com.siftalpha.studio.runtime.ProjectRuntimeSelection
 import com.siftalpha.studio.runtime.RuntimeState
 import com.siftalpha.studio.ui.theme.StudioTheme
-import kotlinx.coroutines.delay
-import kotlin.math.PI
-import kotlin.math.sin
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 
 private val Ink = Color(0xFF040817)
 private val InkSoft = Color(0xFF071027)
@@ -147,961 +137,55 @@ internal fun SiftAlphaNormalTheme(content: @Composable () -> Unit) {
     }
 }
 
+
 @Composable
-internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
-    val motion = remember { ValueAnimator.areAnimatorsEnabled() }
-    var visible by rememberSaveable { mutableStateOf(true) }
-    val timeline = remember { Animatable(if (motion) 0f else 1f) }
-
-    LaunchedEffect(Unit) {
-        if (motion) {
-            // One continuous native Compose sequence:
-            // 01 chaos from the edges -> 02 S-flow convergence ->
-            // 03 code/nebula S formation -> 04 real app logo.
-            timeline.animateTo(1f, tween(4100, easing = LinearEasing))
-            delay(500)
-        } else {
-            timeline.snapTo(1f)
-            delay(3600)
-        }
-        visible = false
+private fun rememberDecorativeMotionEnabled(): Boolean {
+    val lifecycleOwner = LocalActivity.current as? LifecycleOwner
+    var foregroundVisible by remember(lifecycleOwner) {
+        mutableStateOf(
+            lifecycleOwner
+                ?.lifecycle
+                ?.currentState
+                ?.isAtLeast(Lifecycle.State.STARTED)
+                ?: true,
+        )
+    }
+    var systemAnimationsEnabled by remember {
+        mutableStateOf(ValueAnimator.areAnimatorsEnabled())
     }
 
-    Box(Modifier.fillMaxSize()) {
-        content()
-        AnimatedVisibility(
-            visible = visible,
-            enter = fadeIn(tween(140)),
-            exit = fadeOut(tween(if (motion) 300 else 120)),
-        ) {
-            SiftAlphaLaunchMotion(
-                progress = timeline.value,
-                motion = motion,
-            )
+    DisposableEffect(lifecycleOwner) {
+        if (lifecycleOwner == null) {
+            return@DisposableEffect onDispose { }
+        }
+
+        fun refresh() {
+            foregroundVisible =
+                lifecycleOwner.lifecycle.currentState
+                    .isAtLeast(Lifecycle.State.STARTED)
+            systemAnimationsEnabled = ValueAnimator.areAnimatorsEnabled()
+        }
+
+        val observer = LifecycleEventObserver { _, _ -> refresh() }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        refresh()
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
-}
 
-private val BrandCodeLexicon = listOf(
-    "AI", "101", "</>", "{}", "0x", "Py", "JS",
-    "{ }", "[ ]", "01", "λ", "Σ", "API", "def",
-)
-
-private data class BrandCodeParticle(
-    val text: String,
-    val upper: Boolean,
-    val lane: Float,
-    val delay: Float,
-)
-
-private val BrandCodeParticles = List(252) { index ->
-    val upper = index < 126
-    val local = if (upper) index else index - 126
-    BrandCodeParticle(
-        text = BrandCodeLexicon[index % BrandCodeLexicon.size],
-        upper = upper,
-        lane = local / 125f,
-        delay = (local % 18) * .006f + if (upper) 0f else .015f,
+    return DecorativeMotionPolicy.enabled(
+        foregroundVisible = foregroundVisible,
+        systemAnimationsEnabled = systemAnimationsEnabled,
     )
 }
 
-private fun cubicBezier(
-    start: Float,
-    control1: Float,
-    control2: Float,
-    end: Float,
-    t: Float,
-): Float {
-    val u = 1f - t
-    return u * u * u * start +
-        3f * u * u * t * control1 +
-        3f * u * t * t * control2 +
-        t * t * t * end
-}
-
-private fun smoothStep(value: Float): Float {
-    val t = value.coerceIn(0f, 1f)
-    return t * t * (3f - 2f * t)
-}
-
-private fun mixFloat(start: Float, end: Float, t: Float): Float =
-    start + (end - start) * t
-
-private fun flowEnvelope(phase: Float): Float {
-    val enter = smoothStep((phase / .18f).coerceIn(0f, 1f))
-    val exit = 1f - smoothStep(((phase - .86f) / .14f).coerceIn(0f, 1f))
-    return enter * exit
-}
-
-private fun sceneAlpha(
-    progress: Float,
-    start: Float,
-    inEnd: Float,
-    outStart: Float,
-    end: Float,
-): Float {
-    val enter =
-        if (inEnd <= start) 1f
-        else smoothStep(((progress - start) / (inEnd - start)).coerceIn(0f, 1f))
-    val exit =
-        if (end <= outStart) 1f
-        else 1f -
-            smoothStep(
-                ((progress - outStart) / (end - outStart)).coerceIn(0f, 1f),
-            )
-    return enter * exit
-}
-
 @Composable
-private fun SiftAlphaLaunchMotion(
-    progress: Float,
-    motion: Boolean,
-) {
-    val p = progress.coerceIn(0f, 1f)
-    val inflowAlpha =
-        1f -
-            smoothStep(
-                ((p - .38f) / .22f).coerceIn(0f, 1f),
-            )
-    val logoBuild =
-        smoothStep(
-            ((p - .20f) / .42f).coerceIn(0f, 1f),
-        )
-    val codeLogoAlpha =
-        logoBuild *
-            (
-                1f -
-                    smoothStep(
-                        ((p - .90f) / .08f).coerceIn(0f, 1f),
-                    )
-                )
-    val realLogoAlpha =
-        if (motion) {
-            smoothStep(
-                ((p - .87f) / .10f).coerceIn(0f, 1f),
-            )
-        } else {
-            1f
-        }
-    val copyAlpha =
-        if (motion) {
-            smoothStep(
-                ((p - .86f) / .10f).coerceIn(0f, 1f),
-            )
-        } else {
-            1f
-        }
-    val maskFillAlpha =
-        smoothStep(
-            ((p - .34f) / .28f).coerceIn(0f, 1f),
-        ) * codeLogoAlpha
-
-    val flowTransition = rememberInfiniteTransition(label = "siftalpha-logo-build-flow")
-    val upperClock by if (motion) {
-        flowTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1950, easing = LinearEasing),
-            ),
-            label = "logo-build-upper",
-        )
-    } else {
-        remember { mutableStateOf(.54f) }
-    }
-    val lowerClock by if (motion) {
-        flowTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(2240, easing = LinearEasing),
-            ),
-            label = "logo-build-lower",
-        )
-    } else {
-        remember { mutableStateOf(.48f) }
-    }
-    val breathe by if (motion) {
-        flowTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1050),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "logo-build-breathe",
-        )
-    } else {
-        remember { mutableStateOf(.5f) }
-    }
-
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color(0xFF050A15),
-                        Color(0xFF020711),
-                        Color.Black,
-                    ),
-                ),
-            ),
-    ) {
-        val cx = .50f
-        val cy = .445f
-        val logoHalfW = 92.dp.value / maxWidth.value
-        val logoHalfH = 96.dp.value / maxHeight.value
-
-        fun codeSPoint(u: Float): Offset {
-            val t = u.coerceIn(0f, 1f)
-            val left = cx - logoHalfW * .67f
-            val right = cx + logoHalfW * .67f
-            val top = cy - logoHalfH * .68f
-            val bottom = cy + logoHalfH * .68f
-            return when {
-                t < .34f -> {
-                    val q = t / .34f
-                    Offset(
-                        cubicBezier(
-                            right,
-                            cx + logoHalfW * .08f,
-                            left - logoHalfW * .15f,
-                            left,
-                            q,
-                        ),
-                        cubicBezier(
-                            top,
-                            top - logoHalfH * .04f,
-                            cy - logoHalfH * .24f,
-                            cy - logoHalfH * .05f,
-                            q,
-                        ),
-                    )
-                }
-                t < .68f -> {
-                    val q = (t - .34f) / .34f
-                    Offset(
-                        cubicBezier(
-                            left,
-                            left - logoHalfW * .10f,
-                            right + logoHalfW * .12f,
-                            right,
-                            q,
-                        ),
-                        cubicBezier(
-                            cy - logoHalfH * .05f,
-                            cy + logoHalfH * .08f,
-                            cy + logoHalfH * .12f,
-                            cy + logoHalfH * .20f,
-                            q,
-                        ),
-                    )
-                }
-                else -> {
-                    val q = (t - .68f) / .32f
-                    Offset(
-                        cubicBezier(
-                            right,
-                            right + logoHalfW * .12f,
-                            cx - logoHalfW * .10f,
-                            left,
-                            q,
-                        ),
-                        cubicBezier(
-                            cy + logoHalfH * .20f,
-                            cy + logoHalfH * .40f,
-                            bottom + logoHalfH * .05f,
-                            bottom,
-                            q,
-                        ),
-                    )
-                }
-            }
-        }
-
-        fun roundedSquarePoint(t: Float): Offset {
-            val u = (t % 1f + 1f) % 1f
-            val left = cx - logoHalfW
-            val right = cx + logoHalfW
-            val top = cy - logoHalfH
-            val bottom = cy + logoHalfH
-            val cornerX = logoHalfW * .28f
-            val cornerY = logoHalfH * .28f
-            val seg = u * 8f
-            val q = seg % 1f
-            return when (seg.toInt().coerceIn(0, 7)) {
-                0 -> Offset(mixFloat(left + cornerX, right - cornerX, q), top)
-                1 -> Offset(
-                    right - cornerX + cornerX * q,
-                    top + cornerY * (1f - kotlin.math.cos(q * PI.toFloat() / 2f)),
-                )
-                2 -> Offset(right, mixFloat(top + cornerY, bottom - cornerY, q))
-                3 -> Offset(
-                    right - cornerX * (1f - kotlin.math.sin(q * PI.toFloat() / 2f)),
-                    bottom - cornerY + cornerY * q,
-                )
-                4 -> Offset(mixFloat(right - cornerX, left + cornerX, q), bottom)
-                5 -> Offset(
-                    left + cornerX * (1f - q),
-                    bottom - cornerY * (1f - kotlin.math.cos(q * PI.toFloat() / 2f)),
-                )
-                6 -> Offset(left, mixFloat(bottom - cornerY, top + cornerY, q))
-                else -> Offset(
-                    left + cornerX * (1f - kotlin.math.sin(q * PI.toFloat() / 2f)),
-                    top + cornerY * (1f - q),
-                )
-            }
-        }
-
-        fun normalizedSPoint(u: Float): Offset {
-            val t = u.coerceIn(0f, 1f)
-            return when {
-                t < .34f -> {
-                    val q = t / .34f
-                    Offset(
-                        cubicBezier(.64f, .15f, -.68f, -.60f, q),
-                        cubicBezier(-.72f, -.90f, -.74f, -.28f, q),
-                    )
-                }
-                t < .67f -> {
-                    val q = (t - .34f) / .33f
-                    Offset(
-                        cubicBezier(-.60f, -.58f, .62f, .60f, q),
-                        cubicBezier(-.28f, -.02f, .02f, .28f, q),
-                    )
-                }
-                else -> {
-                    val q = (t - .67f) / .33f
-                    Offset(
-                        cubicBezier(.60f, .66f, -.12f, -.66f, q),
-                        cubicBezier(.28f, .72f, .88f, .70f, q),
-                    )
-                }
-            }
-        }
-
-        val codeSMaskTargets = remember(logoHalfW, logoHalfH) {
-            val candidates = mutableListOf<Pair<Int, Offset>>()
-            val columns = 30
-            val rows = 36
-            val pathSamples = 150
-
-            repeat(rows) { row ->
-                val ly =
-                    -1f +
-                        2f *
-                            row.toFloat() /
-                            (rows - 1).toFloat()
-                repeat(columns) { column ->
-                    val lx =
-                        -1f +
-                            2f *
-                                column.toFloat() /
-                                (columns - 1).toFloat()
-
-                    var nearestDistanceSquared = Float.MAX_VALUE
-                    var nearestU = 0f
-                    repeat(pathSamples) { sample ->
-                        val u =
-                            sample.toFloat() /
-                                (pathSamples - 1).toFloat()
-                        val point = normalizedSPoint(u)
-                        val dx = lx - point.x
-                        val dy = ly - point.y
-                        val distanceSquared = dx * dx + dy * dy
-                        if (distanceSquared < nearestDistanceSquared) {
-                            nearestDistanceSquared = distanceSquared
-                            nearestU = u
-                        }
-                    }
-
-                    // Wide upper/lower lobes + intentionally tight waist.
-                    // This creates an actual filled S area instead of parallel path rows.
-                    val endWeight =
-                        kotlin.math.abs(nearestU * 2f - 1f)
-                    val allowedHalfWidth =
-                        .165f + .085f * endWeight
-                    if (
-                        nearestDistanceSquared <=
-                            allowedHalfWidth * allowedHalfWidth
-                    ) {
-                        val hash =
-                            (
-                                row * 193 +
-                                    column * 389 +
-                                    row * column * 17
-                                ) % 10007
-                        candidates +=
-                            hash to
-                                Offset(
-                                    cx + lx * logoHalfW,
-                                    cy + ly * logoHalfH,
-                                )
-                    }
-                }
-            }
-
-            candidates
-                .sortedBy { it.first }
-                .map { it.second }
-        }
-
-        fun codeLogoTarget(index: Int): Offset {
-            if (codeSMaskTargets.isEmpty()) {
-                return Offset(cx, cy)
-            }
-            return codeSMaskTargets[index % codeSMaskTargets.size]
-        }
-
-        val codeMaskPaint = remember {
-            AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                textAlign = AndroidPaint.Align.CENTER
-            }
-        }
-
-        fun codeLogoColor(target: Offset, index: Int): Color =
-            when {
-                target.y < cy - logoHalfH * .18f ->
-                    if (index % 5 == 0) Color.White else Cyan
-                target.y > cy + logoHalfH * .18f ->
-                    if (index % 5 == 0) ElectricBlue else Violet
-                index % 3 == 0 -> Cyan
-                index % 3 == 1 -> ElectricBlue
-                else -> Violet
-            }
-
-        fun inflowPoint(
-            upper: Boolean,
-            lane: Float,
-            t: Float,
-            clock: Float,
-            target: Offset,
-        ): Offset {
-            val eased = smoothStep(t)
-            val laneSigned = lane * 2f - 1f
-            val start =
-                if (upper) {
-                    Offset(
-                        1.10f,
-                        .02f + lane * .34f,
-                    )
-                } else {
-                    Offset(
-                        -.10f,
-                        .64f + lane * .34f,
-                    )
-                }
-            val control1 =
-                if (upper) {
-                    Offset(.94f, .10f + lane * .22f)
-                } else {
-                    Offset(.06f, .84f - lane * .22f)
-                }
-            val control2 =
-                if (upper) {
-                    Offset(.73f, .33f + lane * .13f)
-                } else {
-                    Offset(.27f, .58f - lane * .13f)
-                }
-            val base = Offset(
-                cubicBezier(start.x, control1.x, control2.x, target.x, eased),
-                cubicBezier(start.y, control1.y, control2.y, target.y, eased),
-            )
-
-            val taper = (1f - eased) * (1f - eased)
-            val direction = if (upper) 1f else -1f
-            val angle =
-                direction *
-                    (
-                        eased * 1.45f * PI.toFloat() +
-                            clock * 2f * PI.toFloat()
-                        ) +
-                    laneSigned * 1.35f
-            val orbit =
-                (.032f + .015f * kotlin.math.abs(laneSigned)) * taper
-
-            return Offset(
-                base.x +
-                    kotlin.math.cos(angle) * orbit +
-                    laneSigned * .020f * taper,
-                base.y +
-                    sin(angle) * orbit * .70f +
-                    laneSigned * .022f * taper,
-            )
-        }
-
-        Canvas(Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val center = Offset(w * cx, h * cy)
-
-            drawCircle(
-                brush = Brush.radialGradient(
-                    listOf(
-                        Cyan.copy(alpha = .065f),
-                        Blue.copy(alpha = .035f),
-                        Color.Transparent,
-                    ),
-                    center = Offset(w * .76f, h * .16f),
-                    radius = size.maxDimension * .50f,
-                ),
-                radius = size.maxDimension * .48f,
-                center = Offset(w * .76f, h * .16f),
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    listOf(
-                        Violet.copy(alpha = .055f),
-                        Color.Transparent,
-                    ),
-                    center = Offset(w * .18f, h * .82f),
-                    radius = size.maxDimension * .42f,
-                ),
-                radius = size.maxDimension * .40f,
-                center = Offset(w * .18f, h * .82f),
-            )
-
-            if (inflowAlpha > .004f) {
-                val strandsPerSide = 42
-                val samples = 28
-                repeat(2) { side ->
-                    val upper = side == 0
-                    val clock = if (upper) upperClock else lowerClock
-                    repeat(strandsPerSide) { strand ->
-                        val lane = strand / (strandsPerSide - 1f)
-                        val target =
-                            codeLogoTarget(
-                                strand + side * strandsPerSide,
-                            )
-                        val phase =
-                            (
-                                clock +
-                                    strand * if (upper) .037f else .043f
-                                ) % 1f
-
-                        fun point(t: Float): Offset {
-                            val n = inflowPoint(
-                                upper,
-                                lane,
-                                t,
-                                clock,
-                                target,
-                            )
-                            return Offset(n.x * w, n.y * h)
-                        }
-
-                        var previous = point(0f)
-                        for (sample in 1..samples) {
-                            val t = sample / samples.toFloat()
-                            val current = point(t)
-                            val distance = kotlin.math.abs(t - phase)
-                            val wrapped =
-                                kotlin.math.min(distance, 1f - distance)
-                            val pulse =
-                                1f -
-                                    (wrapped / .15f).coerceIn(0f, 1f)
-                            val edgeFade =
-                                smoothStep((t / .06f).coerceIn(0f, 1f)) *
-                                    (
-                                        1f -
-                                            smoothStep(
-                                                ((t - .985f) / .015f)
-                                                    .coerceIn(0f, 1f),
-                                            )
-                                        )
-                            val color =
-                                if (upper) {
-                                    when (strand % 4) {
-                                        0 -> Cyan
-                                        1 -> ElectricBlue
-                                        2 -> Blue
-                                        else -> Color.White
-                                    }
-                                } else {
-                                    when (strand % 4) {
-                                        0 -> Violet
-                                        1 -> Cyan
-                                        2 -> ElectricBlue
-                                        else -> Color.White
-                                    }
-                                }
-
-                            drawLine(
-                                color = color.copy(
-                                    alpha =
-                                        inflowAlpha *
-                                            edgeFade *
-                                            (.050f + .40f * pulse),
-                                ),
-                                start = previous,
-                                end = current,
-                                strokeWidth =
-                                    (.40f + (strand % 6) * .09f).dp.toPx(),
-                                cap = StrokeCap.Round,
-                            )
-                            previous = current
-                        }
-                    }
-                }
-
-                val particleCount = 220
-                repeat(particleCount) { index ->
-                    val upper = index % 2 == 0
-                    val lane = (index % 55) / 54f
-                    val clock = if (upper) upperClock else lowerClock
-                    val raw =
-                        (clock + index * .024f + lane * .11f) % 1f
-                    val t = smoothStep(raw)
-                    val target = codeLogoTarget(index)
-                    val n = inflowPoint(
-                        upper,
-                        lane,
-                        t,
-                        clock,
-                        target,
-                    )
-                    val life = flowEnvelope(raw) * inflowAlpha
-                    val point = Offset(n.x * w, n.y * h)
-                    val color =
-                        if (upper) {
-                            if (index % 3 == 0) Cyan else ElectricBlue
-                        } else {
-                            if (index % 3 == 0) Violet else Cyan
-                        }
-                    drawCircle(
-                        color = color.copy(alpha = .68f * life),
-                        radius = (.65f + (index % 4) * .25f).dp.toPx(),
-                        center = point,
-                    )
-                }
-            }
-
-            // v211: draw EVERY accepted S-mask cell as a real code glyph.
-            // This is the key difference from v210: the silhouette is now fully filled instead
-            // of showing only 252 scattered samples, so it reads immediately as one continuous S.
-            if (maskFillAlpha > .004f && codeSMaskTargets.isNotEmpty()) {
-                val native = drawContext.canvas.nativeCanvas
-                codeMaskPaint.textSize = 5.9.dp.toPx()
-
-                codeSMaskTargets.forEachIndexed { index, target ->
-                    val revealOrder =
-                        index.toFloat() /
-                            (codeSMaskTargets.size - 1)
-                                .coerceAtLeast(1)
-                                .toFloat()
-                    val localReveal =
-                        smoothStep(
-                            (
-                                (logoBuild - revealOrder * .28f) /
-                                    .44f
-                                ).coerceIn(0f, 1f),
-                        )
-                    val shimmer =
-                        .78f +
-                            .22f *
-                                kotlin.math.abs(
-                                    sin(
-                                        lowerClock * 2f * PI.toFloat() +
-                                            index * .19f,
-                                    ),
-                                )
-                    val alpha =
-                        (
-                            maskFillAlpha *
-                                localReveal *
-                                shimmer
-                            ).coerceIn(0f, 1f)
-
-                    if (alpha > .01f) {
-                        val color = codeLogoColor(target, index)
-                        codeMaskPaint.color = color.toArgb()
-                        codeMaskPaint.alpha = (alpha * 255f).toInt().coerceIn(0, 255)
-                        codeMaskPaint.setShadowLayer(
-                            4.2.dp.toPx(),
-                            0f,
-                            0f,
-                            color.copy(alpha = .70f).toArgb(),
-                        )
-                        native.drawText(
-                            BrandCodeLexicon[index % BrandCodeLexicon.size],
-                            target.x * w,
-                            target.y * h + 2.0.dp.toPx(),
-                            codeMaskPaint,
-                        )
-                    }
-                }
-                codeMaskPaint.clearShadowLayer()
-            }
-
-            // No code-stage halo/cloud: the S shape itself must be the visual object.
-            if (realLogoAlpha > .004f) {
-                val pulse = .72f + .28f * breathe
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        listOf(
-                            Cyan.copy(alpha = .28f * pulse * realLogoAlpha),
-                            Blue.copy(alpha = .17f * pulse * realLogoAlpha),
-                            Violet.copy(alpha = .13f * pulse * realLogoAlpha),
-                            Color.Transparent,
-                        ),
-                        center = center,
-                        radius = size.minDimension * .39f,
-                    ),
-                    radius =
-                        size.minDimension *
-                            (.34f + .018f * breathe),
-                    center = center,
-                )
-            }
-        }
-
-        // The visible code itself converges directly into the filled S mask.
-        if (motion && (inflowAlpha > .01f || codeLogoAlpha > .01f)) {
-            BrandCodeParticles.forEachIndexed { index, particle ->
-                val lane = particle.lane
-                val clock = if (particle.upper) upperClock else lowerClock
-                val raw =
-                    (
-                        clock +
-                            index * .053f +
-                            lane * .123f +
-                            particle.delay
-                        ) % 1f
-                val t = smoothStep(raw)
-                val life = flowEnvelope(raw)
-                val target = codeLogoTarget(index)
-                val stream = inflowPoint(
-                    particle.upper,
-                    lane,
-                    t,
-                    clock,
-                    target,
-                )
-
-                // Spatial continuity: each code token physically travels into its final S slot.
-                val morph =
-                    smoothStep(
-                        ((p - .22f) / .42f)
-                            .coerceIn(0f, 1f),
-                    )
-                val x =
-                    stream.x * (1f - morph) +
-                        target.x * morph
-                val y =
-                    stream.y * (1f - morph) +
-                        target.y * morph
-
-                // Once the S is built, glyphs stay crisp and fully readable before real-logo reveal.
-                val settledAlpha =
-                    .92f +
-                        .08f *
-                            kotlin.math.abs(
-                                sin(
-                                    lowerClock * 2f * PI.toFloat() +
-                                        index * .23f,
-                                ),
-                            )
-                val alpha =
-                    (
-                        inflowAlpha * life * (1f - morph) +
-                            codeLogoAlpha *
-                                morph *
-                                settledAlpha *
-                                (1f - .88f * maskFillAlpha)
-                        ).coerceIn(0f, 1f)
-
-                Text(
-                    text = particle.text,
-                    color = codeLogoColor(target, index),
-                    fontSize =
-                        when {
-                            particle.text.length >= 4 -> 5.8.sp
-                            particle.text.length == 3 -> 6.8.sp
-                            else -> 7.8.sp
-                        },
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .offset(
-                            x = maxWidth * x - 14.dp,
-                            y = maxHeight * y - 7.dp,
-                        )
-                        .alpha(alpha)
-                        .graphicsLayer {
-                            val scale =
-                                .98f -
-                                    .08f * morph -
-                                    .08f * realLogoAlpha
-                            scaleX = scale
-                            scaleY = scale
-                        },
-                )
-            }
-        }
-
-        if (realLogoAlpha > .004f) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .offset(y = (-10).dp)
-                    .alpha(realLogoAlpha),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Box(
-                    modifier = Modifier.size(196.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Canvas(Modifier.fillMaxSize()) {
-                        val pulse = .70f + .30f * breathe
-                        drawRoundRect(
-                            color = Cyan.copy(
-                                alpha = .24f * pulse * realLogoAlpha,
-                            ),
-                            topLeft = Offset(
-                                6.dp.toPx(),
-                                6.dp.toPx(),
-                            ),
-                            size = Size(
-                                size.width - 12.dp.toPx(),
-                                size.height - 12.dp.toPx(),
-                            ),
-                            cornerRadius = CornerRadius(
-                                42.dp.toPx(),
-                                42.dp.toPx(),
-                            ),
-                            style = Stroke(1.6.dp.toPx()),
-                        )
-                    }
-                    OriginalLogoMark(
-                        modifier = Modifier
-                            .size(154.dp)
-                            .graphicsLayer {
-                                val scale =
-                                    .965f + .035f * breathe
-                                scaleX = scale
-                                scaleY = scale
-                            },
-                        alpha = realLogoAlpha,
-                    )
-                }
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    text = stringResource(R.string.app_name),
-                    color = Color.White,
-                    fontSize = 34.sp,
-                    lineHeight = 40.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.alpha(copyAlpha),
-                )
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = "INTELLIGENCE IN MOTION",
-                    color = Color(0xFFB8C3E4),
-                    fontSize = 10.sp,
-                    letterSpacing = 3.8.sp,
-                    modifier = Modifier.alpha(copyAlpha),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SiftRibbonMark(
-    modifier: Modifier = Modifier,
-    reveal: Float = 1f,
-) {
-    val progress = reveal.coerceIn(0f, 1f)
-    Canvas(modifier) {
-        val sx = size.width / 100f
-        val sy = size.height / 100f
-        fun path(build: Path.() -> Unit): Path = Path().apply(build)
-
-        val upper = path {
-            moveTo(72f * sx, 7f * sy)
-            cubicTo(54f * sx, 4f * sy, 33f * sx, 10f * sy, 22f * sx, 23f * sy)
-            cubicTo(14f * sx, 33f * sy, 18f * sx, 42f * sy, 35f * sx, 48f * sy)
-            lineTo(49f * sx, 53f * sy)
-            cubicTo(39f * sx, 47f * sy, 31f * sx, 40f * sy, 35f * sx, 32f * sy)
-            cubicTo(40f * sx, 23f * sy, 56f * sx, 21f * sy, 71f * sx, 24f * sy)
-            lineTo(87f * sx, 10f * sy)
-            cubicTo(82f * sx, 8f * sy, 77f * sx, 7f * sy, 72f * sx, 7f * sy)
-            close()
-        }
-        val fold = path {
-            moveTo(35f * sx, 32f * sy)
-            cubicTo(45f * sx, 29f * sy, 60f * sx, 26f * sy, 71f * sx, 24f * sy)
-            cubicTo(79f * sx, 29f * sy, 86f * sx, 36f * sy, 88f * sx, 43f * sy)
-            cubicTo(91f * sx, 51f * sy, 86f * sx, 55f * sy, 79f * sx, 51f * sy)
-            lineTo(54f * sx, 39f * sy)
-            cubicTo(48f * sx, 36f * sy, 41f * sx, 34f * sy, 35f * sx, 32f * sy)
-            close()
-        }
-        val lower = path {
-            moveTo(48f * sx, 50f * sy)
-            cubicTo(62f * sx, 53f * sy, 75f * sx, 57f * sy, 79f * sx, 65f * sy)
-            cubicTo(86f * sx, 79f * sy, 74f * sx, 91f * sy, 59f * sx, 96f * sy)
-            cubicTo(43f * sx, 101f * sy, 27f * sx, 95f * sy, 17f * sx, 85f * sy)
-            lineTo(32f * sx, 69f * sy)
-            cubicTo(42f * sx, 78f * sy, 56f * sx, 81f * sy, 65f * sx, 76f * sy)
-            cubicTo(72f * sx, 72f * sy, 68f * sx, 66f * sy, 56f * sx, 62f * sy)
-            lineTo(39f * sx, 56f * sy)
-            cubicTo(42f * sx, 54f * sy, 45f * sx, 52f * sy, 48f * sx, 50f * sy)
-            close()
-        }
-
-        val glow = 0.20f + 0.24f * progress
-        drawCircle(
-            brush = Brush.radialGradient(
-                listOf(Cyan.copy(alpha = glow), Violet.copy(alpha = glow * .55f), Color.Transparent),
-                center = Offset(size.width * .54f, size.height * .50f),
-                radius = size.minDimension * .66f,
-            ),
-            radius = size.minDimension * .56f,
-            center = Offset(size.width * .52f, size.height * .52f),
-        )
-
-        val upperAlpha = (progress / .48f).coerceIn(0f, 1f)
-        val foldAlpha = ((progress - .20f) / .50f).coerceIn(0f, 1f)
-        val lowerAlpha = ((progress - .34f) / .66f).coerceIn(0f, 1f)
-
-        drawPath(
-            upper,
-            brush = Brush.linearGradient(
-                colors = listOf(Violet.copy(alpha = upperAlpha), ElectricBlue.copy(alpha = upperAlpha), Cyan.copy(alpha = upperAlpha)),
-                start = Offset(0f, size.height),
-                end = Offset(size.width, 0f),
-            ),
-        )
-        drawPath(
-            fold,
-            brush = Brush.linearGradient(
-                colors = listOf(Cyan.copy(alpha = foldAlpha), Blue.copy(alpha = foldAlpha), Violet.copy(alpha = foldAlpha)),
-                start = Offset(0f, 0f),
-                end = Offset(size.width, size.height),
-            ),
-        )
-        drawPath(
-            lower,
-            brush = Brush.linearGradient(
-                colors = listOf(Cyan.copy(alpha = lowerAlpha), ElectricBlue.copy(alpha = lowerAlpha), Magenta.copy(alpha = lowerAlpha)),
-                start = Offset(0f, size.height),
-                end = Offset(size.width, 0f),
-            ),
-        )
-
-        drawPath(
-            upper,
-            color = Color.White.copy(alpha = .18f * upperAlpha),
-            style = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round),
-        )
-        drawPath(
-            lower,
-            color = Color.White.copy(alpha = .12f * lowerAlpha),
-            style = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round),
-        )
-    }
+internal fun SiftAlphaBrandTransition(content: @Composable () -> Unit) {
+    // v212: no custom animated opening. Android's normal system splash is followed
+    // directly by Normal Mode. This eliminates the launch animation's frame work.
+    content()
 }
 
 @Composable
@@ -1109,10 +193,11 @@ private fun AuroraBackdrop(
     modifier: Modifier = Modifier,
     animate: Boolean = true,
 ) {
-    val motion = remember { ValueAnimator.areAnimatorsEnabled() }
-    val transition = rememberInfiniteTransition(label = "siftalpha-aurora")
-    val phase by if (animate && motion) {
-        transition.animateFloat(
+    val motion = rememberDecorativeMotionEnabled()
+    val phase = if (animate && motion) {
+        val transition =
+            rememberInfiniteTransition(label = "siftalpha-aurora")
+        val animatedPhase by transition.animateFloat(
             initialValue = -0.06f,
             targetValue = 0.08f,
             animationSpec = infiniteRepeatable(
@@ -1121,8 +206,9 @@ private fun AuroraBackdrop(
             ),
             label = "aurora-phase",
         )
+        animatedPhase
     } else {
-        remember { mutableStateOf(0f) }
+        0f
     }
 
     Canvas(modifier.background(Ink)) {
@@ -2644,11 +1730,16 @@ private fun RunOrb(
     running: Boolean,
     resultAvailable: Boolean,
 ) {
-    val motion = remember { ValueAnimator.areAnimatorsEnabled() }
-    val transition = rememberInfiniteTransition(label = "run-orb")
+    val motion = rememberDecorativeMotionEnabled()
+    val transition =
+        if (motion) {
+            rememberInfiniteTransition(label = "run-orb")
+        } else {
+            null
+        }
 
     val angle by if (motion && !running) {
-        transition.animateFloat(
+        transition!!.animateFloat(
             initialValue = -90f,
             targetValue = 270f,
             animationSpec = infiniteRepeatable(
@@ -2661,7 +1752,7 @@ private fun RunOrb(
     }
 
     val breath by if (motion && running) {
-        transition.animateFloat(
+        transition!!.animateFloat(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
@@ -2675,7 +1766,7 @@ private fun RunOrb(
     }
 
     val flow by if (motion && running && resultAvailable) {
-        transition.animateFloat(
+        transition!!.animateFloat(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
@@ -2952,17 +2043,18 @@ private fun RunPhaseRow(
 
 @Composable
 private fun DotPulse(modifier: Modifier) {
-    val motion = remember { ValueAnimator.areAnimatorsEnabled() }
-    val transition = rememberInfiniteTransition(label = "pulse")
-    val alpha by if (motion) {
-        transition.animateFloat(
+    val motion = rememberDecorativeMotionEnabled()
+    val alpha = if (motion) {
+        val transition = rememberInfiniteTransition(label = "pulse")
+        val animatedAlpha by transition.animateFloat(
             .35f,
             1f,
             infiniteRepeatable(tween(700), RepeatMode.Reverse),
             label = "pulse-alpha",
         )
+        animatedAlpha
     } else {
-        remember { mutableStateOf(1f) }
+        1f
     }
     Box(modifier.background(Cyan.copy(alpha = alpha), CircleShape))
 }

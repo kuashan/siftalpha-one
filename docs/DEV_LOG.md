@@ -3021,3 +3021,36 @@ v211 keeps the 2D S mask but changes rendering:
 Target:
 - `0.8.0-alpha43-r48d3`
 - versionCode `211`.
+
+
+## 2026-09-22 · R48-D3 v212 remove custom opening + lifecycle-gate decorative infinite motion
+
+User decision:
+- remove the experimental code-built animated opening completely;
+- keep normal Android system splash behavior only;
+- all decorative infinite UI animation must stop when the app/page is no longer foreground-visible.
+
+Implementation:
+- `SiftAlphaBrandTransition` is now a pass-through; the custom code/S/logo launch choreography no longer exists or schedules frames;
+- added one shared `rememberDecorativeMotionEnabled()` gate using the current Activity lifecycle plus `ValueAnimator.areAnimatorsEnabled()`;
+- the gate is true only when:
+  1. the Activity lifecycle is at least `STARTED`;
+  2. Android system animations are enabled;
+- audited all `rememberInfiniteTransition` calls in the current R48-D3 Normal Mode surface;
+- the remaining three decorative infinite animations are all gated:
+  - `AuroraBackdrop` background drift;
+  - `RunOrb` rotation / breathing / inner-flow decoration;
+  - `DotPulse` status-dot pulse;
+- when the gate becomes false, those `InfiniteTransition` instances leave Compose composition instead of merely receiving a zero speed;
+- foreground return recreates/resumes their decorative motion;
+- added `DecorativeMotionPolicy` + unit coverage for foreground/system-animation truth table.
+
+Explicitly unchanged:
+- project execution and Python/Internal/External runtime lifetime;
+- environment preparation, dependency install, downloads and local Web service lifetime;
+- logs, status observation, Open / Refresh / Stop semantics;
+- R48-D2 baseline.
+
+Target:
+- `0.8.0-alpha43-r48d3`
+- versionCode `212`.
