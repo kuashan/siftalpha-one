@@ -1449,6 +1449,8 @@ open class V04Activity : StudioActivity() {
                 R.string.runtime_policy_reason_environment_unknown
             ProjectActionPolicy.DisableReason.ENVIRONMENT_NOT_READY ->
                 R.string.runtime_policy_reason_environment_not_ready
+            ProjectActionPolicy.DisableReason.ENVIRONMENT_ALREADY_READY ->
+                R.string.runtime_policy_reason_environment_already_ready
             ProjectActionPolicy.DisableReason.REQUIRED_CONFIGURATION_MISSING ->
                 R.string.runtime_policy_reason_required_configuration_missing
             ProjectActionPolicy.DisableReason.WEB_NOT_AVAILABLE ->

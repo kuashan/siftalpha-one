@@ -3243,3 +3243,14 @@ This is a Shared Core repair, not a Developer Mode UI patch. `V04Activity（开�
 Target:
 - versionCode = 218
 - versionName = 0.8.0-alpha43-r48d6
+
+
+### 2026-09-22 · R48-D6 build follow-up — approved Developer Mode localization mapping
+
+W0 #628 exposed one Kotlin exhaustive-enum compile failure after the shared `ENVIRONMENT_ALREADY_READY` disable reason was added.
+
+With explicit user approval, `V04Activity（开发者工作区）` receives exactly one presentation-only mapping:
+
+- `ENVIRONMENT_ALREADY_READY -> runtime_policy_reason_environment_already_ready`
+
+This change only lets the Developer Mode explanation renderer localize the new Shared Core reason. It does not alter Developer Mode Prepare / Run behavior, Runtime control, lifecycle, button policy, or workflow. The Prepare button continues to consume `ProjectActionPolicy.isEnabled(PREPARE)`; the behavioral fix remains owned by Shared Core.
