@@ -141,3 +141,42 @@ Android（安卓）当前由 `AndroidSafProjectFilesystem` 使用 SAF / Document
 macOS（苹果）与 Windows（微软）后续只需实现同一个 `ProjectFilesystem`，无需复制 Android SAF（安卓存储访问框架）语义。
 
 Runtime staging（运行暂存）已经通过该端口读取项目树和文件内容，因此后续桌面平台可以向相同的 Core（核心）/ staging consumer（暂存消费者）提供本机文件系统实现。
+
+## Process control boundary（进程控制边界）
+
+M1.6（进程控制接口）建立 `ProjectProcessControl` 作为跨平台项目级进程控制端口。
+
+Core（核心）只定义：
+
+- project process scope（项目进程作用域）
+- opaque process handle（不透明进程句柄）
+- start / status / logs / stopProject（启动 / 状态 / 日志 / 停止项目）
+- project ownership（项目归属）
+- STOP isolation（停止隔离）
+
+Android（安卓）继续保留经过真机验收的 Embedded R / Termux / PID / PGID / setsid（内部运行时 / 外部终端 / 进程 / 进程组 / 会话）具体实现。
+
+macOS（苹果）后续可使用 POSIX process group / signals（进程组 / 信号）；Windows（微软）后续可使用 Job Object / process tree（作业对象 / 进程树）。
+
+Core（核心）不解释 PID / PGID / Windows handle（进程号 / 进程组号 / Windows 句柄）。
+
+## M1 Core Boundary closure（M1 核心边界关闭）
+
+2026-09-23，M1.7 Core Boundary Audit（核心边界总审计）确认全部 M1 Exit Criteria（退出条件）PASS（通过）。
+
+最终共享 Core（核心）边界至少包括：
+
+- RuntimeKind / ProjectRuntimeProfile（运行时类型 / 项目运行时画像）
+- Platform Capability Model（平台能力模型）
+- Runtime Lifecycle（运行生命周期）
+- Environment Needs / Plan semantics（环境需求 / 计划语义）
+- Project Operation（项目操作）
+- Platform State Storage（平台状态存储）
+- Project Filesystem（项目文件系统）
+- Project Process Control（项目进程控制）
+
+`:core` 保持纯 Kotlin/JVM（Kotlin/JVM 平台），无 Android / macOS / Windows（安卓 / 苹果 / 微软）平台 API（接口）导入。
+
+**M1 = PASS（通过） / CLOSED（关闭）。**
+
+下一阶段为 **M2 — macOS Host Skeleton（macOS 主机应用骨架）**。
