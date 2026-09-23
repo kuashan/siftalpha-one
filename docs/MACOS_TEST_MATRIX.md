@@ -329,3 +329,22 @@ Cloud Verification（云端验证）：
 下一项：
 
 **M1.5 — Project Filesystem Interface（项目文件系统接口）**
+
+### M1.5 Project Filesystem Interface（项目文件系统接口）
+
+Cloud Verification（云端验证）：
+
+- ProjectFileEntry（项目文件条目）model（模型）: PASS（通过）
+- ProjectFilesystem（项目文件系统端口）: PASS（通过）
+- Project-relative path safety（项目相对路径安全规则）: PASS（通过）
+- Android SAF Adapter（安卓 SAF 适配器）compile integration（编译接线）: PASS（通过）
+- Project child listing（项目子项列表）production path（生产路径）: PASS（通过）
+- Recursive project tree（递归项目树）production path（生产路径）: PASS（通过）
+- Internal staging tree（内部运行暂存树）production path（生产路径）: PASS（通过）
+- Bounded file read（有界文件读取）production path（生产路径）: PASS（通过）
+- File write/create/rename/delete（文件写入 / 创建 / 重命名 / 删除）production path（生产路径）: PASS（通过）
+- W0 Cloud Build（W0 云端构建） #704: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #120: PASS（通过）
+- APK SHA-256: `6318488cc7b8c355228e4eb5ceb30708252a7a60b4ac2d98fe41ee49d5c280cf`
+
+当前结论：**Cloud PASS（云端通过） / Real Device Pending（真机待确认）**。
