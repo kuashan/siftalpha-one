@@ -5,7 +5,7 @@
 
 ## 1. 当前阶段
 
-状态：**M1 — Core Boundary（核心边界）进行中；M1.1～M1.5 已通过，M1.6 — Process Control Interface（进程控制接口）正在实现与回归验证。**
+状态：**M1 — Core Boundary（核心边界）进行中；M1.1～M1.6 已通过，当前进入最后一步 M1.7 — Core Boundary Audit（核心边界总审计）。**
 
 当前工作分支：
 - `feature/cross-platform-core`
