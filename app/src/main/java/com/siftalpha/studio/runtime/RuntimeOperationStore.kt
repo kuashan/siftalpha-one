@@ -2,6 +2,13 @@ package com.siftalpha.studio.runtime
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.siftalpha.core.storage.PlatformStateStorage
+import com.siftalpha.core.storage.StateStorageMutation
+import com.siftalpha.core.storage.StoredStateValue
+import com.siftalpha.core.storage.readBoolean
+import com.siftalpha.core.storage.readInt
+import com.siftalpha.core.storage.readLong
+import com.siftalpha.core.storage.readText
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
@@ -17,27 +24,33 @@ interface RuntimeOperationRecordStore {
 }
 
 class RuntimeOperationStore internal constructor(
-    private val prefs: SharedPreferences,
+    private val storage: PlatformStateStorage,
 ) : RuntimeOperationRecordStore {
+    internal constructor(prefs: SharedPreferences) : this(
+        AndroidSharedPreferencesStateStorage(prefs),
+    )
+
     constructor(context: Context) : this(
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        AndroidSharedPreferencesStateStorage(
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        ),
     )
 
     override fun read(projectId: String): RuntimeOperationRecord? {
         val prefix = prefix(projectId)
-        val action = prefs.getString(prefix + ACTION, null)?.let {
+        val action = storage.readText(prefix + ACTION)?.let {
             runCatching { RuntimeOperationAction.valueOf(it) }.getOrNull()
         } ?: return null
-        val provider = prefs.getString(prefix + PROVIDER, null)?.let {
+        val provider = storage.readText(prefix + PROVIDER)?.let {
             runCatching { RuntimeOperationProvider.valueOf(it) }.getOrNull()
         } ?: return null
-        val phase = prefs.getString(prefix + PHASE, null)?.let {
+        val phase = storage.readText(prefix + PHASE)?.let {
             runCatching { RuntimeOperationPhase.valueOf(it) }.getOrNull()
         } ?: return null
-        val generation = prefs.getLong(prefix + GENERATION, 0L)
-        val started = prefs.getLong(prefix + STARTED, 0L)
-        val persistedDeadline = if (prefs.contains(prefix + DEADLINE)) {
-            prefs.getLong(prefix + DEADLINE, 0L)
+        val generation = storage.readLong(prefix + GENERATION) ?: 0L
+        val started = storage.readLong(prefix + STARTED) ?: 0L
+        val persistedDeadline = if (storage.contains(prefix + DEADLINE)) {
+            storage.readLong(prefix + DEADLINE) ?: 0L
         } else {
             null
         }
@@ -48,58 +61,76 @@ class RuntimeOperationStore internal constructor(
         if (generation <= 0L || started <= 0L) return null
         if (deadline != null && deadline < started) return null
         return RuntimeOperationRecord(
-            projectId = prefs.getString(prefix + PROJECT, projectId) ?: projectId,
+            projectId = storage.readText(prefix + PROJECT) ?: projectId,
             provider = provider,
             action = action,
-            executionId = if (prefs.contains(prefix + EXECUTION_ID)) {
-                prefs.getInt(prefix + EXECUTION_ID, 0)
+            executionId = if (storage.contains(prefix + EXECUTION_ID)) {
+                storage.readInt(prefix + EXECUTION_ID) ?: 0
             } else {
                 null
             },
             generation = generation,
             startedAtEpochMs = started,
             deadlineAtEpochMs = deadline,
-            userVisible = prefs.getBoolean(prefix + USER_VISIBLE, true),
+            userVisible = storage.readBoolean(prefix + USER_VISIBLE) ?: true,
             phase = phase,
         )
     }
 
     override fun lastGeneration(projectId: String): Long =
-        prefs.getLong(prefix(projectId) + NEXT_GENERATION, 0L)
+        storage.readLong(prefix(projectId) + NEXT_GENERATION) ?: 0L
 
     override fun write(record: RuntimeOperationRecord) {
         val prefix = prefix(record.projectId)
-        prefs.edit()
-            .putString(prefix + PROJECT, record.projectId)
-            .putString(prefix + PROVIDER, record.provider.name)
-            .putString(prefix + ACTION, record.action.name)
-            .putString(prefix + PHASE, record.phase.name)
-            .putLong(prefix + GENERATION, record.generation)
-            .putLong(prefix + NEXT_GENERATION, record.generation)
-            .putLong(prefix + STARTED, record.startedAtEpochMs)
-            .putBoolean(prefix + USER_VISIBLE, record.userVisible)
-            .apply {
-                if (record.deadlineAtEpochMs == null) remove(prefix + DEADLINE)
-                else putLong(prefix + DEADLINE, record.deadlineAtEpochMs!!)
-                if (record.executionId == null) remove(prefix + EXECUTION_ID)
-                else putInt(prefix + EXECUTION_ID, record.executionId)
-            }
-            .apply()
+        val writes = linkedMapOf<String, StoredStateValue>(
+            prefix + PROJECT to StoredStateValue.Text(record.projectId),
+            prefix + PROVIDER to StoredStateValue.Text(record.provider.name),
+            prefix + ACTION to StoredStateValue.Text(record.action.name),
+            prefix + PHASE to StoredStateValue.Text(record.phase.name),
+            prefix + GENERATION to StoredStateValue.LongNumber(record.generation),
+            prefix + NEXT_GENERATION to StoredStateValue.LongNumber(record.generation),
+            prefix + STARTED to StoredStateValue.LongNumber(record.startedAtEpochMs),
+            prefix + USER_VISIBLE to StoredStateValue.Bool(record.userVisible),
+        )
+        val removals = linkedSetOf<String>()
+
+        if (record.deadlineAtEpochMs == null) {
+            removals += prefix + DEADLINE
+        } else {
+            writes[prefix + DEADLINE] = StoredStateValue.LongNumber(record.deadlineAtEpochMs)
+        }
+
+        if (record.executionId == null) {
+            removals += prefix + EXECUTION_ID
+        } else {
+            writes[prefix + EXECUTION_ID] = StoredStateValue.IntNumber(record.executionId)
+        }
+
+        storage.mutate(
+            StateStorageMutation(
+                writes = writes,
+                removals = removals,
+            ),
+        )
     }
 
     override fun clear(projectId: String) {
         val prefix = prefix(projectId)
-        prefs.edit()
-            .remove(prefix + PROJECT)
-            .remove(prefix + PROVIDER)
-            .remove(prefix + ACTION)
-            .remove(prefix + PHASE)
-            .remove(prefix + GENERATION)
-            .remove(prefix + STARTED)
-            .remove(prefix + DEADLINE)
-            .remove(prefix + USER_VISIBLE)
-            .remove(prefix + EXECUTION_ID)
-            .apply()
+        storage.mutate(
+            StateStorageMutation(
+                removals = setOf(
+                    prefix + PROJECT,
+                    prefix + PROVIDER,
+                    prefix + ACTION,
+                    prefix + PHASE,
+                    prefix + GENERATION,
+                    prefix + STARTED,
+                    prefix + DEADLINE,
+                    prefix + USER_VISIBLE,
+                    prefix + EXECUTION_ID,
+                ),
+            ),
+        )
     }
 
     private fun prefix(projectId: String): String = PREFIX + digest(projectId) + ":"
