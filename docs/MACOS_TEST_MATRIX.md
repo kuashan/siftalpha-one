@@ -62,8 +62,20 @@ M1.1 结论：**PASS（通过）**
 - 可加载 SiftAlpha Core（核心）。
 - 可读取基本平台能力快照。
 - 不要求 Android（安卓）库参与 macOS（苹果）构建。
+- 完成真实 Mac（苹果电脑）验收。
 
-当前状态：**NOT STARTED（未开始）**
+当前状态：**IN PROGRESS（进行中）**
+
+当前切片：**M2.1 — Minimal macOS Host + Core Load（最小 macOS 主机应用 + Core 加载）**
+
+当前证据状态：
+
+- macOS host source（苹果宿主源码）: IMPLEMENTED（已实现）
+- Core direct dependency（核心直接依赖）: IMPLEMENTED（已实现）
+- Capability snapshot read（能力快照读取）: IMPLEMENTED（已实现）
+- macOS cloud build（苹果云端构建）: PENDING（待验证）
+- Real Mac launch / exit（真实 Mac 启动 / 退出）: PENDING（待验证）
+- Real Mac acceptance（真实 Mac 验收）: PENDING（待验证）
 
 ## M3 — Host Runtime Provider（主机运行提供者）
 

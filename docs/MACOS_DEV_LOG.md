@@ -1065,3 +1065,40 @@ M2 的第一目标不是复杂 Runtime（运行时）或完整 UI（界面），
 - 加载现有 SiftAlpha Core（跨平台核心）；
 - 读取基础 Platform Capability Snapshot（平台能力快照）；
 - 不依赖 Android Framework（安卓框架）。
+
+
+## 2026-09-23 · M2.1 — Minimal macOS Host + Core Load（最小 macOS 主机应用 + Core 加载）开始
+
+### 唯一目标
+
+建立第一个真实 macOS App（苹果桌面应用）骨架，并直接加载现有 `:core`，不复制 macOS 专属 Core（苹果核心）。
+
+### 实现
+
+- 新增 `:macosApp` Kotlin/JVM（Kotlin / Java 虚拟机）Application（应用）模块。
+- `:macosApp` 直接依赖 `project(":core")`。
+- 新增最小 Swing（Java 桌面窗口）宿主，仅用于 M2 骨架验收，不作为 M5 正式产品 UI（界面）。
+- 窗口从 Core（核心）的 `PlatformCapabilitySnapshot` 读取基础 CapabilityAvailability（能力可用状态）。
+- M2 不进行主机运行时探测；HOST_PROCESS_EXECUTION / SECURE_SECRET_STORAGE / CONTAINER_RUNTIME（主机进程执行 / 安全存储 / 容器运行时）当前均保持 UNKNOWN（未知）。
+- 新增 `--probe`（探针）模式，在无图形交互条件下证明 macOS 宿主 classpath（类路径）真实加载 Core（核心）并读取能力快照。
+- 新增 `SiftAlpha macOS Host Skeleton` GitHub Actions（GitHub 云端构建）：
+  - macOS runner（苹果运行器）；
+  - Core tests（核心测试）；
+  - macOS host tests（苹果宿主测试）；
+  - Core load probe（核心加载探针）；
+  - Android dependency leak check（安卓依赖泄漏检查）；
+  - `jpackage` 生成真正 `SiftAlpha.app`；
+  - 上传 ZIP（压缩包）与验证证据。
+
+### 边界
+
+- 未修改 `:core` 生产源码。
+- 未修改 Android Runtime（安卓运行时）逻辑。
+- 未实现 Python / Node.js / Bun / Git / Docker（Python / Node / Bun / Git / 容器）探测；这些属于 M3。
+- 未实现正式产品 UI（界面）、签名、公证、DMG / PKG（磁盘映像 / 安装包）；这些不属于 M2.1。
+
+### 验证状态
+
+提交时：**Cloud Verification Pending（云端验证待完成）**。
+
+M2 不会因源码提交而提前 PASS（通过）；仍需真实 Mac（苹果电脑）启动 / 退出与最终验收证据。

@@ -1,0 +1,94 @@
+name: SiftAlpha macOS Host Skeleton
+
+on:
+  push:
+    branches:
+      - feature/cross-platform-core
+    paths:
+      - .github/workflows/macos-host-skeleton.yml
+      - build.gradle.kts
+      - settings.gradle.kts
+      - core/**
+      - macosApp/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: siftalpha-macos-host-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build M2 macOS host
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.3.1'
+          cache-provider: basic
+
+      - name: Build Core and macOS host
+        run: |
+          set -euo pipefail
+          mkdir -p macos-evidence
+          git rev-parse HEAD | tee macos-evidence/source-commit.txt
+          java -version > macos-evidence/java-version.txt 2>&1
+          gradle --version > macos-evidence/gradle-version.txt
+          gradle --no-daemon --stacktrace --console=plain             :core:test             :macosApp:test             :macosApp:installDist | tee macos-evidence/gradle-build.txt
+
+      - name: Prove macOS host loads SiftAlpha Core
+        run: |
+          set -euo pipefail
+          java -cp "macosApp/build/install/macosApp/lib/*"             com.siftalpha.macos.SiftAlphaMacAppKt --probe             | tee macos-evidence/core-load-probe.txt
+          grep -q '^SIFTALPHA_MACOS_HOST=READY$' macos-evidence/core-load-probe.txt
+          grep -q '^SIFTALPHA_CORE_LOAD=PASS$' macos-evidence/core-load-probe.txt
+          grep -q '^SIFTALPHA_CAPABILITY=host_process_execution = UNKNOWN$' macos-evidence/core-load-probe.txt
+
+      - name: Verify no Android dependency leaks into macOS host
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --console=plain             :macosApp:dependencies --configuration runtimeClasspath             | tee macos-evidence/runtime-dependencies.txt
+          if grep -E '(^|[[:space:]])(com\.android|androidx\.)' macos-evidence/runtime-dependencies.txt; then
+            echo "Android dependency leaked into macOS host runtimeClasspath" >&2
+            exit 1
+          fi
+
+      - name: Package SiftAlpha.app
+        run: |
+          set -euo pipefail
+          rm -rf macos-dist
+          mkdir -p macos-dist
+          jpackage             --type app-image             --name SiftAlpha             --dest macos-dist             --input macosApp/build/install/macosApp/lib             --main-jar macosApp.jar             --main-class com.siftalpha.macos.SiftAlphaMacAppKt             --mac-package-identifier com.siftalpha.macos             --java-options "-Dapple.awt.application.name=SiftAlpha"
+          test -d macos-dist/SiftAlpha.app
+          test -f macos-dist/SiftAlpha.app/Contents/Info.plist
+          plutil -p macos-dist/SiftAlpha.app/Contents/Info.plist             | tee macos-evidence/info-plist.txt
+          find macos-dist/SiftAlpha.app -maxdepth 4 -type f             | sort | tee macos-evidence/app-files.txt
+          ditto -c -k --sequesterRsrc --keepParent             macos-dist/SiftAlpha.app             macos-dist/SiftAlpha-m2.1.zip
+          shasum -a 256 macos-dist/SiftAlpha-m2.1.zip             | tee macos-evidence/app-zip-sha256.txt
+
+      - name: Upload macOS app and evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: siftalpha-macos-m2.1-${{ github.run_number }}
+          path: |
+            macos-dist/SiftAlpha-m2.1.zip
+            macos-evidence
+          if-no-files-found: warn
+          retention-days: 14

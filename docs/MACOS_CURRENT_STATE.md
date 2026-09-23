@@ -174,13 +174,21 @@ Android（安卓）现有 Embedded CPython（内嵌 CPython）、Internal Alpine
 
 ## 8. 下一步唯一方向
 
-下一轮不是直接制作完整 macOS UI（苹果界面）。
+当前正式进入 **M2 — macOS Host Skeleton（macOS 主机应用骨架）**。
 
-下一步应继续完成 **M1 — Core Boundary（核心边界）**：
+当前 Implementation Slice（实现切片）：
 
-- 审查现有 Runtime Lifecycle（运行生命周期）、Environment Plan（环境计划）、Project Operation（项目操作）中哪些代码可以安全进入 `:core`。
-- 对仍依赖 Android Context / SharedPreferences / Service / SAF（安卓上下文 / 存储 / 服务 / 文件框架）的代码建立明确 Platform Interface（平台接口）。
-- 每一次抽取都要求 Android（安卓）回归通过。
+**M2.1 — Minimal macOS Host + Core Load（最小 macOS 主机应用 + Core 加载）**
+
+本切片只负责：
+
+- 建立真正的 macOS App（苹果桌面应用）骨架；
+- macOS App（苹果桌面应用）直接依赖现有 `:core`；
+- 读取 `PlatformCapabilitySnapshot`（平台能力快照）；
+- 生成可供真实 Mac（苹果电脑）验收的 `SiftAlpha.app`；
+- 验证 macOS 模块不依赖 Android Framework（安卓框架）。
+
+本切片不进行 Python / Node.js / Bun / Git / Docker（Python / Node / Bun / Git / 容器）真实发现或项目进程执行；这些属于 M3（主机运行提供者）。
 
 ## 9. 固定开发方法
 
@@ -196,13 +204,13 @@ macOS（苹果桌面系统）开发采用“总路线提前规划、每个阶段
 
 **M2 — macOS Host Skeleton（macOS 主机应用骨架）**
 
-已完成：
-- M1.1 Runtime Lifecycle（运行生命周期）= Cloud PASS + Real Device PASS（云端通过 + 真机通过）
+当前切片：
 
-下一步：
-- M1.2 Environment Plan（环境计划）= Cloud PASS + Real Device PASS（云端通过 + 真机通过）
+**M2.1 — Minimal macOS Host + Core Load（最小 macOS 主机应用 + Core 加载）**
 
-M1（核心边界）已完成。M2（macOS 主机应用骨架）只建立可构建、可启动、可加载 Core（核心）的真实 macOS App（苹果桌面应用）；完整产品 UI（界面）与复杂项目运行仍属于后续阶段。
+状态：**IMPLEMENTATION STARTED / CLOUD VERIFICATION PENDING（实现已开始 / 云端验证待完成）**。
+
+M1（核心边界）已经 PASS / CLOSED（通过 / 关闭），不得重新打开。M2（macOS 主机应用骨架）只建立可构建、可启动、可加载 Core（核心）的真实 macOS App（苹果桌面应用）；完整产品 UI（界面）与复杂项目运行仍属于后续阶段。
 
 ## 10. macOS 分发策略
 
@@ -292,3 +300,24 @@ M2 Exit Criteria（退出条件）：
 6. 完成真实 Mac（苹果电脑）验收。
 
 满足以上条件后 M2 必须立即 PASS（通过）并进入 M3（主机运行提供者）。
+
+## 19. M2.1 当前执行状态 — 2026-09-23
+
+目标：建立最小真实 macOS App（苹果桌面应用）并证明其直接加载现有 SiftAlpha Core（跨平台核心）。
+
+实现边界：
+
+- 新增 `:macosApp` Kotlin/JVM（Kotlin / Java 虚拟机）宿主模块；
+- `:macosApp` 直接 `implementation(project(":core"))`；
+- 最小窗口只呈现 M2 验证信息，不建设 M5（产品界面对齐）的正式 Normal / Developer UI（普通 / 开发者界面）；
+- `MacPlatformCapabilities` 只发布 M2 阶段的基础 Capability Snapshot（能力快照），未知能力保持 UNKNOWN（未知）；
+- 新增 macOS GitHub Actions（GitHub 云端构建）验证，使用 macOS runner（苹果运行器）+ `jpackage` 生成 `SiftAlpha.app`；
+- 未引入 Android Framework（安卓框架）依赖；
+- 未修改 `:core` 生产源码；
+- 未提前实现 M3 Host Runtime Provider（主机运行提供者）。
+
+当前状态：
+
+**SOURCE IMPLEMENTED / CLOUD PENDING（源码已实现 / 云端待验证）**。
+
+M2 仍未关闭。真实 Mac Acceptance（真实 Mac 验收）仍是最终退出条件。
