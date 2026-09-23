@@ -168,3 +168,99 @@ Android Regression（安卓回归）
 - 某个 macOS（苹果）平台专属需求不能自动升级为 Core（核心）必备能力。
 - OpenBot（开放机器人）只作为 M7（第七阶段）验收项目，不提前写特殊适配。
 - 分发问题从 M2（应用骨架）开始持续考虑，但正式签名、公证、安装验收归 M8（正式分发）。
+
+## 2026-09-23 · M1.1 — Runtime Lifecycle（运行生命周期）抽取完成
+
+### 目标
+
+把真正平台无关的 Runtime Lifecycle（运行生命周期）事实解析和状态决策从 Android（安卓）模块下沉到 SiftAlpha Core（跨平台核心），同时保持现有 Android（安卓）接口和行为不变。
+
+### 审查结论
+
+原有生命周期代码混合了两类职责：
+
+1. 平台无关：
+   - Runtime output parsing（运行时输出解析）
+   - Runtime execution state（运行执行状态）
+   - project lifecycle decision（项目生命周期决策）
+   - operation priority（操作优先级）
+   - recovery precedence（恢复优先级）
+
+2. Android（安卓）专属：
+   - `Context`
+   - `R.string`
+   - UI label（界面文案）
+   - Android persistence（安卓持久化）
+
+因此本轮不迁移 Android UI（安卓界面）与持久化，只迁移纯生命周期规则。
+
+### 实现
+
+新增 Core（核心）文件：
+
+- `core/src/main/kotlin/com/siftalpha/core/lifecycle/RuntimeLifecycleCore.kt`
+
+Core（核心）现负责：
+
+- `RuntimeExecutionState`
+- `ProjectLifecycleState`
+- `ProjectLifecycleOperation`
+- `RuntimeLifecyclePolicy`
+- `RuntimeOutputStateParser`
+
+Android（安卓）现有：
+
+- `RuntimeState`
+- `RuntimeLifecycleState`
+- `RuntimeLifecycleOperation`
+- `RuntimeLifecycleResolver`
+
+继续保留为 compatibility facade（兼容外壳），但状态解析和生命周期决策已经委托给 `:core`。
+
+因此现有 Android（安卓）调用方、UI（界面）、持久化和 Runtime（运行时）执行路径无需同步重写。
+
+### 行为保持
+
+本轮没有改变：
+
+- START / STARTING（启动 / 启动中）语义
+- RUNNING（运行中）语义
+- STOP / STOPPING / STOPPED（停止 / 停止中 / 已停止）语义
+- EXITED_SUCCESS / EXITED_ERROR（正常结束 / 异常结束）语义
+- PREPARING（准备中）语义
+- RECOVERING（恢复中）优先级
+- project-scoped STOP（项目级停止）
+- Embedded CPython（内嵌 CPython）
+- Internal Alpine（内部 Alpine）
+- External Provider / Termux（外部运行提供者 / Termux）
+- Normal Mode / Developer Mode（普通模式 / 开发者模式）
+
+### 云端验证
+
+- W0 Cloud Build（W0 云端构建） #677 / run ID `35813725333`: **PASS（通过）**
+- Internal Alpine Probe（内部 Alpine 探针） #115: **PASS（通过）**
+- `:core:test`: **PASS（通过）**
+- Android unit tests（安卓单元测试）: **PASS（通过）**
+- `assembleDebug`（安卓调试包构建）: **PASS（通过）**
+- versionCode: `225`
+- versionName: `0.8.0-alpha43-r48d11-m1.1`
+- APK SHA-256: `43619a6f3aed4d960fc2efdfb99804faf1804f0d69d00da42f15c2f60944cf67`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- artifact（云端制品）: `siftalpha-w0-677`, ID `10731002876`
+
+### M1.1 结论
+
+**PASS（通过）**
+
+Runtime Lifecycle（运行生命周期）的第一层生产逻辑已经进入 SiftAlpha Core（跨平台核心），Android（安卓）回归通过。
+
+### 下一步
+
+**M1.2 — Environment Plan（环境计划）**
+
+下一轮审查现有 Environment Detection / Environment Plan（环境检测 / 环境计划），区分：
+
+- 平台无关的“项目需要什么”
+- 平台专属的“当前平台如何满足这些需要”
+
+目标是让 Core（核心）表达需求，而 Android / macOS / Windows Platform Adapter（安卓 / 苹果 / 微软平台适配层）各自决定实现方式。
