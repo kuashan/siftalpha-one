@@ -70,6 +70,7 @@ import com.siftalpha.studio.runtime.ExternalActionGate
 import com.siftalpha.studio.runtime.ExternalProviderPreflightResult
 import com.siftalpha.studio.runtime.ExternalProviderProbeCoordinator
 import com.siftalpha.studio.runtime.ExternalProviderReadiness
+import com.siftalpha.studio.runtime.ExternalProviderResumePolicy
 import com.siftalpha.studio.runtime.RuntimeOwnership
 import com.siftalpha.studio.runtime.RuntimeOwnershipPolicy
 import com.siftalpha.studio.runtime.RuntimeResult
@@ -476,8 +477,18 @@ open class V04Activity : StudioActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (::externalActionGate.isInitialized && externalPreflight.current().ready) {
-            resumeExternalActionGate()
+        if (::externalActionGate.isInitialized && ::externalPreflight.isInitialized) {
+            val readiness = externalPreflight.current()
+            if (readiness.ready) {
+                resumeExternalActionGate()
+            } else if (
+                ExternalProviderResumePolicy.shouldRetry(
+                    readiness = readiness.readiness,
+                    hasDeferredAction = externalGateDeferredActions.isNotEmpty(),
+                )
+            ) {
+                externalPreflight.probe()
+            }
         }
         if (::projectList.isInitialized) refresh()
         resumeEmbeddedPolling()

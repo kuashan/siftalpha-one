@@ -160,14 +160,16 @@ class ExternalActionGate internal constructor(
 
     private fun ExternalProviderReadiness.isTerminalGateFailure(): Boolean = when (this) {
         ExternalProviderReadiness.TERMUX_NOT_INSTALLED,
-        ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED,
-        ExternalProviderReadiness.BRIDGE_UNRESPONSIVE,
         ExternalProviderReadiness.UNAVAILABLE,
         -> true
 
+        // These states are recoverable by user action or a later provider retry. Keep the original
+        // PREPARE / RUN / REFRESH intent so READY can resume it exactly once.
         ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED,
         ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED,
         ExternalProviderReadiness.BRIDGE_CHECKING,
+        ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED,
+        ExternalProviderReadiness.BRIDGE_UNRESPONSIVE,
         ExternalProviderReadiness.READY,
         -> false
     }

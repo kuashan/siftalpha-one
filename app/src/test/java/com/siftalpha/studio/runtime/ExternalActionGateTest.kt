@@ -130,7 +130,37 @@ class ExternalActionGateTest {
     }
 
     @Test
-    fun terminalProbeFailureClearsDeferredRequestsWithoutStarting() {
+    fun recoverableProviderFailureKeepsDeveloperRunUntilReadyAndResumesOnce() {
+        var readiness = result(ExternalProviderReadiness.BRIDGE_CHECKING)
+        val gate = ExternalActionGate(
+            currentReadiness = { readiness },
+            ensureReadiness = { readiness },
+        )
+
+        val waiting = gate.request(
+            projectId = "project-a",
+            action = ExternalActionGate.Action.RUN,
+            origin = ExternalActionGate.Origin.DEVELOPER_MODE,
+        ) as ExternalActionGate.Decision.Awaiting
+
+        readiness = result(ExternalProviderReadiness.BRIDGE_UNRESPONSIVE)
+        gate.handlePreflightResult(readiness)
+        assertEquals(waiting.request.generation, gate.pending("project-a")?.generation)
+
+        readiness = result(ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED)
+        gate.handlePreflightResult(readiness)
+        assertEquals(waiting.request.generation, gate.pending("project-a")?.generation)
+
+        readiness = result(ExternalProviderReadiness.READY)
+        assertEquals(
+            waiting.request.generation,
+            gate.claimReady("project-a", ExternalActionGate.Origin.DEVELOPER_MODE)?.generation,
+        )
+        assertNull(gate.claimReady("project-a", ExternalActionGate.Origin.DEVELOPER_MODE))
+    }
+
+    @Test
+    fun terminalUnavailableStillClearsDeferredRequestsWithoutStarting() {
         var readiness = result(ExternalProviderReadiness.BRIDGE_CHECKING)
         val gate = ExternalActionGate(
             currentReadiness = { readiness },
@@ -140,9 +170,9 @@ class ExternalActionGateTest {
         gate.request(
             projectId = "project-a",
             action = ExternalActionGate.Action.RUN,
-            origin = ExternalActionGate.Origin.NORMAL_MODE,
+            origin = ExternalActionGate.Origin.DEVELOPER_MODE,
         )
-        readiness = result(ExternalProviderReadiness.BRIDGE_UNRESPONSIVE)
+        readiness = result(ExternalProviderReadiness.UNAVAILABLE)
         gate.handlePreflightResult(readiness)
 
         assertNull(gate.pending("project-a"))

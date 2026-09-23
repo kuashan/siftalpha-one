@@ -3565,3 +3565,45 @@ M1.1～M1.6 已完成共享 Core（核心）抽取与 Android（安卓）回归�
 最新 M1 Android（安卓）回归版本为 v231 / `0.8.0-alpha43-r48d11-m1.6`；W0 #708 与 Internal Alpine Probe（内部 Alpine 探针）#121 均 PASS（通过），用户真机验收 PASS（通过）。
 
 **M1 — Core Boundary（核心边界）正式关闭。下一阶段：M2 — macOS Host Skeleton（macOS 主机应用骨架）。**
+
+
+## 2026-09-23 · Android Developer Mode External Provider Return Recovery r1
+
+### Trigger
+
+Real-device Developer Mode（开发者模式） regression:
+Run（运行）→ prompt to open Termux（外部终端）→ return to SiftAlpha（筛选阿尔法）→ Run again → Termux again, repeating indefinitely.
+
+Normal Mode（普通模式） was user-confirmed normal, so the repair scope was narrowed to Developer Mode return recovery plus the shared deferred-intent classification required for that recovery.
+
+### Root cause
+
+- Developer Mode `onResume()` only resumed the gate when provider readiness was already READY（就绪）.
+- Unlike Normal Mode, it did not automatically retry `BRIDGE_CHECK_REQUIRED`, `BRIDGE_UNRESPONSIVE`, or `EXTERNAL_APPS_CONFIGURATION_REQUIRED` after returning from Termux.
+- `ExternalActionGate` also classified `BRIDGE_UNRESPONSIVE` and `EXTERNAL_APPS_CONFIGURATION_REQUIRED` as terminal gate failures, which could discard the original PREPARE / RUN continuation before the user returned.
+
+### Repair
+
+- Preserve deferred PREPARE / RUN / REFRESH intent across the two recoverable provider states:
+  - `BRIDGE_UNRESPONSIVE`
+  - `EXTERNAL_APPS_CONFIGURATION_REQUIRED`
+- Keep `TERMUX_NOT_INSTALLED` and `UNAVAILABLE` terminal.
+- Add Developer Mode return policy:
+  - only when a Developer Mode deferred action exists;
+  - retry probe for `BRIDGE_CHECK_REQUIRED`, `BRIDGE_UNRESPONSIVE`, or `EXTERNAL_APPS_CONFIGURATION_REQUIRED`;
+  - READY callback resumes the original action through `ExternalActionGate` exactly once.
+- Normal Mode UI/workflow source is not modified.
+- Runtime execution, Web Discovery, Project Operation, STOP semantics, Embedded R, and macOS M2 source are unchanged.
+
+### Version
+
+- versionCode = `232`
+- versionName = `0.8.0-alpha43-r48d11-m1.6-r1`
+
+### Verification target
+
+- Shared gate regression tests.
+- Developer return retry policy tests.
+- W0 Cloud Build（云端构建）.
+- Real-device acceptance:
+  `Run → Open Termux → return → automatic reprobe → READY → original Run resumes once`.

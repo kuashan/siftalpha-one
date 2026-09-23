@@ -1918,3 +1918,14 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | M1 final status（M1 最终状态） | **PASS / CLOSED（通过 / 关闭）** |
 
 Next stage（下一阶段）: **M2 — macOS Host Skeleton（macOS 主机应用骨架）**。
+
+
+## E.x Developer Mode External Provider Return Recovery — 2026-09-23
+
+| ID | 操作 | 期望 | 状态 |
+|---|---|---|---|
+| EXR-01 | Developer Mode（开发者模式）点击 External Run（外部运行），Termux（外部终端）未响应 | 原 Run（运行）请求保持为 deferred intent（待执行操作），不丢失 | unit test added / cloud pending |
+| EXR-02 | 点击“打开 Termux”后返回 SiftAlpha | Developer Mode 自动重新 Probe（探测），不要求再次点击 Run | unit test added / cloud pending |
+| EXR-03 | Probe（探测）最终 READY（就绪） | 原 Run（运行）只恢复一次，不重复启动 | unit test added / cloud pending |
+| EXR-04 | Normal Mode（普通模式） | 不修改其 UI / return-retry 实现；现有正常行为保持 | regression cloud pending |
+| EXR-05 | STOP / Runtime / Web Discovery | 行为不变 | regression cloud pending |

@@ -172,8 +172,11 @@ android {
         // routes Android SAF project tree and file CRUD through the adapter.
         // r48d11-m1.6 introduces the cross-platform project process-control
         // contract while preserving Android's accepted PID/PGID and Embedded R mechanisms.
-        versionCode = 231
-        versionName = "0.8.0-alpha43-r48d11-m1.6"
+        // r48d11-m1.6-r1 repairs Developer Mode External Provider return-to-app recovery:
+        // recoverable Termux bridge/configuration states retain the original user intent and
+        // onResume retries provider probing before resuming the deferred action exactly once.
+        versionCode = 232
+        versionName = "0.8.0-alpha43-r48d11-m1.6-r1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
