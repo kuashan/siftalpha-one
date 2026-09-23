@@ -181,3 +181,45 @@ Android（安卓）现有 Embedded CPython（内嵌 CPython）、Internal Alpine
 - 审查现有 Runtime Lifecycle（运行生命周期）、Environment Plan（环境计划）、Project Operation（项目操作）中哪些代码可以安全进入 `:core`。
 - 对仍依赖 Android Context / SharedPreferences / Service / SAF（安卓上下文 / 存储 / 服务 / 文件框架）的代码建立明确 Platform Interface（平台接口）。
 - 每一次抽取都要求 Android（安卓）回归通过。
+
+## 9. 固定开发方法
+
+macOS（苹果桌面系统）开发采用“总路线提前规划、每个阶段再拆小任务”的方式。
+
+当前总路线固定为：
+
+`M0 → M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8`
+
+不得把未来所有实现细节提前写死，但不得改变阶段目标而不记录架构决策。
+
+当前唯一开发方向仍为：
+
+**M1 — Core Boundary（核心边界）**
+
+M1（核心边界）完成前，不进入完整 macOS UI（苹果界面）和复杂项目运行开发。
+
+## 10. macOS 分发策略
+
+macOS（苹果桌面系统）和 iOS（苹果手机系统）的安装限制不同。
+
+开发阶段可以先生成本机可运行的 macOS App（苹果桌面应用）进行开发和测试；正式提供给普通用户直接下载安装时，目标分发方式为：
+
+```
+SiftAlpha.app（苹果应用）
+    ↓
+Developer ID Application（开发者身份应用证书）签名
+    ↓
+Hardened Runtime（强化运行时）
+    ↓
+Apple Notarization（苹果公证）
+    ↓
+DMG / PKG（磁盘映像 / 安装包）
+    ↓
+用户直接下载安装
+```
+
+正式对外分发阶段需要 Apple Developer Program（苹果开发者计划）提供的 Developer ID（开发者身份）证书和 Notarization（苹果公证）能力。
+
+普通用户安装 SiftAlpha（筛选阿尔法）不需要自己的开发者账号，也不采用 iOS（苹果手机系统）那种每台设备注册的开发模式。
+
+未经 Developer ID（开发者身份）签名和 Notarization（苹果公证）的开发包可以用于内部开发/测试，但不作为最终普通用户分发方案。
