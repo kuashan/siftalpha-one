@@ -963,3 +963,40 @@ M1.5（项目文件系统接口）正式关闭。
 **M1.6 — Process Control Interface（进程控制接口）**
 
 目标是把“Core（核心）需要怎样表达进程启动、状态、日志与项目级停止”与“Android / macOS / Windows（安卓 / 苹果 / 微软）各自怎样控制真实进程树”分离。
+
+## 2026-09-23 · M1.6 Real Device Acceptance（真机验收）完成
+
+用户已完成 v231 / `0.8.0-alpha43-r48d11-m1.6` Android（安卓）真实设备验收。
+
+已确认：
+
+- 同时运行项目 A / B：PASS（通过）
+- STOP（停止）项目 A 后项目 B 继续运行：PASS（通过）
+- 项目级 STOP isolation（停止隔离）：PASS（通过）
+- 项目 A STOP（停止）后再次 Run（运行）：PASS（通过）
+- Internal Runtime（内部运行时）STOP → Run（停止 → 再次运行）：PASS（通过）
+- External Runtime（外部运行时）STOP → Run（停止 → 再次运行）：PASS（通过）
+- background → foreground（后台 → 前台）RECOVERING（恢复中）回归未复发：PASS（通过）
+- 当前实测范围内未发现相对 Android Baseline（安卓基线）的新增回归。
+
+结论：
+
+**M1.6 Process Control Interface（进程控制接口）= Cloud PASS + Real Device PASS（云端通过 + 真机通过）。**
+
+M1.6（进程控制接口）正式关闭。
+
+下一步：
+
+**M1.7 — Core Boundary Audit（核心边界总审计）**
+
+M1.7 不再新增新的架构切片。其任务是逐项核对 M1 Exit Criteria（M1 退出条件），确认：
+
+1. Runtime Lifecycle（运行生命周期）已进入 Core（核心）。
+2. Environment Needs / Plan（环境需求 / 环境计划）已进入 Core（核心）。
+3. Project Operation（项目操作）通用动作、状态与归属规则已进入 Core（核心）。
+4. Platform Storage / Project Filesystem / Process Control（平台存储 / 项目文件系统 / 进程控制）均已有明确跨平台接口。
+5. Core（核心）不直接导入 Android / macOS / Windows（安卓 / 苹果 / 微软）平台 API。
+6. Android（安卓）自动回归与关键真机回归全部通过。
+7. Capability Isolation（能力隔离）规则未迫使 Android / Windows（安卓 / 微软）实现 macOS（苹果）专属能力。
+
+全部满足后，M1（核心边界）必须立即关闭并进入 M2 — macOS Host Skeleton（苹果主机骨架）。
