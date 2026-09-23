@@ -1597,3 +1597,21 @@ Stage Closure Rule（阶段关闭规则）生效：不得继续增加新的 M1.x
 当前阶段唯一事实：
 
 **M2 — macOS Host Skeleton（macOS 主机应用骨架）**。
+
+
+## Android Developer Mode Termux Return Recovery accepted — 2026-09-23
+
+Latest accepted Android（安卓） regression package for this issue:
+
+- versionCode: `232`
+- versionName: `0.8.0-alpha43-r48d11-m1.6-r1`
+- functional source: `f7e2f654fbe45b3d7fa92be318bb0f57836d3830`
+- W0 Cloud Build（云端构建） #710: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #122: PASS（通过）
+- real-device acceptance（真机验收）: PASS（通过）
+
+Accepted behavior:
+
+`Developer Mode Run（开发者模式运行） → Open Termux（打开外部终端） → return（返回） → automatic provider reprobe（自动重新探测） → READY（就绪） → original Run resumes once（原运行仅恢复一次）`
+
+The previous infinite Termux reopen loop is closed. Normal Mode（普通模式） remains unchanged.

@@ -3628,3 +3628,24 @@ Normal Mode（普通模式） was user-confirmed normal, so the repair scope was
 - versionName: `0.8.0-alpha43-r48d11-m1.6-r1`
 
 Current status: **CODE / CLOUD PASS（代码 / 云端通过）; REAL DEVICE ACCEPTANCE PENDING（真机验收待确认）**。
+
+
+### Real-device acceptance — PASS（通过）
+
+用户已在真实 Android（安卓）设备完成 v232 验收并确认修复通过。
+
+验证路径：
+
+`Developer Mode（开发者模式） → External Run（外部运行） → Open Termux（打开外部终端） → return to SiftAlpha（返回应用） → automatic reprobe（自动重新探测） → READY（就绪） → original Run resumes automatically（原运行自动继续）`
+
+结果：
+
+- 不再要求用户第二次点击 Run（运行）。
+- 不再出现 “打开 Termux → 返回 → 再打开 Termux” 无限循环。
+- 原 deferred intent（待执行操作）被保留并仅恢复一次。
+- Normal Mode（普通模式）继续保持原有正常行为。
+- 用户未报告新的 STOP / Runtime / Web Discovery（停止 / 运行时 / 网页发现）回归。
+
+最终结论：
+
+**Android Developer Mode External Provider Return Recovery r1 = PASS / CLOSED（通过 / 关闭）。**

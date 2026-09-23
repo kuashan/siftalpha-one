@@ -1924,8 +1924,17 @@ Next stage（下一阶段）: **M2 — macOS Host Skeleton（macOS 主机应用�
 
 | ID | 操作 | 期望 | 状态 |
 |---|---|---|---|
-| EXR-01 | Developer Mode（开发者模式）点击 External Run（外部运行），Termux（外部终端）未响应 | 原 Run（运行）请求保持为 deferred intent（待执行操作），不丢失 | Cloud PASS（云端通过）/ Real Device Pending（真机待验收） |
-| EXR-02 | 点击“打开 Termux”后返回 SiftAlpha | Developer Mode 自动重新 Probe（探测），不要求再次点击 Run | Cloud PASS（云端通过）/ Real Device Pending（真机待验收） |
-| EXR-03 | Probe（探测）最终 READY（就绪） | 原 Run（运行）只恢复一次，不重复启动 | Cloud PASS（云端通过）/ Real Device Pending（真机待验收） |
+| EXR-01 | Developer Mode（开发者模式）点击 External Run（外部运行），Termux（外部终端）未响应 | 原 Run（运行）请求保持为 deferred intent（待执行操作），不丢失 | Cloud PASS（云端通过）/ Real Device PASS（真机通过） |
+| EXR-02 | 点击“打开 Termux”后返回 SiftAlpha | Developer Mode 自动重新 Probe（探测），不要求再次点击 Run | Cloud PASS（云端通过）/ Real Device PASS（真机通过） |
+| EXR-03 | Probe（探测）最终 READY（就绪） | 原 Run（运行）只恢复一次，不重复启动 | Cloud PASS（云端通过）/ Real Device PASS（真机通过） |
 | EXR-04 | Normal Mode（普通模式） | 不修改其 UI / return-retry 实现；现有正常行为保持 | Cloud regression PASS（云端回归通过） |
 | EXR-05 | STOP / Runtime / Web Discovery | 行为不变 | Cloud regression PASS（云端回归通过） |
+
+
+Real-device result（真机结果）：
+
+- v232 / `0.8.0-alpha43-r48d11-m1.6-r1`
+- Developer Mode（开发者模式）Termux return recovery（外部终端返回恢复）: PASS（通过）
+- Original Run auto-resume（原运行自动恢复）: PASS（通过）
+- Infinite Termux reopen loop（反复打开外部终端循环）: FIXED / PASS（已修复 / 通过）
+- Final status（最终状态）: **PASS / CLOSED（通过 / 关闭）**
