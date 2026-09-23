@@ -684,3 +684,28 @@ Android（安卓）的：
 **M1.3 Cloud PASS（云端通过），Real Device Acceptance（真机验收）待完成。**
 
 真机通过后关闭 M1.3（项目操作），进入 M1.4 — Platform Storage Interface（平台存储接口）。
+
+## 2026-09-23 · M1.3 Real Device Acceptance（真机验收）完成
+
+用户已完成 v228 / `0.8.0-alpha43-r48d11-m1.3` Android（安卓）真实设备验收。
+
+已确认：
+
+- Prepare → Run → Status / Logs → Stop → Run（准备 → 运行 → 状态 / 日志 → 停止 → 再次运行）链路：PASS（通过）
+- RUNNING → STOP（运行中 → 停止）：PASS（通过）
+- 同项目冲突操作未出现重复执行问题：PASS（通过）
+- 项目级 STOP（停止）未观察到影响其他项目：PASS（通过）
+- v227 修复的 background → foreground（后台 → 前台）RECOVERING（恢复中）问题未重新出现：PASS（通过）
+- 当前实测范围内未发现相对 Android Baseline（安卓基线）的新增回归。
+
+结论：
+
+**M1.3 Project Operation（项目操作）= Cloud PASS + Real Device PASS（云端通过 + 真机通过）。**
+
+M1.3（项目操作）正式关闭。
+
+下一步：
+
+**M1.4 — Platform Storage Interface（平台存储接口）**
+
+目标是把“Core（核心）需要保存什么状态”与“Android / macOS / Windows（安卓 / 苹果 / 微软）具体怎样持久化”分离，避免 SharedPreferences（安卓偏好存储）之类的平台 API（接口）继续渗入共享核心。
