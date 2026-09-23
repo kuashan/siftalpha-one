@@ -388,3 +388,27 @@ Cloud Verification（云端验证）：
 下一项：
 
 **M1.7 — Core Boundary Audit（核心边界总审计）**
+
+### M1.7 Core Boundary Audit（核心边界总审计）
+
+| Exit Criterion（退出条件） | Result（结果） |
+| --- | --- |
+| Runtime Lifecycle（运行生命周期）in Core（核心） | PASS（通过） |
+| Environment Needs / Plan（环境需求 / 环境计划）in Core（核心） | PASS（通过） |
+| Generic Project Operation（通用项目操作）contract（契约） | PASS（通过） |
+| Platform Storage Interface（平台存储接口） | PASS（通过） |
+| Project Filesystem Interface（项目文件系统接口） | PASS（通过） |
+| Process Control Interface（进程控制接口） | PASS（通过） |
+| Core imports no platform API（核心无平台 API 导入） | PASS（通过） |
+| Core module remains pure Kotlin/JVM（核心保持纯 Kotlin/JVM） | PASS（通过） |
+| Android automated regression（安卓自动回归） | PASS（通过） |
+| Android key real-device regression（安卓关键真机回归） | PASS（通过） |
+| Capability Isolation（能力隔离） | PASS（通过） |
+
+最终结论：
+
+**M1 — Core Boundary（核心边界）= PASS（通过） / CLOSED（关闭）。**
+
+下一阶段：
+
+**M2 — macOS Host Skeleton（macOS 主机应用骨架）**。
