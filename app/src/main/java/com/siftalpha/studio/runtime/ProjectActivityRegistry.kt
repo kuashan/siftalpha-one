@@ -1,5 +1,7 @@
 package com.siftalpha.studio.runtime
 
+import com.siftalpha.core.process.ProjectProcessControlPolicy
+import com.siftalpha.core.process.ProjectProcessScope
 import java.util.concurrent.atomic.AtomicLong
 
 class ProjectActivityRegistry {
@@ -13,10 +15,13 @@ class ProjectActivityRegistry {
     }
 
     data class Token internal constructor(
-        val projectId: String,
+        val scope: ProjectProcessScope,
         val operationId: Long,
         val kind: Kind,
-    )
+    ) {
+        val projectId: String
+            get() = scope.projectId
+    }
 
     private data class Entry(
         val token: Token,
@@ -33,7 +38,7 @@ class ProjectActivityRegistry {
         cancel: () -> Unit = {},
     ): Token {
         require(projectId.isNotBlank()) { "projectId must not be blank" }
-        val token = Token(projectId, nextId.incrementAndGet(), kind)
+        val token = Token(ProjectProcessScope(projectId), nextId.incrementAndGet(), kind)
         synchronized(lock) {
             entries[token.operationId] = Entry(token, cancel)
         }
@@ -63,20 +68,27 @@ class ProjectActivityRegistry {
         }
 
     fun hasActive(projectId: String): Boolean =
-        synchronized(lock) { entries.values.any { it.token.projectId == projectId } }
+        synchronized(lock) {
+            val scope = ProjectProcessScope(projectId)
+            entries.values.any { ProjectProcessControlPolicy.sameProject(it.token.scope, scope) }
+        }
 
     fun activeKinds(projectId: String): Set<Kind> =
         synchronized(lock) {
+            val scope = ProjectProcessScope(projectId)
             entries.values
                 .asSequence()
-                .filter { it.token.projectId == projectId }
+                .filter { ProjectProcessControlPolicy.sameProject(it.token.scope, scope) }
                 .map { it.token.kind }
                 .toSet()
         }
 
     fun cancelProject(projectId: String): Int {
+        val scope = ProjectProcessScope(projectId)
         val cancelled = synchronized(lock) {
-            val matching = entries.values.filter { it.token.projectId == projectId }
+            val matching = entries.values.filter {
+                ProjectProcessControlPolicy.sameProject(it.token.scope, scope)
+            }
             matching.forEach { entries.remove(it.token.operationId) }
             matching
         }
