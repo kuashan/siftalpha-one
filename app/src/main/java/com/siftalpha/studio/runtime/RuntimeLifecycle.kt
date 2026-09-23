@@ -1,14 +1,16 @@
 package com.siftalpha.studio.runtime
 
 import android.content.Context
+import com.siftalpha.core.lifecycle.ProjectLifecycleOperation
+import com.siftalpha.core.lifecycle.RuntimeExecutionState
+import com.siftalpha.core.lifecycle.RuntimeLifecyclePolicy
 import com.siftalpha.studio.R
 
 /**
- * Project-level lifecycle states shown by Runtime Center.
+ * Android（安卓） presentation-compatible project lifecycle states.
  *
- * This is intentionally separate from the low-level RuntimeState parsed from Termux output:
- * the presentation state can say "Recovering" while the app is reconciling a persisted active
- * process with a fresh status command.
+ * Lifecycle decision policy now lives in SiftAlpha Core（跨平台核心）. UI（界面） labels remain
+ * Android（安卓） platform responsibility.
  */
 enum class RuntimeLifecycleState {
     ENVIRONMENT_NOT_PREPARED,
@@ -54,6 +56,12 @@ enum class RuntimeLifecycleOperation {
     CLEAN,
 }
 
+/**
+ * Android（安卓） compatibility facade over the platform-independent Core（核心） lifecycle policy.
+ *
+ * Existing Android callers keep their stable types while all lifecycle decisions are delegated
+ * to :core.
+ */
 object RuntimeLifecycleResolver {
     fun resolve(
         environmentReady: Boolean?,
@@ -63,48 +71,14 @@ object RuntimeLifecycleResolver {
         processActive: Boolean = false,
         recoveryInProgress: Boolean = false,
     ): RuntimeLifecycleState {
-        // A user-issued operation has priority over a stale recovery marker. Recovery is only
-        // shown while no current operation is accepted for the project.
-        if (operation == RuntimeLifecycleOperation.NONE && recoveryInProgress) {
-            return RuntimeLifecycleState.RECOVERING
-        }
-
-        when (operation) {
-            RuntimeLifecycleOperation.PREPARE -> return RuntimeLifecycleState.PREPARING
-            RuntimeLifecycleOperation.START -> return RuntimeLifecycleState.STARTING
-            RuntimeLifecycleOperation.STATUS,
-            RuntimeLifecycleOperation.LOGS,
-            -> return RuntimeLifecycleState.CHECKING
-            RuntimeLifecycleOperation.STOP -> return RuntimeLifecycleState.STOPPING
-            RuntimeLifecycleOperation.CLEAN -> return RuntimeLifecycleState.CLEANING
-            RuntimeLifecycleOperation.NONE -> Unit
-        }
-
-        // Internal preparation is app-owned and does not have an External Pending executionId.
-        // Its RuntimeState is therefore authoritative while the environment is still not READY.
-        if (runtimeState == RuntimeState.PREPARING) return RuntimeLifecycleState.PREPARING
-        if (runtimeState == RuntimeState.STARTING) return RuntimeLifecycleState.STARTING
-
-        if (environmentReady != true) return RuntimeLifecycleState.ENVIRONMENT_NOT_PREPARED
-        if (configurationRequired) return RuntimeLifecycleState.NEEDS_CONFIGURATION
-
-        return when {
-            runtimeState == RuntimeState.RUNNING || processActive ->
-                RuntimeLifecycleState.RUNNING
-            runtimeState == RuntimeState.PREPARING ||
-            runtimeState == RuntimeState.STARTING ->
-                if (runtimeState == RuntimeState.STARTING) {
-                    RuntimeLifecycleState.STARTING
-                } else {
-                    RuntimeLifecycleState.PREPARING
-                }
-            runtimeState == RuntimeState.EXITED_ERROR ||
-                runtimeState == RuntimeState.ENVIRONMENT_ERROR ->
-                RuntimeLifecycleState.RUN_FAILED
-            runtimeState == RuntimeState.EXITED_SUCCESS ||
-                runtimeState == RuntimeState.STOPPED_BY_USER ->
-                RuntimeLifecycleState.STOPPED
-            else -> RuntimeLifecycleState.READY_TO_RUN
-        }
+        val resolved = RuntimeLifecyclePolicy.resolve(
+            environmentReady = environmentReady,
+            runtimeState = RuntimeExecutionState.valueOf(runtimeState.name),
+            operation = ProjectLifecycleOperation.valueOf(operation.name),
+            configurationRequired = configurationRequired,
+            processActive = processActive,
+            recoveryInProgress = recoveryInProgress,
+        )
+        return RuntimeLifecycleState.valueOf(resolved.name)
     }
 }
