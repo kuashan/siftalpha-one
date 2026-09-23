@@ -168,8 +168,10 @@ android {
         // concurrency rules into the shared cross-platform Core.
         // r48d11-m1.4 introduces the cross-platform state-storage port and routes
         // shared lifecycle/operation persistence through the Android adapter.
-        versionCode = 229
-        versionName = "0.8.0-alpha43-r48d11-m1.4"
+        // r48d11-m1.5 introduces the cross-platform project-filesystem port and
+        // routes Android SAF project tree and file CRUD through the adapter.
+        versionCode = 230
+        versionName = "0.8.0-alpha43-r48d11-m1.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
