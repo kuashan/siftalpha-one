@@ -564,3 +564,19 @@ M1.2（环境计划）真机验收期间发现：
 5. Open / Logs / Refresh（打开 / 日志 / 刷新）等原本应可用操作不被恢复门禁永久锁死。
 6. STOP（停止）仍能正常工作。
 7. Activity（页面）真正重建后，持久化恢复仍可执行一次。
+
+### Android Foreground Recovery Repair（安卓前台恢复修复）云端验证
+
+- code/build SHA: `e95b07b65a82fe661ce1eeb352744a7da0076827`
+- W0 Cloud Build（W0 云端构建） #685 / run ID `35818682810`: **PASS（通过）**
+- Internal Alpine Probe（内部 Alpine 探针） #117: **PASS（通过）**
+- `:core:test`: **PASS（通过）**
+- Android unit tests（安卓单元测试）: **PASS（通过）**
+- `assembleDebug`（安卓调试包构建）: **PASS（通过）**
+- versionCode: `227`
+- versionName: `0.8.0-alpha43-r48d11-m1.2-r1`
+- APK SHA-256: `efb75996e7a92eb5cdb82ebae53d774e3ed8cf881b2883041406b8c4c674022a`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- artifact（云端制品）: `siftalpha-w0-685`, ID `10731739860`
+
+当前状态：**Cloud PASS（云端通过） / Real Device Pending（真机待确认）**。
