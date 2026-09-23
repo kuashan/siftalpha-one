@@ -160,8 +160,10 @@ android {
         // Core may define optional capabilities but no platform is forced to implement all of them.
         // r48d11-m1.1 moves Runtime lifecycle parsing/decision policy into :core while
         // keeping Android UI/persistence compatibility facades unchanged.
-        versionCode = 225
-        versionName = "0.8.0-alpha43-r48d11-m1.1"
+        // r48d11-m1.2 separates provider-neutral project environment needs from
+        // Android-specific backend selection and preparation execution.
+        versionCode = 226
+        versionName = "0.8.0-alpha43-r48d11-m1.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
