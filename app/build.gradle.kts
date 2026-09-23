@@ -162,8 +162,10 @@ android {
         // keeping Android UI/persistence compatibility facades unchanged.
         // r48d11-m1.2 separates provider-neutral project environment needs from
         // Android-specific backend selection and preparation execution.
-        versionCode = 226
-        versionName = "0.8.0-alpha43-r48d11-m1.2"
+        // r48d11-m1.2-r1 fixes Android foreground-resume recovery so a normal
+        // background -> foreground transition cannot lock a healthy running project in RECOVERING.
+        versionCode = 227
+        versionName = "0.8.0-alpha43-r48d11-m1.2-r1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
