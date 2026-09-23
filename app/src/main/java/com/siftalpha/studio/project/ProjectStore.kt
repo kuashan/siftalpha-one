@@ -3,6 +3,8 @@ package com.siftalpha.studio.project
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import com.siftalpha.core.filesystem.ProjectFileEntry
+import com.siftalpha.core.filesystem.ProjectFilesystemPolicy
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -42,6 +44,7 @@ class ProjectStore(private val context: Context) {
 
     private val resolver = context.contentResolver
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val filesystem = AndroidSafProjectFilesystem(context) { rootUri() }
 
     fun rootUri(): Uri? = prefs.getString(KEY_ROOT_URI, null)?.let(Uri::parse)
 
@@ -197,23 +200,24 @@ if __name__ == "__main__":
         parent: FileNode? = null,
     ): List<FileNode> {
         require(parent == null || parent.isDirectory) { "只能读取文件夹的子项" }
-        val treeUri = rootUri() ?: error("项目目录不可用")
         val parentId = parent?.documentId ?: projectDocumentId
         val parentPath = parent?.relativePath.orEmpty()
         val depth = (parent?.depth ?: -1) + 1
-        return sortedVisibleChildren(treeUri, parentId)
-            .take(MAX_TREE_ITEMS)
-            .map { child ->
-                val isDirectory = child.mimeType == DocumentsContract.Document.MIME_TYPE_DIR
-                FileNode(
-                    name = child.name,
-                    relativePath = joinPath(parentPath, child.name),
-                    documentId = child.documentId,
-                    mimeType = child.mimeType,
-                    depth = depth,
-                    isDirectory = isDirectory,
-                )
+        return filesystem.listChildren(
+            projectId = projectDocumentId,
+            parentId = parentId,
+            parentRelativePath = parentPath,
+            depth = depth,
+        )
+            .filterNot { child ->
+                child.isDirectory && child.name.lowercase() in SKIPPED_TREE_DIRECTORIES
             }
+            .sortedWith(
+                compareBy<ProjectFileEntry> { !it.isDirectory }
+                    .thenBy { it.name.lowercase() },
+            )
+            .take(MAX_TREE_ITEMS)
+            .map(::fromCoreFile)
     }
 
     /**
@@ -259,7 +263,6 @@ if __name__ == "__main__":
         maxItems: Int,
         skippedDirectories: Set<String>,
     ): ProjectTreeCollection {
-        val treeUri = rootUri() ?: error("项目目录不可用")
         val result = mutableListOf<FileNode>()
         var truncated = false
 
@@ -268,22 +271,27 @@ if __name__ == "__main__":
                 truncated = true
                 return
             }
-            for (child in sortedTreeChildren(treeUri, parentId, skippedDirectories)) {
+            val children = filesystem.listChildren(
+                projectId = projectDocumentId,
+                parentId = parentId,
+                parentRelativePath = parentPath,
+                depth = depth,
+            )
+                .filterNot { child ->
+                    child.isDirectory && child.name.lowercase() in skippedDirectories
+                }
+                .sortedWith(
+                    compareBy<ProjectFileEntry> { !it.isDirectory }
+                        .thenBy { it.name.lowercase() },
+                )
+            for (child in children) {
                 if (result.size >= maxItems) {
                     truncated = true
                     return
                 }
-                val relativePath = joinPath(parentPath, child.name)
-                val isDirectory = child.mimeType == DocumentsContract.Document.MIME_TYPE_DIR
-                result += FileNode(
-                    name = child.name,
-                    relativePath = relativePath,
-                    documentId = child.documentId,
-                    mimeType = child.mimeType,
-                    depth = depth,
-                    isDirectory = isDirectory,
-                )
-                if (isDirectory) walk(child.documentId, depth + 1, relativePath)
+                val node = fromCoreFile(child)
+                result += node
+                if (node.isDirectory) walk(node.documentId, depth + 1, node.relativePath)
             }
         }
 
