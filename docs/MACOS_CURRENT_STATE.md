@@ -5,14 +5,14 @@
 
 ## 1. 当前阶段
 
-状态：**M1 — Core Boundary（核心边界）进行中；M1.1 Runtime Lifecycle（运行生命周期）= Cloud PASS + Real Device PASS（云端通过 + 真机通过），当前进入 M1.2 Environment Plan（环境计划）。**
+状态：**M1 — Core Boundary（核心边界）进行中；M1.1 Runtime Lifecycle（运行生命周期）已通过，M1.2 Environment Plan（环境计划）正在实现与回归验证。**
 
 当前工作分支：
 - `feature/cross-platform-core`
 
 当前跨平台 Core（核心）版本：
-- `0.8.0-alpha43-r48d11-m1.1`
-- Android（安卓） versionCode = `225`
+- `0.8.0-alpha43-r48d11-m1.2`
+- Android（安卓） versionCode = `226`
 
 当前 Core（核心）能力隔离规则：
 - `docs/PLATFORM_CAPABILITY_CONTRACT.md`
