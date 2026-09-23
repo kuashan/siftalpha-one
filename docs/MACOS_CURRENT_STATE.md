@@ -5,7 +5,7 @@
 
 ## 1. 当前阶段
 
-状态：**M1 — Core Boundary（核心边界）进行中；M1.1 Runtime Lifecycle（运行生命周期）已通过，M1.2 Environment Plan（环境计划）正在实现与回归验证。**
+状态：**M1 — Core Boundary（核心边界）进行中；M1.1 已通过，M1.2 Environment Plan（环境计划）= Cloud PASS（云端通过），Real Device Acceptance（真机验收）待完成。**
 
 当前工作分支：
 - `feature/cross-platform-core`
@@ -229,3 +229,26 @@ DMG / PKG（磁盘映像 / 安装包）
 普通用户安装 SiftAlpha（筛选阿尔法）不需要自己的开发者账号，也不采用 iOS（苹果手机系统）那种每台设备注册的开发模式。
 
 未经 Developer ID（开发者身份）签名和 Notarization（苹果公证）的开发包可以用于内部开发/测试，但不作为最终普通用户分发方案。
+
+
+## 11. M1.2 Environment Plan（环境计划）当前边界
+
+Core（核心）现已拥有 provider-neutral（提供者中立）的 `ProjectEnvironmentNeeds`。
+
+原则：
+
+```
+Project（项目）
+    ↓
+Core（核心）：项目需要什么
+    ↓
+Platform Adapter（平台适配层）：当前平台如何满足
+```
+
+例如同一个“需要 Python（Python 运行时）”事实：
+
+- Android（安卓）可由 Embedded CPython / Internal Alpine / External Provider（内嵌 CPython / 内部 Alpine / 外部提供者）满足。
+- macOS（苹果）未来可由 Host Python / Managed Runtime（主机 Python / 托管运行时）满足。
+- Windows（微软）未来可由 Host Python / WSL2 / Managed Runtime（主机 Python / Windows Linux 子系统 / 托管运行时）满足。
+
+Core（核心）不得因为某个平台的实现方式而要求其他平台实现同一个 backend（后端）。
