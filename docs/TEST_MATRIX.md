@@ -1868,3 +1868,14 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Project-scoped STOP（项目级停止） | Existing semantics unchanged |
 | Internal Alpine Probe（内部 Alpine 探针） | Must remain PASS because app build wiring changed |
 | macOS / Windows execution（苹果 / 微软执行） | Not implemented in Slice 1; only shared module boundary begins |
+
+### R48-D11 Slice 1 verification result
+
+- `:core:test`: PASS（通过）
+- Android unit tests（安卓单元测试）: PASS（通过）
+- `assembleDebug`（调试包构建）: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #113: PASS（通过）
+- W0 Cloud Build（W0 云端构建） #664: PASS（通过）
+- Stable signing（稳定签名）: PASS（通过）
+- APK SHA-256: `9c072da6d5028709fbedbecab8336101b014895d71720e900715beba7fe1fb2a`
+- Real-device acceptance（真机验收）: not required to claim behavior changes because this slice intentionally changes module ownership only; installable APK is available if regression confirmation is desired.
