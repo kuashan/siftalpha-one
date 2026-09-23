@@ -124,3 +124,20 @@ Core（核心）只定义状态值与读写/删除契约，不依赖 Android Sha
 Android（安卓）当前通过 `AndroidSharedPreferencesStateStorage` 实现该端口；macOS（苹果）与 Windows（微软）后续各自提供平台实现。
 
 Runtime Lifecycle / Runtime Operation（运行生命周期 / 运行操作）已通过该端口持久化。Android SAF（安卓存储访问框架）项目文件访问不属于本端口，由 M1.5（项目文件系统接口）处理。
+
+## Project filesystem boundary（项目文件系统边界）
+
+M1.5（项目文件系统接口）建立 `ProjectFilesystem` 作为跨平台项目文件访问端口。
+
+Core（核心）只认识：
+
+- opaque file identity（不透明文件身份）
+- project-relative path（项目相对路径）
+- file / directory（文件 / 文件夹）
+- list / read / write / create / rename / delete（列出 / 读取 / 写入 / 创建 / 重命名 / 删除）
+
+Android（安卓）当前由 `AndroidSafProjectFilesystem` 使用 SAF / DocumentsContract（存储访问框架 / 文档接口）实现。
+
+macOS（苹果）与 Windows（微软）后续只需实现同一个 `ProjectFilesystem`，无需复制 Android SAF（安卓存储访问框架）语义。
+
+Runtime staging（运行暂存）已经通过该端口读取项目树和文件内容，因此后续桌面平台可以向相同的 Core（核心）/ staging consumer（暂存消费者）提供本机文件系统实现。
