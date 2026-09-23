@@ -1841,3 +1841,17 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | version | installable build | 0.8.0-alpha43-r48d10 / versionCode 222 |
 | W0 / unit tests / assembleDebug | cloud build | PASS — Run #658 on `2ff4dac58730681e5e1e7d5f86dcf7e6b01c78a1`; artifact `siftalpha-w0-658`; APK SHA-256 `7b317eed6e945bffd02fbb9f291da35fb60c9533eeabff06d4130b891143e184` |
 | Internal Alpine Probe | cloud probe after version bump | PASS — Run #112 |
+
+### R48-D10 v222 — Real Device Accepted Baseline
+
+| Area | Result |
+| --- | --- |
+| Baseline branch | `baseline/r48d10` |
+| Frozen commit | `a60d7fb5d81a6611ea6695c023c1c70e8181388c` |
+| W0 Cloud Build（云端构建） | PASS — Run #660 |
+| Internal Alpine Probe（内部 Alpine 探针） | PASS — Run #112 |
+| Trusted Signed Debug APK（可信签名调试安装包） | PASS — real device |
+| Normal Mode（普通模式） external one-click continuation | PASS — real device |
+| Developer Mode（开发者模式） external one-click continuation | PASS — real device |
+| STOP（停止） project-scoped pending cancellation | PASS — real device |
+| Baseline status | FROZEN / DO NOT MODIFY |
