@@ -517,3 +517,50 @@ M0～M8（第 0～8 阶段）是固定的一级阶段。
 > **停止继续拆分该阶段 → 标记 PASS（通过）→ 进入下一阶段。**
 
 新的非阻塞优化进入 Backlog（待办），不阻止阶段推进。
+
+## 2026-09-23 · Android Foreground Recovery Repair（安卓前台恢复修复）
+
+### 真机问题
+
+M1.2（环境计划）真机验收期间发现：
+
+- 项目已经正常 Prepare / Run（准备 / 运行）。
+- Runtime（运行时）仍在正常工作，日志与结果可访问。
+- App（应用）切到后台后再回到前台，Developer Workspace（开发者工作区）可能永久显示 RECOVERING（恢复中）。
+- 此时只剩 STOP（停止）与编辑类操作可用，其他操作被恢复门禁禁用。
+- 必须 STOP（停止）后才能重新 Run（运行）。
+
+### 根因
+
+这不是 Runtime（运行时）实际失败，而是 Android Activity Lifecycle（安卓页面生命周期）把普通 background -> foreground（后台 → 前台）错误当成了 persisted runtime recovery（持久化运行时恢复）。
+
+两个问题叠加：
+
+1. `restoreStoredState()` 在 Activity（页面）停止时仍可能因异步 card refresh（卡片刷新）把健康运行项目加入 `recoveryProjects`。
+2. `onStart()` 每次回前台都会再次调用 `recoverPersistedRuntimeStates()`，即使当前 Activity（页面）实例没有被销毁或重建。
+
+### 修复
+
+- 新增 `RuntimeForegroundRecoveryGate`。
+- 一个新建 Activity（页面）实例只允许执行一次 persisted runtime recovery（持久化运行时恢复）。
+- 普通后台 → 前台返回不重新进入 persisted recovery（持久化恢复）。
+- Activity（页面）真正重建后，新实例仍会获得一次恢复机会。
+- `restoreStoredState()` 改为纯状态读取，不再修改 `recoveryProjects`。
+- External observation（外部运行观察）在普通前后台切换时继续由原有 resume mechanism（恢复机制）接管，不使用 RECOVERING（恢复中）锁住整个项目。
+
+### 版本
+
+- versionCode = `227`
+- versionName = `0.8.0-alpha43-r48d11-m1.2-r1`
+
+### 验收要求
+
+必须验证：
+
+1. External Runtime（外部运行时）项目正常运行。
+2. App（应用）切后台。
+3. 再回前台。
+4. 项目仍显示真实 RUNNING / result-ready（运行中 / 结果可用）状态，不永久显示 RECOVERING（恢复中）。
+5. Open / Logs / Refresh（打开 / 日志 / 刷新）等原本应可用操作不被恢复门禁永久锁死。
+6. STOP（停止）仍能正常工作。
+7. Activity（页面）真正重建后，持久化恢复仍可执行一次。
