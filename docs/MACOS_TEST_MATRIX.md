@@ -230,3 +230,13 @@ M1.2（环境计划）真机验收新增阻塞项：
 - STOP（停止）后重新 Run（运行）保持正常。
 
 当前状态：**Cloud Verification Pending（云端验证中） / Real Device Pending（真机待确认）**。
+
+Android Foreground Recovery Regression（安卓前台恢复回归）云端结果：
+
+- RuntimeForegroundRecoveryGate（前台恢复门禁）单元测试：PASS（通过）
+- W0 Cloud Build（W0 云端构建） #685：PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #117：PASS（通过）
+- Android APK build（安卓安装包构建）：PASS（通过）
+- APK SHA-256：`efb75996e7a92eb5cdb82ebae53d774e3ed8cf881b2883041406b8c4c674022a`
+
+真机仍需验证普通后台 → 前台不会永久进入 RECOVERING（恢复中）。
