@@ -3508,3 +3508,24 @@ Cloud verification pending at the time of this entry.
 - Signer certificate SHA-256 remains `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`.
 
 Result: first platform-independent Core（核心） extraction slice is cloud-verified. Android（安卓） Runtime behavior was not intentionally changed.
+
+## 2026-09-23 · R48-D11 Core Capability Isolation
+
+### Purpose
+Freeze the rule that platform-specific requirements discovered during macOS（苹果桌面系统）, Windows（微软桌面系统） or Android（安卓系统） development must not become mandatory shared-core behavior by default.
+
+### Contract
+- Added `docs/PLATFORM_CAPABILITY_CONTRACT.md`.
+- Added platform-neutral `PlatformCapability`, `CapabilityAvailability`, `PlatformCapabilitySnapshot` and `StandardPlatformCapabilities` in `:core`.
+- A capability may be AVAILABLE（可用）, UNAVAILABLE（不可用） or UNKNOWN（未知）.
+- Missing/unsupported capability is a valid platform fact, not an architecture failure.
+- Platform-only behavior stays in the platform adapter.
+- Same abstract capability with different implementations is represented by a Core（核心） contract plus per-platform implementation.
+- Core（核心） must not accumulate Android/macOS/Windows branching for platform mechanisms.
+
+### Version
+- versionCode = 224
+- versionName = `0.8.0-alpha43-r48d11-core2`
+
+### Regression requirement
+Every future platform-driven Core（核心） change must pass Core tests（核心测试） and existing Android regression/build verification（安卓回归/构建验证） before acceptance.
