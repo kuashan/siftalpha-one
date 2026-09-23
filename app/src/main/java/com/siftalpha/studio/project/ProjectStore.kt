@@ -312,24 +312,27 @@ if __name__ == "__main__":
         val name = validateEntryName(rawName)
         require(parent == null || parent.isDirectory) { "只能在文件夹中创建文件" }
 
-        val treeUri = rootUri() ?: error("项目目录不可用")
         val parentId = parent?.documentId ?: projectDocumentId
-        require(listChildren(treeUri, parentId).none { it.name.equals(name, ignoreCase = true) }) {
-            "$name 已存在"
-        }
+        val parentPath = parent?.relativePath.orEmpty()
+        val depth = (parent?.depth ?: -1) + 1
+        require(
+            filesystem.listChildren(
+                projectId = projectDocumentId,
+                parentId = parentId,
+                parentRelativePath = parentPath,
+                depth = depth,
+            ).none { it.name.equals(name, ignoreCase = true) },
+        ) { "$name 已存在" }
 
-        val parentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, parentId)
-        val fileUri = createExactDocument(parentUri, name, "text/plain")
-        val actualMime = documentMimeType(fileUri) ?: "application/octet-stream"
-
-        val path = joinPath(parent?.relativePath.orEmpty(), name)
-        return FileNode(
-            name = name,
-            relativePath = path,
-            documentId = DocumentsContract.getDocumentId(fileUri),
-            mimeType = actualMime,
-            depth = (parent?.depth ?: -1) + 1,
-            isDirectory = false,
+        return fromCoreFile(
+            filesystem.createFile(
+                projectId = projectDocumentId,
+                parentId = parentId,
+                parentRelativePath = parentPath,
+                depth = depth,
+                name = name,
+                mediaType = "text/plain",
+            ),
         )
     }
 
@@ -341,28 +344,26 @@ if __name__ == "__main__":
         val name = validateEntryName(rawName)
         require(parent == null || parent.isDirectory) { "只能在文件夹中创建子文件夹" }
 
-        val treeUri = rootUri() ?: error("项目目录不可用")
         val parentId = parent?.documentId ?: projectDocumentId
-        require(listChildren(treeUri, parentId).none { it.name.equals(name, ignoreCase = true) }) {
-            "$name 已存在"
-        }
+        val parentPath = parent?.relativePath.orEmpty()
+        val depth = (parent?.depth ?: -1) + 1
+        require(
+            filesystem.listChildren(
+                projectId = projectDocumentId,
+                parentId = parentId,
+                parentRelativePath = parentPath,
+                depth = depth,
+            ).none { it.name.equals(name, ignoreCase = true) },
+        ) { "$name 已存在" }
 
-        val parentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, parentId)
-        val folderUri = DocumentsContract.createDocument(
-            resolver,
-            parentUri,
-            DocumentsContract.Document.MIME_TYPE_DIR,
-            name,
-        ) ?: error("无法创建文件夹 $name")
-
-        val path = joinPath(parent?.relativePath.orEmpty(), name)
-        return FileNode(
-            name = name,
-            relativePath = path,
-            documentId = DocumentsContract.getDocumentId(folderUri),
-            mimeType = DocumentsContract.Document.MIME_TYPE_DIR,
-            depth = (parent?.depth ?: -1) + 1,
-            isDirectory = true,
+        return fromCoreFile(
+            filesystem.createDirectory(
+                projectId = projectDocumentId,
+                parentId = parentId,
+                parentRelativePath = parentPath,
+                depth = depth,
+                name = name,
+            ),
         )
     }
 
@@ -374,8 +375,7 @@ if __name__ == "__main__":
         val name = validateEntryName(rawName)
         if (name == node.name) return node
 
-        val treeUri = rootUri() ?: error("项目目录不可用")
-        val parentPath = node.relativePath.substringBeforeLast('/', "")
+        val parentPath = ProjectFilesystemPolicy.parentPath(node.relativePath)
         val parentId = if (parentPath.isBlank()) {
             projectDocumentId
         } else {
@@ -386,34 +386,27 @@ if __name__ == "__main__":
         }
 
         require(
-            listChildren(treeUri, parentId).none {
-                it.documentId != node.documentId &&
+            filesystem.listChildren(
+                projectId = projectDocumentId,
+                parentId = parentId,
+                parentRelativePath = parentPath,
+                depth = node.depth,
+            ).none {
+                it.id != node.documentId &&
                     it.name.equals(name, ignoreCase = true)
             },
         ) { "$name 已存在" }
 
-        val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, node.documentId)
-        val renamedUri = DocumentsContract.renameDocument(resolver, uri, name)
-            ?: error("重命名失败")
-        val actualName = documentDisplayName(renamedUri)
-        require(actualName == null || actualName == name) {
-            "Android 文件提供器修改了文件名：$name -> $actualName"
-        }
-
-        return node.copy(
-            name = name,
-            relativePath = joinPath(parentPath, name),
-            documentId = DocumentsContract.getDocumentId(renamedUri),
-            mimeType = documentMimeType(renamedUri) ?: node.mimeType,
+        return fromCoreFile(
+            filesystem.rename(
+                file = toCoreFile(node),
+                newName = name,
+            ),
         )
     }
 
     fun deleteProjectNode(node: FileNode) {
-        val treeUri = rootUri() ?: error("项目目录不可用")
-        val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, node.documentId)
-        check(DocumentsContract.deleteDocument(resolver, uri)) {
-            "删除失败：${node.relativePath}"
-        }
+        filesystem.delete(toCoreFile(node))
     }
 
     fun isEditableTextFile(file: FileNode): Boolean =
@@ -448,12 +441,10 @@ if __name__ == "__main__":
             "文件超过 ${MAX_EDIT_FILE_BYTES / 1024} KB，当前编辑器暂不保存"
         }
 
-        val treeUri = rootUri() ?: error("项目目录不可用")
-        val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, file.documentId)
-        resolver.openOutputStream(uri, "wt")?.use { output ->
-            output.write(bytes)
-            output.flush()
-        } ?: error("无法写入 ${file.relativePath}")
+        filesystem.writeBytes(
+            file = toCoreFile(file),
+            content = bytes,
+        )
     }
 
     fun searchProject(
@@ -718,20 +709,10 @@ if __name__ == "__main__":
     private fun readFileBytes(
         file: FileNode,
         maxBytes: Int,
-    ): ByteArray {
-        val treeUri = rootUri() ?: error("项目目录不可用")
-        val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, file.documentId)
-        return resolver.openInputStream(uri)?.use { input ->
-            val buffer = ByteArray(maxBytes)
-            var offset = 0
-            while (offset < buffer.size) {
-                val count = input.read(buffer, offset, buffer.size - offset)
-                if (count < 0) break
-                offset += count
-            }
-            buffer.copyOf(offset)
-        } ?: error("无法读取 ${file.relativePath}")
-    }
+    ): ByteArray = filesystem.readBytes(
+        file = toCoreFile(file),
+        maxBytes = maxBytes,
+    )
 
     private fun readSearchText(file: FileNode): String? {
         return runCatching {
@@ -770,6 +751,24 @@ if __name__ == "__main__":
         }
         return result
     }
+
+    private fun toCoreFile(file: FileNode): ProjectFileEntry = ProjectFileEntry(
+        id = file.documentId,
+        name = file.name,
+        relativePath = file.relativePath,
+        mediaType = file.mimeType,
+        depth = file.depth,
+        isDirectory = file.isDirectory,
+    )
+
+    private fun fromCoreFile(file: ProjectFileEntry): FileNode = FileNode(
+        name = file.name,
+        relativePath = file.relativePath,
+        documentId = file.id,
+        mimeType = file.mediaType ?: "application/octet-stream",
+        depth = file.depth,
+        isDirectory = file.isDirectory,
+    )
 
     private fun validateEntryName(rawName: String): String {
         val name = rawName.trim()
