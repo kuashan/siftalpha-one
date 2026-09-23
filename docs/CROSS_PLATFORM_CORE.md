@@ -94,3 +94,13 @@ Every extraction slice must keep the Android（安卓） baseline buildable and 
 - `assembleDebug`（调试包构建）
 - existing APK evidence / stable signing（安装包证据 / 稳定签名）
 - Internal Alpine Probe（内部 Alpine 探针） whenever its build inputs are touched
+
+## macOS development records（macOS 开发记录）
+
+macOS（苹果桌面系统）平台工作的固定入口：
+
+- `MACOS_CURRENT_STATE.md` — 当前状态
+- `MACOS_DEV_LOG.md` — 开发日志
+- `MACOS_TEST_MATRIX.md` — 测试矩阵
+
+macOS（苹果）工作不得只依赖聊天上下文。每轮状态变化、架构决定、测试证据和下一步都必须写回这些文件。
