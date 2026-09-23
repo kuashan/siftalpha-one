@@ -164,8 +164,10 @@ android {
         // Android-specific backend selection and preparation execution.
         // r48d11-m1.2-r1 fixes Android foreground-resume recovery so a normal
         // background -> foreground transition cannot lock a healthy running project in RECOVERING.
-        versionCode = 227
-        versionName = "0.8.0-alpha43-r48d11-m1.2-r1"
+        // r48d11-m1.3 moves project-operation arbitration and project-scoped
+        // concurrency rules into the shared cross-platform Core.
+        versionCode = 228
+        versionName = "0.8.0-alpha43-r48d11-m1.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
