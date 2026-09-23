@@ -606,3 +606,81 @@ M1.2（环境计划）正式关闭。
 **M1.3 — Project Operation（项目操作）**
 
 目标是把 Prepare / Run / Status / Logs / Stop（准备 / 运行 / 状态 / 日志 / 停止）的通用操作语义、项目归属和动作门禁进一步从 Android（安卓）具体执行机制中分离出来。
+
+## 2026-09-23 · M1.3 — Project Operation（项目操作）Core Extraction（核心抽取）
+
+### 目标
+
+把 Prepare / Start / Status / Logs / Stop / Clean（准备 / 启动 / 状态 / 日志 / 停止 / 清理）的通用操作语义、项目归属和冲突仲裁从 Android（安卓）具体执行实现中分离出来。
+
+### 审查结论
+
+原有 `RuntimeOperationLifecycle.kt` 已经包含较成熟的通用操作语义，但仍混有：
+
+- Internal / External Provider（内部 / 外部提供者）
+- Android（安卓）控制操作超时
+- ProjectRuntimeSelection（项目运行时选择）
+- 当前 Android（安卓）执行 ID / Provider（提供者）细节
+
+其中真正跨平台的部分是：
+
+- 操作类型
+- 操作阶段
+- terminal phase（终态）判断
+- 同一项目只允许一个活动可变操作
+- STOP（停止）可抢占同项目的非 STOP（停止）操作
+- duplicate STOP（重复停止）拒绝
+- 不同项目互不阻塞
+- generation（代际）属于项目级操作身份
+
+### 实现
+
+新增：
+
+- `core/src/main/kotlin/com/siftalpha/core/operation/ProjectOperationCore.kt`
+- `core/src/test/kotlin/com/siftalpha/core/operation/ProjectOperationCoreTest.kt`
+
+Core（核心）新增：
+
+- `ProjectOperationAction`
+- `ProjectOperationPhase`
+- `ProjectOperationOwnership`
+- `ProjectOperationPolicy`
+
+Android（安卓）的：
+
+- `RuntimeOperationRecord.terminal`
+- `RuntimeOperationContract.canBegin()`
+- `RuntimeOperationTracker.begin()`
+- `ProjectOperationCoordinator.begin()`
+
+现已使用同一个 Core（核心）操作仲裁规则。
+
+### 已冻结的共享规则
+
+1. 不同项目的操作互不阻塞。
+2. 同一项目同时最多一个活动可变 Runtime（运行时）操作。
+3. STOP（停止）可以抢占同项目正在进行的 PREPARE / START / STATUS / LOGS / CLEAN（准备 / 启动 / 状态 / 日志 / 清理）。
+4. 已经存在 STOP（停止）时不能重复创建第二个 STOP（停止）。
+5. SUCCESS / FAILED / CANCELLED / TIMED_OUT（成功 / 失败 / 取消 / 超时）是共享终态。
+6. Provider（提供者）、进程 ID、Android executionId（安卓执行编号）仍属于 Platform Adapter（平台适配层），不进入 Core（核心）。
+
+### 云端验证
+
+- code/build SHA: `9c4f807c58ba2625c3c7e7eea647a9acf5152cf0`
+- W0 Cloud Build（W0 云端构建） #691 / run ID `35820101971`: **PASS（通过）**
+- Internal Alpine Probe（内部 Alpine 探针） #118: **PASS（通过）**
+- `:core:test`: **PASS（通过）**
+- Android unit tests（安卓单元测试）: **PASS（通过）**
+- `assembleDebug`（安卓调试包构建）: **PASS（通过）**
+- versionCode: `228`
+- versionName: `0.8.0-alpha43-r48d11-m1.3`
+- APK SHA-256: `7b3aa037642e5818a027a636dce363fd22d694c60f451e348296371f1fc94994`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- artifact（云端制品）: `siftalpha-w0-691`, ID `10732917346`
+
+### 当前状态
+
+**M1.3 Cloud PASS（云端通过），Real Device Acceptance（真机验收）待完成。**
+
+真机通过后关闭 M1.3（项目操作），进入 M1.4 — Platform Storage Interface（平台存储接口）。
