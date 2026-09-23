@@ -824,3 +824,113 @@ M1.4（平台存储接口）正式关闭。
 **M1.5 — Project Filesystem Interface（项目文件系统接口）**
 
 目标是把“Core（核心）需要对项目文件做什么”与“Android SAF（安卓存储访问框架）/ macOS POSIX（苹果 POSIX 文件系统）/ Windows Filesystem（Windows 文件系统）具体怎样访问文件”分离。
+
+## 2026-09-23 · M1.5 — Project Filesystem Interface（项目文件系统接口）Core Extraction（核心抽取）
+
+### 目标
+
+把“Core（核心）需要对项目文件做什么”与“Android / macOS / Windows（安卓 / 苹果 / 微软）具体如何访问项目文件”分离。
+
+### 边界审查
+
+原有 Android（安卓）`ProjectStore` 同时包含：
+
+1. Project metadata（项目元数据）与项目列表展示。
+2. Recent-file/UI preference（最近文件 / 界面偏好）。
+3. Project filesystem access（项目文件系统访问）：
+   - list children / tree（列目录 / 文件树）
+   - bounded read（有界读取）
+   - write（写入）
+   - create file / directory（创建文件 / 文件夹）
+   - rename（重命名）
+   - delete（删除）
+   - execution staging traversal（运行暂存遍历）
+
+M1.5（项目文件系统接口）只抽取第 3 类。第 1、2 类不在本轮范围。
+
+### Core（核心）新增
+
+- `core/src/main/kotlin/com/siftalpha/core/filesystem/ProjectFilesystem.kt`
+- `ProjectFileEntry`
+- `ProjectFilesystem`
+- `ProjectFilesystemPolicy`
+
+共享能力：
+
+- listChildren（列子项）
+- readBytes（读取字节）
+- writeBytes（写入字节）
+- createFile（创建文件）
+- createDirectory（创建文件夹）
+- rename（重命名）
+- delete（删除）
+- project-relative path policy（项目相对路径规则）
+
+`ProjectFileEntry.id` 为 opaque identity（不透明身份）：
+
+- Android（安卓）可使用 SAF document ID（文档 ID）
+- macOS（苹果）未来可使用规范化 POSIX path / platform identity（POSIX 路径 / 平台身份）
+- Windows（微软）未来可使用 Windows path / platform identity（Windows 路径 / 平台身份）
+
+Core（核心）不理解 Uri / ContentResolver / DocumentsContract（URI / 内容解析器 / 文档接口）。
+
+### Android（安卓）实现
+
+新增：
+
+- `AndroidSafProjectFilesystem`
+
+该适配器是 Android SAF（安卓存储访问框架）实现，Android 专属的：
+
+- `Uri`
+- `ContentResolver`
+- `DocumentsContract`
+- SAF exact-name workaround（SAF 文件名保持处理）
+
+全部停留在 Android Platform Adapter（安卓平台适配层）。
+
+现有 `ProjectStore` 已将以下生产路径切换到 `ProjectFilesystem`：
+
+- 项目直接子项列表
+- 全项目递归树
+- Internal Runtime staging tree（内部运行时暂存树）
+- 项目文件有界读取
+- 文本文件写入
+- 创建文件
+- 创建文件夹
+- 重命名
+- 删除
+
+这意味着 Embedded R / Internal Alpine（内部运行环境）执行前的项目暂存读取也已经过跨平台文件系统端口。
+
+### 明确保留在 Android（安卓）的内容
+
+本轮没有移动：
+
+- Android 项目根目录选择 / persistable Uri permission（持久 URI 权限）
+- 项目列表的 SAF root discovery（SAF 根目录发现）
+- 项目元数据解析的 Android facade（安卓外观层）
+- Recent files（最近文件）界面偏好
+- ProjectStore UI helper（项目存储界面辅助逻辑）
+
+这些不影响 Core（核心）的 filesystem port（文件系统端口）成立，也不应为了 M1.5（项目文件系统接口）无限扩大范围。
+
+### 云端验证
+
+- code/build SHA: `597b47b50ff50d1f1e9bf488350c9f00a95c80a5`
+- W0 Cloud Build（W0 云端构建） #704 / run ID `35831792955`: **PASS（通过）**
+- Internal Alpine Probe（内部 Alpine 探针） #120: **PASS（通过）**
+- `:core:test`: **PASS（通过）**
+- Android unit tests（安卓单元测试）: **PASS（通过）**
+- `assembleDebug`（安卓调试包构建）: **PASS（通过）**
+- versionCode: `230`
+- versionName: `0.8.0-alpha43-r48d11-m1.5`
+- APK SHA-256: `6318488cc7b8c355228e4eb5ceb30708252a7a60b4ac2d98fe41ee49d5c280cf`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- artifact（云端制品）: `siftalpha-w0-704`, ID `10737413684`
+
+### 当前状态
+
+**M1.5 Cloud PASS（云端通过），Real Device Acceptance（真机验收）待完成。**
+
+真机通过后关闭 M1.5（项目文件系统接口），进入 M1.6 — Process Control Interface（进程控制接口）。
