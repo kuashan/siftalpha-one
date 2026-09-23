@@ -580,3 +580,29 @@ M1.2（环境计划）真机验收期间发现：
 - artifact（云端制品）: `siftalpha-w0-685`, ID `10731739860`
 
 当前状态：**Cloud PASS（云端通过） / Real Device Pending（真机待确认）**。
+
+## 2026-09-23 · M1.2 Real Device Acceptance（真机验收）完成
+
+用户已完成 v227 / `0.8.0-alpha43-r48d11-m1.2-r1` Android（安卓）真实设备验收。
+
+已确认：
+
+- M1.2 Environment Plan（环境计划）抽取后的 Android（安卓）现有行为正常。
+- Internal Runtime（内部运行时）测试通过。
+- External Runtime（外部运行时）测试通过。
+- App（应用）后台 → 前台恢复修复通过。
+- 健康运行项目不再永久停留在 RECOVERING（恢复中）。
+- STOP / RUN（停止 / 运行）生命周期正常。
+- 当前实测范围内未发现相对 Android Baseline（安卓基线）的新增回归。
+
+结论：
+
+**M1.2 Environment Plan（环境计划）= Cloud PASS + Real Device PASS（云端通过 + 真机通过）。**
+
+M1.2（环境计划）正式关闭。
+
+下一步：
+
+**M1.3 — Project Operation（项目操作）**
+
+目标是把 Prepare / Run / Status / Logs / Stop（准备 / 运行 / 状态 / 日志 / 停止）的通用操作语义、项目归属和动作门禁进一步从 Android（安卓）具体执行机制中分离出来。
