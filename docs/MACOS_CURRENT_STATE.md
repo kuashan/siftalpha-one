@@ -5,7 +5,7 @@
 
 ## 1. 当前阶段
 
-状态：**M1 — Core Boundary（核心边界）进行中；M1.1、M1.2 已通过，M1.3 — Project Operation（项目操作）正在实现与回归验证。**
+状态：**M1 — Core Boundary（核心边界）进行中；M1.1、M1.2 已通过，M1.3 — Project Operation（项目操作）= Cloud PASS（云端通过），Real Device Acceptance（真机验收）待完成。**
 
 当前工作分支：
 - `feature/cross-platform-core`
