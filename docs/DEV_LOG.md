@@ -3544,3 +3544,24 @@ Every future platform-driven Core（核心） change must pass Core tests（核�
 - Artifact（云端制品）: `siftalpha-w0-672`, ID `10728382546`, digest `sha256:f2f17de58084019b63c4fb6a7bd6c3a7ffd31ad8b3bf99da14a59f6d297f0a14`.
 
 Result: the platform Capability（能力） isolation rule is now documented, represented in Core（核心） code, covered by tests, and verified against the existing Android（安卓） build.
+
+## 2026-09-23 · Cross-Platform M1 Core Boundary Closed（跨平台 M1 核心边界关闭）
+
+M1.1～M1.6 已完成共享 Core（核心）抽取与 Android（安卓）回归；M1.7（核心边界总审计）确认全部退出条件满足。
+
+最终结果：
+
+- Runtime Lifecycle（运行生命周期）：PASS
+- Environment Needs / Plan（环境需求 / 环境计划）：PASS
+- Project Operation（项目操作）：PASS
+- Platform State Storage（平台状态存储）：PASS
+- Project Filesystem（项目文件系统）：PASS
+- Project Process Control（项目进程控制）：PASS
+- `:core` platform API isolation（平台 API 隔离）：PASS
+- Android automated regression（安卓自动回归）：PASS
+- Android real-device regression（安卓真机回归）：PASS
+- Capability Isolation（能力隔离）：PASS
+
+最新 M1 Android（安卓）回归版本为 v231 / `0.8.0-alpha43-r48d11-m1.6`；W0 #708 与 Internal Alpine Probe（内部 Alpine 探针）#121 均 PASS（通过），用户真机验收 PASS（通过）。
+
+**M1 — Core Boundary（核心边界）正式关闭。下一阶段：M2 — macOS Host Skeleton（macOS 主机应用骨架）。**
