@@ -12,6 +12,7 @@ on:
       - codex/siftalpha-x-embedded-cpython-spike
       - codex/siftalpha-no-worker-alpha43
       - codex/r48-shared-core-realignment
+      - feature/cross-platform-core
   workflow_dispatch:
 
 permissions:
@@ -139,7 +140,7 @@ jobs:
       - name: Run unit tests and assemble debug APK
         run: |
           set -o pipefail
-          gradle --no-daemon --stacktrace --console=plain testDebugUnitTest assembleDebug | tee w0-evidence/gradle-build.txt
+          gradle --no-daemon --stacktrace --console=plain :core:test testDebugUnitTest assembleDebug | tee w0-evidence/gradle-build.txt
 
       - name: Collect APK evidence
         run: |
