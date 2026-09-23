@@ -114,3 +114,13 @@ Core（核心）回答“项目需要什么”，例如 Python / Node.js / Vite 
 Platform Adapter（平台适配层）回答“当前平台怎样满足”，例如 Android Embedded R（安卓内部运行时）、macOS Host Runtime（苹果主机运行时）、Windows WSL2（Windows Linux 子系统）或 Container Provider（容器提供者）。
 
 Platform-specific backend selection（平台专属后端选择）不得进入 Core（核心）成为所有平台的强制实现。
+
+## Platform state storage boundary（平台状态存储边界）
+
+M1.4（平台存储接口）建立 `PlatformStateStorage` 作为跨平台应用私有状态持久化端口。
+
+Core（核心）只定义状态值与读写/删除契约，不依赖 Android SharedPreferences（安卓偏好存储）或任何桌面平台持久化 API（接口）。
+
+Android（安卓）当前通过 `AndroidSharedPreferencesStateStorage` 实现该端口；macOS（苹果）与 Windows（微软）后续各自提供平台实现。
+
+Runtime Lifecycle / Runtime Operation（运行生命周期 / 运行操作）已通过该端口持久化。Android SAF（安卓存储访问框架）项目文件访问不属于本端口，由 M1.5（项目文件系统接口）处理。
