@@ -2,15 +2,24 @@ package com.siftalpha.studio.runtime
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.siftalpha.core.storage.PlatformStateStorage
+import com.siftalpha.core.storage.StateStorageMutation
+import com.siftalpha.core.storage.StoredStateValue
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.Locale
 
 class RuntimeLifecycleStore internal constructor(
-    private val prefs: SharedPreferences,
+    private val storage: PlatformStateStorage,
 ) {
+    internal constructor(prefs: SharedPreferences) : this(
+        AndroidSharedPreferencesStateStorage(prefs),
+    )
+
     constructor(context: Context) : this(
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        AndroidSharedPreferencesStateStorage(
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        ),
     )
 
     data class Snapshot(
@@ -57,30 +66,47 @@ class RuntimeLifecycleStore internal constructor(
             ProjectRuntimeSelection.EMBEDDED_R ->
                 FIELD_EMBEDDED_ENV_PRESENT to FIELD_EMBEDDED_ENV_VALUE
         }
-        val editor = prefs.edit().putString(key(projectKey, FIELD_STATE), runtimeState.name)
+        val writes = linkedMapOf<String, StoredStateValue>(
+            key(projectKey, FIELD_STATE) to StoredStateValue.Text(runtimeState.name),
+        )
+        val removals = linkedSetOf<String>()
+
         if (environmentReady == null) {
-            editor.remove(key(projectKey, presentField)).remove(key(projectKey, valueField))
+            removals += key(projectKey, presentField)
+            removals += key(projectKey, valueField)
         } else {
-            editor.putBoolean(key(projectKey, presentField), true)
-                .putBoolean(key(projectKey, valueField), environmentReady)
+            writes[key(projectKey, presentField)] = StoredStateValue.Bool(true)
+            writes[key(projectKey, valueField)] = StoredStateValue.Bool(environmentReady)
         }
+
         if (failureReason.isNullOrBlank()) {
-            editor.remove(key(projectKey, FIELD_FAILURE))
+            removals += key(projectKey, FIELD_FAILURE)
         } else {
-            editor.putString(key(projectKey, FIELD_FAILURE), failureReason.trim().take(MAX_FAILURE_LENGTH))
+            writes[key(projectKey, FIELD_FAILURE)] =
+                StoredStateValue.Text(failureReason.trim().take(MAX_FAILURE_LENGTH))
         }
-        editor.apply()
+
+        storage.mutate(
+            StateStorageMutation(
+                writes = writes,
+                removals = removals,
+            ),
+        )
     }
 
     fun clear(projectKey: String) {
-        prefs.edit()
-            .remove(key(projectKey, FIELD_STATE))
-            .remove(key(projectKey, FIELD_ENV_PRESENT))
-            .remove(key(projectKey, FIELD_ENV_VALUE))
-            .remove(key(projectKey, FIELD_EMBEDDED_ENV_PRESENT))
-            .remove(key(projectKey, FIELD_EMBEDDED_ENV_VALUE))
-            .remove(key(projectKey, FIELD_FAILURE))
-            .apply()
+        storage.mutate(
+            StateStorageMutation(
+                removals = setOf(
+                    key(projectKey, FIELD_STATE),
+                    key(projectKey, FIELD_ENV_PRESENT),
+                    key(projectKey, FIELD_ENV_VALUE),
+                    key(projectKey, FIELD_EMBEDDED_ENV_PRESENT),
+                    key(projectKey, FIELD_EMBEDDED_ENV_VALUE),
+                    key(projectKey, FIELD_FAILURE),
+                ),
+            ),
+        )
     }
 
     private fun readEnvironment(
@@ -127,24 +153,36 @@ class RuntimeLifecycleStore internal constructor(
 
     private fun readFailureReason(projectKey: String): String? {
         val current = rawValue(key(projectKey, FIELD_FAILURE))
-        if (current is String) return current
-        val old = rawValue(legacyKey(projectKey, FIELD_FAILURE)) as? String ?: return null
+        if (current is StoredStateValue.Text) return current.value
+        val old = rawValue(legacyKey(projectKey, FIELD_FAILURE)) as? StoredStateValue.Text
+            ?: return null
         if (old.toBooleanOrNull() != null || runtimeStateFrom(old) != null) return null
-        return old
+        return old.value
     }
 
-    private fun runtimeStateFrom(value: Any?): RuntimeState? =
-        (value as? String)?.let { runCatching { RuntimeState.valueOf(it) }.getOrNull() }
+    private fun runtimeStateFrom(value: StoredStateValue?): RuntimeState? =
+        (value as? StoredStateValue.Text)?.value
+            ?.let { runCatching { RuntimeState.valueOf(it) }.getOrNull() }
 
-    private fun migrateBoolean(key: String, raw: Any?, value: Boolean) {
-        if (raw is String) runCatching { prefs.edit().putBoolean(key, value).apply() }
+    private fun migrateBoolean(key: String, raw: StoredStateValue?, value: Boolean) {
+        if (raw is StoredStateValue.Text) {
+            runCatching {
+                storage.mutate(
+                    StateStorageMutation(
+                        writes = mapOf(key to StoredStateValue.Bool(value)),
+                    ),
+                )
+            }
+        }
     }
 
-    private fun rawValue(key: String): Any? = runCatching { prefs.all[key] }.getOrNull()
+    private fun rawValue(key: String): StoredStateValue? = runCatching {
+        storage.read(key)
+    }.getOrNull()
 
-    private fun Any?.toBooleanOrNull(): Boolean? = when (this) {
-        is Boolean -> this
-        is String -> when (trim().lowercase(Locale.ROOT)) {
+    private fun StoredStateValue?.toBooleanOrNull(): Boolean? = when (this) {
+        is StoredStateValue.Bool -> value
+        is StoredStateValue.Text -> when (value.trim().lowercase(Locale.ROOT)) {
             "true" -> true
             "false" -> false
             else -> null
@@ -157,7 +195,7 @@ class RuntimeLifecycleStore internal constructor(
 
     @Suppress("UNUSED_PARAMETER")
     private fun legacyKey(projectKey: String, suffix: String): String =
-        "project:${'$'}{digest(projectKey)}:${'$'}suffix"
+        "project:${digest(projectKey)}:$suffix"
 
     private fun digest(value: String): String {
         val bytes = MessageDigest.getInstance("SHA-256")
