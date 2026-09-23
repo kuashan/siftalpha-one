@@ -277,3 +277,20 @@ Cloud Verification（云端验证）：
 - APK SHA-256: `7b3aa037642e5818a027a636dce363fd22d694c60f451e348296371f1fc94994`
 
 当前结论：**Cloud PASS（云端通过） / Real Device Pending（真机待确认）**。
+
+### M1.3 Real Device Acceptance（真机验收）
+
+- Single-project operation flow（单项目操作链）: PASS（通过）
+- RUNNING → STOP（运行中 → 停止）: PASS（通过）
+- Same-project conflict protection（同项目冲突保护）: PASS（通过）
+- Project-scoped STOP isolation（项目级停止隔离）: PASS（通过）
+- Background → Foreground recovery regression（后台 → 前台恢复回归）: PASS（通过）
+- User-observed regression（用户实测新增回归）: 未发现
+
+最终结论：
+
+**M1.3 Project Operation（项目操作）= PASS（通过，云端 + 真机）。**
+
+下一项：
+
+**M1.4 — Platform Storage Interface（平台存储接口）**
