@@ -135,3 +135,16 @@
 - 普通用户无需开发工具即可启动 SiftAlpha（筛选阿尔法）。
 
 当前状态：**NOT STARTED（未开始）**
+
+## macOS Distribution Gate（macOS 分发门槛）
+
+M8（正式分发）最终验收必须同时覆盖：
+
+- Developer ID Application（开发者身份应用证书）签名验证。
+- Hardened Runtime（强化运行时）启用并兼容 SiftAlpha（筛选阿尔法）的 Host Runtime Provider（主机运行提供者）。
+- Apple Notarization（苹果公证）成功。
+- Gatekeeper（macOS 安全验证）在普通用户默认安全设置下接受应用。
+- DMG / PKG（磁盘映像 / 安装包）下载后可正常安装。
+- 用户不需要 Apple Developer Program（苹果开发者计划）账号即可安装和运行。
+- 不依赖“右键打开”“关闭 Gatekeeper（安全验证）”等绕过方式作为正式安装流程。
+- 若使用 Mac App Store（Mac 应用商店）分发，则作为另一条分发渠道单独验收，不替代 Developer ID（开发者身份）直接分发测试。
