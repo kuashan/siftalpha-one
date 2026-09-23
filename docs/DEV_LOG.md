@@ -3468,3 +3468,28 @@ Baseline rule（基线规则）:
 - `baseline/r48d10` is frozen and must not be moved, rebased, merged into, or force-updated.
 - Future development must branch from this baseline or a later explicitly accepted baseline.
 - If a later change regresses Runtime（运行时）, Environment（环境）, lifecycle（生命周期）, external provider（外部运行环境）, Normal Mode（普通模式）, or Developer Mode（开发者模式）, compare first against this frozen commit.
+
+## 2026-09-23 · R48-D11 Core Extraction Slice 1
+
+### Goal
+Begin Cross-Platform Core（跨平台核心） extraction from the real-device-accepted r48d10 Android（安卓） line without changing Runtime（运行时） behavior.
+
+### Branch
+- `feature/cross-platform-core`
+- parent: `3a55a2965bb3c1f93ff097bc98c91e6d22e030af`
+- frozen Android baseline remains `baseline/r48d10`
+
+### Implementation
+- Added a new Kotlin/JVM（Kotlin/JVM 平台） module: `:core`.
+- Moved `RuntimeKind`, `RuntimeCandidate`, and `ProjectRuntimeProfile` from the Android app module into `:core`.
+- Android `:app` now consumes `:core` as a project dependency.
+- Added platform-independent unit coverage for Runtime alias mapping and polyglot threshold behavior.
+- Added `docs/CROSS_PLATFORM_CORE.md` as the cross-platform ownership contract.
+- No Android UI, Runtime execution, provider routing, Internal Alpine, Embedded CPython, Termux, Web Discovery, Shared External Action Gate, or STOP semantics were intentionally changed.
+
+### Version
+- versionCode = 223
+- versionName = `0.8.0-alpha43-r48d11-core1`
+
+### Verification
+Cloud verification pending at the time of this entry.
