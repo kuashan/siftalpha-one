@@ -5,7 +5,7 @@
 
 ## 1. 当前阶段
 
-状态：**M1 — Core Boundary（核心边界）进行中；M1.1、M1.2、M1.3、M1.4 已通过，M1.5 — Project Filesystem Interface（项目文件系统接口）= Cloud PASS（云端通过），Real Device Acceptance（真机验收）待完成。**
+状态：**M1 — Core Boundary（核心边界）进行中；M1.1、M1.2、M1.3、M1.4、M1.5 已通过，当前进入 M1.6 — Process Control Interface（进程控制接口）。**
 
 当前工作分支：
 - `feature/cross-platform-core`
