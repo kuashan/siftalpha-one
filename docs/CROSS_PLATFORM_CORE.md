@@ -75,6 +75,16 @@ This slice deliberately does not change:
 5. Add Windows（微软桌面系统） Host Provider（主机提供者）, including WSL2（Windows Linux 子系统） integration where appropriate.
 6. Never fork the business core into independent macOS / Windows copies.
 
+## Capability isolation rule（能力隔离规则）
+
+Platform-driven work must follow `docs/PLATFORM_CAPABILITY_CONTRACT.md`.
+
+Core（核心） is not a container for every feature discovered on macOS（苹果桌面系统） or Windows（微软桌面系统）. A platform-specific requirement must remain in its platform adapter unless it is a genuine shared rule or a provider-neutral capability contract.
+
+Core（核心） may ask whether a capability exists; it must not assume all platforms implement it. AVAILABLE（可用）, UNAVAILABLE（不可用） and UNKNOWN（未知） are all valid capability states.
+
+This rule is specifically intended to prevent future macOS（苹果） or Windows（微软） development from breaking Android（安卓） by turning platform-only behavior into a mandatory shared-core requirement.
+
 ## Verification rule（验证规则）
 
 Every extraction slice must keep the Android（安卓） baseline buildable and must run:
