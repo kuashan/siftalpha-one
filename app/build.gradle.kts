@@ -156,8 +156,10 @@ android {
         // cannot leave the shared operation stuck in PREPARING for minutes.
         // r48d11-core1 begins platform-independent Core（核心） extraction without changing
         // Android Runtime（安卓运行时） behavior. RuntimeKind is now compiled from :core.
-        versionCode = 223
-        versionName = "0.8.0-alpha43-r48d11-core1"
+        // r48d11-core2 freezes the cross-platform Capability（能力） isolation contract.
+        // Core may define optional capabilities but no platform is forced to implement all of them.
+        versionCode = 224
+        versionName = "0.8.0-alpha43-r48d11-core2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
