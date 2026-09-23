@@ -191,11 +191,12 @@ class ProjectOperationCoordinator internal constructor(
                 }
             }
             if (persisted != null && !persisted.terminal) {
-                if (action != RuntimeOperationAction.STOP || persisted.action == RuntimeOperationAction.STOP) {
+                if (!RuntimeOperationContract.canBegin(persisted, projectId, action)) {
                     return@synchronized null
                 }
-                // STOP has priority. The provider command itself remains project-scoped; only
-                // the stale control record is superseded here.
+                // Core（核心） arbitration has accepted only the same-project STOP supersession.
+                // The provider command remains project-scoped; only the stale control record is
+                // superseded here.
                 removeOperationBindings(persisted, fenceResult = true)
                 operationStore.clear(projectId)
             } else if (persisted != null) {
@@ -212,7 +213,7 @@ class ProjectOperationCoordinator internal constructor(
                 }
             }
             if (local != null && !local.terminal) {
-                if (action != RuntimeOperationAction.STOP || local.action == RuntimeOperationAction.STOP) {
+                if (!RuntimeOperationContract.canBegin(local, projectId, action)) {
                     return@synchronized null
                 }
                 removeOperationBindings(local, fenceResult = true)
