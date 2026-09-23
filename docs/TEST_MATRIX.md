@@ -1900,3 +1900,21 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 - Internal Alpine Probe（内部 Alpine 探针） #114: PASS（通过）
 - W0 Cloud Build（W0 云端构建） #672: PASS（通过）
 - APK SHA-256: `85063b15f9dd02c4c1cb6ec33fd4dbddba3886b40a7ea4c379ca5f591d3adbaa`
+
+## Cross-Platform M1 Final Acceptance（跨平台 M1 最终验收）
+
+| Area（领域） | Final Result（最终结果） |
+| --- | --- |
+| Runtime Lifecycle（运行生命周期） | PASS（通过） |
+| Environment Needs / Plan（环境需求 / 环境计划） | PASS（通过） |
+| Project Operation（项目操作） | PASS（通过） |
+| Platform State Storage（平台状态存储） | PASS（通过） |
+| Project Filesystem（项目文件系统） | PASS（通过） |
+| Project Process Control（项目进程控制） | PASS（通过） |
+| Core platform API audit（核心平台 API 审计） | PASS（通过） |
+| Android cloud regression（安卓云端回归） | PASS（通过） |
+| Android real-device regression（安卓真机回归） | PASS（通过） |
+| Capability Isolation（能力隔离） | PASS（通过） |
+| M1 final status（M1 最终状态） | **PASS / CLOSED（通过 / 关闭）** |
+
+Next stage（下一阶段）: **M2 — macOS Host Skeleton（macOS 主机应用骨架）**。
