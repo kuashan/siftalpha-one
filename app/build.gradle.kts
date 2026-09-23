@@ -170,8 +170,10 @@ android {
         // shared lifecycle/operation persistence through the Android adapter.
         // r48d11-m1.5 introduces the cross-platform project-filesystem port and
         // routes Android SAF project tree and file CRUD through the adapter.
-        versionCode = 230
-        versionName = "0.8.0-alpha43-r48d11-m1.5"
+        // r48d11-m1.6 introduces the cross-platform project process-control
+        // contract while preserving Android's accepted PID/PGID and Embedded R mechanisms.
+        versionCode = 231
+        versionName = "0.8.0-alpha43-r48d11-m1.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
