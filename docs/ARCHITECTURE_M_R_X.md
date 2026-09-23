@@ -467,3 +467,18 @@ alpha43 的真实 Android 真机验收确认了当前 M-facing Trigger → Lifec
 这些验收结果不改变 canonical architecture：M 管，R 跑，X = M + R。它们也不代表 Embedded R、完整 R、完整 X 或 production-grade M ↔ R 已完成。Production external runtime 仍主要依赖 Termux + PRoot + Ubuntu + Python；Embedded CPython 仍是 R 的一个实现方向。
 
 alpha43 real-device acceptance = PASS；下一项正式研究为 R Environment & Dependency Model Architecture Audit。
+
+## 9. Cross-Platform Capability Isolation（跨平台能力隔离）
+
+SiftAlpha Core（跨平台核心） must not require Android（安卓）, macOS（苹果桌面系统） and Windows（微软桌面系统） to implement identical platform mechanisms.
+
+The invariant is:
+
+- Core（核心） owns platform-independent rules and capability contracts.
+- Platform Adapter（平台适配层） owns platform-specific implementation.
+- A capability may be AVAILABLE（可用）, UNAVAILABLE（不可用） or UNKNOWN（未知） on a platform.
+- A platform-only feature must not enter Core（核心） merely because one platform needs it.
+- Core（核心） must not branch on Android/macOS/Windows identity for platform mechanisms.
+- Platform-driven Core changes must pass `docs/PLATFORM_CAPABILITY_CONTRACT.md` classification and regression gates.
+
+This rule prevents macOS（苹果） or Windows（微软） evolution from turning optional platform features into mandatory Android（安卓） requirements, and vice versa.
