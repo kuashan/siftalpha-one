@@ -798,3 +798,29 @@ Core（核心）不得直接引用：
 **M1.4 Cloud PASS（云端通过），Real Device Acceptance（真机验收）待完成。**
 
 真机通过后关闭 M1.4（平台存储接口），进入 M1.5 — Project Filesystem Interface（项目文件系统接口）。
+
+## 2026-09-23 · M1.4 Real Device Acceptance（真机验收）完成
+
+用户已完成 v229 / `0.8.0-alpha43-r48d11-m1.4` Android（安卓）真实设备验收。
+
+已确认：
+
+- 覆盖安装后既有项目与关键状态保持正常：PASS（通过）
+- 既有 Environment Readiness（环境就绪状态）未异常丢失：PASS（通过）
+- Internal / External（内部 / 外部）环境状态保持独立：PASS（通过）
+- Run → Status / Logs → Stop → Run（运行 → 状态 / 日志 → 停止 → 再次运行）连续正常：PASS（通过）
+- App（应用）关闭 / 重新打开后的状态读取正常：PASS（通过）
+- background → foreground（后台 → 前台）RECOVERING（恢复中）回归未复发：PASS（通过）
+- 当前实测范围内未发现相对 Android Baseline（安卓基线）的新增回归。
+
+结论：
+
+**M1.4 Platform Storage Interface（平台存储接口）= Cloud PASS + Real Device PASS（云端通过 + 真机通过）。**
+
+M1.4（平台存储接口）正式关闭。
+
+下一步：
+
+**M1.5 — Project Filesystem Interface（项目文件系统接口）**
+
+目标是把“Core（核心）需要对项目文件做什么”与“Android SAF（安卓存储访问框架）/ macOS POSIX（苹果 POSIX 文件系统）/ Windows Filesystem（Windows 文件系统）具体怎样访问文件”分离。
