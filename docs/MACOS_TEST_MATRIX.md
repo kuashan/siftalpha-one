@@ -369,3 +369,22 @@ Cloud Verification（云端验证）：
 下一项：
 
 **M1.6 — Process Control Interface（进程控制接口）**
+
+### M1.6 Real Device Acceptance（真机验收）
+
+- Concurrent project A / B execution（项目 A / B 同时运行）: PASS（通过）
+- Stop A while B continues（停止 A、B 继续运行）: PASS（通过）
+- Project-scoped STOP isolation（项目级停止隔离）: PASS（通过）
+- Project A re-run after STOP（A 停止后再次运行）: PASS（通过）
+- Internal Runtime STOP → Run（内部运行时停止 → 再次运行）: PASS（通过）
+- External Runtime STOP → Run（外部运行时停止 → 再次运行）: PASS（通过）
+- Background → Foreground recovery regression（后台 → 前台恢复回归）: PASS（通过）
+- User-observed regression（用户实测新增回归）: 未发现
+
+最终结论：
+
+**M1.6 Process Control Interface（进程控制接口）= PASS（通过，云端 + 真机）。**
+
+下一项：
+
+**M1.7 — Core Boundary Audit（核心边界总审计）**
