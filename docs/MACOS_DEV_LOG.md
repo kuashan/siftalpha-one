@@ -934,3 +934,32 @@ Core（核心）不理解 Uri / ContentResolver / DocumentsContract（URI / 内�
 **M1.5 Cloud PASS（云端通过），Real Device Acceptance（真机验收）待完成。**
 
 真机通过后关闭 M1.5（项目文件系统接口），进入 M1.6 — Process Control Interface（进程控制接口）。
+
+## 2026-09-23 · M1.5 Real Device Acceptance（真机验收）完成
+
+用户已完成 v230 / `0.8.0-alpha43-r48d11-m1.5` Android（安卓）真实设备验收。
+
+已确认：
+
+- 覆盖安装后既有项目仍可正常访问：PASS（通过）
+- Project file tree（项目文件树）与目录层级：PASS（通过）
+- Existing text file read/write（已有文本文件读写）：PASS（通过）
+- Create file / directory（创建文件 / 文件夹）：PASS（通过）
+- Rename / delete（重命名 / 删除）：PASS（通过）
+- Internal Runtime staging（内部运行时暂存）后的 Prepare / Run（准备 / 运行）：PASS（通过）
+- External Runtime（外部运行时）既有项目运行：PASS（通过）
+- Stop → Run（停止 → 再次运行）：PASS（通过）
+- Background → Foreground（后台 → 前台）回归：PASS（通过）
+- 当前实测范围内未发现相对 Android Baseline（安卓基线）的新增回归。
+
+结论：
+
+**M1.5 Project Filesystem Interface（项目文件系统接口）= Cloud PASS + Real Device PASS（云端通过 + 真机通过）。**
+
+M1.5（项目文件系统接口）正式关闭。
+
+下一步：
+
+**M1.6 — Process Control Interface（进程控制接口）**
+
+目标是把“Core（核心）需要怎样表达进程启动、状态、日志与项目级停止”与“Android / macOS / Windows（安卓 / 苹果 / 微软）各自怎样控制真实进程树”分离。
