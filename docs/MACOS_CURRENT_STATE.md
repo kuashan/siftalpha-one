@@ -5,14 +5,14 @@
 
 ## 1. 当前阶段
 
-状态：**M1 — Core Boundary（核心边界）进行中；M1.1、M1.2 已通过，当前进入 M1.3 — Project Operation（项目操作）。**
+状态：**M1 — Core Boundary（核心边界）进行中；M1.1、M1.2 已通过，M1.3 — Project Operation（项目操作）正在实现与回归验证。**
 
 当前工作分支：
 - `feature/cross-platform-core`
 
 当前跨平台 Core（核心）版本：
-- `0.8.0-alpha43-r48d11-m1.2`
-- Android（安卓） versionCode = `226`
+- `0.8.0-alpha43-r48d11-m1.3`
+- Android（安卓） versionCode = `228`
 
 当前 Core（核心）能力隔离规则：
 - `docs/PLATFORM_CAPABILITY_CONTRACT.md`
