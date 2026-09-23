@@ -1879,3 +1879,15 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 - Stable signing（稳定签名）: PASS（通过）
 - APK SHA-256: `9c072da6d5028709fbedbecab8336101b014895d71720e900715beba7fe1fb2a`
 - Real-device acceptance（真机验收）: not required to claim behavior changes because this slice intentionally changes module ownership only; installable APK is available if regression confirmation is desired.
+
+## R48-D11 Core Capability Isolation
+
+| Check | Expected |
+|---|---|
+| Missing capability | UNKNOWN（未知）, never implicitly AVAILABLE（可用） |
+| Explicit unsupported capability | UNAVAILABLE（不可用） is valid and non-throwing |
+| Independent capabilities | One AVAILABLE（可用） capability does not force another capability to exist |
+| Platform-only feature | Remains outside Core（核心） |
+| Core tests（核心测试） | PASS required |
+| Android regression tests（安卓回归测试） | PASS required |
+| Android APK build（安卓安装包构建） | PASS required |
