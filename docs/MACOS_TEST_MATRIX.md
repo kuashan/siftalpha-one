@@ -218,3 +218,15 @@ Cloud Verification（云端验证）：
 4. Current State（当前状态）立即切换到下一一级阶段。
 
 这条规则优先于“继续完善”“顺便重构”“还能再优化”等开放式理由。
+
+### Android Foreground Recovery Regression（安卓前台恢复回归）
+
+M1.2（环境计划）真机验收新增阻塞项：
+
+- Normal background -> foreground（普通后台 → 前台）不得进入永久 RECOVERING（恢复中）。
+- 健康 RUNNING（运行中）项目返回前台后应保持可观察、可打开、可停止。
+- Runtime logs（运行日志）与 Web/result presentation（网页 / 结果呈现）不得因 UI recovery gate（界面恢复门禁）失效。
+- Activity recreation（页面重建）仍必须允许一次 persisted recovery（持久化恢复）。
+- STOP（停止）后重新 Run（运行）保持正常。
+
+当前状态：**Cloud Verification Pending（云端验证中） / Real Device Pending（真机待确认）**。
