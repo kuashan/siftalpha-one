@@ -154,8 +154,10 @@ android {
         // v221 moves External Python PREPARE's success boundary ahead of potentially slow rollback-
         // backup deletion and caps opportunistic backup cleanup so a committed READY environment
         // cannot leave the shared operation stuck in PREPARING for minutes.
-        versionCode = 222
-        versionName = "0.8.0-alpha43-r48d10"
+        // r48d11-core1 begins platform-independent Core（核心） extraction without changing
+        // Android Runtime（安卓运行时） behavior. RuntimeKind is now compiled from :core.
+        versionCode = 223
+        versionName = "0.8.0-alpha43-r48d11-core1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -226,6 +228,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":core"))
+
     val composeBom = platform("androidx.compose:compose-bom:2026.03.01")
     implementation(composeBom)
     implementation("androidx.activity:activity-compose:1.13.0")
