@@ -283,3 +283,101 @@ Runtime Lifecycle（运行生命周期）的第一层生产逻辑已经进入 Si
 **M1.1 Runtime Lifecycle（运行生命周期）Real Device Acceptance（真机验收）= PASS（通过）。**
 
 因此 M1.1（第一小阶段）正式关闭，后续开发进入 M1.2 — Environment Plan（环境计划）。
+
+## 2026-09-23 · M1.2 — Environment Plan（环境计划）Core Extraction（核心抽取）
+
+### 目标
+
+把“项目需要什么环境”与“某个平台如何满足这些环境需求”分离。
+
+### 审查结论
+
+原有 `ProjectEnvironmentPlan.kt` 同时包含：
+
+1. Project Needs（项目需求）
+   - primary runtime（主运行时）
+   - supplemental runtime（补充运行时）
+   - dependency count（依赖数量）
+   - Python version requirement（Python 版本要求）
+   - optional dependency groups（可选依赖组）
+   - Vite components（Vite 组件）
+   - preparation sequence（准备顺序）
+
+2. Android（安卓）当前 provider/backend（提供者 / 后端）决策
+   - Embedded CPython（内嵌 CPython）
+   - Internal Alpine（内部 Alpine）
+   - External Provider / Termux（外部运行提供者 / Termux）
+
+3. Android（安卓）当前兼容性实现
+   - Embedded CPython compatibility（内嵌 CPython 兼容性）
+   - Internal Alpine fallback（内部 Alpine 回退）
+   - 当前外部 Provider（提供者）可用性
+
+M1.2（环境计划）明确：第 1 类进入 Core（核心）；第 2、3 类不能因为 macOS（苹果）开发而被强行写进 Core（核心）。
+
+### 实现
+
+新增：
+
+- `core/src/main/kotlin/com/siftalpha/core/environment/ProjectEnvironmentNeeds.kt`
+- `core/src/test/kotlin/com/siftalpha/core/environment/ProjectEnvironmentNeedsTest.kt`
+
+Core（核心）新增通用模型：
+
+- `ProjectEnvironmentNeeds`
+- `EnvironmentPreparationStep`
+- `ProjectEnvironmentNeedPolicy`
+
+Core（核心）现在能够表达：
+
+- 项目是否需要 Python（Python 运行时）
+- 项目是否需要 Node.js（Node 运行时）
+- 是否需要 Node install / build（Node 安装 / 构建）
+- 是否需要 Python install（Python 依赖安装）
+- Python 版本要求
+- Python optional groups（Python 可选依赖组）
+- 直接依赖数量
+- 是否存在阻塞性检测问题
+- provider-neutral preparation steps（提供者中立的准备步骤）
+
+Core（核心）**不知道也不选择**：
+
+- Embedded CPython（内嵌 CPython）
+- Internal Alpine（内部 Alpine）
+- Termux（外部终端）
+- macOS Host Runtime（苹果主机运行时）
+- Windows WSL2（Windows Linux 子系统）
+- Docker（容器）具体实现
+
+Android（安卓）的 `ProjectEnvironmentPlanner` 继续选择当前 Android（安卓）后端，但通用的准备步骤与 Python install extras（Python 安装额外组）已经委托给 Core（核心）。
+
+### 行为保持
+
+现有 Android（安卓）以下行为未改变：
+
+- pure Python（纯 Python）仍可优先 Embedded CPython（内嵌 CPython）
+- Python + Vite（Python + Vite）仍先执行 Node install / build（Node 安装 / 构建），再执行 Python install（Python 安装）
+- Node.js（Node 运行时）项目的现有准备顺序不变
+- blocking detection issue（阻塞检测问题）仍只执行 VALIDATE_PLAN（验证计划）
+- Android backend selection（安卓后端选择）未迁入 Core（核心）
+- Environment Plan ID（环境计划标识）与现有 Android（安卓）行为保持由现有回归测试验证
+
+### 云端验证
+
+- code/build SHA: `565a002f50b8330e875c023fb81328264deccdf7`
+- W0 Cloud Build（W0 云端构建） #681 / run ID `35816048625`: **PASS（通过）**
+- Internal Alpine Probe（内部 Alpine 探针） #116: **PASS（通过）**
+- `:core:test`: **PASS（通过）**
+- Android unit tests（安卓单元测试）: **PASS（通过）**
+- `assembleDebug`（安卓调试包构建）: **PASS（通过）**
+- versionCode: `226`
+- versionName: `0.8.0-alpha43-r48d11-m1.2`
+- APK SHA-256: `049e74acd8a85420f373d32464a4473947c50e2bc0b32e19e649044ce8963fca`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- artifact（云端制品）: `siftalpha-w0-681`, ID `10731741579`
+
+### 当前状态
+
+**M1.2 Cloud PASS（云端通过），Real Device Acceptance（真机验收）待完成。**
+
+真机验收通过后才正式关闭 M1.2（环境计划）。
