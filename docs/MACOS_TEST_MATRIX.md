@@ -348,3 +348,24 @@ Cloud Verification（云端验证）：
 - APK SHA-256: `6318488cc7b8c355228e4eb5ceb30708252a7a60b4ac2d98fe41ee49d5c280cf`
 
 当前结论：**Cloud PASS（云端通过） / Real Device Pending（真机待确认）**。
+
+### M1.5 Real Device Acceptance（真机验收）
+
+- Overlay install project access（覆盖安装后项目访问）: PASS（通过）
+- Project file tree（项目文件树）: PASS（通过）
+- Text file read/write（文本文件读写）: PASS（通过）
+- Create file / directory（创建文件 / 文件夹）: PASS（通过）
+- Rename / delete（重命名 / 删除）: PASS（通过）
+- Internal Runtime staging + Prepare / Run（内部运行时暂存 + 准备 / 运行）: PASS（通过）
+- External Runtime project access（外部运行时项目访问）: PASS（通过）
+- Stop → Run continuity（停止 → 再次运行连续性）: PASS（通过）
+- Background → Foreground regression（后台 → 前台回归）: PASS（通过）
+- User-observed regression（用户实测新增回归）: 未发现
+
+最终结论：
+
+**M1.5 Project Filesystem Interface（项目文件系统接口）= PASS（通过，云端 + 真机）。**
+
+下一项：
+
+**M1.6 — Process Control Interface（进程控制接口）**
