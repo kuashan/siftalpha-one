@@ -5,7 +5,7 @@
 
 ## 1. 当前阶段
 
-状态：**M1 — Core Boundary（核心边界）进行中；M1.1 Runtime Lifecycle（运行生命周期）= PASS（通过），下一步 M1.2 Environment Plan（环境计划）。**
+状态：**M1 — Core Boundary（核心边界）进行中；M1.1 Runtime Lifecycle（运行生命周期）= Cloud PASS + Real Device PASS（云端通过 + 真机通过），当前进入 M1.2 Environment Plan（环境计划）。**
 
 当前工作分支：
 - `feature/cross-platform-core`
@@ -197,7 +197,7 @@ macOS（苹果桌面系统）开发采用“总路线提前规划、每个阶段
 **M1 — Core Boundary（核心边界）**
 
 已完成：
-- M1.1 Runtime Lifecycle（运行生命周期）= PASS（通过）
+- M1.1 Runtime Lifecycle（运行生命周期）= Cloud PASS + Real Device PASS（云端通过 + 真机通过）
 
 下一步：
 - M1.2 Environment Plan（环境计划）
