@@ -252,3 +252,17 @@ Platform Adapter（平台适配层）：当前平台如何满足
 - Windows（微软）未来可由 Host Python / WSL2 / Managed Runtime（主机 Python / Windows Linux 子系统 / 托管运行时）满足。
 
 Core（核心）不得因为某个平台的实现方式而要求其他平台实现同一个 backend（后端）。
+
+## 12. Stage Exit Rule（阶段退出规则）
+
+为防止开发无限细分，M0～M8（第 0～8 阶段）现在都有固定 Exit Criteria（退出条件），完整定义见 `MACOS_DEV_LOG.md` 与 `MACOS_TEST_MATRIX.md`。
+
+执行原则：
+
+- M1.1 / M1.2 等只属于 Implementation Slice（实现切片），不是无限扩展的新阶段。
+- 一级阶段的全部退出条件满足后必须结束该阶段并进入下一阶段。
+- 非阻塞优化进入 Backlog（待办）。
+- “还能继续优化”本身不能作为延迟进入下一阶段的理由。
+- 当前 M1（核心边界）只有在其明确退出条件尚未满足时才继续拆分。
+
+当前仍处于 M1（核心边界），M1.2（环境计划）Cloud PASS（云端通过），等待 Real Device Acceptance（真机验收）。
