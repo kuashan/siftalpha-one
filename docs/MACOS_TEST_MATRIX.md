@@ -294,3 +294,20 @@ Cloud Verification（云端验证）：
 下一项：
 
 **M1.4 — Platform Storage Interface（平台存储接口）**
+
+### M1.4 Platform Storage Interface（平台存储接口）
+
+Cloud Verification（云端验证）：
+
+- PlatformStateStorage（平台状态存储端口）: PASS（通过）
+- Typed primitive persistence contract（类型化基础值存储契约）: PASS（通过）
+- Android SharedPreferences Adapter（安卓偏好存储适配器）: PASS（通过）
+- RuntimeLifecycleStore（运行生命周期存储）接线: PASS（通过）
+- Legacy boolean migration（旧布尔字符串迁移）: PASS（通过）
+- RuntimeOperationStore（运行操作存储）接线: PASS（通过）
+- Operation generation preservation（操作代际保留）: PASS（通过）
+- W0 Cloud Build（W0 云端构建） #698: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #119: PASS（通过）
+- APK SHA-256: `af10db03615c8e0a209fb2b69ed8cb7b4d0638f93067a09c82a7423146be6d1b`
+
+当前结论：**Cloud PASS（云端通过） / Real Device Pending（真机待确认）**。
