@@ -709,3 +709,92 @@ M1.3（项目操作）正式关闭。
 **M1.4 — Platform Storage Interface（平台存储接口）**
 
 目标是把“Core（核心）需要保存什么状态”与“Android / macOS / Windows（安卓 / 苹果 / 微软）具体怎样持久化”分离，避免 SharedPreferences（安卓偏好存储）之类的平台 API（接口）继续渗入共享核心。
+
+## 2026-09-23 · M1.4 — Platform Storage Interface（平台存储接口）Core Extraction（核心抽取）
+
+### 目标
+
+把“Core（核心）需要持久化什么状态”与“Android / macOS / Windows（安卓 / 苹果 / 微软）具体使用什么存储 API（接口）”分离。
+
+本轮明确不处理 Project Filesystem（项目文件系统）；Android SAF（安卓存储访问框架）留给 M1.5（项目文件系统接口）。
+
+### 审查结论
+
+现有 Android（安卓）应用私有状态中，真正需要跨平台连续性的关键状态是：
+
+- Runtime Lifecycle（运行生命周期）
+- Runtime Operation（运行操作）与 generation（代际）
+
+而以下内容当前仍属于 Android（安卓）平台选择或平台偏好，不应为了抽 Core（核心）强行统一：
+
+- ProjectRuntimeSelection（项目运行时选择）中的 TERMUX / EMBEDDED_R（外部终端 / 内部运行时）
+- Android SAF（安卓存储访问框架）项目根目录与最近文件
+- Android UI（安卓界面）偏好
+- Android Web / Provider（安卓网页 / 运行提供者）缓存实现细节
+
+### 实现
+
+Core（核心）新增：
+
+- `core/src/main/kotlin/com/siftalpha/core/storage/PlatformStateStorage.kt`
+- `PlatformStateStorage`
+- `StoredStateValue`
+- `StateStorageMutation`
+- typed read helpers（类型化读取辅助函数）
+
+Android（安卓）新增：
+
+- `AndroidSharedPreferencesStateStorage`
+
+Android（安卓）的 SharedPreferences（偏好存储）现在作为 Platform Adapter（平台适配层）实现 Core（核心）的状态存储端口。
+
+已迁移到该端口：
+
+- `RuntimeLifecycleStore`
+- `RuntimeOperationStore`
+
+保留兼容：
+
+- 原有 SharedPreferences（偏好存储）文件名不变
+- 原有 key（键）结构不变
+- 旧 Boolean-as-String（布尔字符串）兼容迁移仍保留
+- Runtime Operation generation（运行操作代际）在 clear current operation（清除当前操作）后继续保留
+- 覆盖安装不要求迁移用户项目文件
+
+### M1.4 边界
+
+Core（核心）只允许表达：
+
+- read（读取）
+- write（写入）
+- remove（删除）
+- String / Boolean / Int / Long（字符串 / 布尔 / 整数 / 长整数）
+
+Core（核心）不得直接引用：
+
+- Android Context（安卓上下文）
+- SharedPreferences（安卓偏好存储）
+- macOS Foundation persistence API（苹果持久化接口）
+- Windows registry / app-data API（Windows 注册表 / 应用数据接口）
+
+各平台只需实现同一个 `PlatformStateStorage`。
+
+### 云端验证
+
+- code/build SHA: `858b080c9974a3d34bad18adb3b3221b8039c8a6`
+- W0 Cloud Build（W0 云端构建） #698 / run ID `35821619142`: **PASS（通过）**
+- Internal Alpine Probe（内部 Alpine 探针） #119: **PASS（通过）**
+- `:core:test`: **PASS（通过）**
+- Android unit tests（安卓单元测试）: **PASS（通过）**
+- `assembleDebug`（安卓调试包构建）: **PASS（通过）**
+- versionCode: `229`
+- versionName: `0.8.0-alpha43-r48d11-m1.4`
+- APK SHA-256: `af10db03615c8e0a209fb2b69ed8cb7b4d0638f93067a09c82a7423146be6d1b`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- artifact（云端制品）: `siftalpha-w0-698`, ID `10733962213`
+
+### 当前状态
+
+**M1.4 Cloud PASS（云端通过），Real Device Acceptance（真机验收）待完成。**
+
+真机通过后关闭 M1.4（平台存储接口），进入 M1.5 — Project Filesystem Interface（项目文件系统接口）。
