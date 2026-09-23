@@ -162,3 +162,15 @@ M8（正式分发）最终验收必须同时覆盖：
 - 用户不需要 Apple Developer Program（苹果开发者计划）账号即可安装和运行。
 - 不依赖“右键打开”“关闭 Gatekeeper（安全验证）”等绕过方式作为正式安装流程。
 - 若使用 Mac App Store（Mac 应用商店）分发，则作为另一条分发渠道单独验收，不替代 Developer ID（开发者身份）直接分发测试。
+
+### M1.1 Real Device Acceptance（真机验收）
+
+- Android（安卓）内部环境准备：PASS（通过）
+- Android（安卓）外部环境准备：PASS（通过）
+- Prepare lifecycle（准备生命周期）：PASS（通过）
+- Baseline behavior parity（与安卓基线行为一致）：PASS（通过）
+- User-observed regression（用户实测回归）：未发现
+
+最终结论：**M1.1 = PASS（通过，云端 + 真机）**
+
+下一阶段：**M1.2 — Environment Plan（环境计划）**
