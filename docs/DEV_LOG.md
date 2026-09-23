@@ -3529,3 +3529,18 @@ Freeze the rule that platform-specific requirements discovered during macOS（�
 
 ### Regression requirement
 Every future platform-driven Core（核心） change must pass Core tests（核心测试） and existing Android regression/build verification（安卓回归/构建验证） before acceptance.
+
+### R48-D11 Core Capability Isolation verification
+
+- Final source HEAD（最终源码）: `f1d29952f498d80aaff0bbed23968aaafe71ebd4`.
+- W0 Cloud Build（W0 云端构建） #672 / run ID `35808418525`: **PASS（通过）**.
+- `:core:test`: **PASS（通过）**.
+- Existing Android unit tests（安卓单元测试）: **PASS（通过）**.
+- `assembleDebug`（调试包构建）: **PASS（通过）**.
+- Internal Alpine Probe（内部 Alpine 探针） #114: **PASS（通过）**.
+- APK package/version: `com.siftalpha.studio` / `0.8.0-alpha43-r48d11-core2` / versionCode `224`.
+- APK SHA-256: `85063b15f9dd02c4c1cb6ec33fd4dbddba3886b40a7ea4c379ca5f591d3adbaa`.
+- Stable signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`.
+- Artifact（云端制品）: `siftalpha-w0-672`, ID `10728382546`, digest `sha256:f2f17de58084019b63c4fb6a7bd6c3a7ffd31ad8b3bf99da14a59f6d297f0a14`.
+
+Result: the platform Capability（能力） isolation rule is now documented, represented in Core（核心） code, covered by tests, and verified against the existing Android（安卓） build.
