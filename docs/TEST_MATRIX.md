@@ -1891,3 +1891,12 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Core tests（核心测试） | PASS required |
 | Android regression tests（安卓回归测试） | PASS required |
 | Android APK build（安卓安装包构建） | PASS required |
+
+### R48-D11 Core Capability Isolation verification result
+
+- Capability contract unit tests（能力契约单元测试）: PASS（通过）
+- Existing Android regression tests（安卓回归测试）: PASS（通过）
+- Android APK build（安卓安装包构建）: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #114: PASS（通过）
+- W0 Cloud Build（W0 云端构建） #672: PASS（通过）
+- APK SHA-256: `85063b15f9dd02c4c1cb6ec33fd4dbddba3886b40a7ea4c379ca5f591d3adbaa`
