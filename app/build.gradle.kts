@@ -158,8 +158,10 @@ android {
         // Android Runtime（安卓运行时） behavior. RuntimeKind is now compiled from :core.
         // r48d11-core2 freezes the cross-platform Capability（能力） isolation contract.
         // Core may define optional capabilities but no platform is forced to implement all of them.
-        versionCode = 224
-        versionName = "0.8.0-alpha43-r48d11-core2"
+        // r48d11-m1.1 moves Runtime lifecycle parsing/decision policy into :core while
+        // keeping Android UI/persistence compatibility facades unchanged.
+        versionCode = 225
+        versionName = "0.8.0-alpha43-r48d11-m1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
