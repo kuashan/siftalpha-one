@@ -191,3 +191,30 @@ Cloud Verification（云端验证）：
 - APK SHA-256: `049e74acd8a85420f373d32464a4473947c50e2bc0b32e19e649044ce8963fca`
 
 当前结论：**Cloud PASS（云端通过） / Real Device Pending（真机待确认）**
+
+## Stage Exit Summary（阶段退出汇总）
+
+> 本表是 M0～M8（第 0～8 阶段）的最终 Gate（门禁）。Implementation Slice（实现切片）数量不决定阶段是否结束；只看本表对应条件是否全部满足。
+
+| 阶段 | 最终通过条件 |
+|---|---|
+| M0 Governance（开发治理） | 治理文档、测试矩阵、能力隔离规则、固定工作流程全部建立 |
+| M1 Core Boundary（核心边界） | 生命周期、环境需求、项目操作的通用规则进入 Core（核心）；存储/文件/进程边界明确；Core（核心）无平台 API（接口）依赖；Android（安卓）回归通过；核心边界审计通过 |
+| M2 macOS Host Skeleton（苹果主机骨架） | 真正的 macOS App（苹果桌面应用）可构建、可启动、可加载 Core（核心）、可读取平台能力，且不依赖 Android Framework（安卓框架） |
+| M3 Host Runtime Provider（主机运行提供者） | 可发现本机运行时、启动进程、采集输出、查询状态、项目级停止，并验证两个并行项目互不影响 |
+| M4 Project Workflow（项目工作流） | 至少普通 Python（Python 运行时）项目完成导入→检测→计划→准备→运行→日志→停止/重启闭环；Web（网页）入口可验证；错误可诊断 |
+| M5 Product UI Parity（产品界面对齐） | Normal Mode（普通模式）与 Developer Mode（开发者模式）均可用，并共享同一 Core（核心）与 Runtime State（运行状态），无双状态机 |
+| M6 Container / Multi-service（容器 / 多服务） | 容器能力可检测；标准 Compose（多服务编排）项目完整运行；日志/端口/停止均项目级隔离；无项目专属补丁 |
+| M7 OpenBot Acceptance（OpenBot 验收） | 原始 OpenBot（开放机器人）无需源码适配即可检测、准备、启动、访问 Web（网页）、观察、停止并重新启动 |
+| M8 Distribution（正式分发） | Developer ID（开发者身份）签名、Hardened Runtime（强化运行时）、Notarization（苹果公证）、Gatekeeper（安全验证）、干净安装、升级和恢复全部通过 |
+
+### Stage Closure Rule（阶段关闭规则）
+
+当某一行的全部条件都有证据并为 PASS（通过）时：
+
+1. 将该一级阶段标记为 PASS（通过）。
+2. 停止为该阶段继续创建新的必做 Implementation Slice（实现切片）。
+3. 未完成但不阻塞上述退出条件的优化移入 Backlog（待办）。
+4. Current State（当前状态）立即切换到下一一级阶段。
+
+这条规则优先于“继续完善”“顺便重构”“还能再优化”等开放式理由。
