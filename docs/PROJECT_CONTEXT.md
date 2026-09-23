@@ -1548,3 +1548,13 @@ Future platform lines should be created only after the shared core boundary is s
 - Windows Platform Adapter（微软平台适配层）
 
 Normal Mode（普通模式） and Developer Mode（开发者模式） remain shared product concepts above the same core/runtime contract on every platform.
+
+## Platform capability isolation rule（平台能力隔离规则） — frozen 2026-09-23
+
+Cross-platform development must not turn platform-specific needs into mandatory SiftAlpha Core（跨平台核心） behavior.
+
+Authoritative contract: `docs/PLATFORM_CAPABILITY_CONTRACT.md`.
+
+Core（核心） may define a provider-neutral capability and query AVAILABLE（可用） / UNAVAILABLE（不可用） / UNKNOWN（未知）. Android（安卓）, macOS（苹果桌面系统） and Windows（微软桌面系统） independently implement or decline that capability through their platform adapters. Platform-only features remain outside Core（核心）.
+
+This rule is required before future macOS（苹果） or Windows（微软） platform development proceeds.
