@@ -3493,3 +3493,18 @@ Begin Cross-Platform Core（跨平台核心） extraction from the real-device-a
 
 ### Verification
 Cloud verification pending at the time of this entry.
+
+### R48-D11 Slice 1 cloud verification
+
+- W0 Cloud Build（W0 云端构建） #664 / run ID `35807116943`: **PASS（通过）** on source `760acc803e87a3c12aa31af4ac60061cf13e4a38`.
+- `:core:test`: **PASS（通过）**.
+- Existing Android unit tests（安卓单元测试）: **PASS（通过）**.
+- `assembleDebug`（调试包构建）: **PASS（通过）**.
+- APK evidence / stable signing（安装包证据 / 稳定签名）: **PASS（通过）**.
+- Internal Alpine Probe（内部 Alpine 探针） #113 / run ID `35807112962`: **PASS（通过）**.
+- Artifact（云端制品）: `siftalpha-w0-664`, artifact ID `10727898874`, digest `sha256:4cd63086add4feff076bf73ae079fb67d2c900ca6749a7a9174f4d0adc0e9855`.
+- APK SHA-256: `9c072da6d5028709fbedbecab8336101b014895d71720e900715beba7fe1fb2a`.
+- APK package/version: `com.siftalpha.studio` / `0.8.0-alpha43-r48d11-core1` / versionCode `223`.
+- Signer certificate SHA-256 remains `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`.
+
+Result: first platform-independent Core（核心） extraction slice is cloud-verified. Android（安卓） Runtime behavior was not intentionally changed.
