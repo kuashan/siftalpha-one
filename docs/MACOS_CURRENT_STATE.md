@@ -5,7 +5,7 @@
 
 ## 1. 当前阶段
 
-状态：**M1 — Core Boundary（核心边界）进行中；M1.1～M1.6 已通过，当前进入最后一步 M1.7 — Core Boundary Audit（核心边界总审计）。**
+状态：**M1 — Core Boundary（核心边界）已正式 PASS（通过）并关闭；当前阶段为 M2 — macOS Host Skeleton（macOS 主机应用骨架）。**
 
 当前工作分支：
 - `feature/cross-platform-core`
@@ -192,9 +192,9 @@ macOS（苹果桌面系统）开发采用“总路线提前规划、每个阶段
 
 不得把未来所有实现细节提前写死，但不得改变阶段目标而不记录架构决策。
 
-当前唯一开发方向仍为：
+当前唯一开发方向为：
 
-**M1 — Core Boundary（核心边界）**
+**M2 — macOS Host Skeleton（macOS 主机应用骨架）**
 
 已完成：
 - M1.1 Runtime Lifecycle（运行生命周期）= Cloud PASS + Real Device PASS（云端通过 + 真机通过）
@@ -202,7 +202,7 @@ macOS（苹果桌面系统）开发采用“总路线提前规划、每个阶段
 下一步：
 - M1.2 Environment Plan（环境计划）= Cloud PASS + Real Device PASS（云端通过 + 真机通过）
 
-M1（核心边界）完成前，不进入完整 macOS UI（苹果界面）和复杂项目运行开发。
+M1（核心边界）已完成。M2（macOS 主机应用骨架）只建立可构建、可启动、可加载 Core（核心）的真实 macOS App（苹果桌面应用）；完整产品 UI（界面）与复杂项目运行仍属于后续阶段。
 
 ## 10. macOS 分发策略
 
@@ -265,4 +265,30 @@ Core（核心）不得因为某个平台的实现方式而要求其他平台实�
 - “还能继续优化”本身不能作为延迟进入下一阶段的理由。
 - 当前 M1（核心边界）只有在其明确退出条件尚未满足时才继续拆分。
 
-当前仍处于 M1（核心边界），M1.2（环境计划）Cloud PASS（云端通过），等待 Real Device Acceptance（真机验收）。
+M1（核心边界）全部 Exit Criteria（退出条件）均已满足，阶段已关闭。当前进入 M2（macOS 主机应用骨架）。
+
+
+## 18. M1 正式关闭 / M2 当前入口
+
+M1.1～M1.6（实现切片）全部完成 Cloud PASS + Real Device PASS（云端通过 + 真机通过）。
+
+M1.7 Core Boundary Audit（核心边界总审计）确认 7 条 M1 Exit Criteria（退出条件）全部 PASS（通过）。
+
+因此：
+
+**M1 — Core Boundary（核心边界）= CLOSED / PASS（已关闭 / 通过）。**
+
+当前唯一阶段：
+
+**M2 — macOS Host Skeleton（macOS 主机应用骨架）**
+
+M2 Exit Criteria（退出条件）：
+
+1. 真正的 macOS App（苹果桌面应用）可在真实 Mac（苹果电脑）构建。
+2. App（应用）可以启动并正常退出。
+3. App（应用）能够加载现有 SiftAlpha Core（跨平台核心）。
+4. App（应用）可以读取基础 Platform Capability Snapshot（平台能力快照）。
+5. macOS 模块不依赖 Android Framework（安卓框架）。
+6. 完成真实 Mac（苹果电脑）验收。
+
+满足以上条件后 M2 必须立即 PASS（通过）并进入 M3（主机运行提供者）。
