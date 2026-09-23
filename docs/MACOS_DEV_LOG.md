@@ -1000,3 +1000,68 @@ M1.7 不再新增新的架构切片。其任务是逐项核对 M1 Exit Criteria�
 7. Capability Isolation（能力隔离）规则未迫使 Android / Windows（安卓 / 微软）实现 macOS（苹果）专属能力。
 
 全部满足后，M1（核心边界）必须立即关闭并进入 M2 — macOS Host Skeleton（苹果主机骨架）。
+
+## 2026-09-23 · M1.7 — Core Boundary Audit（核心边界总审计）PASS（通过）/ M1 正式关闭
+
+### 审计范围
+
+M1.7（核心边界总审计）不新增功能，只核对冻结的 M1 Exit Criteria（M1 退出条件）。
+
+### 审计结果
+
+1. Runtime Lifecycle（运行生命周期）进入 Core（核心）：**PASS（通过）**
+   - `RuntimeLifecycleCore.kt`
+   - platform-neutral（平台无关）状态、操作优先级与输出解析已在 `:core`。
+
+2. Environment Needs / Plan（环境需求 / 环境计划）进入 Core（核心）：**PASS（通过）**
+   - `ProjectEnvironmentNeeds.kt`
+   - Core（核心）定义“项目需要什么”，Platform Adapter（平台适配层）决定“平台怎样满足”。
+
+3. Project Operation（项目操作）通用动作、状态、归属规则：**PASS（通过）**
+   - `ProjectOperationCore.kt`
+   - 同项目互斥、STOP（停止）抢占、跨项目独立、generation（代际）规则已共享。
+
+4. Platform interfaces（平台接口）明确：**PASS（通过）**
+   - `PlatformStateStorage` — 平台状态存储
+   - `ProjectFilesystem` — 项目文件系统
+   - `ProjectProcessControl` — 项目进程控制
+
+5. Core（核心）无 Android / macOS / Windows（安卓 / 苹果 / 微软）平台 API（接口）依赖：**PASS（通过）**
+   - `:core` 主源码共 8 个 Kotlin（Kotlin 语言）文件。
+   - 审计 import（导入）结果：无 `android.*`、Apple/Foundation（苹果 Foundation）、Windows native（Windows 原生）API。
+   - `core/build.gradle.kts` 仅使用 `org.jetbrains.kotlin.jvm`，无 Android Plugin（安卓插件）。
+   - `:core` 仅声明 JUnit（单元测试库）测试依赖。
+
+6. Android（安卓）自动回归与关键真机回归：**PASS（通过）**
+   - M1.1～M1.6 均完成 Cloud PASS + Real Device PASS（云端通过 + 真机通过）。
+   - 最新 M1.6：W0 Cloud Build（云端构建） #708 PASS。
+   - Internal Alpine Probe（内部 Alpine 探针） #121 PASS。
+   - v231 Android（安卓）真机项目级 STOP（停止）隔离 PASS。
+   - Stop A while B continues（停止 A、B 继续运行）PASS。
+   - Internal / External Runtime（内部 / 外部运行时）STOP → Run（停止 → 再次运行）PASS。
+
+7. Capability Isolation（能力隔离）未把 macOS（苹果）专属能力强迫给 Android / Windows（安卓 / 微软）：**PASS（通过）**
+   - `PLATFORM_CAPABILITY_CONTRACT.md` 继续有效。
+   - AVAILABLE / UNAVAILABLE / UNKNOWN（可用 / 不可用 / 未知）均为合法平台事实。
+   - Core（核心）只声明能力，不假设所有平台实现。
+
+### 最终结论
+
+**M1 — Core Boundary（核心边界）= PASS（通过）。**
+
+根据 Stage Closure Rule（阶段关闭规则）：
+
+- M1 正式关闭。
+- 不再创建新的 M1.x 必做切片。
+- 非阻塞优化进入 Backlog（待办）。
+- 当前开发阶段立即切换到：
+
+**M2 — macOS Host Skeleton（macOS 主机应用骨架）**
+
+M2 的第一目标不是复杂 Runtime（运行时）或完整 UI（界面），而是建立真正的 macOS App（苹果桌面应用）骨架，使其可以：
+
+- 在真实 macOS（苹果桌面系统）上构建；
+- 启动并退出；
+- 加载现有 SiftAlpha Core（跨平台核心）；
+- 读取基础 Platform Capability Snapshot（平台能力快照）；
+- 不依赖 Android Framework（安卓框架）。
