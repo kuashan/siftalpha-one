@@ -1526,3 +1526,11 @@ Both Normal Mode and Developer Mode must enter External PREPARE/RUN through this
 A successful External PREPARE ending with `SIFTALPHA_ENV=READY` is itself a Runtime Capability proof and refreshes the shared provider-readiness timestamp. The 60-second freshness window therefore applies to real successful PREPARE as well as explicit probes.
 
 Direct Developer Mode source modification is authorized only for this gate wiring. Developer layout, Web Discovery, auto observation, log/result presentation and existing runtime-control semantics remain unchanged.
+
+## 2026-09-23 · R48-D10 Real Device Accepted Baseline authority
+
+`baseline/r48d10` is the frozen Real Device Accepted Baseline（真机验收基线） at commit `a60d7fb5d81a6611ea6695c023c1c70e8181388c`.
+
+It represents version `0.8.0-alpha43-r48d10` / versionCode `222`, after W0 Cloud Build（云端构建）Run #660 passed and the user completed real-device acceptance with all targeted R48-D10 behavior passing.
+
+This branch is reference-only. Do not modify, rebase, merge into, or force-move it. New work must preserve the ability to compare directly with this commit.
