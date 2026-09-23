@@ -311,3 +311,21 @@ Cloud Verification（云端验证）：
 - APK SHA-256: `af10db03615c8e0a209fb2b69ed8cb7b4d0638f93067a09c82a7423146be6d1b`
 
 当前结论：**Cloud PASS（云端通过） / Real Device Pending（真机待确认）**。
+
+### M1.4 Real Device Acceptance（真机验收）
+
+- Overlay install state continuity（覆盖安装状态连续性）: PASS（通过）
+- Existing environment readiness persistence（既有环境就绪状态持久化）: PASS（通过）
+- Internal / External environment separation（内部 / 外部环境状态隔离）: PASS（通过）
+- Run / Stop / Re-run continuity（运行 / 停止 / 再次运行连续性）: PASS（通过）
+- App restart persistence readback（应用重启后的持久化读取）: PASS（通过）
+- Background → Foreground recovery regression（后台 → 前台恢复回归）: PASS（通过）
+- User-observed regression（用户实测新增回归）: 未发现
+
+最终结论：
+
+**M1.4 Platform Storage Interface（平台存储接口）= PASS（通过，云端 + 真机）。**
+
+下一项：
+
+**M1.5 — Project Filesystem Interface（项目文件系统接口）**
