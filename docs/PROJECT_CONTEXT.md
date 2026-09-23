@@ -1572,3 +1572,28 @@ macOS（苹果桌面系统）开发现已建立独立连续记录体系。
 5. `docs/CROSS_PLATFORM_CORE.md` — Core（跨平台核心）边界
 
 macOS（苹果）平台代码尚未开始；当前阶段为 M1 — Core Boundary（核心边界）。不得跳过 Core（核心）边界直接复制 Android（安卓）逻辑或建立独立 macOS Core（苹果核心）。
+
+## Cross-Platform M1 closure authority（跨平台 M1 关闭事实） — 2026-09-23
+
+M1 — Core Boundary（核心边界）已完成并正式关闭。
+
+M1.7（核心边界总审计）确认：
+
+- Runtime Lifecycle（运行生命周期）
+- Environment Needs / Plan（环境需求 / 环境计划）
+- Project Operation（项目操作）
+- Platform State Storage（平台状态存储）
+- Project Filesystem（项目文件系统）
+- Project Process Control（项目进程控制）
+
+均已形成跨平台 Core（核心）模型/契约或明确 Platform Interface（平台接口）。
+
+`:core` 保持纯 Kotlin/JVM（Kotlin/JVM 平台），不直接依赖 Android / macOS / Windows（安卓 / 苹果 / 微软）平台 API（接口）。
+
+Android（安卓）作为参考平台的 M1.1～M1.6 云端与关键真机回归均 PASS（通过），包括项目级 STOP（停止）隔离、内部/外部运行时 STOP→Run（停止→再次运行）、文件系统与状态持久化连续性。
+
+Stage Closure Rule（阶段关闭规则）生效：不得继续增加新的 M1.x 必做切片。非阻塞优化进入 Backlog（待办）。
+
+当前阶段唯一事实：
+
+**M2 — macOS Host Skeleton（macOS 主机应用骨架）**。
