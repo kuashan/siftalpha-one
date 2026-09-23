@@ -174,3 +174,20 @@ M8（正式分发）最终验收必须同时覆盖：
 最终结论：**M1.1 = PASS（通过，云端 + 真机）**
 
 下一阶段：**M1.2 — Environment Plan（环境计划）**
+
+### M1.2 Environment Plan（环境计划）
+
+Cloud Verification（云端验证）：
+
+- ProjectEnvironmentNeeds（项目环境需求）Core model（核心模型）: PASS（通过）
+- Provider-neutral preparation policy（提供者中立准备策略）: PASS（通过）
+- Pure Python preparation sequence（纯 Python 准备顺序）: PASS（通过）
+- Python + Vite preparation order（Python + Vite 准备顺序）: PASS（通过）
+- Plain Node.js preparation sequence（普通 Node.js 准备顺序）: PASS（通过）
+- Blocking issue fail-closed（阻塞问题安全关闭）: PASS（通过）
+- Existing Android ProjectEnvironmentPlan tests（现有安卓环境计划测试）: PASS（通过）
+- W0 Cloud Build（W0 云端构建） #681: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #116: PASS（通过）
+- APK SHA-256: `049e74acd8a85420f373d32464a4473947c50e2bc0b32e19e649044ce8963fca`
+
+当前结论：**Cloud PASS（云端通过） / Real Device Pending（真机待确认）**
