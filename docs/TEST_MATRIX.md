@@ -1924,8 +1924,8 @@ Next stage（下一阶段）: **M2 — macOS Host Skeleton（macOS 主机应用�
 
 | ID | 操作 | 期望 | 状态 |
 |---|---|---|---|
-| EXR-01 | Developer Mode（开发者模式）点击 External Run（外部运行），Termux（外部终端）未响应 | 原 Run（运行）请求保持为 deferred intent（待执行操作），不丢失 | unit test added / cloud pending |
-| EXR-02 | 点击“打开 Termux”后返回 SiftAlpha | Developer Mode 自动重新 Probe（探测），不要求再次点击 Run | unit test added / cloud pending |
-| EXR-03 | Probe（探测）最终 READY（就绪） | 原 Run（运行）只恢复一次，不重复启动 | unit test added / cloud pending |
-| EXR-04 | Normal Mode（普通模式） | 不修改其 UI / return-retry 实现；现有正常行为保持 | regression cloud pending |
-| EXR-05 | STOP / Runtime / Web Discovery | 行为不变 | regression cloud pending |
+| EXR-01 | Developer Mode（开发者模式）点击 External Run（外部运行），Termux（外部终端）未响应 | 原 Run（运行）请求保持为 deferred intent（待执行操作），不丢失 | Cloud PASS（云端通过）/ Real Device Pending（真机待验收） |
+| EXR-02 | 点击“打开 Termux”后返回 SiftAlpha | Developer Mode 自动重新 Probe（探测），不要求再次点击 Run | Cloud PASS（云端通过）/ Real Device Pending（真机待验收） |
+| EXR-03 | Probe（探测）最终 READY（就绪） | 原 Run（运行）只恢复一次，不重复启动 | Cloud PASS（云端通过）/ Real Device Pending（真机待验收） |
+| EXR-04 | Normal Mode（普通模式） | 不修改其 UI / return-retry 实现；现有正常行为保持 | Cloud regression PASS（云端回归通过） |
+| EXR-05 | STOP / Runtime / Web Discovery | 行为不变 | Cloud regression PASS（云端回归通过） |

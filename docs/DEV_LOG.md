@@ -3607,3 +3607,24 @@ Normal Mode（普通模式） was user-confirmed normal, so the repair scope was
 - W0 Cloud Build（云端构建）.
 - Real-device acceptance:
   `Run → Open Termux → return → automatic reprobe → READY → original Run resumes once`.
+
+
+### Cloud verification — PASS（通过）
+
+- Functional source HEAD（功能源码提交）: `f7e2f654fbe45b3d7fa92be318bb0f57836d3830`
+- W0 Cloud Build（云端构建） #710 / run ID `35879945181`: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #122 / run ID `35879945135`: PASS（通过）
+- Repository validators（仓库校验）: PASS（通过）
+- Android unit tests（安卓单元测试）: PASS（通过）
+- Developer External return recovery regression tests（开发者外部环境返回恢复回归测试）: PASS（通过）
+- `assembleDebug`（调试包构建）: PASS（通过）
+- Artifact（制品）: `siftalpha-w0-710`
+- Artifact ID（制品编号）: `10760428150`
+- Artifact digest（制品摘要）: `sha256:683548a3b01b6c91c59de88065d486dcc34a1211d579404b3d5070b08e2d7a38`
+- APK SHA-256: `02b5b36368193f16299b1ec18ec7180ba8df5ae25521ba7cec69e7f5146266e9`
+- APK signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+- package: `com.siftalpha.studio`
+- versionCode: `232`
+- versionName: `0.8.0-alpha43-r48d11-m1.6-r1`
+
+Current status: **CODE / CLOUD PASS（代码 / 云端通过）; REAL DEVICE ACCEPTANCE PENDING（真机验收待确认）**。
