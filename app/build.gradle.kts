@@ -166,8 +166,10 @@ android {
         // background -> foreground transition cannot lock a healthy running project in RECOVERING.
         // r48d11-m1.3 moves project-operation arbitration and project-scoped
         // concurrency rules into the shared cross-platform Core.
-        versionCode = 228
-        versionName = "0.8.0-alpha43-r48d11-m1.3"
+        // r48d11-m1.4 introduces the cross-platform state-storage port and routes
+        // shared lifecycle/operation persistence through the Android adapter.
+        versionCode = 229
+        versionName = "0.8.0-alpha43-r48d11-m1.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
