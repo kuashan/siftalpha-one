@@ -381,3 +381,139 @@ Android（安卓）的 `ProjectEnvironmentPlanner` 继续选择当前 Android（
 **M1.2 Cloud PASS（云端通过），Real Device Acceptance（真机验收）待完成。**
 
 真机验收通过后才正式关闭 M1.2（环境计划）。
+
+## 2026-09-23 · Stage Exit Contract（阶段退出条件）冻结
+
+### 目的
+
+为避免 M0～M8（第 0～8 阶段）在开发中无限细分，正式建立 Stage Exit Criteria（阶段退出条件）。
+
+规则：
+
+1. 子任务只用于完成当前阶段，不自动成为新的长期阶段。
+2. 当一个阶段的 Exit Criteria（退出条件）全部满足并留下测试证据后，该阶段必须标记 PASS（通过）并进入下一阶段。
+3. 阶段通过后发现的非阻塞优化进入 Backlog（待办），不得把已通过阶段无限延长。
+4. 只有会破坏该阶段核心目标、安全性、跨平台边界或已验收行为的问题，才允许阻止阶段关闭。
+5. 不以“还能继续优化”为理由拒绝进入下一阶段。
+
+### M0 — Governance（开发治理）通过条件
+
+满足以下全部条件即 PASS（通过）：
+
+- Current State（当前状态）、Dev Log（开发日志）、Test Matrix（测试矩阵）存在。
+- Platform Capability Contract（平台能力契约）建立。
+- 每轮工作有固定记录和验证流程。
+- 已明确 Core（核心）与 Platform Adapter（平台适配层）边界原则。
+
+当前状态：**PASS（通过）**。
+
+### M1 — Core Boundary（核心边界）通过条件
+
+满足以下全部条件即 PASS（通过）：
+
+- Runtime Lifecycle（运行生命周期）的平台无关规则由 Core（核心）承载。
+- Environment Needs / Plan（环境需求 / 计划）的平台无关规则由 Core（核心）承载。
+- Project Operation（项目操作）的通用动作、状态和归属规则有平台无关契约。
+- Storage / Filesystem / Process Control（存储 / 文件系统 / 进程控制）的平台边界已形成接口或明确适配边界。
+- Core（核心）不直接依赖 Android API（安卓接口）、macOS API（苹果接口）或 Windows API（微软接口）。
+- Android（安卓）原有功能通过自动化回归；涉及真实运行行为的关键抽取通过真机回归。
+- Core Boundary Audit（核心边界总审计）确认不存在为了 macOS（苹果）而强迫 Android（安卓）或 Windows（微软）实现的平台专属能力。
+
+全部满足后，M1（核心边界）立即关闭，不因为仍有可优化的 Core（核心）代码而继续拆分。
+
+### M2 — macOS Host Skeleton（macOS 主机骨架）通过条件
+
+满足以下全部条件即 PASS（通过）：
+
+- 生成真正的 macOS App（苹果桌面应用）。
+- App（应用）可以在真实 Mac（苹果电脑）启动和退出。
+- macOS（苹果）模块可以加载 SiftAlpha Core（跨平台核心）。
+- 可以读取并显示基本 Platform Capability Snapshot（平台能力快照）。
+- macOS（苹果）构建不依赖 Android Framework（安卓框架）。
+- 至少一次真实 Mac（苹果电脑）验收通过。
+
+### M3 — Host Runtime Provider（主机运行提供者）通过条件
+
+满足以下全部条件即 PASS（通过）：
+
+- 能检测本机 Python / Node.js / Bun / Git / Shell（Python / Node / Bun / Git / 命令环境）的可用性。
+- 能启动至少一个普通主机进程。
+- 能捕获 stdout / stderr（标准输出 / 标准错误）。
+- STATUS（状态）能区分运行和结束。
+- STOP（停止）可以终止当前项目及其归属进程。
+- 同时运行两个项目时，停止 A 不影响 B。
+- 上述行为在真实 Mac（苹果电脑）通过。
+
+### M4 — Project Workflow（项目工作流）通过条件
+
+满足以下全部条件即 PASS（通过）：
+
+- 普通 Python（Python 运行时）项目完成 Import → Detect → Plan → Prepare → Run → Logs → Stop / Restart（导入 → 检测 → 计划 → 准备 → 运行 → 日志 → 停止 / 重启）完整闭环。
+- 普通 Node.js（Node 运行时）项目完成同样闭环，或若当前范围明确不包含 Node.js（Node 运行时），需在状态文档中明确记录范围。
+- Environment Plan（环境计划）只表达需求，Provider（提供者）负责满足需求。
+- Web 项目能够通过 Web Discovery + Endpoint Probe（网页发现 + 端点探测）得到可用结果入口。
+- 项目失败时能得到可理解的失败状态与日志。
+- 真实 Mac（苹果电脑）验收通过。
+
+### M5 — Product UI Parity（产品界面对齐）通过条件
+
+满足以下全部条件即 PASS（通过）：
+
+- Normal Mode（普通用户模式）可以完成正常项目工作流，不要求理解 Runtime（运行时）细节。
+- Developer Mode（开发者模式）能够看到高级 Runtime（运行时）事实与诊断信息。
+- 两种模式共享同一 Core（核心）、同一项目状态、同一 Runtime Lifecycle（运行生命周期）。
+- 同一个项目在两个模式之间切换时不存在状态冲突或重复执行。
+- 真实 Mac（苹果电脑）完成两种模式验收。
+
+### M6 — Container / Multi-service（容器 / 多服务）通过条件
+
+满足以下全部条件即 PASS（通过）：
+
+- 可以检测 Docker / Podman（容器运行时）能力，且不可用时能明确报告 UNAVAILABLE（不可用）。
+- 至少一个标准 Compose（多服务编排）项目能够 Prepare / Run / Status / Logs / Stop（准备 / 运行 / 状态 / 日志 / 停止）。
+- 多服务日志能够归属到当前项目。
+- 端口映射能够被发现并通过 Endpoint Probe（端点探测）。
+- STOP（停止）当前容器项目不影响其他项目或无关容器。
+- 不要求为验收项目写项目专属补丁。
+
+### M7 — OpenBot Acceptance（OpenBot 验收）通过条件
+
+满足以下全部条件即 PASS（通过）：
+
+- 使用未为 SiftAlpha（筛选阿尔法）修改的原始 OpenBot（开放机器人）项目。
+- SiftAlpha（筛选阿尔法）能够识别其 Bun / Docker / Compose / PostgreSQL + pgvector（Bun / 容器 / 多服务编排 / 数据库 + 向量扩展）需求。
+- Prepare（准备）成功。
+- 完整服务启动成功。
+- Web UI（网页界面）可访问。
+- Logs / Status（日志 / 状态）可观察。
+- STOP（停止）仅停止 OpenBot（开放机器人）项目相关活动。
+- 再次启动可以恢复运行。
+- 全程没有 OpenBot-specific patch（OpenBot 专属补丁）。
+
+满足以上条件后即视为 SiftAlpha（筛选阿尔法）复杂真实项目能力验收完成，不继续无限扩大 OpenBot（开放机器人）测试范围。
+
+### M8 — Distribution（正式分发）通过条件
+
+满足以下全部条件即 PASS（通过）：
+
+- 生成正式 SiftAlpha.app（苹果应用）。
+- Developer ID Application（开发者身份应用证书）签名通过。
+- Hardened Runtime（强化运行时）开启且不破坏 Host Runtime Provider（主机运行提供者）。
+- Apple Notarization（苹果公证）通过。
+- DMG / PKG（磁盘映像 / 安装包）可在一台干净的普通 Mac（苹果电脑）安装。
+- Gatekeeper（安全验证）默认设置下正常打开，不要求绕过安全机制。
+- 普通用户不需要开发工具或自己的 Apple Developer（苹果开发者）账号。
+- 从旧版本升级到新版本成功。
+- 至少完成一次崩溃 / 重启恢复验收。
+
+全部满足后，macOS（苹果桌面系统）首个可分发版本开发流程正式完成。
+
+### 防止无限细分的最终规则
+
+M0～M8（第 0～8 阶段）是固定的一级阶段。
+
+允许出现 M1.1、M1.2 等 Implementation Slice（实现切片），但它们只服务于对应一级阶段的 Exit Criteria（退出条件）。一旦一级阶段条件全部满足：
+
+> **停止继续拆分该阶段 → 标记 PASS（通过）→ 进入下一阶段。**
+
+新的非阻塞优化进入 Backlog（待办），不阻止阶段推进。
