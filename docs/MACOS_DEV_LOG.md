@@ -264,3 +264,22 @@ Runtime Lifecycle（运行生命周期）的第一层生产逻辑已经进入 Si
 - 平台专属的“当前平台如何满足这些需要”
 
 目标是让 Core（核心）表达需求，而 Android / macOS / Windows Platform Adapter（安卓 / 苹果 / 微软平台适配层）各自决定实现方式。
+
+### M1.1 Real Device Acceptance（真机验收）
+
+用户已在 Android（安卓）真实设备完成 v225 / `0.8.0-alpha43-r48d11-m1.1` 回归测试。
+
+已验证：
+
+- Internal Environment（内部环境）准备流程：PASS（通过）
+- External Environment（外部环境）准备流程：PASS（通过）
+- 从开始准备到准备结束全过程：PASS（通过）
+- 准备完成后可正常打开/继续操作：PASS（通过）
+- 与此前 Android Baseline（安卓基线）相比，当前未发现功能差异：PASS（通过）
+- 当前用户实际测试范围内未发现回归：PASS（通过）
+
+结论：
+
+**M1.1 Runtime Lifecycle（运行生命周期）Real Device Acceptance（真机验收）= PASS（通过）。**
+
+因此 M1.1（第一小阶段）正式关闭，后续开发进入 M1.2 — Environment Plan（环境计划）。
