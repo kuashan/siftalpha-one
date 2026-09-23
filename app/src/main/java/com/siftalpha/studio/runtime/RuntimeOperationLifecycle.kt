@@ -1,5 +1,10 @@
 package com.siftalpha.studio.runtime
 
+import com.siftalpha.core.operation.ProjectOperationAction
+import com.siftalpha.core.operation.ProjectOperationOwnership
+import com.siftalpha.core.operation.ProjectOperationPhase
+import com.siftalpha.core.operation.ProjectOperationPolicy
+
 /** Provider-neutral actions owned by the project Runtime Center. */
 enum class RuntimeOperationAction {
     PREPARE,
@@ -48,17 +53,21 @@ data class RuntimeOperationRecord(
     }
 
     val terminal: Boolean
-        get() = phase in TERMINAL_PHASES
+        get() = ProjectOperationPhase.valueOf(phase.name).terminal
 
     fun withPhase(next: RuntimeOperationPhase): RuntimeOperationRecord = copy(phase = next)
 
+    internal fun toCoreOwnership(): ProjectOperationOwnership = ProjectOperationOwnership(
+        projectId = projectId,
+        action = ProjectOperationAction.valueOf(action.name),
+        phase = ProjectOperationPhase.valueOf(phase.name),
+        generation = generation,
+    )
+
     companion object {
-        val TERMINAL_PHASES = setOf(
-            RuntimeOperationPhase.SUCCESS,
-            RuntimeOperationPhase.FAILED,
-            RuntimeOperationPhase.CANCELLED,
-            RuntimeOperationPhase.TIMED_OUT,
-        )
+        val TERMINAL_PHASES = RuntimeOperationPhase.entries
+            .filter { ProjectOperationPhase.valueOf(it.name).terminal }
+            .toSet()
     }
 }
 
@@ -160,13 +169,22 @@ object RuntimeOperationContract {
         RuntimeOperationAction.CLEAN -> RuntimeLifecycleState.CLEANING
     }
 
-    fun canBegin(current: RuntimeOperationRecord?, requested: RuntimeOperationAction): Boolean {
-        if (current == null) return true
-        if (current.terminal) return false
-        // STOP has priority over another operation, but duplicate STOP requests are rejected.
-        return requested == RuntimeOperationAction.STOP &&
-            current.action != RuntimeOperationAction.STOP
-    }
+    fun canBegin(
+        current: RuntimeOperationRecord?,
+        requestedProjectId: String,
+        requested: RuntimeOperationAction,
+    ): Boolean = ProjectOperationPolicy.canBegin(
+        current = current?.toCoreOwnership(),
+        requestedProjectId = requestedProjectId,
+        requestedAction = ProjectOperationAction.valueOf(requested.name),
+    )
+
+    fun canBegin(current: RuntimeOperationRecord?, requested: RuntimeOperationAction): Boolean =
+        canBegin(
+            current = current,
+            requestedProjectId = current?.projectId ?: "_unowned_project_slot_",
+            requested = requested,
+        )
 
     fun providerFor(selection: ProjectRuntimeSelection): RuntimeOperationProvider = when (selection) {
         ProjectRuntimeSelection.EMBEDDED_R -> RuntimeOperationProvider.INTERNAL
@@ -193,7 +211,7 @@ class RuntimeOperationTracker(
         now: Long = nowEpochMs(),
     ): RuntimeOperationRecord? = synchronized(lock) {
         val existing = current[projectId]
-        if (!RuntimeOperationContract.canBegin(existing, action)) return@synchronized null
+        if (!RuntimeOperationContract.canBegin(existing, projectId, action)) return@synchronized null
         val generation = (nextGeneration[projectId] ?: 0L) + 1L
         nextGeneration[projectId] = generation
         RuntimeOperationRecord(
