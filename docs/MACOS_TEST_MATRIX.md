@@ -240,3 +240,21 @@ Android Foreground Recovery Regression（安卓前台恢复回归）云端结果
 - APK SHA-256：`efb75996e7a92eb5cdb82ebae53d774e3ed8cf881b2883041406b8c4c674022a`
 
 真机仍需验证普通后台 → 前台不会永久进入 RECOVERING（恢复中）。
+
+### M1.2 Real Device Acceptance（真机验收）
+
+- Android Internal Runtime（安卓内部运行时）: PASS（通过）
+- Android External Runtime（安卓外部运行时）: PASS（通过）
+- Environment Plan behavior parity（环境计划行为与基线一致）: PASS（通过）
+- Background → Foreground recovery（后台 → 前台恢复）: PASS（通过）
+- Permanent RECOVERING regression（永久恢复中回归）: FIXED / PASS（已修复 / 通过）
+- STOP / RUN lifecycle（停止 / 运行生命周期）: PASS（通过）
+- User-observed regression（用户实测新增回归）: 未发现
+
+最终结论：
+
+**M1.2 Environment Plan（环境计划）= PASS（通过，云端 + 真机）。**
+
+下一项：
+
+**M1.3 — Project Operation（项目操作）**
