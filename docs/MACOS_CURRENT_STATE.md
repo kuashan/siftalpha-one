@@ -208,7 +208,7 @@ macOS（苹果桌面系统）开发采用“总路线提前规划、每个阶段
 
 **M2.1 — Minimal macOS Host + Core Load（最小 macOS 主机应用 + Core 加载）**
 
-状态：**IMPLEMENTATION STARTED / CLOUD VERIFICATION PENDING（实现已开始 / 云端验证待完成）**。
+状态：**CLOUD PASS（云端通过） / REAL MAC ACCEPTANCE PENDING（真实 Mac 验收待完成）**。
 
 M1（核心边界）已经 PASS / CLOSED（通过 / 关闭），不得重新打开。M2（macOS 主机应用骨架）只建立可构建、可启动、可加载 Core（核心）的真实 macOS App（苹果桌面应用）；完整产品 UI（界面）与复杂项目运行仍属于后续阶段。
 
@@ -318,6 +318,34 @@ M2 Exit Criteria（退出条件）：
 
 当前状态：
 
-**SOURCE IMPLEMENTED / CLOUD PENDING（源码已实现 / 云端待验证）**。
+**CLOUD PASS（云端通过） / REAL MAC PENDING（真实 Mac 待验收）**。
 
-M2 仍未关闭。真实 Mac Acceptance（真实 Mac 验收）仍是最终退出条件。
+Cloud Verification（云端验证）：
+
+- source commit（源码提交）：`3661165ae4a0ea7b700cb11c43018fe82f9864de`
+- SiftAlpha macOS Host Skeleton（苹果主机骨架）Run #1：PASS（通过）
+- Core tests（核心测试）：PASS（通过）
+- macOS host tests（苹果宿主测试）：PASS（通过）
+- Core load probe（核心加载探针）：PASS（通过）
+- PlatformCapabilitySnapshot read（平台能力快照读取）：PASS（通过）
+- Android dependency leak check（安卓依赖泄漏检查）：PASS（通过）
+- `jpackage` SiftAlpha.app（苹果应用包）构建：PASS（通过）
+- macOS artifact（苹果制品）：`siftalpha-macos-m2.1-1`
+- artifact ID（制品编号）：`10740189814`
+- artifact digest（制品摘要）：`sha256:e2c60e6ca7214fbcd81f267d1f1b7cfca37e2d323f3d9509b1ddb0125faba32c`
+- W0 Android Regression（安卓回归）#709：PASS（通过）
+- W0 artifact（安卓制品）：`siftalpha-w0-709`
+
+M2 Exit Criteria（退出条件）当前完成度：**4 / 6**。
+
+已满足：
+1. 真正的 macOS App（苹果桌面应用）可在 macOS 构建环境生成。
+2. App（应用）能够加载现有 SiftAlpha Core（跨平台核心）。
+3. App（应用）能够读取基础 PlatformCapabilitySnapshot（平台能力快照）。
+4. macOS 模块不依赖 Android Framework（安卓框架）。
+
+剩余 Blocking Items（阻塞项）：
+- 真实 Mac（苹果电脑）GUI 启动并正常退出验收。
+- 真实 Mac Acceptance（真实 Mac 最终验收）。
+
+M2 仍未关闭；除上述两个真实 Mac（苹果电脑）阻塞项外，不新增新的 M2 必做条件。

@@ -1102,3 +1102,40 @@ M2 的第一目标不是复杂 Runtime（运行时）或完整 UI（界面），
 提交时：**Cloud Verification Pending（云端验证待完成）**。
 
 M2 不会因源码提交而提前 PASS（通过）；仍需真实 Mac（苹果电脑）启动 / 退出与最终验收证据。
+
+
+## 2026-09-23 · M2.1 Cloud Verification（云端验证）PASS（通过）
+
+Source commit（源码提交）：
+
+`3661165ae4a0ea7b700cb11c43018fe82f9864de`
+
+验证结果：
+
+- SiftAlpha macOS Host Skeleton（苹果主机骨架）Run #1：PASS（通过）
+- Core tests（核心测试）：PASS（通过）
+- macOS host tests（苹果宿主测试）：PASS（通过）
+- Core load probe（核心加载探针）：PASS（通过）
+- PlatformCapabilitySnapshot（平台能力快照）读取：PASS（通过）
+- Android dependency leak check（安卓依赖泄漏检查）：PASS（通过）
+- `jpackage` 生成 `SiftAlpha.app`：PASS（通过）
+- macOS artifact（苹果制品）：`siftalpha-macos-m2.1-1`
+- artifact ID（制品编号）：`10740189814`
+- artifact digest（制品摘要）：`sha256:e2c60e6ca7214fbcd81f267d1f1b7cfca37e2d323f3d9509b1ddb0125faba32c`
+- W0 Android Regression（安卓回归）#709：PASS（通过）
+- W0 artifact（安卓制品）：`siftalpha-w0-709`
+- Android Runtime（安卓运行时）生产代码：未修改
+- Core（核心）生产代码：未修改
+
+M2 当前 Closure（关闭）检查：
+
+- macOS App build（苹果应用构建）：PASS（通过）
+- Core load（核心加载）：PASS（通过）
+- Capability snapshot（能力快照）：PASS（通过）
+- No Android Framework dependency（无安卓框架依赖）：PASS（通过）
+- Real Mac GUI launch / exit（真实 Mac 图形界面启动 / 退出）：PENDING（待验收）
+- Real Mac Acceptance（真实 Mac 最终验收）：PENDING（待验收）
+
+当前完成度：**4 / 6**。
+
+剩余阶段阻塞项只有 2 个，均属于真实 Mac（苹果电脑）验收。不得因为非阻塞优化继续扩大 M2。

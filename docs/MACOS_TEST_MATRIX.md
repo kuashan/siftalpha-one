@@ -73,9 +73,16 @@ M1.1 结论：**PASS（通过）**
 - macOS host source（苹果宿主源码）: IMPLEMENTED（已实现）
 - Core direct dependency（核心直接依赖）: IMPLEMENTED（已实现）
 - Capability snapshot read（能力快照读取）: IMPLEMENTED（已实现）
-- macOS cloud build（苹果云端构建）: PENDING（待验证）
-- Real Mac launch / exit（真实 Mac 启动 / 退出）: PENDING（待验证）
-- Real Mac acceptance（真实 Mac 验收）: PENDING（待验证）
+- macOS cloud build（苹果云端构建）: PASS（通过），Run #1
+- Core load probe（核心加载探针）: PASS（通过）
+- Capability snapshot read（能力快照读取）: PASS（通过）
+- Android dependency leak check（安卓依赖泄漏检查）: PASS（通过）
+- SiftAlpha.app packaging（苹果应用打包）: PASS（通过）
+- Android regression（安卓回归）: PASS（通过），W0 #709
+- Real Mac launch / exit（真实 Mac 启动 / 退出）: PENDING（待验收）
+- Real Mac acceptance（真实 Mac 验收）: PENDING（待验收）
+
+M2 current completion（当前完成度）：**4 / 6**。
 
 ## M3 — Host Runtime Provider（主机运行提供者）
 
