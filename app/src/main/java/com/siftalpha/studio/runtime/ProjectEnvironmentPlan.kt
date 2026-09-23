@@ -1,5 +1,8 @@
 package com.siftalpha.studio.runtime
 
+import com.siftalpha.core.environment.EnvironmentPreparationStep
+import com.siftalpha.core.environment.ProjectEnvironmentNeedPolicy
+import com.siftalpha.core.environment.ProjectEnvironmentNeeds
 import com.siftalpha.studio.siftalphax.EmbeddedPythonRequirementParserV1
 import com.siftalpha.studio.siftalphax.EmbeddedPythonRuntimeCompatibilityV1
 import java.security.MessageDigest
@@ -619,47 +622,29 @@ object ProjectEnvironmentPlanner {
         )
     }
 
+    /**
+     * Platform-neutral project needs（平台无关项目需求） are derived from detection facts before
+     * Android（安卓） chooses an EnvironmentBackend（环境后端）.
+     */
+    private fun coreNeeds(detection: ProjectEnvironmentDetection): ProjectEnvironmentNeeds =
+        ProjectEnvironmentNeeds(
+            primaryRuntime = detection.primaryRuntime,
+            supplementalRuntimes = detection.supplementalRuntimes,
+            directDependencyCount = detection.directDependencyCount,
+            pythonRequiresVersion = detection.pythonRequiresVersion,
+            pythonOptionalDependencyGroups = detection.pythonOptionalDependencyGroups,
+            viteComponentCount = detection.viteComponentCount,
+            hasBlockingIssues = detection.blockingIssues.isNotEmpty(),
+        )
+
     private fun buildPythonInstallExtras(
         detection: ProjectEnvironmentDetection,
-    ): List<String> = buildList {
-        if (
-            detection.primaryRuntime == RuntimeKind.PYTHON &&
-            detection.viteComponentCount > 0 &&
-            "web" in detection.pythonOptionalDependencyGroups
-        ) {
-            add("web")
-        }
-    }
+    ): List<String> = ProjectEnvironmentNeedPolicy.pythonInstallExtras(coreNeeds(detection))
 
-    private fun buildSteps(detection: ProjectEnvironmentDetection): List<EnvironmentBuildStep> {
-        if (detection.blockingIssues.isNotEmpty() || detection.primaryRuntime == null) {
-            return listOf(EnvironmentBuildStep.VALIDATE_PLAN)
+    private fun buildSteps(detection: ProjectEnvironmentDetection): List<EnvironmentBuildStep> =
+        ProjectEnvironmentNeedPolicy.preparationSteps(coreNeeds(detection)).map { step ->
+            EnvironmentBuildStep.valueOf(step.name)
         }
-        return buildList {
-            add(EnvironmentBuildStep.VALIDATE_PLAN)
-            add(EnvironmentBuildStep.ACQUIRE_RUNTIME)
-            add(EnvironmentBuildStep.CREATE_ENVIRONMENT)
-            val nodeNeeded = detection.primaryRuntime == RuntimeKind.NODE_JS ||
-                (
-                    RuntimeKind.NODE_JS in detection.supplementalRuntimes &&
-                        detection.viteComponentCount > 0
-                )
-            if (nodeNeeded) {
-                add(EnvironmentBuildStep.NODE_INSTALL)
-                if (
-                    detection.primaryRuntime != RuntimeKind.NODE_JS ||
-                    detection.viteComponentCount > 0
-                ) {
-                    add(EnvironmentBuildStep.NODE_BUILD)
-                }
-            }
-            if (detection.primaryRuntime == RuntimeKind.PYTHON) {
-                add(EnvironmentBuildStep.PYTHON_INSTALL)
-            }
-            add(EnvironmentBuildStep.VERIFY_ENVIRONMENT)
-            add(EnvironmentBuildStep.COMMIT_ENVIRONMENT)
-        }
-    }
 
     private fun planId(
         detection: ProjectEnvironmentDetection,
