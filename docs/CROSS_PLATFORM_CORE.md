@@ -104,3 +104,13 @@ macOS（苹果桌面系统）平台工作的固定入口：
 - `MACOS_TEST_MATRIX.md` — 测试矩阵
 
 macOS（苹果）工作不得只依赖聊天上下文。每轮状态变化、架构决定、测试证据和下一步都必须写回这些文件。
+
+## Environment needs boundary（环境需求边界）
+
+M1.2（环境计划）建立 `ProjectEnvironmentNeeds` 作为 Core（核心）的 provider-neutral（提供者中立）需求模型。
+
+Core（核心）回答“项目需要什么”，例如 Python / Node.js / Vite / dependency preparation（Python / Node / Vite / 依赖准备）。
+
+Platform Adapter（平台适配层）回答“当前平台怎样满足”，例如 Android Embedded R（安卓内部运行时）、macOS Host Runtime（苹果主机运行时）、Windows WSL2（Windows Linux 子系统）或 Container Provider（容器提供者）。
+
+Platform-specific backend selection（平台专属后端选择）不得进入 Core（核心）成为所有平台的强制实现。
