@@ -1534,3 +1534,17 @@ Direct Developer Mode source modification is authorized only for this gate wirin
 It represents version `0.8.0-alpha43-r48d10` / versionCode `222`, after W0 Cloud Build（云端构建）Run #660 passed and the user completed real-device acceptance with all targeted R48-D10 behavior passing.
 
 This branch is reference-only. Do not modify, rebase, merge into, or force-move it. New work must preserve the ability to compare directly with this commit.
+
+## Cross-Platform Core（跨平台核心） direction — 2026-09-23
+
+The product is now explicitly planned as one shared SiftAlpha Core（跨平台核心） plus platform adapters, not independent macOS（苹果桌面系统） and Windows（微软桌面系统） forks.
+
+Development branch: `feature/cross-platform-core`.
+
+The first extracted production-used model is RuntimeKind（运行时类型） in the new `:core` Kotlin/JVM（Kotlin/JVM 平台） module. Android（安卓） remains the reference platform and must keep passing its existing cloud build and real-device acceptance contracts while extraction continues.
+
+Future platform lines should be created only after the shared core boundary is stable:
+- macOS Platform Adapter（苹果平台适配层）
+- Windows Platform Adapter（微软平台适配层）
+
+Normal Mode（普通模式） and Developer Mode（开发者模式） remain shared product concepts above the same core/runtime contract on every platform.
