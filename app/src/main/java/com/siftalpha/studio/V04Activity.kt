@@ -58,6 +58,7 @@ import com.siftalpha.studio.runtime.RuntimeLifecycleResolver
 import com.siftalpha.studio.runtime.RuntimeLifecycleState
 import com.siftalpha.studio.runtime.RuntimePresentationState
 import com.siftalpha.studio.runtime.RuntimeLifecycleStore
+import com.siftalpha.studio.runtime.RuntimeForegroundRecoveryGate
 import com.siftalpha.studio.runtime.RuntimeKind
 import com.siftalpha.studio.runtime.RuntimeOperationAction
 import com.siftalpha.studio.runtime.RuntimeOperationPhase
@@ -222,6 +223,7 @@ open class V04Activity : StudioActivity() {
     // Runtime, Web and configuration callbacks stay cache-only.
     private var forceProjectInspectionPending = false
     private var activityStarted = false
+    private val persistedRuntimeRecoveryGate = RuntimeForegroundRecoveryGate()
     private val externalObservations = mutableMapOf<String, ExternalObservation>()
     private val externalObservationGenerations = mutableMapOf<String, Long>()
     private val externalObservationRunnables = mutableMapOf<String, Runnable>()
@@ -466,7 +468,9 @@ open class V04Activity : StudioActivity() {
             TermuxResultBus.consume(id)?.let(resultListener)
         }
         reconcilePersistedOperations()
-        recoverPersistedRuntimeStates()
+        if (persistedRuntimeRecoveryGate.consumeInitialRecovery()) {
+            recoverPersistedRuntimeStates()
+        }
         resumeExternalObservations()
     }
 
@@ -1487,16 +1491,9 @@ open class V04Activity : StudioActivity() {
         if (!failureReasons.containsKey(stateKey)) {
             cached.failureReason?.let { failureReasons[stateKey] = it }
         }
-        val selection = projectRuntimeSelectionStore.read(stateKey)
-        if (
-            !activityStarted &&
-            selection == ProjectRuntimeSelection.TERMUX &&
-            cached.runtimeState in ACTIVE_RUNTIME_STATES
-        ) {
-            recoveryProjects += stateKey
-        } else if (selection == ProjectRuntimeSelection.EMBEDDED_R) {
-            recoveryProjects.remove(stateKey)
-        }
+        // Reading cached state must not mutate foreground-recovery control state.
+        // Recovery is entered explicitly from recoverPersistedRuntimeStates() once per newly
+        // created Activity instance, never merely because a card refresh happens while stopped.
     }
 
     private fun recoverPersistedRuntimeStates() {
