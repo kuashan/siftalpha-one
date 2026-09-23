@@ -1,11 +1,15 @@
 package com.siftalpha.studio.runtime
 
 import android.content.Context
+import com.siftalpha.core.lifecycle.RuntimeOutputStateParser
 import com.siftalpha.studio.R
 
 /**
- * Runtime 生命周期状态。
- * 用于区分用户停止、程序退出、启动阶段与环境异常。
+ * Android（安卓） compatibility view of the shared Runtime（运行时） execution state.
+ *
+ * Lifecycle parsing now lives in SiftAlpha Core（跨平台核心）. Android（安卓） keeps this
+ * enum so existing UI（界面）, persistence and Runtime integration call sites remain stable
+ * during the staged cross-platform extraction.
  */
 enum class RuntimeState {
     PREPARING,
@@ -51,58 +55,10 @@ enum class RuntimeState {
     }
 
     companion object {
-        fun fromOutput(output: String): RuntimeState {
-            val lines = output.lineSequence()
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-                .toList()
+        fun fromOutput(output: String): RuntimeState =
+            valueOf(RuntimeOutputStateParser.fromOutput(output).name)
 
-            // An explicit reconciled Runtime state is authoritative when the Runtime command emits one.
-            lines.lastOrNull { it.startsWith("SIFTALPHA_RUNTIME_STATE=") }
-                ?.substringAfter('=')
-                ?.let(::fromStateToken)
-                ?.let { return it }
-
-            // ManagedProcessRuntime prints the current guest state file before the bounded historical
-            // runtime-log tail. Use that current snapshot before any host PID liveness/status evidence:
-            // a PRoot wrapper can remain alive briefly after the actual workload has already EXITED.
-            lines.firstOrNull { it.startsWith("STATE=") }
-                ?.substringAfter('=')
-                ?.let { state ->
-                    when (state) {
-                        "EXITED" -> return if (extractExitCode(output) == 0) EXITED_SUCCESS else EXITED_ERROR
-                        else -> fromStateToken(state)?.let { return it }
-                    }
-                }
-
-            return when {
-                lines.any { it == "SIFTALPHA_STATUS=STOPPED_BY_USER" } -> STOPPED_BY_USER
-                lines.any { it == "SIFTALPHA_STATUS=EXITED_SUCCESS" } -> EXITED_SUCCESS
-                lines.any { it == "SIFTALPHA_STATUS=EXITED_ERROR" || it == "SIFTALPHA_STATUS=EXITED" } ->
-                    if (extractExitCode(output) == 0) EXITED_SUCCESS else EXITED_ERROR
-                lines.any { it == "SIFTALPHA_STATUS=RUNNING" } -> RUNNING
-                lines.any { it.startsWith("SIFTALPHA_ERROR=") || it == "STATE=START_FAILED" } -> ENVIRONMENT_ERROR
-                else -> UNKNOWN
-            }
-        }
-
-        fun extractExitCode(output: String): Int? {
-            val lines = output.lineSequence().map { it.trim() }.toList()
-            val exitLine = lines.lastOrNull { it.startsWith("EXIT_CODE=") }
-                ?: lines.lastOrNull { it.startsWith("SIFTALPHA_PROCESS_EXIT=") }
-                ?: return null
-            return exitLine.substringAfter('=').trim().toIntOrNull()
-        }
-
-        private fun fromStateToken(token: String): RuntimeState? = when (token.trim()) {
-            "PREPARING" -> PREPARING
-            "STARTING" -> STARTING
-            "RUNNING" -> RUNNING
-            "EXITED_SUCCESS" -> EXITED_SUCCESS
-            "EXITED_ERROR" -> EXITED_ERROR
-            "STOPPED_BY_USER" -> STOPPED_BY_USER
-            "ENVIRONMENT_ERROR" -> ENVIRONMENT_ERROR
-            else -> null
-        }
+        fun extractExitCode(output: String): Int? =
+            RuntimeOutputStateParser.extractExitCode(output)
     }
 }
