@@ -3446,3 +3446,25 @@ Cloud verification:
 - Signer certificate SHA-256 remains `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`.
 
 Real-device acceptance target: with stale External Provider readiness, one PREPARE/RUN click must check and then continue automatically; STOP must cancel only the same project's deferred action.
+
+## 2026-09-23 · R48-D10 Real Device Accepted Baseline
+
+Baseline（基线）: `baseline/r48d10`
+Frozen commit（冻结提交）: `a60d7fb5d81a6611ea6695c023c1c70e8181388c`
+Version（版本）: `0.8.0-alpha43-r48d10`
+versionCode（版本代码）: `222`
+applicationId（应用标识）: `com.siftalpha.studio`
+
+Acceptance（验收）:
+- W0 Cloud Build（云端构建）Run #660: PASS.
+- Internal Alpine Probe（内部 Alpine 探针）Run #112: PASS.
+- Trusted Signed Debug APK（可信签名调试安装包）: real-device acceptance PASS.
+- Normal Mode（普通模式）external Prepare / Run one-click continuation: PASS.
+- Developer Mode（开发者模式）external Prepare / Run one-click continuation: PASS.
+- STOP（停止）project-scoped pending-action cancellation: PASS.
+- PREPARE（准备）success readiness-proof refresh: PASS.
+
+Baseline rule（基线规则）:
+- `baseline/r48d10` is frozen and must not be moved, rebased, merged into, or force-updated.
+- Future development must branch from this baseline or a later explicitly accepted baseline.
+- If a later change regresses Runtime（运行时）, Environment（环境）, lifecycle（生命周期）, external provider（外部运行环境）, Normal Mode（普通模式）, or Developer Mode（开发者模式）, compare first against this frozen commit.
