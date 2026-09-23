@@ -39,6 +39,20 @@
 
 当前状态：**IN PROGRESS（进行中）**
 
+### M1.1 Runtime Lifecycle（运行生命周期）
+
+- Core lifecycle policy（核心生命周期策略）: PASS（通过）
+- Core output parser（核心输出解析）: PASS（通过）
+- Android compatibility facade（安卓兼容外壳）: PASS（通过）
+- Existing Android lifecycle regression（现有安卓生命周期回归）: PASS（通过）
+- W0 Cloud Build（W0 云端构建） #677: PASS（通过）
+- Internal Alpine Probe（内部 Alpine 探针） #115: PASS（通过）
+- APK SHA-256: `43619a6f3aed4d960fc2efdfb99804faf1804f0d69d00da42f15c2f60944cf67`
+
+M1.1 结论：**PASS（通过）**
+
+下一项：M1.2 Environment Plan（环境计划）
+
 ## M2 — macOS Host Skeleton（苹果主机骨架）
 
 必须证明：
