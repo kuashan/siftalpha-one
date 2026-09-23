@@ -5,14 +5,14 @@
 
 ## 1. 当前阶段
 
-状态：**M0 — Development Governance（开发治理）已建立，平台代码尚未开始。**
+状态：**M1 — Core Boundary（核心边界）进行中；M1.1 Runtime Lifecycle（运行生命周期）已进入实现与回归验证。**
 
 当前工作分支：
 - `feature/cross-platform-core`
 
 当前跨平台 Core（核心）版本：
-- `0.8.0-alpha43-r48d11-core2`
-- Android（安卓） versionCode = `224`
+- `0.8.0-alpha43-r48d11-m1.1`
+- Android（安卓） versionCode = `225`
 
 当前 Core（核心）能力隔离规则：
 - `docs/PLATFORM_CAPABILITY_CONTRACT.md`
