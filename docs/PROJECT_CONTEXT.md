@@ -1558,3 +1558,17 @@ Authoritative contract: `docs/PLATFORM_CAPABILITY_CONTRACT.md`.
 Core（核心） may define a provider-neutral capability and query AVAILABLE（可用） / UNAVAILABLE（不可用） / UNKNOWN（未知）. Android（安卓）, macOS（苹果桌面系统） and Windows（微软桌面系统） independently implement or decline that capability through their platform adapters. Platform-only features remain outside Core（核心）.
 
 This rule is required before future macOS（苹果） or Windows（微软） platform development proceeds.
+
+## macOS Development Governance（macOS 开发治理） — 2026-09-23
+
+macOS（苹果桌面系统）开发现已建立独立连续记录体系。
+
+每轮 macOS（苹果）工作开始前，必须读取：
+
+1. `docs/MACOS_CURRENT_STATE.md` — 当前唯一状态事实源
+2. `docs/MACOS_DEV_LOG.md` — 历史开发过程与决策
+3. `docs/MACOS_TEST_MATRIX.md` — 阶段验收门槛
+4. `docs/PLATFORM_CAPABILITY_CONTRACT.md` — 平台能力隔离规则
+5. `docs/CROSS_PLATFORM_CORE.md` — Core（跨平台核心）边界
+
+macOS（苹果）平台代码尚未开始；当前阶段为 M1 — Core Boundary（核心边界）。不得跳过 Core（核心）边界直接复制 Android（安卓）逻辑或建立独立 macOS Core（苹果核心）。
