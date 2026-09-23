@@ -127,6 +127,27 @@ class RuntimeOperationLifecycleTest {
     }
 
     @Test
+    fun differentProjectsCanHoldOperationsAtTheSameTime() {
+        val tracker = RuntimeOperationTracker { 3_500L }
+
+        val first = tracker.begin(
+            projectId = "project-a",
+            provider = RuntimeOperationProvider.EXTERNAL,
+            action = RuntimeOperationAction.START,
+        )
+        val second = tracker.begin(
+            projectId = "project-b",
+            provider = RuntimeOperationProvider.INTERNAL,
+            action = RuntimeOperationAction.PREPARE,
+        )
+
+        assertNotNull(first)
+        assertNotNull(second)
+        assertEquals(RuntimeOperationAction.START, tracker.current("project-a")?.action)
+        assertEquals(RuntimeOperationAction.PREPARE, tracker.current("project-b")?.action)
+    }
+
+    @Test
     fun bothProvidersReceiveActionDeadlines() {
         val startedAt = 4_000L
 
