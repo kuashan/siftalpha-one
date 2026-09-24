@@ -1964,3 +1964,35 @@ New support policy:
 - no requirement to pin obsolete Catalina-era Docker/Compose solely for OS compatibility.
 
 No production code was changed by this policy update.
+
+
+## 2026-09-24 · M6.1 Container Capability + Compose Detection/Plan implementation
+
+Approved M6.1 boundary implemented:
+- added platform-neutral Compose detection/planning to Core;
+- added safe YAML parsing for standard Compose manifests;
+- added service / dependency / port plan facts;
+- added macOS Docker + Podman discovery with AVAILABLE / UNAVAILABLE / UNKNOWN semantics;
+- published macOS CONTAINER_RUNTIME capability from adapter discovery;
+- attached Compose plan facts to imported macOS projects without replacing the existing language-runtime plan;
+- no container execution/STOP/log lifecycle added; M6.2 remains separate.
+
+CI wiring note:
+- Run #35 failed before a real Job because replacement-string handling corrupted grep lines in the first workflow edit;
+- workflow was rebuilt from the last valid M5 workflow using safe callback replacement;
+- no product behavior changed in this CI-only correction.
+
+## 2026-09-24 · M6.1 Cloud Verification PASS
+
+Authority:
+- functional HEAD `8fe74e86ed90490b84d63c894b0de5d37da2d45e`;
+- accepted cloud HEAD `7d3c102032b1aeaae9182b5b972ec17391e80ee7`;
+- macOS Run #36 PASS;
+- Android W0 #745 PASS;
+- M6.1 Compose/capability probe PASS;
+- cloud Docker/Podman absence correctly resolves to UNAVAILABLE rather than failure;
+- Compose service/dependency/port extraction PASS;
+- M4/M5/STOP regressions PASS;
+- Ventura app baseline `LSMinimumSystemVersion=13.0` PASS.
+
+M6.1 is **CLOUD PASS / REAL VENTURA PENDING**.
