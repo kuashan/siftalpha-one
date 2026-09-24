@@ -5,7 +5,6 @@ import com.siftalpha.studio.container.ComposeProjectPlanStatus
 import com.siftalpha.studio.runtime.RuntimeKind
 
 enum class MacNormalPrimaryAction {
-    INSTALL_CONTAINER,
     PREPARE,
     RUN,
     STOP,
@@ -54,7 +53,7 @@ object MacNormalProjectPresentationPolicy {
         val hasResult = !resultUrl.isNullOrBlank()
         val error = view.lastError
 
-        val composeInstallMustTakePriority =
+        val composeProvisionMustTakePriority =
             isCompose &&
                 !view.workflow.environmentReady &&
                 (
@@ -66,7 +65,7 @@ object MacNormalProjectPresentationPolicy {
                         )
                 )
 
-        if (!error.isNullOrBlank() && !composeInstallMustTakePriority) {
+        if (!error.isNullOrBlank() && !composeProvisionMustTakePriority) {
             val canRetry = view.workflow.lifecycle != ProjectLifecycleState.RUNNING
             return MacNormalProjectPresentation(
                 statusLabel = "需要处理",
@@ -105,11 +104,11 @@ object MacNormalProjectPresentationPolicy {
             val installProgress = view.containerInstallProgress
             if (installProgress?.active == true) {
                 return MacNormalProjectPresentation(
-                    statusLabel = "安装中",
-                    title = "正在准备容器环境",
-                    detail = installProgress.message,
+                    statusLabel = "准备中",
+                    title = "正在准备运行环境",
+                    detail = "SiftAlpha X 正在自动补齐当前项目需要的运行环境，请稍候。",
                     primaryAction = MacNormalPrimaryAction.NONE,
-                    primaryLabel = "安装中…",
+                    primaryLabel = "准备中…",
                     primaryEnabled = false,
                     resultAvailable = false,
                     resultUrl = null,
@@ -125,28 +124,22 @@ object MacNormalProjectPresentationPolicy {
                 advice != null &&
                 advice.state != MacContainerAdviceState.READY
             ) {
-                val installPlan = view.containerInstallPlan
-                val option = advice.suggestedOptions.firstOrNull()
-                val detail = buildString {
-                    append(advice.detail)
-                    if (installPlan != null) {
-                        append(" SiftAlpha 已生成可执行的推荐安装方案。")
-                    } else if (!option.isNullOrBlank()) {
-                        append(" 建议：" + option + "。")
-                    }
-                    advice.warnings.firstOrNull()?.let { append(" " + it) }
-                }
+                val canProvision = view.containerInstallPlan != null
                 return MacNormalProjectPresentation(
-                    statusLabel = "需要容器环境",
-                    title = advice.title,
-                    detail = detail,
-                    primaryAction = if (installPlan != null) {
-                        MacNormalPrimaryAction.INSTALL_CONTAINER
+                    statusLabel = "未准备",
+                    title = "项目还没准备好",
+                    detail = if (canProvision) {
+                        "SiftAlpha X 会自动准备运行这个项目所需的环境和依赖。"
+                    } else {
+                        "SiftAlpha X 还不能自动补齐当前缺失的运行能力。你可以在开发者模式查看具体原因。"
+                    },
+                    primaryAction = if (canProvision) {
+                        MacNormalPrimaryAction.PREPARE
                     } else {
                         MacNormalPrimaryAction.NONE
                     },
-                    primaryLabel = installPlan?.title,
-                    primaryEnabled = installPlan != null,
+                    primaryLabel = if (canProvision) "准备环境" else null,
+                    primaryEnabled = canProvision,
                     resultAvailable = false,
                     resultUrl = null,
                     showSecondaryStop = false,
@@ -193,12 +186,12 @@ object MacNormalProjectPresentationPolicy {
                 statusLabel = "未准备",
                 title = "项目还没准备好",
                 detail = if (isCompose) {
-                    "SiftAlpha X 会准备 Compose 所需镜像和构建内容，但不会在准备阶段启动服务。"
+                    "SiftAlpha X 会自动准备运行这个项目所需的环境、镜像和依赖。"
                 } else {
                     "SiftAlpha X 会准备运行环境并安装项目需要的依赖。"
                 },
                 primaryAction = MacNormalPrimaryAction.PREPARE,
-                primaryLabel = "准备项目",
+                primaryLabel = if (isCompose) "准备环境" else "准备项目",
                 primaryEnabled = true,
                 resultAvailable = false,
                 resultUrl = null,
@@ -211,7 +204,7 @@ object MacNormalProjectPresentationPolicy {
                 statusLabel = "准备中",
                 title = "正在准备项目",
                 detail = if (isCompose) {
-                    "SiftAlpha X 正在拉取或构建当前项目需要的容器镜像。"
+                    "SiftAlpha X 正在准备当前项目需要的运行环境和内容。"
                 } else {
                     "SiftAlpha X 正在准备运行环境和依赖。"
                 },
@@ -231,7 +224,7 @@ object MacNormalProjectPresentationPolicy {
                 statusLabel = if (view.workflow.lifecycle == ProjectLifecycleState.STOPPED) "已停止" else "已准备",
                 title = "可以运行",
                 detail = if (isCompose) {
-                    "容器镜像和项目运行条件已经准备完成。"
+                    "运行环境和项目依赖已经准备完成。"
                 } else {
                     "环境和项目依赖已经准备完成。"
                 },
