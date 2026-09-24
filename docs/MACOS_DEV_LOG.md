@@ -1580,3 +1580,16 @@ W0 #721 proved the M4.1 build had not reached Android runtime tests. Gradle conf
 `implementation(project(":core"))\\n implementation("org.tomlj:tomlj:1.1.1")`
 
 The approved-scope correction replaces the literal characters with a real newline. No M4.1 functional logic, Android runtime source, Core architecture, or M3 process semantics change.
+
+
+### M4.1 macOS Run #14 Kotlin import wiring correction
+
+Run #14 reached real Kotlin compilation and failed in `SiftAlphaMacApp.kt` before M4.1 logic executed.
+
+Root cause:
+- the import insertion contained a literal `\\n` between `JFileChooser` and `JFrame`;
+- Kotlin therefore parsed the whole line as invalid source and reported syntax errors plus unresolved `JFrame` references.
+
+Approved-scope correction:
+- replace the literal characters with a real source newline;
+- no M4.1 behavior, Core logic, Android runtime behavior, or frozen boundary changes.
