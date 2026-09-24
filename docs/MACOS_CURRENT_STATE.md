@@ -12,7 +12,7 @@
 - M1 Core Boundary（核心边界）：PASS / CLOSED（通过 / 关闭）
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
-- 当前阶段：**M6 — Container / Multi-service（容器 / 多服务）— M6.1 CLOUD PASS / REAL VENTURA PENDING**
+- 当前阶段：**M6 — Container / Multi-service（容器 / 多服务）— M6.1 PASS / COMPLETE；M6.2 NOT STARTED**
 - M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 PASS / COMPLETE；M4 PASS / CLOSED（M4 已通过并关闭）**
 - M5 implementation（实现）：**M5.1 PASS / COMPLETE；M5.2 PASS / COMPLETE；M5 PASS / CLOSED（M5 已通过并关闭）**
 
@@ -117,7 +117,7 @@ Real Mac（真实 Mac）还确认：
 - Web Discovery / Endpoint Probe（网页发现 / 端点探测）的 macOS 项目工作流接线
 - macOS secure storage（苹果安全存储）
 - Normal Mode / Developer Mode（普通模式 / 开发者模式）正式产品 UI
-- Container / Compose / Multi-service（容器 / 多服务）
+- Container execution / Compose runtime lifecycle / Multi-service orchestration（容器执行 / Compose 运行生命周期 / 多服务编排；M6.2）
 - OpenBot（开放机器人）真实验收
 - Developer ID / Hardened Runtime / Notarization / DMG-PKG（签名 / 强化运行时 / 公证 / 正式分发）
 
@@ -803,6 +803,35 @@ Ventura packaging:
 
 Current M6.1 state:
 
-**CLOUD PASS / REAL VENTURA PENDING（云端通过 / 真实 Ventura 待验收）**.
+**PASS / COMPLETE（通过 / 完成）**.
 
-M6.2 must not start until M6.1 real-machine capability/detection acceptance is resolved and its next-slice boundary remains unchanged.
+Real Ventura capability/detection acceptance has passed. M6.2 remains NOT STARTED and still requires its own implementation approval.
+
+
+## 28. M6.1 Real Ventura Acceptance（真实 Ventura 验收）— PASS / COMPLETE
+
+Acceptance host:
+- macOS 13.7.8 Ventura
+- Intel x86_64
+
+Real probe evidence:
+- `SIFTALPHA_MACOS_HOST=READY`;
+- `SIFTALPHA_CORE_LOAD=PASS`;
+- `host_process_execution = AVAILABLE`;
+- `container_runtime = UNAVAILABLE`;
+- Docker provider = `UNAVAILABLE`;
+- Podman provider = `UNAVAILABLE`;
+- managed Python = `AVAILABLE` / Python 3.14.7;
+- shell = `AVAILABLE` / zsh 5.9 x86_64;
+- missing Docker/Podman was correctly represented as a valid capability fact rather than a project/runtime failure.
+
+Observed first-launch note:
+- one initial probe invocation was terminated by the OS shell as `killed`;
+- the immediately repeated identical probe completed normally with full valid output;
+- because the same binary then completed all required diagnostics, this is not a current M6.1 blocker.
+
+M6.1 final result:
+
+**PASS / COMPLETE**.
+
+M6.2 — Compose Runtime Workflow + Project Isolation remains **NOT STARTED**.
