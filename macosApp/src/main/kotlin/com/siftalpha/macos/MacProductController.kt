@@ -63,6 +63,9 @@ class MacProductController(
     private val containerProviderSnapshotSource: () -> List<MacContainerProviderSnapshot> = {
         MacContainerRuntimeDiscovery().discoverAll()
     },
+    private val composeProviderFactory:
+        (Collection<MacContainerProviderSnapshot>) -> MacComposeContainerProvider? =
+        MacComposeProviderSelector::select,
     private val systemFacts: MacSystemFacts = MacSystemFactsDiscovery.discover(),
     processControl: MacProjectProcessControl = MacProjectProcessControl(),
     dataRoot: File = MacProjectEnvironmentManager.defaultDataRoot(),
@@ -80,7 +83,7 @@ class MacProductController(
         processControl = processControl,
         environmentManager = environmentManager,
         containerProviderSource = {
-            MacComposeProviderSelector.select(latestContainerProviders)
+            composeProviderFactory(latestContainerProviders)
         },
     )
     private val projects = LinkedHashMap<String, MacProductProject>()
