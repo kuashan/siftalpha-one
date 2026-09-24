@@ -34,6 +34,17 @@ data class MacWorkflowStatus(
     val webEndpoint: MacProjectWebEndpoint?,
 )
 
+data class MacWorkflowDiagnostics(
+    val status: MacWorkflowStatus,
+    val environment: MacPreparedEnvironment?,
+    val entrypoint: String?,
+    val ownedPids: Set<Long>,
+    val stdout: String,
+    val stderr: String,
+    val combinedLogs: String,
+    val logsTruncated: Boolean,
+)
+
 class MacProjectWorkflowCoordinator(
     private val processControl: MacProjectProcessControl = MacProjectProcessControl(),
     private val environmentManager: MacProjectEnvironmentManager = MacProjectEnvironmentManager(
@@ -203,6 +214,51 @@ class MacProjectWorkflowCoordinator(
 
     fun webEndpoint(projectId: String): MacProjectWebEndpoint? =
         webDiscovery.discover(ProjectProcessScope(projectId), logs(projectId))
+
+    fun diagnostics(projectId: String, maxBytes: Int = 512 * 1024): MacWorkflowDiagnostics {
+        val state = state(projectId)
+        val scope = ProjectProcessScope(projectId)
+        val processLogs = processControl.logs(scope, maxBytes)
+        val history = synchronized(state.history) { state.history.toString() }
+        val combined = buildString {
+            append(history)
+            if (processLogs.stdout.isNotBlank()) {
+                append("\n--- stdout ---\n")
+                append(processLogs.stdout)
+            }
+            if (processLogs.stderr.isNotBlank()) {
+                append("\n--- stderr ---\n")
+                append(processLogs.stderr)
+            }
+        }.takeLast(maxBytes)
+        return MacWorkflowDiagnostics(
+            status = status(projectId),
+            environment = environmentManager.currentEnvironment(projectId),
+            entrypoint = entrypoint(projectId),
+            ownedPids = processControl.ownedPids(scope),
+            stdout = processLogs.stdout,
+            stderr = processLogs.stderr,
+            combinedLogs = combined,
+            logsTruncated = processLogs.truncated,
+        )
+    }
+
+    fun entrypoint(projectId: String): String? {
+        val context = state(projectId).context ?: return null
+        return when (context.plan.needs?.primaryRuntime) {
+            RuntimeKind.PYTHON -> EmbeddedPythonEntrypointPolicy.resolve(
+                declaredEntry = null,
+                filePaths = context.snapshot.relativePaths,
+            )
+            RuntimeKind.NODE_JS -> {
+                val packageText = context.snapshot.packageJsonText.orEmpty()
+                val hasStart = Regex("""["']start["']\\s*:""").containsMatchIn(packageText)
+                val contract = NodeStartContractPolicy.resolve(null, hasStart)
+                if (contract is NodeStartContractPolicy.Result.Resolved) contract.command else null
+            }
+            else -> null
+        }
+    }
 
     fun status(projectId: String): MacWorkflowStatus {
         val state = state(projectId)
