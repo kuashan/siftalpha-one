@@ -617,7 +617,7 @@ M4.2 is not closed until M4.2-15 passes.
 **M4 = PASS / CLOSED（通过 / 关闭）**
 
 Next stage:
-**M5 — Product UI Parity（产品界面对齐） — CURRENT / M5.2 CLOUD PASS / REAL MAC PENDING**.
+**M5 — Product UI Parity（产品界面对齐） — PASS / CLOSED（通过 / 关闭）**.
 
 
 ### M5.1 Normal Mode Product UI Verification（验证）
@@ -670,14 +670,30 @@ M5.2 remains NOT STARTED. No additional M5.1 verification is required unless a l
 | M5.2-14 | M4.2 regression | managed-Python full workflow remains PASS | PASS — Run #34 |
 | M5.2-15 | Android regression | Android W0 PASS | PASS — W0 #743 |
 | M5.2-16 | Catalina packaging | minimum remains 10.15.7-compatible | PASS — Run #34 |
-| M5.2-17 | Real Mac shared-state acceptance | frozen Normal ↔ Developer scenario on Catalina | REAL MAC PENDING |
+| M5.2-17 | Real Mac shared-state acceptance | frozen Normal ↔ Developer scenario on Catalina | PASS — real Catalina 10.15.7 / Intel x86_64 |
 
 Current M5.2 result:
-**16 / 17 PASS — CLOUD PASS / REAL MAC PENDING**.
+**17 / 17 PASS — PASS / COMPLETE**.
 
-M5 Final Closure Audit（最终关闭审计） remains blocked only by M5.2 real Mac acceptance. Do not create M5.3 / M5.4.
+M5 Final Closure Audit（最终关闭审计）: **PASS / CLOSED**. Do not create M5.3 / M5.4.
 
 
 #### M5.2 real-Mac repair note
 
-Before final real-Mac acceptance, the Developer Mode surface was repaired to add direct project import and Simplified Chinese presentation. Repair HEAD `9e6f3ccb9259704f3efe4f898a97ae3f054f1b33`; macOS Run #34 PASS; Android W0 #743 PASS. M5.2-17 remains REAL MAC PENDING and is the only closure blocker.
+Before final real-Mac acceptance, the Developer Mode surface was repaired to add direct project import and Simplified Chinese presentation. Repair HEAD `9e6f3ccb9259704f3efe4f898a97ae3f054f1b33`; macOS Run #34 PASS; Android W0 #743 PASS. M5.2-17 is PASS on the real Catalina machine; no M5 closure blocker remains.
+
+
+### M5 Final Closure Audit（最终关闭审计）
+
+| Frozen Exit Criterion（冻结退出条件） | Status（状态） |
+| --- | --- |
+| Normal Mode Import → Prepare → Run → Result → Stop | PASS |
+| Developer Mode advanced Runtime / Process / Web / Logs facts | PASS |
+| Normal Mode and Developer Mode read the same Runtime State | PASS |
+| No second Lifecycle / Coordinator | PASS |
+| Android W0 regression | PASS — #743 |
+| Catalina 10.15.7 real Mac acceptance | PASS |
+
+**M5 = PASS / CLOSED（通过 / 关闭）**.
+
+Backlog-only polish cannot reopen M5. Next stage is M6 — Container / Multi-service（容器 / 多服务）, currently NOT STARTED.
