@@ -736,3 +736,30 @@ Current M6.1 result:
 **15 / 15 PASS — PASS / COMPLETE**.
 
 M6.2 Compose Runtime Workflow + Project Isolation remains NOT STARTED.
+
+
+### M6.2 Compose Runtime Workflow + Project Isolation Verification（验证）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| M6.2-01 | Universal provider boundary | no machine/vendor special case in Core | PASS |
+| M6.2-02 | Environment Advisor | system/resource/provider facts produce advice without auto-install | PASS |
+| M6.2-03 | Provider selection | compatible Docker preferred; compatible Podman allowed | PASS |
+| M6.2-04 | Stable project identity | A and B receive distinct stable Compose identities | PASS |
+| M6.2-05 | Compose Prepare | image pull/build path routed through provider | PASS — controlled provider probe |
+| M6.2-06 | Compose Run | A and B start through shared coordinator | PASS |
+| M6.2-07 | Multi-service status | db + web reported RUNNING | PASS |
+| M6.2-08 | Compose Logs | project-scoped logs available | PASS |
+| M6.2-09 | Runtime port discovery | active mapped port → Endpoint Probe → Web URL | PASS — source CONTAINER_PORT |
+| M6.2-10 | Project-scoped STOP | Stop A does not stop B | PASS — B remains RUNNING |
+| M6.2-11 | Restart | stopped A returns to RUNNING | PASS |
+| M6.2-12 | Normal / Developer shared state | one Controller / Coordinator | PASS |
+| M6.2-13 | M4/M5/M6.1 regressions | previous workflows remain valid | PASS — Run #39 |
+| M6.2-14 | Android regression | W0 PASS | PASS — W0 #748 |
+| M6.2-15 | Ventura package | LSMinimumSystemVersion = 13.0 | PASS — Run #39 |
+| M6.2-16 | Real supported Mac with real Docker/Podman + Compose | full Prepare→Run→Status→Logs→Web→Stop→Restart and A/B isolation | REAL VENTURA PENDING |
+
+Current M6.2 result:
+**15 / 16 PASS — CLOUD PASS / REAL VENTURA PENDING**.
+
+M6 Final Closure Audit remains NOT STARTED.
