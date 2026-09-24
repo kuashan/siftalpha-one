@@ -126,7 +126,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - 两种模式读取同一个 Runtime（运行时）状态。
 - 不存在两套独立生命周期。
 
-当前状态：**M5.1 PASS / COMPLETE；M5.2 CLOUD PASS / REAL MAC PENDING**
+当前状态：**M5.1 PASS / COMPLETE；M5.2 PASS / COMPLETE；M5 PASS / CLOSED**
 
 ## M6 — Container / Multi-service（容器 / 多服务）
 
@@ -647,7 +647,7 @@ Authority:
 - Android W0 #732 PASS;
 - real macOS 10.15.7 Catalina / Intel x86_64 acceptance PASS.
 
-M5.2 remains NOT STARTED. No additional M5.1 verification is required unless a later regression explicitly touches this surface.
+M5.2 is now PASS / COMPLETE. No additional M5.1 verification is required unless a later regression explicitly touches this surface.
 
 
 ### M5.2 Developer Mode + Shared State Parity Verification（验证）
