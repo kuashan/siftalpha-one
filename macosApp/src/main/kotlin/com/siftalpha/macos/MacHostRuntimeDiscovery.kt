@@ -25,27 +25,51 @@ data class MacHostToolSnapshot(
 )
 
 /**
- * macOS Host Runtime Discovery（苹果主机运行时发现）.
+ * Passive macOS Host Runtime Discovery（被动式苹果主机运行时发现）.
  *
- * Finder-launched applications often inherit a smaller PATH than an interactive shell, so discovery
- * combines PATH with common Homebrew / MacPorts / Volta / asdf / Bun locations. Availability is
- * proven by a bounded version probe; executable-file existence alone is not treated as AVAILABLE.
+ * Discovery must never trigger installation UI. Catalina exposes some Apple developer-tool shims
+ * such as /usr/bin/python3 and /usr/bin/git even when Command Line Tools（命令行开发者工具） are not
+ * installed. Executing those shims opens the system installer, so they are skipped unless
+ * xcode-select proves developer tools are already configured.
+ *
+ * Python 2 is intentionally not accepted as the SiftAlpha host Python runtime. A candidate named
+ * "python" is still checked because user-managed installations may point it at Python 3.
  */
 class MacHostRuntimeDiscovery(
     private val environment: Map<String, String> = System.getenv(),
     private val userHome: File = File(System.getProperty("user.home")),
+    private val developerToolsAvailable: () -> Boolean = { detectAppleDeveloperTools() },
 ) {
     fun discoverAll(): List<MacHostToolSnapshot> =
         MacHostToolKind.entries.map(::discover)
 
     fun discover(kind: MacHostToolKind): MacHostToolSnapshot {
         val candidates = candidatePaths(kind).distinct()
+        val commandLineToolsAvailable by lazy(developerToolsAvailable)
         var firstFailure: String? = null
+
         for (candidate in candidates) {
             val file = File(candidate)
             if (!file.isFile || !file.canExecute()) continue
+
+            if (
+                MacHostDiscoveryPolicy.shouldSkipDeveloperToolStub(
+                    kind = kind,
+                    path = file.absolutePath,
+                    developerToolsAvailable = commandLineToolsAvailable,
+                )
+            ) {
+                if (firstFailure == null) {
+                    firstFailure = "Apple Command Line Tools are not installed; skipped developer-tool shim"
+                }
+                continue
+            }
+
             val probe = probeVersion(file.absolutePath, versionArguments(kind))
-            if (probe.exitCode == 0 && probe.output.isNotBlank()) {
+            if (
+                probe.exitCode == 0 &&
+                MacHostDiscoveryPolicy.acceptsVersion(kind, probe.output)
+            ) {
                 return MacHostToolSnapshot(
                     kind = kind,
                     availability = MacHostToolAvailability.AVAILABLE,
@@ -53,10 +77,16 @@ class MacHostRuntimeDiscovery(
                     version = probe.output.lineSequence().first().trim().take(240),
                 )
             }
+
             if (firstFailure == null) {
-                firstFailure = probe.detail ?: ("version probe failed for " + file.absolutePath)
+                firstFailure = when {
+                    probe.exitCode == 0 && kind == MacHostToolKind.PYTHON ->
+                        "Python 3 is required; legacy Python is not accepted"
+                    else -> probe.detail ?: ("version probe failed for " + file.absolutePath)
+                }
             }
         }
+
         return MacHostToolSnapshot(
             kind = kind,
             availability = MacHostToolAvailability.UNAVAILABLE,
@@ -78,14 +108,14 @@ class MacHostRuntimeDiscovery(
                 ?.split(File.pathSeparatorChar)
                 ?.filter(String::isNotBlank)
                 ?.forEach(::add)
-            add("/usr/bin")
-            add("/bin")
             add("/usr/local/bin")
             add("/opt/homebrew/bin")
             add("/opt/local/bin")
             add(File(userHome, ".volta/bin").absolutePath)
             add(File(userHome, ".asdf/shims").absolutePath)
             add(File(userHome, ".bun/bin").absolutePath)
+            add("/usr/bin")
+            add("/bin")
         }
 
         val paths = commonDirs.flatMap { dir ->
@@ -152,4 +182,48 @@ class MacHostRuntimeDiscovery(
         val output: String,
         val detail: String?,
     )
+
+    companion object {
+        private fun detectAppleDeveloperTools(): Boolean =
+            runCatching {
+                val process = ProcessBuilder("/usr/bin/xcode-select", "-p")
+                    .redirectErrorStream(true)
+                    .start()
+                val finished = process.waitFor(2, TimeUnit.SECONDS)
+                if (!finished) {
+                    process.destroyForcibly()
+                    false
+                } else {
+                    process.exitValue() == 0
+                }
+            }.getOrDefault(false)
+    }
+}
+
+/** Pure policy helpers kept testable without invoking macOS installation shims. */
+internal object MacHostDiscoveryPolicy {
+    fun shouldSkipDeveloperToolStub(
+        kind: MacHostToolKind,
+        path: String,
+        developerToolsAvailable: Boolean,
+    ): Boolean {
+        if (developerToolsAvailable) return false
+        return when (kind) {
+            MacHostToolKind.PYTHON -> path == "/usr/bin/python3"
+            MacHostToolKind.GIT -> path == "/usr/bin/git"
+            else -> false
+        }
+    }
+
+    fun acceptsVersion(
+        kind: MacHostToolKind,
+        output: String,
+    ): Boolean {
+        val firstLine = output.lineSequence().firstOrNull()?.trim().orEmpty()
+        if (firstLine.isBlank()) return false
+        return when (kind) {
+            MacHostToolKind.PYTHON -> Regex("""^Python\s+3(?:\.|\s|$)""").containsMatchIn(firstLine)
+            else -> true
+        }
+    }
 }

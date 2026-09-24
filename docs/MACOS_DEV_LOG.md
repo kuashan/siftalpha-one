@@ -1367,3 +1367,31 @@ Current status:
 **Cloud PASS（云端通过） / Real Mac M3 Self-Test Pending（真实 Mac M3 自检待完成）**.
 
 No M3 Closure Audit may run until the real macOS 10.15.7 self-test passes.
+
+
+## 2026-09-24 · M3.1 Catalina passive-discovery repair
+
+### Real-Mac evidence
+
+On macOS 10.15.7 Catalina, opening the M3.1 test package showed:
+
+- host process execution AVAILABLE;
+- shell AVAILABLE;
+- legacy Python 2.7.16 reported AVAILABLE;
+- Node.js / Bun / Git UNAVAILABLE;
+- macOS simultaneously displayed the system prompt asking to install Command Line Developer Tools for the `python3` command.
+
+### Root cause
+
+Catalina can expose Apple developer-tool shim executables even when Command Line Tools are not installed. The discovery implementation treated executable-file presence as safe to probe and executed `/usr/bin/python3 --version`, which triggered Apple's installer UI. After that failed candidate it accepted `/usr/bin/python` / Python 2.7.16.
+
+### Repair
+
+- discovery becomes passive: first check `xcode-select -p` without opening installation UI;
+- if developer tools are absent, skip the known `/usr/bin/python3` and `/usr/bin/git` shims;
+- keep user-managed Homebrew / MacPorts / asdf / PATH installations discoverable;
+- Python candidates are accepted only when the version probe reports Python 3;
+- legacy Python 2 is rejected as host Python;
+- add pure policy tests for Python 3 acceptance and developer-tool shim skipping.
+
+This remains part of the single M3.1 implementation slice. No M3.2 is created. Core and Android production source are unchanged.

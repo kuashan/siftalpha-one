@@ -518,3 +518,19 @@ Cloud runtime facts:
 - Catalina binary minimum OS checks: 10.12 / 10.12 / 10.12
 
 M3 尚未关闭。唯一剩余阶段阻塞项是 Real Mac M3 Self-Test（真实 Mac M3 自检）。
+
+
+### M3.1 Catalina real-Mac discovery regression — FIX IN PROGRESS
+
+Real macOS 10.15.7 acceptance exposed two discovery defects before the process self-test:
+
+- probing the Catalina `/usr/bin/python3` developer-tool shim opened the Apple Command Line Tools installer;
+- legacy system Python 2.7.16 was then accepted as SiftAlpha host Python.
+
+Required invariant:
+
+- Runtime Discovery（运行时发现） must be passive and must not trigger installation UI;
+- Python host capability means Python 3, not legacy Python 2;
+- when Command Line Tools are absent, Apple developer-tool shims for `/usr/bin/python3` and `/usr/bin/git` are skipped and reported as unavailable unless another real installation is found.
+
+M3 remains open. Cloud PASS from the previous package is retained as historical evidence but the corrected package must be re-verified before real-Mac acceptance resumes.

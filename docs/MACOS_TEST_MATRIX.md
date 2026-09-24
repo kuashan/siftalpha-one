@@ -482,3 +482,15 @@ Next stage（下一阶段）: **M3 — Host Runtime Provider（主机运行提�
 | M3-11 | Android regression（安卓回归） | W0 PASS | PASS — W0 #718 |
 | M3-12 | Catalina compatibility（Catalina 兼容） | packaged app remains compatible with 10.15.7 | CLOUD PASS |
 | M3-13 | Real Mac M3 Self-Test（真实 Mac 自检） | diagnostic button reports PASS | REAL MAC PENDING |
+
+
+### M3.1 Catalina passive discovery regression
+
+| Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- |
+| Opening M3 app without CLT（未安装命令行工具时打开） | no Apple installer prompt | RE-VERIFY PENDING |
+| Catalina `/usr/bin/python3` shim | skipped when CLT absent | CLOUD RE-VERIFY PENDING |
+| Catalina `/usr/bin/git` shim | skipped when CLT absent | CLOUD RE-VERIFY PENDING |
+| Legacy Python 2.7 | not accepted as SiftAlpha host Python | CLOUD RE-VERIFY PENDING |
+| User-installed Python 3 / Git | remains discoverable | CLOUD RE-VERIFY PENDING |
+| Real Mac M3 Self-Test（真实 Mac 自检） | PASS after passive discovery repair | REAL MAC PENDING |
