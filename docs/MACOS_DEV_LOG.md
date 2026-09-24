@@ -1182,3 +1182,19 @@ Cloud status at implementation commit: **PENDING（待完成）**.
 Initial Catalina rebuild push triggered macOS Run #2, but GitHub rejected the workflow before creating any job because the embedded Python heredoc body was not indented as YAML block content. No macOS build or compatibility check executed in that run.
 
 The workflow-only correction indents the heredoc correctly; functional macOS host source and Core（核心） remain unchanged.
+
+
+### Catalina Run #3 packaging-script correction
+
+macOS Host Skeleton Run #3 reached the real packaging step and proved:
+- Liberica JDK 17.0.20 x64 setup: PASS.
+- Intel x86_64 toolchain: PASS.
+- Core build/tests: PASS.
+- Core load probe: PASS.
+- Android dependency leak check: PASS.
+- generated SiftAlpha launcher architecture: x86_64.
+- Info.plist `LSMinimumSystemVersion`: 10.15.
+
+Run #3 then failed before Mach-O minimum-version assertions because the shell heredoc used by the assertion helper retained indentation after YAML decoding, causing `syntax error: unexpected end of file`.
+
+No compatibility rejection occurred. The assertion helper is replaced with a single-line Python version comparison so the next run can execute the actual launcher/libjli/libjvm minimum-OS checks.
