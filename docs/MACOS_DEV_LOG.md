@@ -1781,3 +1781,23 @@ Final:
 **M4 — Project Workflow = PASS / CLOSED**.
 
 Per governance, do not create further mandatory M4.x slices. Move to M5 Product UI Parity after its plan is discussed and approved.
+
+
+## 2026-09-24 · M5.1 Normal Mode Product UI implementation started
+
+Approved product direction:
+- Project-first + State-driven + One Primary Action;
+- Calm Precision Tech visual language;
+- desktop layout rather than copying the Android mobile layout;
+- original SiftAlpha X logo artwork reused as a packaged desktop resource;
+- no raw runtime diagnostics in Normal Mode;
+- no second lifecycle/state machine.
+
+Implementation architecture:
+- `MacProductController` owns imported-project presentation state and delegates all Prepare / Run / Stop / Restart / result facts to the single M4 `MacProjectWorkflowCoordinator`;
+- `MacNormalProjectPresentationPolicy` maps shared lifecycle facts into ordinary-user status copy and one primary action;
+- `MacNormalModeWindow` renders Projects + Workspace + Result using Swing, keeping Catalina-safe JDK/Swing packaging;
+- a periodic read-only refresh observes the same Coordinator so result availability appears without requiring a manual state machine;
+- Developer Mode is intentionally deferred to M5.2 and will reuse the same controller.
+
+No M4 runtime/provider behavior or Android production UI is changed.

@@ -501,3 +501,29 @@ Per Stage Closure Rule（阶段关闭规则）:
 - non-blocking refinements move to Backlog（待办）;
 - current stage advances to:
   **M5 — Product UI Parity（产品界面对齐）**.
+
+
+## 21. M5.1 Normal Mode Product UI（普通模式产品界面）— IMPLEMENTATION STARTED
+
+User-approved M5 finite plan:
+- M5.1 Normal Mode Product UI（普通模式产品界面）
+- M5.2 Developer Mode + Shared State Parity（开发者模式 + 共享状态对齐）
+- then one M5 Closure Audit（关闭审计）
+
+M5.1 scope:
+
+- replace the temporary M4 engineering window with a real Normal Mode desktop product shell;
+- preserve SiftAlpha X brand hierarchy and reuse the repository's original logo artwork;
+- use a desktop two-pane layout: Projects（项目列表） + Project Workspace（项目工作区）;
+- support project search and All / Python / Node filters;
+- Import Project（导入项目） remains the current real folder-import capability; no fake GitHub/ZIP feature is added;
+- state card and One Primary Action（单一主操作） are derived from the existing shared `ProjectLifecycleState`, not from a new UI state machine;
+- ordinary users see Prepare / Run / Stop / Open Result actions without raw PID/runtime diagnostics;
+- Open Result（打开结果） and Refresh（刷新） remain discoverable secondary actions;
+- when a result is available while the process is still running, Open Result becomes primary and Stop remains available as a secondary action;
+- Result uses the already-verified Web Endpoint and opens through the system browser; M5.1 does not add Chromium/JCEF;
+- all actions are executed through one `MacProductController` backed by the existing single `MacProjectWorkflowCoordinator`;
+- M5.2 will attach Developer Mode to this same controller rather than creating another coordinator;
+- no Runtime / Process Control / Environment / STOP semantics change.
+
+M5.1 remains IN PROGRESS until cloud product-state verification and real Catalina UI acceptance pass.

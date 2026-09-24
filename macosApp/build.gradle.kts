@@ -16,3 +16,10 @@ dependencies {
 application {
     mainClass.set("com.siftalpha.macos.SiftAlphaMacAppKt")
 }
+
+
+tasks.processResources {
+    from(rootProject.file("app/src/main/res/drawable-nodpi/siftalpha_app_icon.png")) {
+        rename { "siftalpha_logo.png" }
+    }
+}

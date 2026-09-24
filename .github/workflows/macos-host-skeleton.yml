@@ -120,6 +120,21 @@ jobs:
           grep -q '^SIFTALPHA_M42=restart=true$' macos-evidence/m4-workflow-probe.txt
           grep -q '^SIFTALPHA_M42=final_stop=true$' macos-evidence/m4-workflow-probe.txt
 
+      - name: Prove M5.1 Normal Mode product-state flow
+        run: |
+          set -euo pipefail
+          "$JAVA_HOME/bin/java" \
+            -Dsiftalpha.managed.python.root="$PWD/macos-managed-python/python" \
+            -cp "macosApp/build/install/macosApp/lib/*" \
+            com.siftalpha.macos.SiftAlphaMacAppKt --m5-normal-ui-probe \
+            | tee macos-evidence/m5-normal-ui-probe.txt
+          grep -q '^SIFTALPHA_M51_NORMAL_PROBE=PASS$' macos-evidence/m5-normal-ui-probe.txt
+          grep -q '^SIFTALPHA_M51=initial_action=PREPARE$' macos-evidence/m5-normal-ui-probe.txt
+          grep -q '^SIFTALPHA_M51=after_prepare_action=RUN$' macos-evidence/m5-normal-ui-probe.txt
+          grep -q '^SIFTALPHA_M51=running_action=OPEN_RESULT$' macos-evidence/m5-normal-ui-probe.txt
+          grep -q '^SIFTALPHA_M51=running_secondary_stop=true$' macos-evidence/m5-normal-ui-probe.txt
+          grep -q '^SIFTALPHA_M51=after_stop_action=RUN$' macos-evidence/m5-normal-ui-probe.txt
+
       - name: Prove project-scoped macOS process control
         run: |
           set -euo pipefail
@@ -223,17 +238,17 @@ jobs:
           find "$APP" -maxdepth 4 -type f | sort | tee macos-evidence/app-files.txt
           ditto -c -k --sequesterRsrc --keepParent \
             "$APP" \
-            macos-dist/SiftAlpha-X-m4.2-catalina-x64.zip
-          shasum -a 256 macos-dist/SiftAlpha-X-m4.2-catalina-x64.zip \
+            macos-dist/SiftAlpha-X-m5.1-catalina-x64.zip
+          shasum -a 256 macos-dist/SiftAlpha-X-m5.1-catalina-x64.zip \
             | tee macos-evidence/app-zip-sha256.txt
 
       - name: Upload macOS app and evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: siftalpha-macos-m4.2-catalina-x64-${{ github.run_number }}
+          name: siftalpha-macos-m5.1-catalina-x64-${{ github.run_number }}
           path: |
-            macos-dist/SiftAlpha-X-m4.2-catalina-x64.zip
+            macos-dist/SiftAlpha-X-m5.1-catalina-x64.zip
             macos-evidence
           if-no-files-found: warn
           retention-days: 14
