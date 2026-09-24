@@ -332,6 +332,12 @@ class MacDeveloperModeWindow(
                         (view.containerAdvice?.title ?: "—") +
                         (view.containerAdvice?.detail?.let { " / " + it } ?: ""),
                 )
+                view.containerAdvice?.suggestedOptions.orEmpty().forEach { option ->
+                    appendLine("  建议选项: " + option)
+                }
+                view.containerAdvice?.warnings.orEmpty().forEach { warning ->
+                    appendLine("  资源提示: " + warning)
+                }
                 if (view.containerServices.isNotEmpty()) {
                     appendLine("服务 Services:")
                     view.containerServices.forEach { service ->
