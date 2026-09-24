@@ -158,7 +158,7 @@ class MacProjectEnvironmentManager(
         val pipCheck = runCommand(
             projectId = project.projectId,
             executable = envPython,
-            arguments = listOf("-m", "pip", "check", "--disable-pip-version-check"),
+            arguments = listOf("-m", "pip", "--disable-pip-version-check", "check"),
             workingDirectory = project.canonicalRootPath,
             cancelled = cancelled,
             log = log,
@@ -275,7 +275,7 @@ class MacProjectEnvironmentManager(
         log: (String) -> Unit,
     ): CommandResult {
         val scope = ProjectProcessScope(projectId)
-        return try {
+        try {
             processControl.start(
                 ProjectProcessLaunchRequest(
                     scope = scope,
@@ -295,7 +295,7 @@ class MacProjectEnvironmentManager(
                     appendCommandLogs(logs.stdout, logs.stderr, log)
                     return CommandResult(false, true, "operation cancelled")
                 }
-                when (val state = processControl.status(scope).state) {
+                when (processControl.status(scope).state) {
                     ProjectProcessState.RUNNING,
                     ProjectProcessState.STARTING,
                     -> Thread.sleep(40)
@@ -324,7 +324,7 @@ class MacProjectEnvironmentManager(
                 }
             }
         } catch (error: Throwable) {
-            CommandResult(false, false, error.message ?: error.javaClass.simpleName)
+            return CommandResult(false, false, error.message ?: error.javaClass.simpleName)
         }
     }
 

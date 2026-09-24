@@ -1,5 +1,6 @@
 package com.siftalpha.macos
 
+import java.io.File
 import java.nio.file.Files
 
 data class MacM42SelfTestResult(
