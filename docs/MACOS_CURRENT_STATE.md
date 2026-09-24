@@ -390,3 +390,27 @@ M2 仍保持 **4 / 6**；真实 Mac 启动 / 退出与最终真实 Mac 验收仍
 Catalina-compatible package rebuild（Catalina 兼容测试包重建）已完成。
 
 M2 stage（M2 阶段）本身仍保持 **4 / 6**，仅剩真实 macOS 10.15.7 机器上的 GUI launch / normal exit（图形界面启动 / 正常退出）与最终 Real Mac acceptance（真实 Mac 验收）。
+
+
+## 20. macOS Minimum Version Policy（macOS 最低系统版本策略）
+
+当前最低支持版本冻结为：
+
+**macOS 10.15.7 Catalina**
+
+规则：
+
+- 在现有功能与后续功能能够继续兼容 Catalina（10.15.7）的前提下，不主动提高最低系统版本。
+- 新功能设计优先寻找仍兼容 10.15.7 的实现方式，但不得为了维持旧系统兼容而破坏安全性、正确性或核心架构。
+- 只有当某项必要功能、Apple system API（苹果系统接口）、第三方运行时、签名/公证链、容器/虚拟化能力或其他硬性依赖明确要求更高 macOS 版本时，才允许提出提高最低版本。
+- 在提高最低版本之前，必须先向用户说明：
+  1. 哪个具体功能或依赖导致升级要求；
+  2. 为什么 10.15.7 已无法继续支持；
+  3. 新的最低 macOS 版本；
+  4. 对现有 Catalina 用户的影响。
+- 未经明确确认，不把最低系统版本从 10.15.7 提高。
+
+当前 M2.1 Catalina x64 测试包已经验证：
+- `LSMinimumSystemVersion=10.15`
+- launcher / bundled JVM minimum OS = 10.12
+- 因此当前 M2.1 技术栈继续支持 macOS 10.15.7。

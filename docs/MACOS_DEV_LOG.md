@@ -1223,3 +1223,18 @@ macOS Host Skeleton Run #4 completed successfully. Evidence:
 - final inner ZIP SHA-256: `6a426bdcc73392bddebad9eb89aa80657f8c64038b8dcb3d354e5212a9d6a654`.
 
 The Catalina-compatible M2.1 rebuild task is **PASS / COMPLETE（通过 / 完成）**. M2 remains open only for real-Mac launch/exit acceptance.
+
+
+## 2026-09-24 · macOS 10.15.7 minimum-version policy frozen
+
+User decision:
+
+Keep macOS 10.15.7 Catalina as SiftAlpha's minimum supported macOS version for now.
+
+Development rule:
+- do not raise the minimum macOS version merely for convenience;
+- continue using Catalina-compatible implementations when they remain correct and maintainable;
+- if a future mandatory feature/API/runtime requires a newer system, report the concrete dependency, reason, proposed new minimum version, and user impact before changing the support floor;
+- no silent minimum-version bump.
+
+This policy is compatible with the current M2.1 Catalina x64 package evidence.
