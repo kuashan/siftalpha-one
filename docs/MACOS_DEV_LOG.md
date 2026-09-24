@@ -1650,3 +1650,17 @@ Approved-scope repair:
 - rename the M4.1 package/artifact filenames from stale `m3.1` labels to `m4.1`.
 
 No M4.1 project detection logic, Core architecture, Android runtime behavior, Catalina support floor, or M3 process semantics change.
+
+
+### M4.1 macOS Run #16 workflow-generation correction
+
+Run #16 again failed before Job creation because the workflow-editing script used JavaScript replacement text containing the shell pattern `$'`. The replacement engine interpreted that token specially and duplicated the YAML suffix.
+
+Correction:
+- restore the exact Run #15 PASS workflow as the only structural baseline;
+- apply the launcher repair using index slicing rather than JavaScript replacement semantics;
+- use `grep -Fxq 'java-options=X'` for the packaged-launcher guard, avoiding `$'` entirely;
+- retain the removal of the unsafe jpackage display-name Java option;
+- retain M4.1 artifact naming.
+
+No product logic changes.
