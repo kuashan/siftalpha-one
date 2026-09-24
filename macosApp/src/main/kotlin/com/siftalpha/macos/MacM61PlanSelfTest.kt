@@ -41,7 +41,7 @@ object MacM61PlanSelfTest {
             val controller = MacProductController(
                 discovery = emptyList(),
                 managedPython = null,
-                containerProviders = listOf(availableProvider),
+                containerProviderSnapshotSource = { listOf(availableProvider) },
                 dataRoot = temp.resolve("data"),
             )
             val imported = controller.importProject(project)
