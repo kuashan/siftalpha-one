@@ -590,10 +590,12 @@ class MacNormalModeWindow(
         statePill.setStatus(
             p.statusLabel,
             running = view.workflow.lifecycle == com.siftalpha.core.lifecycle.ProjectLifecycleState.RUNNING,
-            warning = p.statusLabel.contains("失败") || p.statusLabel.contains("处理"),
+            warning = p.statusLabel.contains("失败") ||
+                p.statusLabel.contains("处理") ||
+                p.statusLabel.contains("容器"),
         )
         statusTitle.text = p.title
-        statusDetail.text = p.detail
+        statusDetail.text = wrapHtml(p.detail, 560)
 
         configurePrimary(p.primaryLabel ?: "暂不可用", p.primaryEnabled) {
             performPrimaryAction()
@@ -628,6 +630,7 @@ class MacNormalModeWindow(
         }
         val view = controller.view(id) ?: return
         when (MacNormalProjectPresentationPolicy.resolve(view).primaryAction) {
+            MacNormalPrimaryAction.INSTALL_CONTAINER -> confirmAndInstallContainer(view)
             MacNormalPrimaryAction.PREPARE ->
                 runProjectOperation("正在准备项目…") { projectId -> controller.prepare(projectId).success }
             MacNormalPrimaryAction.RUN ->
@@ -637,6 +640,41 @@ class MacNormalModeWindow(
             MacNormalPrimaryAction.OPEN_RESULT -> openResult()
             MacNormalPrimaryAction.NONE -> Unit
         }
+    }
+
+    private fun confirmAndInstallContainer(view: MacProductProjectView) {
+        val id = view.project.projectId
+        val plan = view.containerInstallPlan ?: return
+        val message = buildString {
+            appendLine(plan.detail)
+            appendLine()
+            appendLine("将安装：")
+            plan.components.forEach { appendLine("• " + it) }
+            appendLine()
+            appendLine("将进行：")
+            plan.sideEffects.forEach { appendLine("• " + it) }
+            appendLine()
+            append("是否继续？")
+        }
+        val choice = JOptionPane.showConfirmDialog(
+            frame,
+            message,
+            plan.title,
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE,
+        )
+        if (choice != JOptionPane.YES_OPTION) return
+
+        statusTitle.text = "正在安装容器环境"
+        statusDetail.text = wrapHtml("SiftAlpha 正在下载、安装并验证推荐容器环境。完成后会自动重新检测并继续准备当前项目。", 560)
+        primaryButton.isEnabled = false
+
+        Thread {
+            controller.installRecommendedContainerAndPrepare(id)
+            SwingUtilities.invokeLater {
+                refreshProjects(selectProjectId = id)
+            }
+        }.start()
     }
 
     private fun runProjectOperation(message: String, operation: (String) -> Boolean) {
@@ -663,6 +701,14 @@ class MacNormalModeWindow(
             },
         ).show()
     }
+
+    private fun wrapHtml(value: String, width: Int): String =
+        "<html><div style='width:" + width + "px'>" +
+            value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;") +
+            "</div></html>"
 
     private fun openResult() {
         val id = selectedProjectId ?: return
