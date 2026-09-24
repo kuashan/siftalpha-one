@@ -25,6 +25,8 @@ data class MacProductProjectView(
     val workflow: MacWorkflowStatus,
     val lastError: String?,
     val containerAdvice: MacContainerEnvironmentAdvice? = null,
+    val containerInstallPlan: MacContainerInstallPlan? = null,
+    val containerInstallProgress: MacContainerInstallProgress? = null,
 ) {
     val resultUrl: String? get() = workflow.webEndpoint?.url
 }
@@ -42,6 +44,8 @@ data class MacDeveloperProjectView(
     val logsTruncated: Boolean,
     val lastError: String?,
     val containerAdvice: MacContainerEnvironmentAdvice? = null,
+    val containerInstallPlan: MacContainerInstallPlan? = null,
+    val containerInstallProgress: MacContainerInstallProgress? = null,
     val containerProvider: String? = null,
     val composeProjectName: String? = null,
     val containerServices: List<MacComposeServiceStatus> = emptyList(),
@@ -67,6 +71,8 @@ class MacProductController(
         (Collection<MacContainerProviderSnapshot>) -> MacComposeContainerProvider? =
         MacComposeProviderSelector::select,
     private val systemFacts: MacSystemFacts = MacSystemFactsDiscovery.discover(),
+    private val containerInstaller: MacContainerEnvironmentInstaller =
+        MacManagedContainerInstaller(systemFacts),
     processControl: MacProjectProcessControl = MacProjectProcessControl(),
     dataRoot: File = MacProjectEnvironmentManager.defaultDataRoot(),
 ) {
@@ -88,6 +94,8 @@ class MacProductController(
     )
     private val projects = LinkedHashMap<String, MacProductProject>()
     private val lastErrors = ConcurrentHashMap<String, String?>()
+    private val containerInstallProgress = ConcurrentHashMap<String, MacContainerInstallProgress>()
+    private val containerInstallLogs = ConcurrentHashMap<String, StringBuilder>()
     private val managedPythonVersion: String? by lazy { managedPython?.version() }
 
     @Synchronized
@@ -130,6 +138,8 @@ class MacProductController(
             workflow = coordinator.status(projectId),
             lastError = lastErrors[projectId],
             containerAdvice = adviceFor(product),
+            containerInstallPlan = installPlanFor(product),
+            containerInstallProgress = containerInstallProgress[projectId],
         )
     }
 
@@ -162,10 +172,83 @@ class MacProductController(
             logsTruncated = diagnostics.logsTruncated,
             lastError = lastErrors[projectId],
             containerAdvice = adviceFor(product),
+            containerInstallPlan = installPlanFor(product),
+            containerInstallProgress = containerInstallProgress[projectId],
             containerProvider = diagnostics.containerProvider,
             composeProjectName = diagnostics.composeProjectName,
             containerServices = diagnostics.containerServices,
         )
+    }
+
+    fun installRecommendedContainerAndPrepare(projectId: String): Boolean {
+        val product = synchronized(this) { projects[projectId] } ?: return false
+        if (!product.isCompose) return false
+        if (containerInstallProgress[projectId]?.active == true) return false
+
+        refreshContainerProviders()
+        val plan = installPlanFor(product) ?: run {
+            lastErrors[projectId] = "当前没有可自动执行的容器安装方案，请刷新或检查已有容器环境。"
+            return false
+        }
+
+        lastErrors.remove(projectId)
+        containerInstallLogs[projectId] = StringBuilder()
+
+        fun updateProgress(phase: MacContainerInstallPhase, message: String) {
+            val lines = synchronized(containerInstallLogs.getValue(projectId)) {
+                containerInstallLogs.getValue(projectId)
+                    .toString()
+                    .lineSequence()
+                    .filter(String::isNotBlank)
+                    .takeLast(80)
+                    .toList()
+            }
+            containerInstallProgress[projectId] = MacContainerInstallProgress(
+                phase = phase,
+                message = message,
+                logLines = lines,
+            )
+        }
+
+        val installResult = containerInstaller.install(
+            plan = plan,
+            progress = ::updateProgress,
+            log = { line ->
+                val buffer = containerInstallLogs.getValue(projectId)
+                synchronized(buffer) {
+                    buffer.append(line).append('\n')
+                    if (buffer.length > 200_000) {
+                        buffer.delete(0, buffer.length - 160_000)
+                    }
+                }
+            },
+        )
+        if (!installResult.success) {
+            val detail = installResult.detail ?: "容器环境安装失败"
+            lastErrors[projectId] = detail
+            updateProgress(MacContainerInstallPhase.FAILED, detail)
+            return false
+        }
+
+        val refreshed = refreshProject(projectId)
+        if (refreshed == null || adviceFor(refreshed)?.state != MacContainerAdviceState.READY) {
+            val detail = "安装步骤完成，但 SiftAlpha 重新检测后仍未发现可用的 Docker/Podman + Compose。"
+            lastErrors[projectId] = detail
+            updateProgress(MacContainerInstallPhase.FAILED, detail)
+            return false
+        }
+
+        updateProgress(MacContainerInstallPhase.PREPARING_PROJECT, "容器环境已就绪，正在继续准备项目…")
+        val prepareResult = coordinator.prepare(projectId)
+        if (!prepareResult.success) {
+            val detail = prepareResult.detail ?: "容器环境已安装，但项目准备失败。"
+            lastErrors[projectId] = detail
+            updateProgress(MacContainerInstallPhase.FAILED, detail)
+            return false
+        }
+
+        updateProgress(MacContainerInstallPhase.COMPLETE, "容器环境和项目准备已完成。")
+        return true
     }
 
     fun prepare(projectId: String): MacPrepareResult {
@@ -246,6 +329,21 @@ class MacProductController(
         } else {
             null
         }
+
+    private fun installPlanFor(project: MacProductProject): MacContainerInstallPlan? =
+        if (
+            project.isCompose &&
+            containerInstallProgress[project.projectId]?.active != true
+        ) {
+            MacContainerInstallPlanner.plan(systemFacts, latestContainerProviders)
+        } else {
+            null
+        }
+
+    fun containerInstallLog(projectId: String): String {
+        val buffer = containerInstallLogs[projectId] ?: return ""
+        return synchronized(buffer) { buffer.toString() }
+    }
 
     private fun refreshContainerProviders() {
         latestContainerProviders = containerProviderSnapshotSource()
