@@ -891,3 +891,64 @@ Current M6.2 state:
 **CLOUD PASS / REAL VENTURA PENDING（云端通过 / 真实 Ventura 容器环境待验收）**.
 
 M6 Final Closure Audit must not run until real macOS container execution, Web, Stop isolation, and Restart acceptance pass.
+
+
+## 30. M6.2 Managed Container Environment Installer（托管容器环境安装器）— CLOUD PASS
+
+Approved M6.2 scope expansion:
+
+**Detect → Recommend → User Confirm → Install → Re-detect → Continue**
+
+Accepted cloud implementation HEAD:
+`1d3c8bcc23c94064c82b1ff652fc4eda7fd87ae4`
+
+Behavior:
+- Compose project import detects missing/unready container capability;
+- generic system/provider facts produce an install recommendation;
+- Normal Mode exposes an explicit **安装推荐容器环境** action;
+- installation never starts without user confirmation;
+- SiftAlpha-managed container toolchain is installed into the current user's SiftAlpha data directory;
+- no Homebrew / MacPorts dependency is required;
+- Intel x86_64 and Apple Silicon arm64 are selected by architecture capability, not device-model branches;
+- managed environment currently consists of pinned Colima + Lima + Docker CLI + Docker Compose + Docker Buildx;
+- managed Docker / Colima / Lima state and Docker CLI plugins use SiftAlpha-owned directories instead of overwriting the user's existing Docker configuration;
+- upstream assets are version-pinned; release checksums are verified when upstream publishes them;
+- after installation SiftAlpha re-detects Docker + Compose and automatically continues Prepare for the current project;
+- an existing external provider in an unresolved state is preserved rather than overwritten by the managed installer;
+- no automatic CPU / memory / disk tuning is performed.
+
+Cloud verification:
+- macOS Run #56 PASS;
+- Android W0 #765 PASS;
+- `SIFTALPHA_M62_CONTAINER_INSTALL_PROBE=PASS`;
+- before install: advice = INSTALL_PROVIDER;
+- generated plan = INSTALL_MANAGED_DOCKER;
+- Normal Mode primary action = INSTALL_CONTAINER;
+- user-approved installer invocation = exactly once in controlled probe;
+- re-detect after install = READY;
+- project environment ready = true;
+- install phase = COMPLETE;
+- automatic continuation ends at primary action = RUN;
+- managed upstream assets for Intel and ARM were reachable in CI;
+- previous M6.2 Compose workflow/isolation probe remains PASS;
+- Ventura package baseline remains `LSMinimumSystemVersion = 13.0`.
+
+Artifact:
+- name = `siftalpha-macos-m6.2-managed-container-ventura-x64-56`;
+- artifact ID = `10813026065`;
+- artifact digest = `sha256:359d98ff4bba539529b9ef87031a8de278decd775dd11b6fc285ca405c1840c1`;
+- user-facing ZIP SHA-256 = `46cef1fb0b29c9c58a51bee5930b7d9b9a95082d7d96ad39e7e16feac516f348`.
+
+Current state:
+
+**M6.2 = CLOUD PASS / REAL VENTURA MANAGED-INSTALL ACCEPTANCE PENDING**.
+
+Real acceptance must still prove on macOS 13+:
+1. click install recommendation;
+2. confirm installation;
+3. real managed container environment downloads / starts / verifies;
+4. project automatically continues Prepare;
+5. Run → Web works;
+6. A/B Compose isolation and Restart still pass with the real provider.
+
+M6 Final Closure Audit remains blocked until those real-device checks pass.
