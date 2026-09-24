@@ -113,6 +113,28 @@ jobs:
           grep -q '^SIFTALPHA_M61=unavailable_plan=CAPABILITY_UNAVAILABLE$' macos-evidence/m6-container-plan-probe.txt
           grep -q '^SIFTALPHA_M61=unknown_plan=CAPABILITY_UNKNOWN$' macos-evidence/m6-container-plan-probe.txt
 
+      - name: Prove M6.2 Compose runtime workflow and isolation
+        run: |
+          set -euo pipefail
+          "$JAVA_HOME/bin/java" -cp "macosApp/build/install/macosApp/lib/*" \
+            com.siftalpha.macos.SiftAlphaMacAppKt --m6-compose-workflow-probe \
+            | tee macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62_COMPOSE_WORKFLOW_PROBE=PASS$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=compose_detect_a=true$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=compose_detect_b=true$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=project_identity_distinct=true$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=advisor_ready=true$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=prepare_a=true$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=prepare_b=true$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=start_a=true$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=start_b=true$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=a_running=RUNNING$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=b_running=RUNNING$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=stop_a=true$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=b_after_a_stop=RUNNING$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=restart_a=true$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=a_after_restart=RUNNING$' macos-evidence/m6-compose-workflow-probe.txt
+
       - name: Prove M4.1 import detect plan
         run: |
           set -euo pipefail
@@ -279,17 +301,17 @@ jobs:
           find "$APP" -maxdepth 4 -type f | sort | tee macos-evidence/app-files.txt
           ditto -c -k --sequesterRsrc --keepParent \
             "$APP" \
-            macos-dist/SiftAlpha-X-m6.1-ventura-x64.zip
-          shasum -a 256 macos-dist/SiftAlpha-X-m6.1-ventura-x64.zip \
+            macos-dist/SiftAlpha-X-m6.2-ventura-x64.zip
+          shasum -a 256 macos-dist/SiftAlpha-X-m6.2-ventura-x64.zip \
             | tee macos-evidence/app-zip-sha256.txt
 
       - name: Upload macOS app and evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: siftalpha-macos-m6.1-ventura-x64-${{ github.run_number }}
+          name: siftalpha-macos-m6.2-ventura-x64-${{ github.run_number }}
           path: |
-            macos-dist/SiftAlpha-X-m6.1-ventura-x64.zip
+            macos-dist/SiftAlpha-X-m6.2-ventura-x64.zip
             macos-evidence
           if-no-files-found: warn
           retention-days: 14
