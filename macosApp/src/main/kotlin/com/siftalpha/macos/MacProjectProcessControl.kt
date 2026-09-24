@@ -95,6 +95,17 @@ class MacProjectProcessControl : ProjectProcessControl {
         )
     }
 
+    internal fun ownedPids(scope: ProjectProcessScope): Set<Long> {
+        val record = records[scope.projectId] ?: return emptySet()
+        val root = record.process.toHandle()
+        return buildSet {
+            if (root.isAlive) add(root.pid())
+            root.descendants().forEach { handle ->
+                if (handle.isAlive) add(handle.pid())
+            }
+        }
+    }
+
     override fun stopProject(scope: ProjectProcessScope): ProjectStopResult {
         val record = records[scope.projectId]
             ?: return ProjectStopResult(scope, ProjectStopOutcome.NOT_FOUND)

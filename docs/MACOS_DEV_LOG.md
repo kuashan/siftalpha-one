@@ -1703,3 +1703,18 @@ This closes the M4.1 acceptance contract:
 **M4.1 — Import + Detect + Plan = PASS / COMPLETE**.
 
 No M4.2 implementation has started. The next development-decision boundary requires discussion/approval of the M4.2 plan before source changes.
+
+
+## 2026-09-24 · M4.2 Prepare + Run + Observe + Stop/Restart implementation started
+
+Approved architecture:
+
+- Python is a SiftAlpha-managed runtime bundled in the macOS app, not a prerequisite installed by the user.
+- Project dependencies live in project-owned environment generations, not in Runtime Base.
+- Prepare is transactional: new temp generation, verification, then atomic pointer commit.
+- pip is constrained to `--only-binary=:all:`; source build/editable/VCS/direct-URL/local-path installs are not part of M4.2.
+- Core owns lifecycle/operation semantics and pure entrypoint/Web URL/probe rules.
+- macOS Adapter owns runtime location, venv/pip execution, project process control, and project-scoped listener discovery.
+- STOP supersedes/cancels only the selected project's active Prepare/Run work.
+- Web discovery prefers explicit/ordinary local URLs from project logs, then uses only owned process PIDs with macOS lsof fallback and a Core endpoint probe.
+- No Android runtime/provider behavior is modified.

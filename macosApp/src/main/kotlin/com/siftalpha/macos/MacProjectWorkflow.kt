@@ -119,6 +119,7 @@ object MacProjectWorkflowPlanner {
     fun plan(
         snapshot: MacProjectSnapshot,
         hostTools: List<MacHostToolSnapshot>,
+        managedPythonExecutable: String? = null,
     ): MacProjectEnvironmentPlan {
         val selection = ProjectRuntimeExecutionPlanner.select(snapshot.relativePaths)
         if (selection !is ProjectRuntimeExecutionPlanner.Selection.Resolved) {
@@ -208,6 +209,9 @@ object MacProjectWorkflowPlanner {
             addAll(supplemental)
         }
         val availableByRuntime = buildMap<RuntimeKind, String> {
+            managedPythonExecutable
+                ?.takeIf { primary == RuntimeKind.PYTHON || RuntimeKind.PYTHON in supplemental }
+                ?.let { put(RuntimeKind.PYTHON, it) }
             hostTools.forEach { tool ->
                 if (tool.availability != MacHostToolAvailability.AVAILABLE) return@forEach
                 val kind = when (tool.kind) {
@@ -215,7 +219,9 @@ object MacProjectWorkflowPlanner {
                     MacHostToolKind.NODE_JS -> RuntimeKind.NODE_JS
                     else -> null
                 } ?: return@forEach
-                tool.executablePath?.let { put(kind, it) }
+                tool.executablePath?.let { path ->
+                    if (kind !in this) put(kind, path)
+                }
             }
         }
         val missing = requiredKinds.filter { it !in availableByRuntime }

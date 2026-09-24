@@ -65,6 +65,23 @@ jobs:
             :macosApp:test \
             :macosApp:installDist | tee macos-evidence/gradle-build.txt
 
+      - name: Acquire pinned Catalina-compatible managed Python 3.14.7
+        run: |
+          set -euo pipefail
+          PYTHON_URL='https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.14.7%2B20260901-x86_64-apple-darwin-install_only_stripped.tar.gz'
+          PYTHON_SHA256='7e151a7c9028855b61a7d6e78381f2020a1ef185281399f3b1aafc5e1c9a1a64'
+          rm -rf macos-managed-python
+          mkdir -p macos-managed-python
+          curl -fL --retry 3 --retry-delay 2 "$PYTHON_URL" -o macos-managed-python/python.tar.gz
+          printf '%s  %s\n' "$PYTHON_SHA256" macos-managed-python/python.tar.gz | shasum -a 256 -c -
+          tar -xzf macos-managed-python/python.tar.gz -C macos-managed-python
+          test -x macos-managed-python/python/bin/python3
+          macos-managed-python/python/bin/python3 --version | tee macos-evidence/managed-python-version.txt
+          macos-managed-python/python/bin/python3 -m pip --version | tee macos-evidence/managed-python-pip.txt
+          macos-managed-python/python/bin/python3 -m venv --help >/dev/null
+          file macos-managed-python/python/bin/python3 | tee macos-evidence/managed-python-file.txt
+          grep -q 'x86_64' macos-evidence/managed-python-file.txt
+
       - name: Prove macOS Core load and runtime discovery
         run: |
           set -euo pipefail
@@ -87,6 +104,21 @@ jobs:
           grep -q '^SIFTALPHA_M4_PLAN_PROBE=PASS$' macos-evidence/m4-plan-probe.txt
           grep -q '^SIFTALPHA_M4_PLAN=python_import_detect_plan=READY_TO_PREPARE$' macos-evidence/m4-plan-probe.txt
           grep -q '^SIFTALPHA_M4_PLAN=python_primary=python$' macos-evidence/m4-plan-probe.txt
+
+      - name: Prove M4.2 managed Python full project workflow
+        run: |
+          set -euo pipefail
+          "$JAVA_HOME/bin/java" \
+            -Dsiftalpha.managed.python.root="$PWD/macos-managed-python/python" \
+            -cp "macosApp/build/install/macosApp/lib/*" \
+            com.siftalpha.macos.SiftAlphaMacAppKt --m4-workflow-probe \
+            | tee macos-evidence/m4-workflow-probe.txt
+          grep -q '^SIFTALPHA_M42_WORKFLOW_PROBE=PASS$' macos-evidence/m4-workflow-probe.txt
+          grep -q '^SIFTALPHA_M42=prepare=PASS$' macos-evidence/m4-workflow-probe.txt
+          grep -q '^SIFTALPHA_M42=run=PASS$' macos-evidence/m4-workflow-probe.txt
+          grep -q '^SIFTALPHA_M42=stop=true$' macos-evidence/m4-workflow-probe.txt
+          grep -q '^SIFTALPHA_M42=restart=true$' macos-evidence/m4-workflow-probe.txt
+          grep -q '^SIFTALPHA_M42=final_stop=true$' macos-evidence/m4-workflow-probe.txt
 
       - name: Prove project-scoped macOS process control
         run: |
@@ -130,6 +162,12 @@ jobs:
           test -d "$APP"
           test -f "$PLIST"
 
+          mkdir -p "$APP/Contents/app/managed-python"
+          ditto macos-managed-python/python "$APP/Contents/app/managed-python/python"
+          test -x "$APP/Contents/app/managed-python/python/bin/python3"
+          "$APP/Contents/app/managed-python/python/bin/python3" --version \
+            | tee macos-evidence/packaged-managed-python-version.txt
+
           CFG="$APP/Contents/app/SiftAlpha X.cfg"
           test -f "$CFG"
           if grep -Fxq 'java-options=X' "$CFG"; then
@@ -169,6 +207,11 @@ jobs:
           }
 
           inspect_minos "$APP/Contents/MacOS/SiftAlpha X" "launcher"
+          inspect_minos "$APP/Contents/app/managed-python/python/bin/python3" "managed-python"
+
+          MANAGED_LIBPYTHON="$(find "$APP/Contents/app/managed-python/python/lib" -type f -name 'libpython3.14*.dylib' -print -quit)"
+          test -n "$MANAGED_LIBPYTHON"
+          inspect_minos "$MANAGED_LIBPYTHON" "managed-libpython"
 
           LIBJLI="$(find "$APP/Contents/runtime" -type f -name 'libjli.dylib' -print -quit)"
           LIBJVM="$(find "$APP/Contents/runtime" -type f -name 'libjvm.dylib' -print -quit)"
@@ -180,17 +223,17 @@ jobs:
           find "$APP" -maxdepth 4 -type f | sort | tee macos-evidence/app-files.txt
           ditto -c -k --sequesterRsrc --keepParent \
             "$APP" \
-            macos-dist/SiftAlpha-X-m4.1-catalina-x64.zip
-          shasum -a 256 macos-dist/SiftAlpha-X-m4.1-catalina-x64.zip \
+            macos-dist/SiftAlpha-X-m4.2-catalina-x64.zip
+          shasum -a 256 macos-dist/SiftAlpha-X-m4.2-catalina-x64.zip \
             | tee macos-evidence/app-zip-sha256.txt
 
       - name: Upload macOS app and evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: siftalpha-macos-m4.1-catalina-x64-${{ github.run_number }}
+          name: siftalpha-macos-m4.2-catalina-x64-${{ github.run_number }}
           path: |
-            macos-dist/SiftAlpha-X-m4.1-catalina-x64.zip
+            macos-dist/SiftAlpha-X-m4.2-catalina-x64.zip
             macos-evidence
           if-no-files-found: warn
           retention-days: 14

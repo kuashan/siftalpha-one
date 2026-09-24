@@ -13,7 +13,7 @@
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
 - 当前阶段：**M4 — Project Workflow（项目工作流）**
-- M4 implementation（实现）：**M4.1 PASS / COMPLETE（M4.1 通过 / 完成）；M4.2 NOT STARTED（尚未开始）**
+- M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 IN PROGRESS（M4.2 进行中）**
 
 M3 最后一个已验收功能 HEAD：
 `259d94fe7d7501a1232f1d7114445f4673cfc0a1`
@@ -355,3 +355,25 @@ M4.1 final result:
 **PASS / COMPLETE（通过 / 完成）**.
 
 The next approved development decision boundary is **M4.2 — Prepare + Run + Observe + Stop/Restart（准备 + 运行 + 观察 + 停止/重启）**. M4.2 code must not begin until its implementation plan is discussed and approved.
+
+
+## 17. M4.2 Implementation（实现）— STARTED
+
+User-approved scope:
+
+- bundle a fixed SiftAlpha-managed CPython 3.14.7 x86_64 macOS Runtime into the Catalina app;
+- do not require Homebrew, Xcode, Command Line Tools, or a preinstalled Python;
+- create project-owned generation environments under SiftAlpha X application data;
+- Python Prepare: validate → acquire managed runtime → create venv → install wheel-only dependencies → verify → atomic commit;
+- reject requirements options, editable/VCS/direct-URL/local-path installs in this slice;
+- execute Python through the committed project environment;
+- use Core project-operation and lifecycle policies rather than a second macOS state machine;
+- STOP must cancel current-project Prepare or Run without touching other projects;
+- share Python entrypoint, local Web URL, and endpoint-probe rules through Core;
+- macOS Web Discovery uses project logs first and project-process-scoped lsof fallback, never a global 1..65535 scan;
+- preserve M3 process isolation and Android behavior;
+- M4.2 temporary acceptance UI may expose Prepare / Run / Logs / Web / Stop / Restart; M5 owns final UI.
+
+Managed Python build input is pinned to CPython 3.14.7 / python-build-standalone release 20260901, x86_64-apple-darwin install_only_stripped, with SHA-256 verification in CI.
+
+M4.2 remains IN PROGRESS until cloud and real Catalina full-workflow acceptance pass.
