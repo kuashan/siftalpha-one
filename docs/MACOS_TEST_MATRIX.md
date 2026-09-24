@@ -103,7 +103,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 
 ## M4 — Project Workflow（项目工作流）
 
-当前状态：**CURRENT STAGE（当前阶段） / IMPLEMENTATION NOT STARTED（实现尚未开始）**
+当前状态：**CURRENT STAGE（当前阶段） / M4.1 IMPLEMENTATION IN PROGRESS（M4.1 实现进行中）**
 
 必须证明：
 
@@ -532,3 +532,20 @@ Next stage（下一阶段）: **M4 — Project Workflow（项目工作流）**.
 | Stage boundary（阶段边界） | M3 remains closed; M4 not implemented | PASS |
 
 This table is post-closure verification only; it does not add new M3 Exit Criteria（退出条件）.
+
+
+### M4.1 Import + Detect + Plan Verification（验证）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| M4.1-01 | Shared runtime detector（共享运行时检测器） | Android/macOS use Core policy | CLOUD PENDING |
+| M4.1-02 | macOS folder import（目录导入） | canonical project identity | CLOUD PENDING |
+| M4.1-03 | Filesystem containment（文件系统边界） | no root/symlink escape | CLOUD PENDING |
+| M4.1-04 | Python detect（Python 检测） | primary=python | CLOUD PENDING |
+| M4.1-05 | Node detect（Node 检测） | primary=nodejs | CLOUD PENDING |
+| M4.1-06 | Ambiguous project（歧义项目） | BLOCKED, no guessing | CLOUD PENDING |
+| M4.1-07 | Missing runtime（运行时缺失） | RUNTIME_MISSING | CLOUD PENDING |
+| M4.1-08 | Environment Needs（环境需求） | provider-neutral plan | CLOUD PENDING |
+| M4.1-09 | Android regression（安卓回归） | W0 PASS | CLOUD PENDING |
+| M4.1-10 | Catalina packaging（Catalina 打包） | PASS, minimum unchanged | CLOUD PENDING |
+| M4.1-11 | Real Mac import/detect/plan（真实 Mac 导入/检测/计划） | PASS | REAL MAC PENDING |

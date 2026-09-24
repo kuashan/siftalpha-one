@@ -8,7 +8,7 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":core"))
+    implementation(project(":core"))\n    implementation("org.tomlj:tomlj:1.1.1")
     testImplementation("junit:junit:4.13.2")
 }
 

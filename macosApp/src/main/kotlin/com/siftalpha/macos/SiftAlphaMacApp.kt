@@ -10,7 +10,7 @@ import java.awt.FlowLayout
 import javax.swing.JButton
 import javax.swing.BorderFactory
 import javax.swing.DefaultListModel
-import javax.swing.JFrame
+import javax.swing.JFileChooser\nimport javax.swing.JFrame
 import javax.swing.JLabel
 import javax.swing.JList
 import javax.swing.JPanel
@@ -88,33 +88,48 @@ private fun createWindow(
         border = BorderFactory.createEmptyBorder(20, 20, 8, 20)
     }
     val subtitle = JLabel(
-        "M3 Host Runtime Provider — runtime discovery + project process control",
+        "M4 Project Workflow — Import + Detect + Plan",
         SwingConstants.CENTER,
     ).apply {
         border = BorderFactory.createEmptyBorder(0, 20, 16, 20)
     }
 
-    val selfTestStatus = JLabel("Process self-test: not run")
-    val selfTestButton = JButton("Run M3 Process Self-Test").apply {
+    val workflowStatus = JLabel("M4.1: choose a project folder")
+    val importButton = JButton("Import Project Folder").apply {
         addActionListener {
-            isEnabled = false
-            selfTestStatus.text = "Process self-test: running..."
-            Thread {
-                val result = MacM3SelfTest.run()
-                SwingUtilities.invokeLater {
-                    selfTestStatus.text = if (result.passed) {
-                        "Process self-test: PASS"
-                    } else {
-                        "Process self-test: FAIL — " + result.lines.joinToString("; ")
+            val chooser = JFileChooser().apply {
+                fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+                isAcceptAllFileFilterUsed = false
+                dialogTitle = "Import SiftAlpha X Project"
+            }
+            if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                isEnabled = false
+                workflowStatus.text = "M4.1: detecting..."
+                Thread {
+                    val outcome = runCatching {
+                        val fs = MacProjectFilesystem()
+                        val project = fs.importDirectory(chooser.selectedFile)
+                        val snapshot = MacProjectSnapshotBuilder(fs).build(project)
+                        MacProjectWorkflowPlanner.plan(snapshot, discovery)
                     }
-                    isEnabled = true
-                }
-            }.start()
+                    SwingUtilities.invokeLater {
+                        outcome.onSuccess { plan ->
+                            listModel.clear()
+                            plan.diagnosticLines().forEach(listModel::addElement)
+                            workflowStatus.text = "M4.1: " + plan.status
+                        }.onFailure { error ->
+                            workflowStatus.text = "M4.1: FAIL — " +
+                                (error.message ?: error.javaClass.simpleName)
+                        }
+                        isEnabled = true
+                    }
+                }.start()
+            }
         }
     }
     val controls = JPanel(FlowLayout(FlowLayout.CENTER)).apply {
-        add(selfTestButton)
-        add(selfTestStatus)
+        add(importButton)
+        add(workflowStatus)
     }
 
     val content = JPanel(BorderLayout()).apply {
@@ -149,6 +164,13 @@ fun main(args: Array<String>) {
         println("SIFTALPHA_M3_PROCESS_PROBE=" + if (result.passed) "PASS" else "FAIL")
         result.lines.forEach { line -> println("SIFTALPHA_M3_PROCESS=" + line) }
         if (!result.passed) error("M3 process probe failed")
+        return
+    }
+    if ("--m4-plan-probe" in args) {
+        val result = MacM4PlanSelfTest.run()
+        println("SIFTALPHA_M4_PLAN_PROBE=" + if (result.passed) "PASS" else "FAIL")
+        result.lines.forEach { line -> println("SIFTALPHA_M4_PLAN=" + line) }
+        if (!result.passed) error("M4 plan probe failed")
         return
     }
 

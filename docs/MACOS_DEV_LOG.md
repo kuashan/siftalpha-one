@@ -1519,3 +1519,24 @@ Cloud verification:
   `sha256:d72f875cbf18ea96ef5ae4790be826d62cb4af4313c77c9d8f8fc1e080666746`.
 
 This verification is post-M3 housekeeping evidence. It does not reopen M3. M3 remains PASS / CLOSED and the active stage remains M4, with M4 implementation not yet started.
+
+
+## 2026-09-24 · M4.1 Import + Detect + Plan implementation started
+
+User approved a two-slice finite M4 plan:
+
+- M4.1 Import + Detect + Plan;
+- M4.2 Prepare + Run + Observe + Stop/Restart;
+- then one M4 Closure Audit.
+
+M4.1 implementation:
+
+- move pure `ProjectRuntimeDetector` and `ProjectRuntimeExecutionPlanner` policy into `:core` without changing their package/API, so Android and macOS share the same runtime selection facts;
+- add POSIX-backed `MacProjectFilesystem` with canonical-root containment and symlink-escape rejection;
+- add bounded `MacProjectSnapshotBuilder`;
+- add `MacProjectWorkflowPlanner` that emits provider-neutral `ProjectEnvironmentNeeds` and combines them with M3 host-runtime availability;
+- accept Python / Node.js host workflows in M4; unsupported/ambiguous runtime or unsupported package-manager evidence fails closed;
+- add temporary M4.1 folder-import diagnostic surface and CLI cloud probe;
+- no dependency installation or project-code execution in M4.1.
+
+Frozen boundaries remain: no Android runtime behavior change, no M3 process-control semantic change, no M5 final UI, no container/OpenBot work.

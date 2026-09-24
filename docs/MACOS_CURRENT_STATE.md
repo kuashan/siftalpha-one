@@ -13,7 +13,7 @@
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
 - 当前阶段：**M4 — Project Workflow（项目工作流）**
-- M4 implementation（实现）：NOT STARTED（尚未开始）
+- M4 implementation（实现）：**M4.1 IN PROGRESS（M4.1 进行中）**
 
 M3 最后一个已验收功能 HEAD：
 `259d94fe7d7501a1232f1d7114445f4673cfc0a1`
@@ -185,7 +185,12 @@ M4 只负责把现有 Core（核心）与 macOS Host Runtime Provider（主机�
 - 失败状态与日志可诊断；
 - 真实 Mac 验收通过。
 
-**当前不开始 M4 实现，直到下一轮按照 Change Discussion Gate（修改前讨论门禁）先讨论具体实现方案。**
+已批准有限 Implementation Slice（实现切片）：
+
+- **M4.1 — Import + Detect + Plan（导入 + 检测 + 环境计划）**
+- M4.2 — Prepare + Run + Observe + Stop/Restart（准备 + 运行 + 观察 + 停止/重启）
+
+本轮只执行 M4.1；M4.2 必须在 M4.1 收尾并再次按 Change Discussion Gate（修改前讨论门禁）讨论后开始。
 
 
 ## 12. M3 Post-Closure Brand / Governance Verification（M3 关闭后品牌 / 治理复验）
@@ -218,3 +223,17 @@ M4 只负责把现有 Core（核心）与 macOS Host Runtime Provider（主机�
 当前阶段保持：
 
 **M4 — Project Workflow（项目工作流） / IMPLEMENTATION NOT STARTED（实现尚未开始）**。
+
+
+## 13. M4.1 Implementation（实现）
+
+Approved scope（已批准范围）：
+
+- pure Runtime Detect / Select rules（纯运行时检测 / 选择规则）迁入 Core（核心），Android 与 macOS 共用；
+- `MacProjectFilesystem`：真实 macOS 目录导入与安全文件系统适配；
+- `MacProjectSnapshotBuilder`：有界项目快照，忽略依赖/构建目录并阻止 symlink（符号链接）逃逸；
+- `MacProjectWorkflowPlanner`：从项目事实生成 provider-neutral Environment Needs（提供者中立环境需求），再结合 M3 Host Runtime facts（主机运行时事实）得到 READY_TO_PREPARE / RUNTIME_MISSING / BLOCKED；
+- temporary M4.1 diagnostic UI（临时诊断界面）：选择真实项目目录并显示 Import / Detect / Plan 事实；
+- cloud M4.1 probe（云端探针）：Python + Node 项目 Import → Detect → Plan。
+
+本轮不安装依赖、不执行第三方项目代码、不进入 M4.2。
