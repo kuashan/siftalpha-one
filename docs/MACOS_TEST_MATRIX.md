@@ -538,14 +538,14 @@ This table is post-closure verification only; it does not add new M3 Exit Criter
 
 | ID | Check（检查） | Expected（期望） | Status（状态） |
 | --- | --- | --- | --- |
-| M4.1-01 | Shared runtime detector（共享运行时检测器） | Android/macOS use Core policy | CLOUD PENDING |
-| M4.1-02 | macOS folder import（目录导入） | canonical project identity | CLOUD PENDING |
-| M4.1-03 | Filesystem containment（文件系统边界） | no root/symlink escape | CLOUD PENDING |
-| M4.1-04 | Python detect（Python 检测） | primary=python | CLOUD PENDING |
-| M4.1-05 | Node detect（Node 检测） | primary=nodejs | CLOUD PENDING |
-| M4.1-06 | Ambiguous project（歧义项目） | BLOCKED, no guessing | CLOUD PENDING |
-| M4.1-07 | Missing runtime（运行时缺失） | RUNTIME_MISSING | CLOUD PENDING |
-| M4.1-08 | Environment Needs（环境需求） | provider-neutral plan | CLOUD PENDING |
-| M4.1-09 | Android regression（安卓回归） | W0 PASS | CLOUD PENDING |
-| M4.1-10 | Catalina packaging（Catalina 打包） | PASS, minimum unchanged | CLOUD PENDING |
+| M4.1-01 | Shared runtime detector（共享运行时检测器） | Android/macOS use Core policy | PASS |
+| M4.1-02 | macOS folder import（目录导入） | canonical project identity | PASS |
+| M4.1-03 | Filesystem containment（文件系统边界） | no root/symlink escape | PASS |
+| M4.1-04 | Python detect（Python 检测） | primary=python | PASS |
+| M4.1-05 | Node detect（Node 检测） | primary=nodejs | PASS |
+| M4.1-06 | Ambiguous project（歧义项目） | BLOCKED, no guessing | PASS |
+| M4.1-07 | Missing runtime（运行时缺失） | RUNTIME_MISSING | PASS |
+| M4.1-08 | Environment Needs（环境需求） | provider-neutral plan | PASS |
+| M4.1-09 | Android regression（安卓回归） | W0 PASS | PASS — W0 #724 |
+| M4.1-10 | Catalina packaging（Catalina 打包） | PASS, minimum unchanged | PASS — Run #15 |
 | M4.1-11 | Real Mac import/detect/plan（真实 Mac 导入/检测/计划） | PASS | REAL MAC PENDING |

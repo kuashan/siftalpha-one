@@ -1720,3 +1720,24 @@ Current authority remains:
 **M3 PASS / CLOSED → M4 CURRENT / M4.1 IN PROGRESS**.
 
 The Change Discussion Gate（修改前讨论门禁） and Remote HEAD Drift Gate（远端漂移门禁） are mandatory for the next M4 modification task.
+
+
+## M4.1 cloud authority — 2026-09-24
+
+M4.1 — Import + Detect + Plan（导入 + 检测 + 环境计划） has completed cloud verification.
+
+Accepted functional HEAD:
+`4e57066c4aaf4110c66b07448afedd6b680734c1`.
+
+Evidence:
+- macOS Run #15 PASS;
+- Android W0 #724 PASS;
+- Python and Node.js Import → Detect → Plan probes PASS;
+- provider-neutral Environment Needs verified;
+- M3 project-scoped STOP isolation remains PASS;
+- Catalina minimum remains unchanged.
+
+Current M4.1 state:
+**CLOUD PASS / REAL MAC PENDING**.
+
+Do not begin M4.2 until M4.1 real-Mac acceptance is completed and the next-slice plan is discussed per the clarified Change Discussion Gate（修改前讨论门禁）.

@@ -13,7 +13,7 @@
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
 - 当前阶段：**M4 — Project Workflow（项目工作流）**
-- M4 implementation（实现）：**M4.1 IN PROGRESS（M4.1 进行中）**
+- M4 implementation（实现）：**M4.1 CLOUD PASS / REAL MAC PENDING（M4.1 云端通过 / 真实 Mac 待验收）**
 
 M3 最后一个已验收功能 HEAD：
 `259d94fe7d7501a1232f1d7114445f4673cfc0a1`
@@ -249,3 +249,34 @@ Approved scope（已批准范围）：
 - cloud M4.1 probe（云端探针）：Python + Node 项目 Import → Detect → Plan。
 
 本轮不安装依赖、不执行第三方项目代码、不进入 M4.2。
+
+
+## 14. M4.1 Cloud Verification（云端验证）— PASS
+
+Accepted functional HEAD（已验证功能提交）:
+`4e57066c4aaf4110c66b07448afedd6b680734c1`
+
+Evidence（证据）:
+
+- SiftAlpha X macOS Host Runtime Run #15: PASS
+- Android W0 Cloud Build #724: PASS
+- M4.1 plan probe: `SIFTALPHA_M4_PLAN_PROBE=PASS`
+- Python sample: Import → Detect → Plan = `READY_TO_PREPARE`, primary = `python`
+- Node.js sample: Import → Detect → Plan = `READY_TO_PREPARE`, primary = `nodejs`
+- M3 process regression probe: PASS
+- STOP A → B remains RUNNING: PASS
+- Android dependency isolation: PASS
+- Catalina packaging: PASS
+- launcher / libjli / libjvm MIN_OS: 10.12 / 10.12 / 10.12
+- macOS artifact ID: `10789876177`
+- macOS artifact digest:
+  `sha256:ed0eb285ebb7781f40aec12099eb57e68ea3662a3e28b412f7b90b79ac9d7dae`
+- user-facing M4.1 test ZIP SHA-256:
+  `059ea96ca0cd6300fd991e86b1039d19f374d8a441c6db5d7568abb272d6e5fe`
+- Android W0 artifact ID: `10789427452`
+- Android W0 artifact digest:
+  `sha256:5752990025ac839c9b51e586a4d081039c9cb9d1ea5a02a833445337af39ba1a`
+
+M4.1 is not closed yet. Remaining acceptance item:
+
+**Real Mac Import → Detect → Plan（真实 Mac 导入 → 检测 → 计划）**.

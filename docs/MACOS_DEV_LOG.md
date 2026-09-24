@@ -1593,3 +1593,34 @@ Root cause:
 Approved-scope correction:
 - replace the literal characters with a real source newline;
 - no M4.1 behavior, Core logic, Android runtime behavior, or frozen boundary changes.
+
+
+## 2026-09-24 · M4.1 Cloud Verification PASS
+
+Accepted functional HEAD:
+`4e57066c4aaf4110c66b07448afedd6b680734c1`
+
+After correcting implementation-local Gradle/import wiring errors inside the already approved M4.1 scope:
+
+- macOS Host Runtime Run #15: PASS;
+- Android W0 #724: PASS;
+- Core + macOS tests: PASS;
+- `SIFTALPHA_M4_PLAN_PROBE=PASS`;
+- Python Import → Detect → Plan: READY_TO_PREPARE / primary python;
+- Node.js Import → Detect → Plan: READY_TO_PREPARE / primary nodejs;
+- M3 project-scoped process regression probe: PASS;
+- STOP A leaves B RUNNING: PASS;
+- no Android dependency leak into macOS host;
+- Catalina app packaging: PASS;
+- launcher / libjli / libjvm MIN_OS: 10.12 / 10.12 / 10.12.
+
+Artifacts:
+
+- macOS artifact ID `10789876177`;
+- macOS artifact digest `sha256:ed0eb285ebb7781f40aec12099eb57e68ea3662a3e28b412f7b90b79ac9d7dae`;
+- extracted user-facing M4.1 test ZIP SHA-256 `059ea96ca0cd6300fd991e86b1039d19f374d8a441c6db5d7568abb272d6e5fe`;
+- Android W0 artifact ID `10789427452`;
+- Android W0 artifact digest `sha256:5752990025ac839c9b51e586a4d081039c9cb9d1ea5a02a833445337af39ba1a`.
+
+Current M4.1 status:
+**CLOUD PASS（云端通过） / REAL MAC IMPORT-DETECT-PLAN PENDING（真实 Mac 导入-检测-计划待验收）**.
