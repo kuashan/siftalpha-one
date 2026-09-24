@@ -162,9 +162,10 @@ class MacDeveloperModeWindow(
                 val project = value as? MacProductProject
                 if (project != null) {
                     val state = controller.view(project.projectId)?.workflow?.lifecycle?.name ?: "UNKNOWN"
+                    val runtime = if (project.isCompose) "compose" else (project.runtime?.id ?: "未知")
                     label.text = "<html><b>" + escape(project.name) + "</b><br>" +
                         "<span style='color:#64748B'>" +
-                        escape(project.runtime?.id ?: "未知") + " · " + escape(state) +
+                        escape(runtime) + " · " + escape(state) +
                         "</span></html>"
                 }
                 label.font = MacDesignTokens.bodyFont
@@ -318,8 +319,28 @@ class MacDeveloperModeWindow(
             appendLine("项目名称: " + view.project.name)
             appendLine("项目位置: " + view.project.imported.canonicalRootPath)
             appendLine()
-            appendLine("运行时 Runtime: " + (view.project.runtime?.id ?: "未解析"))
+            appendLine(
+                "运行时 Runtime: " +
+                    if (view.project.isCompose) "compose" else (view.project.runtime?.id ?: "未解析"),
+            )
             appendLine("运行时版本: " + (view.runtimeVersion ?: "—"))
+            if (view.project.isCompose) {
+                appendLine("容器 Provider: " + (view.containerProvider ?: "—"))
+                appendLine("Compose Project: " + (view.composeProjectName ?: "—"))
+                appendLine(
+                    "容器建议: " +
+                        (view.containerAdvice?.title ?: "—") +
+                        (view.containerAdvice?.detail?.let { " / " + it } ?: ""),
+                )
+                if (view.containerServices.isNotEmpty()) {
+                    appendLine("服务 Services:")
+                    view.containerServices.forEach { service ->
+                        appendLine("  - " + service.name + ": " + service.state)
+                    }
+                } else {
+                    appendLine("服务 Services: —")
+                }
+            }
             appendLine("环境已就绪: " + view.workflow.environmentReady)
             appendLine("环境代际 Generation: " + (view.environment?.generation ?: "—"))
             appendLine("环境位置: " + (view.environment?.root?.absolutePath ?: "—"))
