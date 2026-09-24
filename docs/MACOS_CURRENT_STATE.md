@@ -12,7 +12,7 @@
 - M1 Core Boundary（核心边界）：PASS / CLOSED（通过 / 关闭）
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
-- 当前阶段：**M6 — Container / Multi-service（容器 / 多服务）— NOT STARTED（未开始）**
+- 当前阶段：**M6 — Container / Multi-service（容器 / 多服务）— M6.1 CLOUD PASS / REAL VENTURA PENDING**
 - M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 PASS / COMPLETE；M4 PASS / CLOSED（M4 已通过并关闭）**
 - M5 implementation（实现）：**M5.1 PASS / COMPLETE；M5.2 PASS / COMPLETE；M5 PASS / CLOSED（M5 已通过并关闭）**
 
@@ -756,3 +756,53 @@ User-confirmed platform boundary change:
 - historical Catalina PASS evidence remains valid historical evidence and is not deleted or rewritten.
 
 This change specifically removes the need to constrain Container / Compose / Bun / virtualization work to legacy Catalina-era tool versions.
+
+
+## 27. M6.1 Container Capability + Compose Detection/Plan（容器能力 + Compose 检测/计划）— CLOUD PASS
+
+Accepted cloud HEAD:
+`7d3c102032b1aeaae9182b5b972ec17391e80ee7`
+
+Functional implementation HEAD:
+`8fe74e86ed90490b84d63c894b0de5d37da2d45e`
+
+Implemented boundary:
+- Core（核心）adds platform-neutral Compose manifest detection and multi-service planning;
+- supported root manifest names: `compose.yaml`, `compose.yml`, `docker-compose.yaml`, `docker-compose.yml`;
+- Compose plan records services, image/build facts, `depends_on`, and published/target port facts;
+- container availability is consumed only through existing `CapabilityAvailability = AVAILABLE / UNAVAILABLE / UNKNOWN`;
+- macOS Adapter（苹果适配层）passively discovers Docker and Podman CLI/runtime/Compose facts;
+- `StandardPlatformCapabilities.CONTAINER_RUNTIME` is now published from real macOS adapter discovery rather than hard-coded UNKNOWN;
+- imported macOS projects retain an optional Compose plan alongside the existing Python/Node language plan;
+- no container Start / Stop / Logs implementation was added; that remains M6.2;
+- no second lifecycle/coordinator was introduced.
+
+Cloud evidence:
+- SiftAlpha X macOS Host Runtime Run #36: PASS;
+- Android W0 Cloud Build #745: PASS;
+- M6.1 container capability / Compose plan probe: PASS;
+- Compose manifest = `compose.yaml`;
+- services = `db,web`;
+- web published port = `18080`, target port = `80`;
+- web depends_on = `db`;
+- AVAILABLE plan = `READY`;
+- UNAVAILABLE plan = `CAPABILITY_UNAVAILABLE`;
+- UNKNOWN plan = `CAPABILITY_UNKNOWN`;
+- cloud-host Docker = UNAVAILABLE;
+- cloud-host Podman = UNAVAILABLE;
+- published container capability = UNAVAILABLE;
+- M4.1 / M4.2 / M5.1 / M5.2 / project-scoped STOP regressions all PASS;
+- Android dependency isolation PASS.
+
+Ventura packaging:
+- `LSMinimumSystemVersion = 13.0`;
+- user-facing ZIP SHA-256 = `7fe17f94269b94b8e4f6a37c7a8946a36c5f0dbbfd236afb2a00e6357f8e846d`;
+- artifact = `siftalpha-macos-m6.1-ventura-x64-36`;
+- artifact ID = `10805349421`;
+- artifact digest = `sha256:38bce4b3e7c1863460bf01234b1f68f483a16447ade6effdc7ac96aecd883611`.
+
+Current M6.1 state:
+
+**CLOUD PASS / REAL VENTURA PENDING（云端通过 / 真实 Ventura 待验收）**.
+
+M6.2 must not start until M6.1 real-machine capability/detection acceptance is resolved and its next-slice boundary remains unchanged.
