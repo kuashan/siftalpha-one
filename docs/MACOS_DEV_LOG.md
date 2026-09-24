@@ -1283,3 +1283,35 @@ Per Stage Closure Rule（阶段关闭规则）, no new mandatory M2.x slice may 
 Current stage moves to:
 
 **M3 — Host Runtime Provider（主机运行提供者）**.
+
+
+## 2026-09-24 · M3.1 Host Runtime Discovery + Project Process Control
+
+### Scope frozen
+
+M3.1 is a finite implementation slice intended to cover the complete M3 core control loop.
+
+### Implementation
+
+- Added `MacHostRuntimeDiscovery` for Python / Node.js / Bun / Git.
+- Discovery searches inherited PATH plus common Homebrew, MacPorts, Volta, asdf, Bun and nvm locations.
+- A tool is AVAILABLE only after a bounded successful version probe.
+- Added `MacProjectProcessControl` implementing the existing shared `ProjectProcessControl` port.
+- START is direct ProcessBuilder execution with explicit argument lists.
+- stdout and stderr are captured independently into bounded buffers.
+- STATUS maps host process facts into shared `ProjectProcessState`.
+- STOP is project-scoped and terminates only the selected project's recorded root and descendants.
+- No global process scan is permitted.
+- Added concurrent A/B isolation tests: STOP A must leave B RUNNING.
+- Added a temporary M3 real-host Self-Test button and CLI probe.
+- macOS `HOST_PROCESS_EXECUTION` capability changes from UNKNOWN to AVAILABLE.
+- secure secret storage and container runtime remain UNKNOWN.
+
+### Boundaries
+
+- No Core contract change.
+- No Android production-source change.
+- No M4 project workflow.
+- No M5 final product UI.
+
+Cloud verification: **IN PROGRESS（进行中）**.

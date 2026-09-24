@@ -98,7 +98,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - STOP（停止）只影响当前项目。
 - 另一个同时运行的项目不受影响。
 
-当前状态：**CURRENT STAGE（当前阶段） / IMPLEMENTATION NOT STARTED（实现尚未开始）**
+当前状态：**IMPLEMENTED / CLOUD VERIFICATION IN PROGRESS（已实现 / 云端验证进行中）**
 
 ## M4 — Project Workflow（项目工作流）
 
@@ -463,3 +463,21 @@ Cloud Verification（云端验证）：
 **M2 final result（最终结果）: 6 / 6 — PASS / CLOSED（通过 / 关闭）**
 
 Next stage（下一阶段）: **M3 — Host Runtime Provider（主机运行提供者）**。
+
+
+### M3.1 Verification Matrix（验证矩阵）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| M3-01 | Python discovery（Python 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PENDING |
+| M3-02 | Node.js discovery（Node 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PENDING |
+| M3-03 | Bun discovery（Bun 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PENDING |
+| M3-04 | Git discovery（Git 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PENDING |
+| M3-05 | Host process start（主机进程启动） | project-owned process starts | CLOUD PENDING |
+| M3-06 | stdout / stderr capture（输出采集） | both streams captured independently | CLOUD PENDING |
+| M3-07 | STATUS（状态） | RUNNING / EXITED / STOPPED facts are correct | CLOUD PENDING |
+| M3-08 | Project STOP（项目停止） | selected project stops | CLOUD PENDING |
+| M3-09 | Concurrent A/B isolation（并行项目隔离） | STOP A leaves B RUNNING | CLOUD PENDING |
+| M3-10 | Android regression（安卓回归） | W0 PASS | CLOUD PENDING |
+| M3-11 | Catalina compatibility（Catalina 兼容） | packaged app remains compatible with 10.15.7 | CLOUD PENDING |
+| M3-12 | Real Mac M3 Self-Test（真实 Mac 自检） | diagnostic button reports PASS | REAL MAC PENDING |

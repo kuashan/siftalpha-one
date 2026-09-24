@@ -439,3 +439,54 @@ M2 Exit Criteria（退出条件）全部满足：**6 / 6**。
 当前唯一阶段：
 
 **M3 — Host Runtime Provider（主机运行提供者）**。
+
+
+## 22. M3.1 — Host Runtime Discovery + Project Process Control
+
+M3 使用一个有限实现切片完成主机运行提供者的核心闭环，不允许无限拆分。
+
+### Goal（目标）
+
+在 macOS Platform Adapter（苹果平台适配层）实现：
+
+- Python / Node.js / Bun / Git（运行时 / 工具）发现；
+- host process execution（主机进程执行）；
+- stdout / stderr（标准输出 / 标准错误）采集；
+- STATUS（状态）；
+- project-scoped STOP（项目级停止）；
+- 两个并行项目的 STOP isolation（停止隔离）。
+
+### Architecture（架构）
+
+- 复用 Core（核心）现有 `ProjectProcessControl` 契约；
+- macOS 具体实现位于 `macosApp`；
+- STOP 只终止该项目记录的 root process + descendants（根进程 + 子进程），不做全局进程扫描；
+- Runtime Discovery（运行时发现）同时检查 Finder（访达）可能缺失的 PATH 与常见 Homebrew / MacPorts / Volta / asdf / Bun 路径；
+- AVAILABLE（可用）必须通过实际 `--version` 探测，不以文件存在作为唯一依据；
+- `HOST_PROCESS_EXECUTION` 现在由 macOS Adapter（苹果适配器）发布为 AVAILABLE（可用）。
+
+### Boundary（边界）
+
+- Core（核心）契约不修改；
+- Android（安卓）功能源码不修改；
+- 不提前实现 M4 Import / Prepare / Project Workflow（导入 / 准备 / 项目工作流）；
+- 不提前建设 M5 final UI（最终产品界面）；
+- 当前 Self-Test（自检）按钮仅服务于 M3 真机验收。
+
+### Frozen M3 closure path（冻结收尾路径）
+
+只检查以下 9 个 M3 功能条件：
+
+1. Python discovery fact（发现事实）；
+2. Node.js discovery fact；
+3. Bun discovery fact；
+4. Git discovery fact；
+5. process start（进程启动）；
+6. stdout / stderr capture（输出采集）；
+7. STATUS（状态）；
+8. selected-project STOP（选中项目停止）；
+9. Project A/B concurrent isolation（并发隔离）。
+
+Cloud（云端）与真实 Catalina Mac（苹果电脑）关键验证通过后，只执行一次 M3 Closure Audit（关闭审计），随后 M3 必须 PASS / CLOSED（通过 / 关闭）并进入 M4。
+
+当前状态：**IMPLEMENTED / CLOUD VERIFICATION IN PROGRESS（已实现 / 云端验证进行中）**。
