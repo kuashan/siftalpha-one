@@ -2146,3 +2146,34 @@ SHA-256:
 
 State:
 **CLOUD PASS / REAL VENTURA UNIFIED-PREPARE ACCEPTANCE PENDING**.
+
+
+## 2026-09-24 · M6.2 R3 real-Mac checksum mismatch repair PASS
+
+Real Developer Mode evidence:
+`checksum mismatch for lima-2.2.0-Darwin-x86_64.tar.gz`
+
+Observed:
+- installer expected `bbdef917...`;
+- downloaded file SHA-256 was `0d6f99c1...`;
+- GitHub Release metadata confirms `0d6f99c19f6e4bc3c92730c4c29d929e6927f0cb0a0ba1a84383367135a8ff31` is the official Lima 2.2.0 Darwin x86_64 asset digest.
+
+Root cause:
+the generic parser used an OR condition that caused the first valid digest line in a multi-asset manifest to match even if its filename did not match the requested asset.
+
+Fix:
+- exact filename matching for multi-file checksum manifests;
+- single bare digest remains supported for one-asset sidecars;
+- no fallback to another named asset;
+- dedicated regression tests added.
+
+Verification:
+- HEAD `d1cf3ba4b90a8b47ded7e07f3c09140c5d754ae9`;
+- macOS Run #73 PASS;
+- Android W0 #782 PASS;
+- Gradle `:macosApp:test` PASS;
+- managed environment flow probe PASS;
+- user-facing R3 ZIP SHA-256 `5a7165eade86a179c3933543b578b84a45b273b735d5955882a21d3d73c100ba`.
+
+State:
+**CLOUD PASS / REAL VENTURA RETEST PENDING**.
