@@ -1923,6 +1923,38 @@ Repair authority:
 - Catalina minimum remains 10.15.7.
 
 Current authority remains:
-**M5 CURRENT / M5.1 COMPLETE / M5.2 CLOUD PASS / REAL MAC PENDING**.
+**M5 PASS / CLOSED / M5.1 COMPLETE / M5.2 COMPLETE**.
 
-The next action is to re-run the frozen real Catalina M5.2 acceptance on the repaired package. Do not perform M5 Final Closure Audit before that pass.
+The repaired real Catalina M5.2 acceptance has passed. The single M5 Final Closure Audit is complete and M5 is closed.
+
+
+## M5 final closure authority — 2026-09-24
+
+Real macOS 10.15.7 Catalina / Intel x86_64 M5.2 acceptance is PASS.
+
+Final real evidence confirms:
+- Developer Mode Simplified Chinese UI and direct project import;
+- Normal and Developer Mode observe the same running project state;
+- Developer Stop propagates immediately to Normal Mode;
+- Normal Run propagates immediately to Developer Mode;
+- presentation switching itself does not create another Runtime lifecycle.
+
+Combined closure authority:
+- M5.1 real Mac PASS;
+- M5.2 real Mac PASS;
+- M5.2 functional repair HEAD `9e6f3ccb9259704f3efe4f898a97ae3f054f1b33`;
+- macOS Run #34 PASS;
+- Android W0 #743 PASS;
+- M5.2 shared-state parity PASS;
+- Project A/B STOP isolation PASS;
+- Catalina minimum remains 10.15.7.
+
+Frozen M5 Exit Criteria are all satisfied. There is no remaining Blocking Issue.
+
+Current authority:
+**M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CLOSED → M6 NOT STARTED**.
+
+Governance:
+- M5 must not be reopened for optional polish;
+- do not create M5.3 / M5.4;
+- M6 — Container / Multi-service requires its own Change Discussion Gate before implementation begins.
