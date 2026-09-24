@@ -36,7 +36,7 @@ class MacContainerRuntimeDiscovery(
                 detail = "no executable candidate found",
             )
 
-        val versionProbe = probe(executable, listOf("--version"))
+        val versionProbe = probe(executable, listOf("--version"), commandEnvironment(executable))
         if (!versionProbe.success) {
             return MacContainerProviderSnapshot(
                 kind = kind,
@@ -48,9 +48,9 @@ class MacContainerRuntimeDiscovery(
 
         val runtimeProbe = when (kind) {
             MacContainerProviderKind.DOCKER ->
-                probe(executable, listOf("info", "--format", "{{.ServerVersion}}"))
+                probe(executable, listOf("info", "--format", "{{.ServerVersion}}"), commandEnvironment(executable))
             MacContainerProviderKind.PODMAN ->
-                probe(executable, listOf("info", "--format", "{{.Version.Version}}"))
+                probe(executable, listOf("info", "--format", "{{.Version.Version}}"), commandEnvironment(executable))
         }
         val composeProbe = probeCompose(executable)
 
@@ -76,9 +76,10 @@ class MacContainerRuntimeDiscovery(
     }
 
     private fun probeCompose(executable: String): ProbeResult {
-        val short = probe(executable, listOf("compose", "version", "--short"))
+        val commandEnvironment = commandEnvironment(executable)
+        val short = probe(executable, listOf("compose", "version", "--short"), commandEnvironment)
         if (short.success) return short
-        return probe(executable, listOf("compose", "version"))
+        return probe(executable, listOf("compose", "version"), commandEnvironment)
     }
 
     private fun candidatePaths(kind: MacContainerProviderKind): List<String> {
@@ -102,11 +103,23 @@ class MacContainerRuntimeDiscovery(
         return directories.map { File(it, name).absolutePath }
     }
 
-    private fun probe(executable: String, arguments: List<String>): ProbeResult =
+    private fun commandEnvironment(executable: String): Map<String, String> =
+        MacManagedContainerToolchain.environmentForExecutable(
+            executable = executable,
+            userHome = userHome,
+            base = environment,
+        )
+
+    private fun probe(
+        executable: String,
+        arguments: List<String>,
+        commandEnvironment: Map<String, String>,
+    ): ProbeResult =
         runCatching {
-            val process = ProcessBuilder(listOf(executable) + arguments)
+            val processBuilder = ProcessBuilder(listOf(executable) + arguments)
                 .redirectErrorStream(true)
-                .start()
+            processBuilder.environment().putAll(commandEnvironment)
+            val process = processBuilder.start()
             val finished = process.waitFor(4, TimeUnit.SECONDS)
             if (!finished) {
                 process.destroyForcibly()
