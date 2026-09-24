@@ -13,12 +13,38 @@ data class MacProjectWebEndpoint(
     enum class Source {
         LOG_OUTPUT,
         PROJECT_PROCESS_PORT,
+        CONTAINER_PORT,
     }
 }
 
 class MacProjectWebDiscovery(
     private val processControl: MacProjectProcessControl,
 ) {
+    fun discoverFromPorts(
+        ports: Collection<Int>,
+        combinedOutput: String,
+    ): MacProjectWebEndpoint? {
+        RuntimeWebUrl.extractLocalHttpUrl(combinedOutput)?.let { candidate ->
+            if (RuntimeWebEndpointProbe.isListening(candidate, timeoutMs = 500)) {
+                return MacProjectWebEndpoint(candidate, MacProjectWebEndpoint.Source.LOG_OUTPUT)
+            }
+        }
+        ports.asSequence()
+            .filter { it in 1..65535 }
+            .distinct()
+            .sorted()
+            .forEach { port ->
+                val candidate = "http://127.0.0.1:" + port
+                if (RuntimeWebEndpointProbe.isListening(candidate, timeoutMs = 500)) {
+                    return MacProjectWebEndpoint(
+                        candidate,
+                        MacProjectWebEndpoint.Source.CONTAINER_PORT,
+                    )
+                }
+            }
+        return null
+    }
+
     fun discover(scope: ProjectProcessScope, combinedOutput: String): MacProjectWebEndpoint? {
         RuntimeWebUrl.extractLocalHttpUrl(combinedOutput)?.let { candidate ->
             if (RuntimeWebEndpointProbe.isListening(candidate, timeoutMs = 500)) {
