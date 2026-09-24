@@ -8,6 +8,7 @@ enum class MacHostToolKind(val id: String) {
     NODE_JS("nodejs"),
     BUN("bun"),
     GIT("git"),
+    SHELL("shell"),
 }
 
 enum class MacHostToolAvailability {
@@ -69,6 +70,7 @@ class MacHostRuntimeDiscovery(
             MacHostToolKind.NODE_JS -> listOf("node")
             MacHostToolKind.BUN -> listOf("bun")
             MacHostToolKind.GIT -> listOf("git")
+            MacHostToolKind.SHELL -> listOf("zsh", "bash", "sh")
         }
 
         val commonDirs = linkedSetOf<String>().apply {
@@ -106,6 +108,7 @@ class MacHostRuntimeDiscovery(
         MacHostToolKind.NODE_JS,
         MacHostToolKind.BUN,
         MacHostToolKind.GIT,
+        MacHostToolKind.SHELL,
         -> listOf("--version")
     }
 

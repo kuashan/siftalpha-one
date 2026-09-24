@@ -74,7 +74,7 @@ jobs:
           grep -q '^SIFTALPHA_MACOS_HOST=READY$' macos-evidence/core-load-probe.txt
           grep -q '^SIFTALPHA_CORE_LOAD=PASS$' macos-evidence/core-load-probe.txt
           grep -q '^SIFTALPHA_CAPABILITY=host_process_execution = AVAILABLE$' macos-evidence/core-load-probe.txt
-          for tool in python nodejs bun git; do
+          for tool in python nodejs bun git shell; do
             grep -q "^SIFTALPHA_HOST_TOOL=$tool|" macos-evidence/core-load-probe.txt
           done
 

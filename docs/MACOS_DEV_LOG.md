@@ -1315,3 +1315,19 @@ M3.1 is a finite implementation slice intended to cover the complete M3 core con
 - No M5 final product UI.
 
 Cloud verification: **IN PROGRESS（进行中）**.
+
+
+### M3 Exit Criteria reconciliation — Shell discovery
+
+The pre-existing Stage Exit Contract（阶段退出条件） requires host discovery facts for Python / Node.js / Bun / Git / Shell.
+
+The initial M3.1 implementation covered Python / Node.js / Bun / Git but omitted Shell from its later closure checklist. That later checklist is not allowed to silently weaken an already frozen stage exit condition.
+
+Correction inside the same finite M3.1 slice:
+
+- add `MacHostToolKind.SHELL`;
+- discover `zsh`, then `bash`, then `sh` through the same bounded executable + version-probe mechanism;
+- require an explicit shell discovery fact in cloud probe output;
+- add a cloud-host test proving a system shell is AVAILABLE.
+
+No new M3.2 slice is created. Core（核心）, Android（安卓） production source, M4 workflow, and M5 product UI remain unchanged.

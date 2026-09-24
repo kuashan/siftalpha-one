@@ -449,7 +449,7 @@ M3 使用一个有限实现切片完成主机运行提供者的核心闭环，�
 
 在 macOS Platform Adapter（苹果平台适配层）实现：
 
-- Python / Node.js / Bun / Git（运行时 / 工具）发现；
+- Python / Node.js / Bun / Git / Shell（运行时 / 工具 / 命令环境）发现；
 - host process execution（主机进程执行）；
 - stdout / stderr（标准输出 / 标准错误）采集；
 - STATUS（状态）；
@@ -481,12 +481,13 @@ M3 使用一个有限实现切片完成主机运行提供者的核心闭环，�
 2. Node.js discovery fact；
 3. Bun discovery fact；
 4. Git discovery fact；
-5. process start（进程启动）；
-6. stdout / stderr capture（输出采集）；
-7. STATUS（状态）；
-8. selected-project STOP（选中项目停止）；
-9. Project A/B concurrent isolation（并发隔离）。
+5. Shell discovery fact（命令环境发现事实）；
+6. process start（进程启动）；
+7. stdout / stderr capture（输出采集）；
+8. STATUS（状态）；
+9. selected-project STOP（选中项目停止）；
+10. Project A/B concurrent isolation（并发隔离）。
 
 Cloud（云端）与真实 Catalina Mac（苹果电脑）关键验证通过后，只执行一次 M3 Closure Audit（关闭审计），随后 M3 必须 PASS / CLOSED（通过 / 关闭）并进入 M4。
 
-当前状态：**IMPLEMENTED / CLOUD VERIFICATION IN PROGRESS（已实现 / 云端验证进行中）**。
+当前状态：**IMPLEMENTED / CLOUD RE-VERIFICATION IN PROGRESS（已实现 / 云端重新验证进行中）**。

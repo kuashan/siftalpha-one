@@ -473,11 +473,12 @@ Next stage（下一阶段）: **M3 — Host Runtime Provider（主机运行提�
 | M3-02 | Node.js discovery（Node 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PENDING |
 | M3-03 | Bun discovery（Bun 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PENDING |
 | M3-04 | Git discovery（Git 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PENDING |
-| M3-05 | Host process start（主机进程启动） | project-owned process starts | CLOUD PENDING |
-| M3-06 | stdout / stderr capture（输出采集） | both streams captured independently | CLOUD PENDING |
-| M3-07 | STATUS（状态） | RUNNING / EXITED / STOPPED facts are correct | CLOUD PENDING |
-| M3-08 | Project STOP（项目停止） | selected project stops | CLOUD PENDING |
-| M3-09 | Concurrent A/B isolation（并行项目隔离） | STOP A leaves B RUNNING | CLOUD PENDING |
-| M3-10 | Android regression（安卓回归） | W0 PASS | CLOUD PENDING |
-| M3-11 | Catalina compatibility（Catalina 兼容） | packaged app remains compatible with 10.15.7 | CLOUD PENDING |
-| M3-12 | Real Mac M3 Self-Test（真实 Mac 自检） | diagnostic button reports PASS | REAL MAC PENDING |
+| M3-05 | Shell discovery（Shell 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PENDING |
+| M3-06 | Host process start（主机进程启动） | project-owned process starts | CLOUD PENDING |
+| M3-07 | stdout / stderr capture（输出采集） | both streams captured independently | CLOUD PENDING |
+| M3-08 | STATUS（状态） | RUNNING / EXITED / STOPPED facts are correct | CLOUD PENDING |
+| M3-09 | Project STOP（项目停止） | selected project stops | CLOUD PENDING |
+| M3-10 | Concurrent A/B isolation（并行项目隔离） | STOP A leaves B RUNNING | CLOUD PENDING |
+| M3-11 | Android regression（安卓回归） | W0 PASS | CLOUD PENDING |
+| M3-12 | Catalina compatibility（Catalina 兼容） | packaged app remains compatible with 10.15.7 | CLOUD PENDING |
+| M3-13 | Real Mac M3 Self-Test（真实 Mac 自检） | diagnostic button reports PASS | REAL MAC PENDING |
