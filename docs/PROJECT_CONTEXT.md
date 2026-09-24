@@ -1738,7 +1738,7 @@ Evidence:
 - Catalina minimum remains unchanged.
 
 Current M4.1 state:
-**CLOUD PASS / REAL MAC PENDING**.
+**PASS / COMPLETE**.
 
 Do not begin M4.2 until M4.1 real-Mac acceptance is completed and the next-slice plan is discussed per the clarified Change Discussion Gate（修改前讨论门禁）.
 
@@ -1842,4 +1842,26 @@ Key product facts:
 - Android W0 #732 PASS;
 - Catalina minimum remains 10.15.7.
 
-Do not start M5.2 until M5.1 real-Mac visual/interaction acceptance is complete.
+Real macOS 10.15.7 Catalina / Intel x86_64 M5.1 acceptance is PASS. M5.1 is closed. Do not start M5.2 until its Change Discussion Gate plan is discussed and approved.
+
+
+## M5.1 real-Mac authority — 2026-09-24
+
+M5.1 — Normal Mode Product UI（普通模式产品界面） is now **PASS / COMPLETE**.
+
+Real acceptance:
+- macOS 10.15.7 Catalina;
+- Intel x86_64;
+- user-confirmed M5.1 visual / interaction acceptance PASS.
+
+Combined evidence:
+- accepted functional HEAD `71e9dba0323aa35a531a3a1b26b55907ac8b907b`;
+- macOS Run #23 PASS;
+- Android W0 #732 PASS;
+- Catalina minimum remains 10.15.7;
+- real Mac acceptance PASS.
+
+Current authority:
+**M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CURRENT / M5.1 COMPLETE / M5.2 NOT STARTED**.
+
+Per the Stage Closure Rule, M5.1 must not be reopened for optional polish. The next allowed implementation slice is M5.2 Developer Mode + Shared State Parity, after its Change Discussion Gate discussion and approval.
