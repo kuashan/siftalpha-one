@@ -165,6 +165,8 @@ jobs:
             "https://download.docker.com/mac/static/stable/aarch64/docker-29.8.1.tgz"
             "https://github.com/docker/compose/releases/download/v5.5.1/docker-compose-darwin-x86_64"
             "https://github.com/docker/compose/releases/download/v5.5.1/docker-compose-darwin-aarch64"
+            "https://github.com/docker/buildx/releases/download/v0.37.1/buildx-v0.37.1.darwin-amd64"
+            "https://github.com/docker/buildx/releases/download/v0.37.1/buildx-v0.37.1.darwin-arm64"
           )
           for url in "${urls[@]}"; do
             curl --fail --silent --show-error --location --range 0-0 --output /dev/null "$url"
