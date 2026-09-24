@@ -72,7 +72,7 @@ object MacM62SelfTest {
             maxBytes: Int,
         ): String =
             if (running[projectName(project.projectId)] == true) {
-                "web | listening http://127.0.0.1:" + webPort + "\n" +
+                "web | ready\n" +
                     "db | ready\n"
             } else {
                 ""
@@ -189,6 +189,7 @@ object MacM62SelfTest {
                     resultUrl == "http://127.0.0.1:" + port &&
                     developerA.containerServices.size == 2 &&
                     developerA.containerServices.all { it.state == MacComposeServiceState.RUNNING } &&
+                    developerA.webSource == "CONTAINER_PORT" &&
                     stopA &&
                     aAfterStop.workflow.processState.name == "STOPPED" &&
                     bAfterAStop.workflow.processState.name == "RUNNING" &&
@@ -216,6 +217,7 @@ object MacM62SelfTest {
                     "service_states=" + developerA.containerServices.joinToString(",") {
                         it.name + ":" + it.state
                     },
+                    "web_source=" + developerA.webSource,
                     "stop_a=" + stopA,
                     "a_after_stop=" + aAfterStop.workflow.processState,
                     "b_after_a_stop=" + bAfterAStop.workflow.processState,
