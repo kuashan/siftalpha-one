@@ -151,6 +151,7 @@ object MacM62InstallerSelfTest {
             )
 
             val project = controller.importProject(projectRoot)
+            val failedPrepare = controller.prepare(project.projectId)
             val before = controller.view(project.projectId)!!
             val beforePresentation = MacNormalProjectPresentationPolicy.resolve(before)
 
@@ -160,6 +161,8 @@ object MacM62InstallerSelfTest {
 
             val passed =
                 project.isCompose &&
+                    !failedPrepare.success &&
+                    !before.lastError.isNullOrBlank() &&
                     before.containerAdvice?.state != MacContainerAdviceState.READY &&
                     before.containerInstallPlan?.kind == MacContainerInstallPlanKind.INSTALL_MANAGED_DOCKER &&
                     beforePresentation.primaryAction == MacNormalPrimaryAction.INSTALL_CONTAINER &&
@@ -175,6 +178,8 @@ object MacM62InstallerSelfTest {
                 passed = passed,
                 lines = listOf(
                     "compose_detect=" + project.isCompose,
+                    "failed_prepare_before_install=" + !failedPrepare.success,
+                    "stale_error_present=" + !before.lastError.isNullOrBlank(),
                     "before_advice=" + before.containerAdvice?.state,
                     "before_install_plan=" + before.containerInstallPlan?.kind,
                     "before_primary=" + beforePresentation.primaryAction,
