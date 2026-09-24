@@ -314,7 +314,7 @@ class MacCliComposeContainerProvider(
         maxOutputBytes: Int = 512 * 1024,
     ): MacContainerOperationResult {
         val outputFile = File.createTempFile("siftalpha-compose-", ".log")
-        return try {
+        try {
             val command = buildList {
                 add(executable)
                 add("compose")
@@ -366,7 +366,7 @@ class MacCliComposeContainerProvider(
                 }
             }
         } catch (error: Throwable) {
-            MacContainerOperationResult(
+            return MacContainerOperationResult(
                 success = false,
                 detail = error.message ?: error.javaClass.simpleName,
                 output = readOutput(outputFile, maxOutputBytes),
