@@ -2060,3 +2060,35 @@ Final cloud verification:
 
 State:
 **M6.2 = CLOUD PASS / REAL VENTURA PENDING**.
+
+
+## 2026-09-24 · M6.2 Managed Container Installer cloud PASS
+
+User-approved M6.2 scope expansion implemented:
+- Detect → Recommend → User Confirm → Install → Re-detect → Continue;
+- explicit user confirmation required before system change;
+- managed Colima/Lima/Docker/Compose/Buildx toolchain under SiftAlpha user data;
+- no Homebrew/MacPorts prerequisite;
+- architecture selection supports x86_64 and arm64 generically;
+- isolated managed Docker/Colima/Lima configuration;
+- re-detect and automatic Prepare continuation;
+- Normal Mode install action and wrapped guidance text;
+- existing external providers are not silently replaced.
+
+Validation:
+- accepted functional HEAD `1d3c8bcc23c94064c82b1ff652fc4eda7fd87ae4`;
+- macOS Run #56 PASS;
+- Android W0 #765 PASS;
+- managed container install flow probe PASS;
+- original M6.2 Compose workflow + A/B isolation probe PASS;
+- upstream managed assets reachability PASS;
+- M4/M5/M6.1 regressions PASS;
+- Ventura package PASS.
+
+Artifact:
+`SiftAlpha-X-m6.2-managed-container-ventura-x64.zip`
+SHA-256:
+`46cef1fb0b29c9c58a51bee5930b7d9b9a95082d7d96ad39e7e16feac516f348`
+
+State:
+**CLOUD PASS / REAL VENTURA MANAGED-INSTALL ACCEPTANCE PENDING**.
