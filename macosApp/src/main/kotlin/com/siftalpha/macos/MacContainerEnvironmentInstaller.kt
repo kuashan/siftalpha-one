@@ -85,7 +85,20 @@ object MacContainerInstallPlanner {
         val docker = providers.firstOrNull { it.kind == MacContainerProviderKind.DOCKER }
         val podman = providers.firstOrNull { it.kind == MacContainerProviderKind.PODMAN }
 
-        if (docker?.availability == CapabilityAvailability.AVAILABLE && !docker.composeAvailable) {
+        val managedRoot = MacManagedContainerToolchain.currentRoot(userHome)
+        val dockerIsManaged = docker?.executablePath?.let { executable ->
+            managedRoot?.let { root ->
+                runCatching { File(executable).canonicalPath }
+                    .getOrNull()
+                    ?.startsWith(runCatching { root.canonicalPath + File.separator }.getOrDefault("")) == true
+            } == true
+        } == true
+
+        if (
+            docker?.availability == CapabilityAvailability.AVAILABLE &&
+            !docker.composeAvailable &&
+            dockerIsManaged
+        ) {
             return MacContainerInstallPlan(
                 id = "managed-compose-" + MacManagedContainerToolchain.COMPOSE_VERSION + "-" + arch,
                 kind = MacContainerInstallPlanKind.INSTALL_DOCKER_COMPOSE,
@@ -100,7 +113,7 @@ object MacContainerInstallPlanner {
             )
         }
 
-        val managed = MacManagedContainerToolchain.currentRoot(userHome)
+        val managed = managedRoot
         val managedDocker = managed?.resolve("bin/docker")?.takeIf { it.isFile }
         if (
             docker?.availability == CapabilityAvailability.UNKNOWN &&
@@ -139,6 +152,7 @@ object MacContainerInstallPlanner {
                 "Lima " + MacManagedContainerToolchain.LIMA_VERSION,
                 "Docker CLI " + MacManagedContainerToolchain.DOCKER_VERSION,
                 "Docker Compose " + MacManagedContainerToolchain.COMPOSE_VERSION,
+                "Docker Buildx " + MacManagedContainerToolchain.BUILDX_VERSION,
             ),
             sideEffects = listOf(
                 "下载并校验官方发布文件到 SiftAlpha 用户数据目录",
@@ -155,7 +169,8 @@ object MacManagedContainerToolchain {
     const val LIMA_VERSION = "2.2.0"
     const val DOCKER_VERSION = "29.8.1"
     const val COMPOSE_VERSION = "5.5.1"
-    const val STACK_VERSION = "c0.10.3-l2.2.0-d29.8.1-p5.5.1"
+    const val BUILDX_VERSION = "0.37.1"
+    const val STACK_VERSION = "c0.10.3-l2.2.0-d29.8.1-p5.5.1-b0.37.1"
 
     fun normalizeArchitecture(value: String): String? = when (value.lowercase()) {
         "x86_64", "amd64" -> "x86_64"
@@ -299,6 +314,8 @@ class MacManagedContainerInstaller(
                 .copyTo(File(staging, "bin/colima"), overwrite = true)
             downloaded.getValue(composeAssetName(arch))
                 .copyTo(File(staging, "docker-config/cli-plugins/docker-compose"), overwrite = true)
+            downloaded.getValue(buildxAssetName(arch))
+                .copyTo(File(staging, "docker-config/cli-plugins/docker-buildx"), overwrite = true)
 
             listOf(
                 File(staging, "bin/colima"),
@@ -306,6 +323,7 @@ class MacManagedContainerInstaller(
                 File(staging, "bin/limactl"),
                 File(staging, "bin/lima"),
                 File(staging, "docker-config/cli-plugins/docker-compose"),
+                File(staging, "docker-config/cli-plugins/docker-buildx"),
             ).filter { it.exists() }.forEach { file ->
                 check(file.setExecutable(true, true) || file.canExecute()) {
                     "failed to mark executable: " + file.absolutePath
@@ -320,6 +338,7 @@ class MacManagedContainerInstaller(
                     appendLine("LIMA=" + MacManagedContainerToolchain.LIMA_VERSION)
                     appendLine("DOCKER=" + MacManagedContainerToolchain.DOCKER_VERSION)
                     appendLine("COMPOSE=" + MacManagedContainerToolchain.COMPOSE_VERSION)
+                    appendLine("BUILDX=" + MacManagedContainerToolchain.BUILDX_VERSION)
                 },
             )
             downloads.deleteRecursively()
@@ -422,6 +441,12 @@ class MacManagedContainerInstaller(
                 60,
                 log,
             )
+            runChecked(
+                listOf(docker.absolutePath, "buildx", "version"),
+                environmentFor(root),
+                60,
+                log,
+            )
             MacContainerInstallResult(true)
         } catch (error: Throwable) {
             progress(MacContainerInstallPhase.FAILED, "容器环境启动或验证失败")
@@ -434,6 +459,7 @@ class MacManagedContainerInstaller(
         limaAsset(arch),
         dockerAsset(arch),
         composeAsset(arch),
+        buildxAsset(arch),
     )
 
     private fun colimaAsset(arch: String): Asset {
@@ -467,6 +493,13 @@ class MacManagedContainerInstaller(
         return Asset(name, base + name, base + name + ".sha256", name)
     }
 
+    private fun buildxAsset(arch: String): Asset {
+        val name = buildxAssetName(arch)
+        val base = "https://github.com/docker/buildx/releases/download/v" +
+            MacManagedContainerToolchain.BUILDX_VERSION + "/"
+        return Asset(name, base + name, base + "checksums.txt", name)
+    }
+
     private fun colimaAssetName(arch: String): String =
         "colima-Darwin-" + if (arch == "arm64") "arm64" else "x86_64"
 
@@ -479,6 +512,10 @@ class MacManagedContainerInstaller(
 
     private fun composeAssetName(arch: String): String =
         "docker-compose-darwin-" + if (arch == "arm64") "aarch64" else "x86_64"
+
+    private fun buildxAssetName(arch: String): String =
+        "buildx-v" + MacManagedContainerToolchain.BUILDX_VERSION + ".darwin-" +
+            if (arch == "arm64") "arm64" else "amd64"
 
     private fun downloadAndVerify(
         asset: Asset,
