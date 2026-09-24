@@ -222,8 +222,8 @@ class MacManagedContainerInstaller(
     private data class Asset(
         val name: String,
         val url: String,
-        val checksumUrl: String,
-        val checksumMatchName: String,
+        val checksumUrl: String? = null,
+        val checksumMatchName: String = name,
     )
 
     override fun install(
@@ -405,6 +405,12 @@ class MacManagedContainerInstaller(
 
             progress(MacContainerInstallPhase.VERIFYING, "正在验证 Docker 与 Compose…")
             runChecked(
+                listOf(docker.absolutePath, "--version"),
+                environmentFor(root),
+                30,
+                log,
+            )
+            runChecked(
                 listOf(docker.absolutePath, "info", "--format", "{{.ServerVersion}}"),
                 environmentFor(root),
                 60,
@@ -448,7 +454,10 @@ class MacManagedContainerInstaller(
         val name = dockerAssetName()
         val dockerArch = if (arch == "arm64") "aarch64" else "x86_64"
         val base = "https://download.docker.com/mac/static/stable/" + dockerArch + "/"
-        return Asset(name, base + name, base + name + ".sha256", name)
+        // Docker's macOS static archive directory does not publish a per-file checksum
+        // sidecar. Keep the URL version-pinned over HTTPS and verify the extracted CLI
+        // version before accepting the managed environment.
+        return Asset(name, base + name)
     }
 
     private fun composeAsset(arch: String): Asset {
@@ -478,22 +487,27 @@ class MacManagedContainerInstaller(
     ) {
         destination.parentFile.mkdirs()
         download(asset.url, destination)
-        val checksumText = downloadText(asset.checksumUrl)
-        val expected = checksumText
-            .lineSequence()
-            .map(String::trim)
-            .filter(String::isNotBlank)
-            .firstOrNull { line ->
-                line.contains(asset.checksumMatchName) ||
-                    Regex("^[0-9a-fA-F]{64}(\\s|$)").containsMatchIn(line)
-            }
-            ?.let { Regex("[0-9a-fA-F]{64}").find(it)?.value?.lowercase() }
-            ?: error("checksum not found for " + asset.name)
         val actual = sha256(destination)
-        check(actual == expected) {
-            "checksum mismatch for " + asset.name + ": expected=" + expected + " actual=" + actual
+        val checksumUrl = asset.checksumUrl
+        if (checksumUrl != null) {
+            val checksumText = downloadText(checksumUrl)
+            val expected = checksumText
+                .lineSequence()
+                .map(String::trim)
+                .filter(String::isNotBlank)
+                .firstOrNull { line ->
+                    line.contains(asset.checksumMatchName) ||
+                        Regex("^[0-9a-fA-F]{64}(\\s|$)").containsMatchIn(line)
+                }
+                ?.let { Regex("[0-9a-fA-F]{64}").find(it)?.value?.lowercase() }
+                ?: error("checksum not found for " + asset.name)
+            check(actual == expected) {
+                "checksum mismatch for " + asset.name + ": expected=" + expected + " actual=" + actual
+            }
+            log("VERIFY_SHA256=PASS|" + asset.name + "|" + actual)
+        } else {
+            log("VERIFY_SHA256=UPSTREAM_NOT_PUBLISHED|" + asset.name + "|" + actual)
         }
-        log("VERIFY_SHA256=PASS|" + asset.name + "|" + actual)
     }
 
     private fun download(url: String, destination: File) {
