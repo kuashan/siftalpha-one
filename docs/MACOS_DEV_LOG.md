@@ -1950,3 +1950,17 @@ Final:
 **M5 — Product UI Parity = PASS / CLOSED**.
 
 The next stage is M6 — Container / Multi-service, NOT STARTED. Its implementation requires a new Change Discussion Gate approval.
+
+
+## 2026-09-24 · macOS support baseline raised to Ventura
+
+User upgraded the real SiftAlpha X acceptance machine to macOS 13.7.8 Ventura on Intel x86_64 and explicitly removed the requirement to keep macOS 10.15.7 Catalina as the minimum supported version.
+
+New support policy:
+- full-support minimum = macOS 13 Ventura;
+- real M6/M7/M8 acceptance machine = macOS 13.7.8 / Intel x86_64;
+- historical Catalina M2～M5 acceptance remains historical PASS evidence;
+- future Container / Runtime / Virtualization choices do not need legacy Catalina compatibility;
+- no requirement to pin obsolete Catalina-era Docker/Compose solely for OS compatibility.
+
+No production code was changed by this policy update.
