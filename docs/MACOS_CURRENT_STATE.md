@@ -320,7 +320,7 @@ Cloud re-verification:
 
 M4.1 remains:
 
-**PASS / COMPLETE（通过 / 完成）**.
+**CLOUD PASS / REAL MAC PENDING（云端通过 / 真实 Mac 待验收）**.
 
 Real Mac still needs to confirm:
 1. double-click launch succeeds;
