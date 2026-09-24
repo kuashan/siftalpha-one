@@ -245,7 +245,7 @@ class MacNormalModeWindow(
         }
         add(brand, BorderLayout.WEST)
 
-        moreButton.addActionListener { event ->
+        moreButton.addActionListener {
             val menu = JPopupMenu()
             menu.add(JMenuItem("刷新项目").apply {
                 addActionListener { refreshProjects() }
@@ -260,17 +260,19 @@ class MacNormalModeWindow(
                     )
                 }
             })
-            menu.show(event.component, 0, event.component.height)
+            menu.show(moreButton, 0, moreButton.height)
         }
         add(moreButton, BorderLayout.EAST)
     }
 
     private fun loadLogo(): JLabel {
         val resource = javaClass.getResource("/siftalpha_logo.png")
-        val icon = runCatching {
-            val image = ImageIO.read(resource)
-            ImageIcon(image.getScaledInstance(28, 28, java.awt.Image.SCALE_SMOOTH))
-        }.getOrNull()
+        val icon = resource?.let { url ->
+            runCatching {
+                val image = ImageIO.read(url)
+                ImageIcon(image.getScaledInstance(28, 28, java.awt.Image.SCALE_SMOOTH))
+            }.getOrNull()
+        }
         return JLabel(icon ?: ImageIcon()).apply {
             if (icon == null) {
                 text = "S"
