@@ -22,12 +22,15 @@ class MacHostRuntimeDiscoveryTest {
         assertEquals(MacHostToolAvailability.AVAILABLE, git.availability)
         assertTrue(git.executablePath?.endsWith("/git") == true)
     }
-}
-
 
     @Test
     fun macOSSystemShellIsDetectedOnTheCloudHost() {
         val shell = MacHostRuntimeDiscovery().discover(MacHostToolKind.SHELL)
         assertEquals(MacHostToolAvailability.AVAILABLE, shell.availability)
-        assertTrue(shell.executablePath?.let { it.endsWith("/zsh") || it.endsWith("/bash") || it.endsWith("/sh") } == true)
+        assertTrue(
+            shell.executablePath?.let {
+                it.endsWith("/zsh") || it.endsWith("/bash") || it.endsWith("/sh")
+            } == true,
+        )
     }
+}

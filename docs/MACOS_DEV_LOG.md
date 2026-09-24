@@ -1331,3 +1331,10 @@ Correction inside the same finite M3.1 slice:
 - add a cloud-host test proving a system shell is AVAILABLE.
 
 No new M3.2 slice is created. Core（核心）, Android（安卓） production source, M4 workflow, and M5 product UI remain unchanged.
+
+
+### M3 Shell test wiring correction
+
+The first Shell-discovery test addition was syntactically valid Kotlin but appended at file scope, outside `MacHostRuntimeDiscoveryTest`. JUnit 4 would not execute it as a test method on the test class.
+
+The test is moved inside the class before accepting any cloud result. Production discovery logic is unchanged.
