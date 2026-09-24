@@ -730,9 +730,9 @@ Future M6/M7/M8 verification must use the current Ventura baseline. Older Catali
 | M6.1-12 | Project-scoped STOP regression | A/B isolation preserved | PASS — Run #36 |
 | M6.1-13 | Android regression | W0 PASS | PASS — W0 #745 |
 | M6.1-14 | Ventura application baseline | LSMinimumSystemVersion 13.0 | PASS — Run #36 |
-| M6.1-15 | Real Ventura capability/detection acceptance | macOS 13.7.8 / Intel x86_64 | REAL VENTURA PENDING |
+| M6.1-15 | Real Ventura capability/detection acceptance | macOS 13.7.8 / Intel x86_64 | PASS — real probe: container UNAVAILABLE, Docker UNAVAILABLE, Podman UNAVAILABLE, managed Python 3.14.7 AVAILABLE |
 
 Current M6.1 result:
-**14 / 15 PASS — CLOUD PASS / REAL VENTURA PENDING**.
+**15 / 15 PASS — PASS / COMPLETE**.
 
 M6.2 Compose Runtime Workflow + Project Isolation remains NOT STARTED.
