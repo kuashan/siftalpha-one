@@ -324,11 +324,14 @@ class MacCliComposeContainerProvider(
                 add(manifest)
                 addAll(arguments)
             }
-            val process = ProcessBuilder(command)
+            val processBuilder = ProcessBuilder(command)
                 .directory(File(project.canonicalRootPath))
                 .redirectErrorStream(true)
                 .redirectOutput(outputFile)
-                .start()
+            processBuilder.environment().putAll(
+                MacManagedContainerToolchain.environmentForExecutable(executable),
+            )
+            val process = processBuilder.start()
 
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
             while (true) {
