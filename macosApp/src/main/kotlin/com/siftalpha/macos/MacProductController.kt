@@ -200,8 +200,8 @@ class MacProductController(
                     .toString()
                     .lineSequence()
                     .filter(String::isNotBlank)
-                    .takeLast(80)
                     .toList()
+                    .takeLast(80)
             }
             containerInstallProgress[projectId] = MacContainerInstallProgress(
                 phase = phase,
