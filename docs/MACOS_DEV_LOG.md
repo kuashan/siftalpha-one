@@ -1540,3 +1540,23 @@ M4.1 implementation:
 - no dependency installation or project-code execution in M4.1.
 
 Frozen boundaries remain: no Android runtime behavior change, no M3 process-control semantic change, no M5 final UI, no container/OpenBot work.
+
+
+### M4.1 macOS Run #12 workflow-generation failure
+
+Run #12 failed before creating any macOS Job（任务）. This was not an M4.1 Kotlin/Core failure.
+
+Root cause:
+
+- M4.1 probe insertion used JavaScript replacement text containing shell `grep` expressions ending in `$'`;
+- JavaScript `String.replace` interpreted `$'` as a special replacement token and injected the original workflow suffix repeatedly;
+- the resulting YAML was invalid, so GitHub Actions rejected it during workflow parsing.
+
+Repair:
+
+- restore the exact Run #11 verified workflow as the structural baseline;
+- insert one standalone `Prove M4.1 import detect plan` step using a replacement callback, so shell `$` characters are treated literally;
+- keep all M4.1 Kotlin/Core source unchanged;
+- retain the existing M3 process probe, Android-dependency isolation check, Catalina packaging, and artifact upload steps unchanged.
+
+Acceptance requires the next macOS workflow to create a real Job and execute Core/macOS tests plus the M4.1 plan probe.
