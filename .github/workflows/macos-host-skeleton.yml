@@ -1,4 +1,4 @@
-name: SiftAlpha macOS Host Runtime
+name: SiftAlpha X macOS Host Runtime
 
 on:
   push:
@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build M3 macOS host
+    name: Build SiftAlpha X macOS host
     runs-on: macos-15-intel
     timeout-minutes: 25
 
@@ -100,7 +100,7 @@ jobs:
             exit 1
           fi
 
-      - name: Package Catalina-compatible SiftAlpha.app
+      - name: Package Catalina-compatible SiftAlpha X.app
         run: |
           set -euo pipefail
           rm -rf macos-dist
@@ -108,15 +108,15 @@ jobs:
 
           "$JAVA_HOME/bin/jpackage" \
             --type app-image \
-            --name SiftAlpha \
+            --name "SiftAlpha X" \
             --dest macos-dist \
             --input macosApp/build/install/macosApp/lib \
             --main-jar macosApp.jar \
             --main-class com.siftalpha.macos.SiftAlphaMacAppKt \
             --mac-package-identifier com.siftalpha.macos \
-            --java-options "-Dapple.awt.application.name=SiftAlpha"
+            --java-options "-Dapple.awt.application.name=SiftAlpha X"
 
-          APP="macos-dist/SiftAlpha.app"
+          APP="macos-dist/SiftAlpha X.app"
           PLIST="$APP/Contents/Info.plist"
           test -d "$APP"
           test -f "$PLIST"
@@ -130,7 +130,7 @@ jobs:
           plutil -p "$PLIST" | tee macos-evidence/info-plist.txt
           test "$(plutil -extract LSMinimumSystemVersion raw -o - "$PLIST")" = "10.15"
 
-          file "$APP/Contents/MacOS/SiftAlpha" | tee macos-evidence/app-launcher-file.txt
+          file "$APP/Contents/MacOS/SiftAlpha X" | tee macos-evidence/app-launcher-file.txt
           grep -q 'x86_64' macos-evidence/app-launcher-file.txt
 
           inspect_minos() {
@@ -150,7 +150,7 @@ jobs:
             python3 -c 'import sys; parts=tuple(int(p) for p in sys.argv[1].split(".")[:2]); sys.exit(f"binary requires macOS {sys.argv[1]}, newer than Catalina 10.15") if parts > (10, 15) else None' "$minos"
           }
 
-          inspect_minos "$APP/Contents/MacOS/SiftAlpha" "launcher"
+          inspect_minos "$APP/Contents/MacOS/SiftAlpha X" "launcher"
 
           LIBJLI="$(find "$APP/Contents/runtime" -type f -name 'libjli.dylib' -print -quit)"
           LIBJVM="$(find "$APP/Contents/runtime" -type f -name 'libjvm.dylib' -print -quit)"
@@ -162,8 +162,8 @@ jobs:
           find "$APP" -maxdepth 4 -type f | sort | tee macos-evidence/app-files.txt
           ditto -c -k --sequesterRsrc --keepParent \
             "$APP" \
-            macos-dist/SiftAlpha-m3.1-catalina-x64.zip
-          shasum -a 256 macos-dist/SiftAlpha-m3.1-catalina-x64.zip \
+            macos-dist/SiftAlpha-X-m3.1-catalina-x64.zip
+          shasum -a 256 macos-dist/SiftAlpha-X-m3.1-catalina-x64.zip \
             | tee macos-evidence/app-zip-sha256.txt
 
       - name: Upload macOS app and evidence
@@ -172,7 +172,7 @@ jobs:
         with:
           name: siftalpha-macos-m3.1-catalina-x64-${{ github.run_number }}
           path: |
-            macos-dist/SiftAlpha-m3.1-catalina-x64.zip
+            macos-dist/SiftAlpha-X-m3.1-catalina-x64.zip
             macos-evidence
           if-no-files-found: warn
           retention-days: 14

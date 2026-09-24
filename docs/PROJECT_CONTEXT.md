@@ -1650,3 +1650,45 @@ Current cross-platform stage:
 **M3 — Host Runtime Provider（主机运行提供者）**.
 
 macOS minimum supported version remains frozen at **10.15.7 Catalina** until a future mandatory capability requires a higher system version and the user is informed before any support-floor change.
+
+
+## Current macOS development authority — 2026-09-24
+
+This section supersedes earlier “current stage” statements in this cumulative context.
+
+- Product Display Name（产品显示名称）: **SiftAlpha X**
+- macOS minimum supported version: **10.15.7 Catalina**
+- M0: PASS / CLOSED
+- M1: PASS / CLOSED
+- M2: PASS / CLOSED
+- M3: **PASS / CLOSED**
+- Current stage: **M4 — Project Workflow（项目工作流）**
+- M4 implementation: NOT STARTED
+
+M3 accepted functional HEAD:
+`259d94fe7d7501a1232f1d7114445f4673cfc0a1`.
+
+M3 final evidence includes macOS Host Runtime Run #10 PASS, Android W0 #719 PASS, passive Catalina discovery without Apple installer UI, rejection of legacy Python 2.7 as Host Python, project-scoped STOP isolation, and real macOS 10.15.7 `Process self-test: PASS`.
+
+### Change Discussion Gate（修改前讨论门禁） — authoritative
+
+Before every source / CI / architecture / behavior / product-display mutation:
+
+1. re-read real remote HEAD;
+2. read `MACOS_CURRENT_STATE.md`, `MACOS_DEV_LOG.md`, `MACOS_TEST_MATRIX.md`, `PLATFORM_CAPABILITY_CONTRACT.md`, and `CROSS_PLATFORM_CORE.md`;
+3. perform read-only source audit;
+4. explain Problem / Root Cause / Repair Plan;
+5. state Modification Scope / Frozen Boundary / Risk / Acceptance;
+6. obtain explicit user approval;
+7. re-check remote HEAD immediately before writing;
+8. only then implement, run cloud verification, obtain required real-device / real-Mac evidence, update docs, and close.
+
+If remote HEAD changed from the approved starting point, stop and report `REMOTE_HEAD_CHANGED`. Do not automatically rebase, merge, or force-push.
+
+### Stage closure rule
+
+Closed stages are not reopened for non-blocking polish. Non-blocking improvements go to Backlog（待办）. M3 must not gain new mandatory M3.x slices after closure.
+
+### Display identity boundary
+
+macOS user-visible app identity is `SiftAlpha X`. Internal technical identifiers remain stable unless a separately approved architecture change requires migration.

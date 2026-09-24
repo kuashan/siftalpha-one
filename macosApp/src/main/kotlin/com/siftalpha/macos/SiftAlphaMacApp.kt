@@ -21,10 +21,9 @@ import javax.swing.UIManager
 import javax.swing.WindowConstants
 
 /**
- * M2 macOS Platform Adapter（苹果平台适配层） capability publication.
+ * macOS Platform Adapter（苹果平台适配层） capability publication.
  *
- * M2 intentionally does not probe host runtimes. Actual Python / Node.js / Bun / Git / container
- * discovery belongs to M3 Host Runtime Provider（主机运行提供者）.
+ * Host runtime discovery is provided separately by MacHostRuntimeDiscovery.
  */
 object MacPlatformCapabilities {
     val publishedCapabilities: List<PlatformCapability> = listOf(
@@ -85,7 +84,7 @@ private fun createWindow(
         )
     }
 
-    val title = JLabel("SiftAlpha", SwingConstants.CENTER).apply {
+    val title = JLabel("SiftAlpha X", SwingConstants.CENTER).apply {
         border = BorderFactory.createEmptyBorder(20, 20, 8, 20)
     }
     val subtitle = JLabel(
@@ -124,7 +123,7 @@ private fun createWindow(
         add(controls, BorderLayout.SOUTH)
     }
 
-    return JFrame("SiftAlpha").apply {
+    return JFrame("SiftAlpha X").apply {
         defaultCloseOperation = WindowConstants.EXIT_ON_CLOSE
         minimumSize = Dimension(760, 480)
         layout = BorderLayout()
@@ -137,7 +136,7 @@ private fun createWindow(
 }
 
 fun main(args: Array<String>) {
-    System.setProperty("apple.awt.application.name", "SiftAlpha")
+    System.setProperty("apple.awt.application.name", "SiftAlpha X")
 
     val snapshot = MacPlatformCapabilities.snapshot()
     val discovery = MacHostRuntimeDiscovery().discoverAll()

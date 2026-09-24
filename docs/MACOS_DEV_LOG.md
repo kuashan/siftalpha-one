@@ -1418,3 +1418,75 @@ Cloud evidence:
   `b3b2fe433ae0dca369659839cacbe387be78cd371d564991212aaad8e26d5272`.
 
 Real-Mac acceptance must now verify that a Catalina machine without Command Line Tools opens the app without an Apple install prompt. Python 2.7 must not be shown as AVAILABLE Host Python. After that, the M3 process self-test must report PASS.
+
+
+## 2026-09-24 · M3 Closure Audit PASS / Governance cleanup / SiftAlpha X display identity
+
+### M3 real-Mac final evidence
+
+Real acceptance machine:
+
+- macOS 10.15.7 Catalina
+- Intel x86_64
+
+Observed on the corrected M3 package:
+
+- no Apple Command Line Tools installer prompt during passive discovery;
+- `python = UNAVAILABLE` rather than accepting legacy Python 2.7.16;
+- `nodejs = UNAVAILABLE` on this host;
+- `bun = UNAVAILABLE` on this host;
+- `git = UNAVAILABLE` on this host without configured developer tools;
+- `shell = AVAILABLE — zsh 5.7.1`;
+- `host_process_execution = AVAILABLE`;
+- `Process self-test: PASS`.
+
+### M3 Closure Audit
+
+All frozen M3 functional and verification criteria have evidence:
+
+- Python / Node.js / Bun / Git / Shell discovery facts — PASS;
+- process start — PASS;
+- stdout / stderr capture — PASS;
+- STATUS — PASS;
+- project-scoped STOP — PASS;
+- Project A/B isolation — PASS;
+- Android W0 #719 — PASS;
+- Catalina compatibility / Run #10 — PASS;
+- real Mac self-test — PASS.
+
+Conclusion:
+
+**M3 — Host Runtime Provider = PASS / CLOSED（通过 / 关闭）**.
+
+Stage Closure Rule（阶段关闭规则） applies. No new mandatory M3.x slice may be created. Current stage advances to **M4 — Project Workflow（项目工作流）**.
+
+### Development Governance Cleanup
+
+A governance gap was identified: the macOS authority documents required reading current state and respecting architecture boundaries, but did not explicitly codify the previously agreed rule that a repair must be discussed before implementation.
+
+The authoritative process is now frozen as Change Discussion Gate（修改前讨论门禁）:
+
+1. read-only audit;
+2. explain Problem（问题）;
+3. explain Root Cause（根因）;
+4. explain Repair Plan（修复方案）;
+5. state Modification Scope（修改范围）;
+6. state Frozen Boundary（冻结边界）;
+7. state Risk（风险）;
+8. state Acceptance（验收方式）;
+9. obtain explicit User Approval（用户确认）;
+10. only then mutate source / CI / authoritative docs.
+
+Remote HEAD Drift Gate（远端漂移门禁） is also explicit: re-read remote HEAD before every write; on drift stop, report, and do not rebase / merge / force-push automatically.
+
+`MACOS_CURRENT_STATE.md` is rewritten as a true current-state authority. Superseded M1/M2 in-progress snapshots remain historical only in `MACOS_DEV_LOG.md`.
+
+### Product Display Identity
+
+User-visible macOS product display identity is standardized to:
+
+**SiftAlpha X**
+
+This changes the macOS window/app display and packaging name only. Technical identities remain stable, including `com.siftalpha.macos` and Android `com.siftalpha.studio`.
+
+No Core（核心） or Android（安卓） runtime behavior is changed.

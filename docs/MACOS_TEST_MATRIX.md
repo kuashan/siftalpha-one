@@ -92,15 +92,18 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - Node.js（Node 运行时）发现。
 - Bun（Bun 运行时）发现。
 - Git（版本控制）发现。
+- Shell（命令环境）发现。
 - 启动一个项目进程。
 - 捕获 stdout / stderr（标准输出 / 标准错误）。
 - STATUS（状态）正确。
 - STOP（停止）只影响当前项目。
 - 另一个同时运行的项目不受影响。
 
-当前状态：**IMPLEMENTED / CLOUD VERIFICATION IN PROGRESS（已实现 / 云端验证进行中）**
+当前状态：**PASS / CLOSED（通过 / 关闭）**
 
 ## M4 — Project Workflow（项目工作流）
+
+当前状态：**CURRENT STAGE（当前阶段） / IMPLEMENTATION NOT STARTED（实现尚未开始）**
 
 必须证明：
 
@@ -113,7 +116,6 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - Web Endpoint（网页端点）可发现和验证。
 - Stop / Restart（停止 / 重启）闭环。
 
-当前状态：**NOT STARTED（未开始）**
 
 ## M5 — Product UI Parity（产品界面对齐）
 
@@ -481,16 +483,39 @@ Next stage（下一阶段）: **M3 — Host Runtime Provider（主机运行提�
 | M3-10 | Concurrent A/B isolation（并行项目隔离） | STOP A leaves B RUNNING | CLOUD PASS |
 | M3-11 | Android regression（安卓回归） | W0 PASS | PASS — W0 #718 |
 | M3-12 | Catalina compatibility（Catalina 兼容） | packaged app remains compatible with 10.15.7 | CLOUD PASS |
-| M3-13 | Real Mac M3 Self-Test（真实 Mac 自检） | diagnostic button reports PASS | REAL MAC PENDING |
+| M3-13 | Real Mac M3 Self-Test（真实 Mac 自检） | diagnostic button reports PASS | PASS — macOS 10.15.7 real Mac |
 
 
 ### M3.1 Catalina passive discovery regression
 
 | Check（检查） | Expected（期望） | Status（状态） |
 | --- | --- | --- |
-| Opening M3 app without CLT（未安装命令行工具时打开） | no Apple installer prompt | CLOUD POLICY PASS / REAL MAC PENDING |
+| Opening M3 app without CLT（未安装命令行工具时打开） | no Apple installer prompt | PASS — real Catalina |
 | Catalina `/usr/bin/python3` shim | skipped when CLT absent | CLOUD TEST PASS |
 | Catalina `/usr/bin/git` shim | skipped when CLT absent | CLOUD TEST PASS |
 | Legacy Python 2.7 | not accepted as SiftAlpha host Python | CLOUD TEST PASS |
 | User-installed Python 3 / Git | remains discoverable | CLOUD PASS |
-| Real Mac M3 Self-Test（真实 Mac 自检） | PASS after passive discovery repair | REAL MAC PENDING |
+| Real Mac M3 Self-Test（真实 Mac 自检） | PASS after passive discovery repair | PASS — real Catalina |
+
+
+### M3 Final Closure Audit（M3 最终关闭审计） — 2026-09-24
+
+| Exit Criterion（退出条件） | Final Evidence（最终证据） | Result（结果） |
+| --- | --- | --- |
+| Python discovery（Python 发现） | explicit fact; Python 2 rejected; Python 3 cloud probe | PASS |
+| Node.js discovery（Node 发现） | explicit AVAILABLE / UNAVAILABLE fact | PASS |
+| Bun discovery（Bun 发现） | explicit UNAVAILABLE is valid | PASS |
+| Git discovery（Git 发现） | explicit fact; Catalina shim safely skipped without CLT | PASS |
+| Shell discovery（Shell 发现） | real Catalina zsh 5.7.1 AVAILABLE | PASS |
+| Host process start（主机进程启动） | cloud self-test + real self-test | PASS |
+| stdout / stderr capture（输出采集） | process-control tests / probe | PASS |
+| STATUS（状态） | RUNNING / STOPPED facts verified | PASS |
+| Project STOP（项目停止） | selected project stops | PASS |
+| Concurrent A/B isolation（并行隔离） | STOP A leaves B RUNNING | PASS |
+| Android regression（安卓回归） | W0 #719 | PASS |
+| Catalina compatibility（Catalina 兼容） | Run #10; MIN_OS 10.12; real 10.15.7 launch | PASS |
+| Real Mac M3 Self-Test（真实 Mac M3 自检） | user screenshot: Process self-test: PASS | PASS |
+
+**M3 final result（最终结果）: PASS / CLOSED（通过 / 关闭）**
+
+Next stage（下一阶段）: **M4 — Project Workflow（项目工作流）**.
