@@ -549,3 +549,16 @@ This table is post-closure verification only; it does not add new M3 Exit Criter
 | M4.1-09 | Android regression（安卓回归） | W0 PASS | PASS — W0 #724 |
 | M4.1-10 | Catalina packaging（Catalina 打包） | PASS, minimum unchanged | PASS — Run #15 |
 | M4.1-11 | Real Mac import/detect/plan（真实 Mac 导入/检测/计划） | PASS | REAL MAC PENDING |
+
+
+### M4.1 packaged launcher regression / repair
+
+| Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- |
+| Generated launcher config | no standalone `java-options=X` | PASS — Run #17 |
+| M4.1 plan probe after launcher repair | PASS | PASS — Run #17 |
+| M3 process regression after launcher repair | PASS | PASS — Run #17 |
+| Catalina package after launcher repair | PASS / MIN_OS unchanged | PASS — Run #17 |
+| Android regression after launcher repair | W0 PASS | PASS — W0 #726 |
+| Real Mac double-click launch | app window opens | REAL MAC PENDING |
+| Real Mac Import → Detect → Plan | expected project facts | REAL MAC PENDING |

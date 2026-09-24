@@ -280,3 +280,49 @@ Evidence（证据）:
 M4.1 is not closed yet. Remaining acceptance item:
 
 **Real Mac Import → Detect → Plan（真实 Mac 导入 → 检测 → 计划）**.
+
+
+## 15. M4.1 real-Mac launch blocker repair — CLOUD RE-VERIFIED
+
+Real macOS 10.15.7 testing of the first M4.1 package exposed a packaging-only startup blocker before Import（导入） could be tested.
+
+Root cause:
+- jpackage received `--java-options "-Dapple.awt.application.name=SiftAlpha X"`;
+- the space split the generated launcher configuration into:
+  - `java-options=-Dapple.awt.application.name=SiftAlpha`
+  - `java-options=X`;
+- the standalone `X` caused the packaged JVM launcher to exit before Swing UI startup.
+
+Repair HEAD:
+`53e7cf637239ae6d92ca11946aae7d8a4d43cf8c`
+
+Repair:
+- remove the packaging-time display-name Java option;
+- keep the runtime `System.setProperty("apple.awt.application.name", "SiftAlpha X")`;
+- add a CI guard that rejects packaged config containing standalone `java-options=X`;
+- rename the macOS artifact from stale M3.1 naming to M4.1 naming.
+
+Cloud re-verification:
+- SiftAlpha X macOS Host Runtime Run #17: PASS;
+- Android W0 #726: PASS;
+- packaged launcher config contains only `java-options=-Djpackage.app-version=1.0`;
+- M4.1 plan probe: PASS;
+- M3 process regression probe: PASS;
+- Catalina packaging: PASS;
+- launcher / libjli / libjvm MIN_OS: 10.12 / 10.12 / 10.12;
+- macOS artifact ID: `10790410614`;
+- macOS artifact digest: `sha256:e28186c3c29688d0cd2ed394aabf7abf01b10687e8c517170346d405875f0b50`;
+- user-facing repaired ZIP SHA-256:
+  `edad50c534e4579ab0f559cd8e72c0ebfa1b886f44c73c756018eccebb591357`;
+- Android W0 artifact ID: `10790305510`;
+- Android W0 artifact digest:
+  `sha256:b739ee110bdf72854f6d5da312373ac8181f6037a8b502cf59fb5d1dba11fe59`.
+
+M4.1 remains:
+
+**CLOUD PASS / REAL MAC PENDING**.
+
+Real Mac still needs to confirm:
+1. double-click launch succeeds;
+2. Import Project Folder works;
+3. Import → Detect → Plan returns the expected Python result on the Catalina host.

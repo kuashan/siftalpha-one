@@ -1664,3 +1664,22 @@ Correction:
 - retain M4.1 artifact naming.
 
 No product logic changes.
+
+
+### M4.1 launcher repair cloud re-verification — PASS
+
+Repair HEAD:
+`53e7cf637239ae6d92ca11946aae7d8a4d43cf8c`
+
+Evidence:
+- macOS Run #17 PASS;
+- Android W0 #726 PASS;
+- packaged `SiftAlpha X.cfg` no longer contains standalone `java-options=X`;
+- current generated config contains only the normal jpackage app-version Java option;
+- M4.1 plan probe PASS;
+- M3 project-scoped process probe PASS;
+- Catalina package/sign/minimum-version checks PASS;
+- repaired user-facing ZIP SHA-256:
+  `edad50c534e4579ab0f559cd8e72c0ebfa1b886f44c73c756018eccebb591357`.
+
+The original real-Mac failure is therefore isolated to the old package launcher configuration. Real macOS launch/import acceptance remains pending on the repaired package.
