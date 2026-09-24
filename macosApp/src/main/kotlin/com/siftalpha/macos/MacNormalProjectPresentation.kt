@@ -5,6 +5,7 @@ import com.siftalpha.studio.container.ComposeProjectPlanStatus
 import com.siftalpha.studio.runtime.RuntimeKind
 
 enum class MacNormalPrimaryAction {
+    INSTALL_CONTAINER,
     PREPARE,
     RUN,
     STOP,
@@ -89,25 +90,51 @@ object MacNormalProjectPresentationPolicy {
                     locationLabel = location,
                 )
             }
+            val installProgress = view.containerInstallProgress
+            if (installProgress?.active == true) {
+                return MacNormalProjectPresentation(
+                    statusLabel = "安装中",
+                    title = "正在准备容器环境",
+                    detail = installProgress.message,
+                    primaryAction = MacNormalPrimaryAction.NONE,
+                    primaryLabel = "安装中…",
+                    primaryEnabled = false,
+                    resultAvailable = false,
+                    resultUrl = null,
+                    showSecondaryStop = false,
+                    runtimeLabel = runtimeLabel,
+                    locationLabel = location,
+                )
+            }
+
             val advice = view.containerAdvice
             if (
                 !view.workflow.environmentReady &&
                 advice != null &&
                 advice.state != MacContainerAdviceState.READY
             ) {
+                val installPlan = view.containerInstallPlan
                 val option = advice.suggestedOptions.firstOrNull()
                 val detail = buildString {
                     append(advice.detail)
-                    if (!option.isNullOrBlank()) append(" 建议：" + option + "。")
+                    if (installPlan != null) {
+                        append(" SiftAlpha 已生成可执行的推荐安装方案。")
+                    } else if (!option.isNullOrBlank()) {
+                        append(" 建议：" + option + "。")
+                    }
                     advice.warnings.firstOrNull()?.let { append(" " + it) }
                 }
                 return MacNormalProjectPresentation(
                     statusLabel = "需要容器环境",
                     title = advice.title,
                     detail = detail,
-                    primaryAction = MacNormalPrimaryAction.NONE,
-                    primaryLabel = null,
-                    primaryEnabled = false,
+                    primaryAction = if (installPlan != null) {
+                        MacNormalPrimaryAction.INSTALL_CONTAINER
+                    } else {
+                        MacNormalPrimaryAction.NONE
+                    },
+                    primaryLabel = installPlan?.title,
+                    primaryEnabled = installPlan != null,
                     resultAvailable = false,
                     resultUrl = null,
                     showSecondaryStop = false,
