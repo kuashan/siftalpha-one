@@ -630,9 +630,8 @@ class MacNormalModeWindow(
         }
         val view = controller.view(id) ?: return
         when (MacNormalProjectPresentationPolicy.resolve(view).primaryAction) {
-            MacNormalPrimaryAction.INSTALL_CONTAINER -> confirmAndInstallContainer(view)
             MacNormalPrimaryAction.PREPARE ->
-                runProjectOperation("正在准备项目…") { projectId -> controller.prepare(projectId).success }
+                runProjectOperation("正在准备运行环境…") { projectId -> controller.prepare(projectId).success }
             MacNormalPrimaryAction.RUN ->
                 runProjectOperation("正在启动项目…") { projectId -> controller.start(projectId) }
             MacNormalPrimaryAction.STOP ->
@@ -640,41 +639,6 @@ class MacNormalModeWindow(
             MacNormalPrimaryAction.OPEN_RESULT -> openResult()
             MacNormalPrimaryAction.NONE -> Unit
         }
-    }
-
-    private fun confirmAndInstallContainer(view: MacProductProjectView) {
-        val id = view.project.projectId
-        val plan = view.containerInstallPlan ?: return
-        val message = buildString {
-            appendLine(plan.detail)
-            appendLine()
-            appendLine("将安装：")
-            plan.components.forEach { appendLine("• " + it) }
-            appendLine()
-            appendLine("将进行：")
-            plan.sideEffects.forEach { appendLine("• " + it) }
-            appendLine()
-            append("是否继续？")
-        }
-        val choice = JOptionPane.showConfirmDialog(
-            frame,
-            message,
-            plan.title,
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.QUESTION_MESSAGE,
-        )
-        if (choice != JOptionPane.YES_OPTION) return
-
-        statusTitle.text = "正在安装容器环境"
-        statusDetail.text = wrapHtml("SiftAlpha 正在下载、安装并验证推荐容器环境。完成后会自动重新检测并继续准备当前项目。", 560)
-        primaryButton.isEnabled = false
-
-        Thread {
-            controller.installRecommendedContainerAndPrepare(id)
-            SwingUtilities.invokeLater {
-                refreshProjects(selectProjectId = id)
-            }
-        }.start()
     }
 
     private fun runProjectOperation(message: String, operation: (String) -> Boolean) {
