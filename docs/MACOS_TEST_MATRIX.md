@@ -431,3 +431,19 @@ Cloud Verification（云端验证）：
 下一阶段：
 
 **M2 — macOS Host Skeleton（macOS 主机应用骨架）**。
+
+
+### M2.1 Catalina compatibility repair
+
+| Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- |
+| CI runner architecture（云端运行器架构） | Intel x86_64 | PENDING |
+| Packaging JDK（打包 Java） | Liberica JDK 17 x64 | PENDING |
+| Info.plist minimum OS（最低系统版本） | 10.15 | PENDING |
+| SiftAlpha launcher Mach-O minimum OS | <= 10.15 | PENDING |
+| bundled libjli Mach-O minimum OS | <= 10.15 | PENDING |
+| bundled libjvm Mach-O minimum OS | <= 10.15 | PENDING |
+| Core load probe（核心加载探针） | PASS | PENDING |
+| Android dependency leak（安卓依赖泄漏） | none | PENDING |
+| Catalina 10.15.7 real launch / exit（真实启动 / 退出） | PASS | REAL MAC PENDING |
+| M2 final status（M2 最终状态） | remains 4/6 until real Mac acceptance | IN PROGRESS |

@@ -1139,3 +1139,39 @@ M2 当前 Closure（关闭）检查：
 当前完成度：**4 / 6**。
 
 剩余阶段阻塞项只有 2 个，均属于真实 Mac（苹果电脑）验收。不得因为非阻塞优化继续扩大 M2。
+
+
+## 2026-09-24 · M2.1 Catalina-compatible package rebuild
+
+### Trigger
+
+The first M2.1 test package was packaged with a Java runtime whose resulting app required macOS 11. The available real acceptance machine runs macOS 10.15.7 Catalina.
+
+### Scope
+
+This is a packaging compatibility repair inside the existing M2.1 slice, not M2.2 and not M3.
+
+- No SiftAlpha Core（核心） production code change.
+- No Android（安卓） production code change.
+- No Host Runtime Provider（主机运行提供者） implementation.
+- No product UI expansion.
+
+### Build strategy
+
+- Move macOS CI to GitHub's Intel x64 runner label `macos-15-intel`.
+- Replace Temurin JDK 17 packaging runtime with Liberica JDK 17 x64.
+- Use the same Liberica `jpackage` to create the bundled app runtime.
+- Set `LSMinimumSystemVersion=10.15` for the internal M2 test bundle.
+- Re-sign the test app ad hoc after the plist compatibility edit.
+- Inspect Mach-O deployment minimum for:
+  - SiftAlpha launcher
+  - `libjli.dylib`
+  - `libjvm.dylib`
+- Fail CI if any inspected binary requires a version newer than macOS 10.15.
+- Verify packaged launcher is x86_64.
+
+### Acceptance boundary
+
+Cloud verification can prove architecture, Core load, capability snapshot, dependency isolation, packaging, and binary minimum OS metadata. Only the user's real macOS 10.15.7 machine can close launch / exit and final M2 real-Mac acceptance.
+
+Cloud status at implementation commit: **PENDING（待完成）**.

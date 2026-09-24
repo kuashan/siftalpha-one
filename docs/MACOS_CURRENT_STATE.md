@@ -349,3 +349,22 @@ M2 Exit Criteria（退出条件）当前完成度：**4 / 6**。
 - 真实 Mac Acceptance（真实 Mac 最终验收）。
 
 M2 仍未关闭；除上述两个真实 Mac（苹果电脑）阻塞项外，不新增新的 M2 必做条件。
+
+
+## 19. M2.1 Catalina compatibility rebuild
+
+真实 Mac（苹果电脑）首次 M2.1 验收发现原测试包要求 macOS 11，而实际验收机器为 macOS 10.15.7 Catalina。
+
+这不是新的 M2 功能切片，也不改变 M2 Exit Criteria（退出条件）。当前只重新构建同一 M2.1 Host Skeleton（主机骨架）测试包：
+
+- target OS（目标系统）: macOS 10.15.7 Catalina
+- target architecture（目标架构）: Intel x86_64
+- JDK（Java 运行时）: Liberica JDK 17 x64
+- packaging（打包）: Liberica `jpackage`
+- `LSMinimumSystemVersion`: 10.15
+- CI（持续集成）必须检查 app launcher、`libjli.dylib`、`libjvm.dylib` 的 Mach-O minimum OS（最低系统版本）不高于 10.15。
+- 不修改 `:core`、Android（安卓）功能源码或 M3 Host Runtime Provider（主机运行提供者）功能。
+
+状态：**CATALINA REBUILD CLOUD PENDING（Catalina 兼容重构云端待验证）**。
+
+M2 仍保持 **4 / 6**；真实 Mac 启动 / 退出与最终真实 Mac 验收仍是唯一剩余 M2 Exit Criteria（退出条件）。
