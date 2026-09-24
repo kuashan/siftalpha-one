@@ -12,9 +12,9 @@
 - M1 Core Boundary（核心边界）：PASS / CLOSED（通过 / 关闭）
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
-- 当前阶段：**M5 — Product UI Parity（产品界面对齐）**
+- 当前阶段：**M6 — Container / Multi-service（容器 / 多服务）— NOT STARTED（未开始）**
 - M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 PASS / COMPLETE；M4 PASS / CLOSED（M4 已通过并关闭）**
-- M5 implementation（实现）：**M5.1 PASS / COMPLETE；M5.2 CLOUD PASS / REAL MAC PENDING**
+- M5 implementation（实现）：**M5.1 PASS / COMPLETE；M5.2 PASS / COMPLETE；M5 PASS / CLOSED（M5 已通过并关闭）**
 
 M3 最后一个已验收功能 HEAD：
 `259d94fe7d7501a1232f1d7114445f4673cfc0a1`
@@ -661,9 +661,9 @@ Android W0 artifact:
 
 Current M5.2 state:
 
-**CLOUD PASS / REAL MAC PENDING（云端通过 / 真实 Mac 待验收）**.
+**PASS / COMPLETE（通过 / 完成）**.
 
-M5.2 must not be marked COMPLETE until the frozen real Catalina Normal ↔ Developer shared-state acceptance passes.
+The frozen real Catalina Normal ↔ Developer shared-state acceptance has passed.
 
 
 ### M5.2 Real-Mac Repair — Developer Import + Simplified Chinese（开发者导入 + 简体中文）
@@ -688,4 +688,52 @@ Repair cloud verification:
 - M5.1 / M4.2 / M3 regressions remain PASS;
 - Catalina MIN_OS chain unchanged.
 
-M5.2 remains **CLOUD PASS / REAL MAC PENDING** until this repaired UI is re-accepted on the real Catalina machine.
+The repaired Developer Mode UI has now been re-accepted on the real Catalina machine. **M5.2 = PASS / COMPLETE**.
+
+
+## 25. M5.2 Real Mac Acceptance + M5 Final Closure Audit（真实 Mac 验收 + M5 最终关闭审计）— PASS / CLOSED
+
+Acceptance machine:
+- macOS 10.15.7 Catalina
+- Intel x86_64
+
+Final real-Mac evidence:
+- Developer Mode（开发者模式）Simplified Chinese UI: PASS;
+- direct **导入项目** from Developer Mode: PASS;
+- imported project visible in the same shared project list: PASS;
+- Developer Mode observed the running project as `RUNNING`: PASS;
+- Runtime Version = Python 3.14.7: PASS;
+- Environment generation / Entrypoint / PID / Web URL / Logs visible: PASS;
+- Developer Stop → Normal Mode immediately becomes stopped / run-ready: PASS;
+- Normal Mode Run → Developer Mode immediately returns to `RUNNING`: PASS;
+- mode switching itself does not restart or stop the project: PASS.
+
+Frozen M5 Exit Criteria audit:
+
+| Exit Criterion | Evidence | Result |
+| --- | --- | --- |
+| Normal Mode Import → Prepare → Run → Result → Stop | M5.1 Run #23 + real Catalina acceptance | PASS |
+| Developer Mode advanced Runtime / Process / Web / Logs facts | Run #34 + real Catalina acceptance | PASS |
+| Normal + Developer read one Runtime State | M5.2 parity probe + real cross-mode stop/run acceptance | PASS |
+| No second Lifecycle / Coordinator | source audit: one MacProductController + one MacProjectWorkflowCoordinator | PASS |
+| Project-scoped STOP isolation | M5.2 + M3 A/B probes | PASS |
+| Android regression | W0 #743 | PASS |
+| Catalina 10.15.7 real-machine acceptance | real Intel Catalina machine | PASS |
+
+Blocking Issues（阻塞项）:
+- none.
+
+Backlog Boundary（待办边界）:
+- optional UI polish, extra diagnostics, additional non-required tests and future enhancements do not reopen M5;
+- no M5.3 / M5.4 is permitted by the frozen finite plan.
+
+Final result:
+
+**M5.1 = PASS / COMPLETE**  
+**M5.2 = PASS / COMPLETE**  
+**M5 — Product UI Parity = PASS / CLOSED（通过 / 关闭）**
+
+Next stage:
+**M6 — Container / Multi-service（容器 / 多服务） — NOT STARTED**.
+
+M6 implementation must begin only after its Change Discussion Gate（修改前讨论门禁） plan is discussed and approved.
