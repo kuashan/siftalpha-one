@@ -710,3 +710,29 @@ Backlog-only polish cannot reopen M5. Next stage is M6 — Container / Multi-ser
 | Catalina compatibility required for M6/M7/M8 | NO |
 
 Future M6/M7/M8 verification must use the current Ventura baseline. Older Catalina deployment-target evidence remains historical only and must not block modern container/runtime implementation.
+
+
+### M6.1 Container Capability + Compose Detection/Plan Verification（验证）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| M6.1-01 | Core capability model | CONTAINER_RUNTIME uses AVAILABLE / UNAVAILABLE / UNKNOWN | PASS — Core tests |
+| M6.1-02 | Docker discovery | CLI/runtime/Compose facts are adapter-owned | PASS — macOS tests |
+| M6.1-03 | Podman discovery | CLI/runtime/Compose facts are adapter-owned | PASS — macOS tests |
+| M6.1-04 | Compose manifest detection | standard root manifest names recognized deterministically | PASS — Core tests / Run #36 |
+| M6.1-05 | Multi-service parsing | service list extracted | PASS — db,web |
+| M6.1-06 | Service dependencies | depends_on preserved | PASS — web → db |
+| M6.1-07 | Port plan | published / target facts preserved | PASS — 18080 → 80 |
+| M6.1-08 | Capability unavailable | valid plan state, not architecture failure | PASS — CAPABILITY_UNAVAILABLE |
+| M6.1-09 | Capability unknown | valid plan state | PASS — CAPABILITY_UNKNOWN |
+| M6.1-10 | Existing Python/Node workflow regression | M4.1 + M4.2 | PASS — Run #36 |
+| M6.1-11 | Product UI/shared-state regression | M5.1 + M5.2 | PASS — Run #36 |
+| M6.1-12 | Project-scoped STOP regression | A/B isolation preserved | PASS — Run #36 |
+| M6.1-13 | Android regression | W0 PASS | PASS — W0 #745 |
+| M6.1-14 | Ventura application baseline | LSMinimumSystemVersion 13.0 | PASS — Run #36 |
+| M6.1-15 | Real Ventura capability/detection acceptance | macOS 13.7.8 / Intel x86_64 | REAL VENTURA PENDING |
+
+Current M6.1 result:
+**14 / 15 PASS — CLOUD PASS / REAL VENTURA PENDING**.
+
+M6.2 Compose Runtime Workflow + Project Isolation remains NOT STARTED.
