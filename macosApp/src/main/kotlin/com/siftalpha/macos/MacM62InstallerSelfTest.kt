@@ -151,43 +151,44 @@ object MacM62InstallerSelfTest {
             )
 
             val project = controller.importProject(projectRoot)
-            val failedPrepare = controller.prepare(project.projectId)
             val before = controller.view(project.projectId)!!
             val beforePresentation = MacNormalProjectPresentationPolicy.resolve(before)
 
-            val installedAndPrepared = controller.installRecommendedContainerAndPrepare(project.projectId)
+            val prepared = controller.prepare(project.projectId)
             val after = controller.view(project.projectId)!!
             val afterPresentation = MacNormalProjectPresentationPolicy.resolve(after)
+            val developerAfter = controller.developerView(project.projectId)!!
 
             val passed =
                 project.isCompose &&
-                    !failedPrepare.success &&
-                    !before.lastError.isNullOrBlank() &&
                     before.containerAdvice?.state != MacContainerAdviceState.READY &&
                     before.containerInstallPlan?.kind == MacContainerInstallPlanKind.INSTALL_MANAGED_DOCKER &&
-                    beforePresentation.primaryAction == MacNormalPrimaryAction.INSTALL_CONTAINER &&
+                    beforePresentation.primaryAction == MacNormalPrimaryAction.PREPARE &&
+                    beforePresentation.primaryLabel == "准备环境" &&
                     beforePresentation.primaryEnabled &&
                     fakeInstaller.calls == 1 &&
-                    installedAndPrepared &&
+                    prepared.success &&
                     after.containerAdvice?.state == MacContainerAdviceState.READY &&
                     after.workflow.environmentReady &&
                     after.containerInstallProgress?.phase == MacContainerInstallPhase.COMPLETE &&
-                    afterPresentation.primaryAction == MacNormalPrimaryAction.RUN
+                    afterPresentation.primaryAction == MacNormalPrimaryAction.RUN &&
+                    developerAfter.containerInstallProgress?.phase == MacContainerInstallPhase.COMPLETE
 
             MacM62InstallerSelfTestResult(
                 passed = passed,
                 lines = listOf(
                     "compose_detect=" + project.isCompose,
-                    "failed_prepare_before_install=" + !failedPrepare.success,
-                    "stale_error_present=" + !before.lastError.isNullOrBlank(),
                     "before_advice=" + before.containerAdvice?.state,
                     "before_install_plan=" + before.containerInstallPlan?.kind,
                     "before_primary=" + beforePresentation.primaryAction,
+                    "before_primary_is_prepare=" +
+                        (beforePresentation.primaryAction == MacNormalPrimaryAction.PREPARE),
                     "installer_calls=" + fakeInstaller.calls,
-                    "install_and_prepare=" + installedAndPrepared,
+                    "prepare_and_provision=" + prepared.success,
                     "after_advice=" + after.containerAdvice?.state,
                     "after_environment_ready=" + after.workflow.environmentReady,
                     "after_install_phase=" + after.containerInstallProgress?.phase,
+                    "developer_install_phase=" + developerAfter.containerInstallProgress?.phase,
                     "after_primary=" + afterPresentation.primaryAction,
                 ),
             )
