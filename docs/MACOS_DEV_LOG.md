@@ -1395,3 +1395,26 @@ Catalina can expose Apple developer-tool shim executables even when Command Line
 - add pure policy tests for Python 3 acceptance and developer-tool shim skipping.
 
 This remains part of the single M3.1 implementation slice. No M3.2 is created. Core and Android production source are unchanged.
+
+
+### M3.1 passive-discovery repair cloud result — PASS
+
+Functional HEAD:
+`259d94fe7d7501a1232f1d7114445f4673cfc0a1`
+
+Cloud evidence:
+
+- macOS Host Runtime Run #10: PASS.
+- Android W0 Cloud Build #719: PASS.
+- cloud Python 3 discovery: AVAILABLE / Python 3.14.7.
+- cloud Node.js discovery: AVAILABLE / v22.23.2.
+- cloud Bun discovery: UNAVAILABLE (valid).
+- cloud Git discovery: AVAILABLE / git 2.55.0.
+- cloud Shell discovery: AVAILABLE / zsh 5.9.
+- M3 process probe: PASS.
+- STOP A leaves B RUNNING: PASS.
+- Catalina minimum OS checks: launcher 10.12, libjli 10.12, libjvm 10.12.
+- corrected test ZIP SHA-256:
+  `b3b2fe433ae0dca369659839cacbe387be78cd371d564991212aaad8e26d5272`.
+
+Real-Mac acceptance must now verify that a Catalina machine without Command Line Tools opens the app without an Apple install prompt. Python 2.7 must not be shown as AVAILABLE Host Python. After that, the M3 process self-test must report PASS.

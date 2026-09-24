@@ -488,9 +488,9 @@ Next stage（下一阶段）: **M3 — Host Runtime Provider（主机运行提�
 
 | Check（检查） | Expected（期望） | Status（状态） |
 | --- | --- | --- |
-| Opening M3 app without CLT（未安装命令行工具时打开） | no Apple installer prompt | RE-VERIFY PENDING |
-| Catalina `/usr/bin/python3` shim | skipped when CLT absent | CLOUD RE-VERIFY PENDING |
-| Catalina `/usr/bin/git` shim | skipped when CLT absent | CLOUD RE-VERIFY PENDING |
-| Legacy Python 2.7 | not accepted as SiftAlpha host Python | CLOUD RE-VERIFY PENDING |
-| User-installed Python 3 / Git | remains discoverable | CLOUD RE-VERIFY PENDING |
+| Opening M3 app without CLT（未安装命令行工具时打开） | no Apple installer prompt | CLOUD POLICY PASS / REAL MAC PENDING |
+| Catalina `/usr/bin/python3` shim | skipped when CLT absent | CLOUD TEST PASS |
+| Catalina `/usr/bin/git` shim | skipped when CLT absent | CLOUD TEST PASS |
+| Legacy Python 2.7 | not accepted as SiftAlpha host Python | CLOUD TEST PASS |
+| User-installed Python 3 / Git | remains discoverable | CLOUD PASS |
 | Real Mac M3 Self-Test（真实 Mac 自检） | PASS after passive discovery repair | REAL MAC PENDING |

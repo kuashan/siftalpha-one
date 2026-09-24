@@ -534,3 +534,30 @@ Required invariant:
 - when Command Line Tools are absent, Apple developer-tool shims for `/usr/bin/python3` and `/usr/bin/git` are skipped and reported as unavailable unless another real installation is found.
 
 M3 remains open. Cloud PASS from the previous package is retained as historical evidence but the corrected package must be re-verified before real-Mac acceptance resumes.
+
+
+### M3.1 passive discovery repair — CLOUD PASS
+
+Corrected functional HEAD:
+`259d94fe7d7501a1232f1d7114445f4673cfc0a1`
+
+Verification:
+
+- macOS Host Runtime Run #10: PASS
+- Android W0 Cloud Build #719: PASS
+- runtime discovery probe: PASS
+- project process self-test: PASS
+- project A stop / B remains RUNNING: PASS
+- Catalina launcher / libjli / libjvm MIN_OS: 10.12 / 10.12 / 10.12
+- corrected Catalina test ZIP SHA-256:
+  `b3b2fe433ae0dca369659839cacbe387be78cd371d564991212aaad8e26d5272`
+
+Behavioral rule after repair:
+
+- Apple developer-tool shims are not probed when `xcode-select -p` says Command Line Tools are absent;
+- discovery must not trigger Apple installation UI;
+- Python 2.x is not accepted as SiftAlpha Host Python;
+- user-managed Python 3 / Git remain discoverable;
+- Git / Python may legitimately report UNAVAILABLE on a clean Catalina machine without extra developer tools.
+
+M3 remains **OPEN** until the corrected package passes the real macOS 10.15.7 self-test.
