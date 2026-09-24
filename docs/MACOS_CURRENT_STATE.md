@@ -12,7 +12,7 @@
 - M1 Core Boundary（核心边界）：PASS / CLOSED（通过 / 关闭）
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
-- 当前阶段：**M6 — Container / Multi-service（容器 / 多服务）— M6.1 PASS / COMPLETE；M6.2 NOT STARTED**
+- 当前阶段：**M6 — Container / Multi-service（容器 / 多服务）— M6.1 COMPLETE；M6.2 CLOUD PASS / REAL VENTURA PENDING**
 - M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 PASS / COMPLETE；M4 PASS / CLOSED（M4 已通过并关闭）**
 - M5 implementation（实现）：**M5.1 PASS / COMPLETE；M5.2 PASS / COMPLETE；M5 PASS / CLOSED（M5 已通过并关闭）**
 
@@ -835,3 +835,59 @@ M6.1 final result:
 **PASS / COMPLETE**.
 
 M6.2 — Compose Runtime Workflow + Project Isolation remains **NOT STARTED**.
+
+
+## 29. M6.2 Compose Runtime Workflow + Project Isolation（Compose 运行工作流 + 项目隔离）— CLOUD PASS
+
+Accepted cloud HEAD:
+`abde6c6a311d0c3c722ad7385bd44351df566f94`
+
+Implemented boundary:
+- keeps one existing `MacProductController` and one `MacProjectWorkflowCoordinator`;
+- Compose is routed through the shared project lifecycle instead of a second runtime center;
+- adds a generic `MacComposeContainerProvider` contract;
+- Docker is preferred when Docker Runtime + Compose are both available;
+- Podman may be selected when it provides the same required Compose capability;
+- no Colima-specific, Docker-Desktop-specific, Mac-model-specific, Intel-only, Apple-Silicon-only, 8GB-only, or OpenBot-specific branch was added;
+- adds `MacContainerEnvironmentAdvisor` using system version / architecture / CPU / memory / disk / provider facts for advice only;
+- advisor never installs software or changes VM/container CPU, memory, or disk settings;
+- Compose Prepare performs provider validation plus image pull/build as required by the plan;
+- Compose Run / Status / Logs / Web / Stop / Restart are now wired into the shared coordinator;
+- every project receives a stable hashed Compose project identity;
+- all Compose operations carry the selected project's project identity;
+- STOP uses targeted project-scoped Compose down and never performs a global container stop;
+- runtime published ports are discovered from the active Compose project and still pass through Endpoint Probe before exposing a Web result;
+- Normal Mode shows simplified Compose lifecycle/advice;
+- Developer Mode exposes Provider / Compose project identity / per-service status / logs.
+
+Cloud verification:
+- SiftAlpha X macOS Host Runtime Run #39: PASS;
+- Android W0 Cloud Build #748: PASS;
+- M6.2 Compose workflow / isolation probe: PASS;
+- Project A and Project B both detected as Compose;
+- project identities are distinct;
+- Prepare A / Prepare B PASS;
+- Start A / Start B PASS;
+- A = RUNNING and B = RUNNING;
+- service states = db:RUNNING, web:RUNNING;
+- Web source = CONTAINER_PORT and Endpoint Probe path PASS;
+- Stop A PASS;
+- after Stop A: A = STOPPED while B = RUNNING;
+- Restart A PASS and A returns to RUNNING;
+- final Stop A / Stop B PASS;
+- M6.1 regression PASS;
+- M4.1 / M4.2 / M5.1 / M5.2 / project-scoped process STOP regressions PASS;
+- Android dependency isolation PASS;
+- Ventura package baseline PASS with `LSMinimumSystemVersion = 13.0`.
+
+Artifact:
+- name = `siftalpha-macos-m6.2-ventura-x64-39`;
+- artifact ID = `10808969382`;
+- artifact digest = `sha256:a1898ea9a71d6474d5f1095324b575a476717543887b69da1ae33703acba42de`;
+- user-facing ZIP SHA-256 = `b261767f3f373aeb9494ac92fdf125a8448b0399eadcb546c5c3546d69b41f2d`.
+
+Current M6.2 state:
+
+**CLOUD PASS / REAL VENTURA PENDING（云端通过 / 真实 Ventura 容器环境待验收）**.
+
+M6 Final Closure Audit must not run until real macOS container execution, Web, Stop isolation, and Restart acceptance pass.
