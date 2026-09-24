@@ -1238,3 +1238,48 @@ Development rule:
 - no silent minimum-version bump.
 
 This policy is compatible with the current M2.1 Catalina x64 package evidence.
+
+
+## 2026-09-24 · M2 Real Mac Acceptance PASS / M2 Closed
+
+### Real machine
+
+- macOS 10.15.7 Catalina
+- Intel x86_64
+- M2.1 Catalina-compatible test package
+- source HEAD `0e138142117367452990a01e09e687a6a9bd53d4`
+
+### User-observed acceptance
+
+The user launched `SiftAlpha.app` on the real Catalina machine and supplied a screenshot showing the M2 host window.
+
+Observed facts:
+
+- application window opened normally;
+- SiftAlpha host UI rendered normally;
+- Core capability snapshot was visible;
+- `host_process_execution = UNKNOWN`;
+- `secure_secret_storage = UNKNOWN`;
+- `container_runtime = UNKNOWN`;
+- user then closed the window and explicitly confirmed the application exited normally.
+
+The UNKNOWN values are expected M2 facts, because actual host runtime/capability discovery belongs to M3.
+
+### M2 closure audit
+
+Frozen M2 Exit Criteria:
+
+1. real macOS app exists / can be built — PASS;
+2. app starts and exits normally on real Mac — PASS;
+3. app loads existing SiftAlpha Core — PASS;
+4. app reads/displays PlatformCapabilitySnapshot — PASS;
+5. macOS module has no Android Framework dependency — PASS;
+6. real Mac acceptance completed — PASS.
+
+**M2 = 6 / 6, PASS / CLOSED（通过 / 关闭）.**
+
+Per Stage Closure Rule（阶段关闭规则）, no new mandatory M2.x slice may be added. Non-blocking M2 improvements go to Backlog（待办）.
+
+Current stage moves to:
+
+**M3 — Host Runtime Provider（主机运行提供者）**.

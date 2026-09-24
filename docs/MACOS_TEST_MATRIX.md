@@ -64,9 +64,9 @@ M1.1 结论：**PASS（通过）**
 - 不要求 Android（安卓）库参与 macOS（苹果）构建。
 - 完成真实 Mac（苹果电脑）验收。
 
-当前状态：**IN PROGRESS（进行中）**
+当前状态：**PASS / CLOSED（通过 / 关闭）**
 
-当前切片：**M2.1 — Minimal macOS Host + Core Load（最小 macOS 主机应用 + Core 加载）**
+最终切片：**M2.1 — Minimal macOS Host + Core Load（最小 macOS 主机应用 + Core 加载）**
 
 当前证据状态：
 
@@ -79,10 +79,10 @@ M1.1 结论：**PASS（通过）**
 - Android dependency leak check（安卓依赖泄漏检查）: PASS（通过）
 - SiftAlpha.app packaging（苹果应用打包）: PASS（通过）
 - Android regression（安卓回归）: PASS（通过），W0 #709
-- Real Mac launch / exit（真实 Mac 启动 / 退出）: PENDING（待验收）
-- Real Mac acceptance（真实 Mac 验收）: PENDING（待验收）
+- Real Mac launch / exit（真实 Mac 启动 / 退出）: PASS（通过，macOS 10.15.7 Catalina）
+- Real Mac acceptance（真实 Mac 验收）: PASS（通过，用户确认）
 
-M2 current completion（当前完成度）：**4 / 6**。
+M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 关闭）**。
 
 ## M3 — Host Runtime Provider（主机运行提供者）
 
@@ -98,7 +98,7 @@ M2 current completion（当前完成度）：**4 / 6**。
 - STOP（停止）只影响当前项目。
 - 另一个同时运行的项目不受影响。
 
-当前状态：**NOT STARTED（未开始）**
+当前状态：**CURRENT STAGE（当前阶段） / IMPLEMENTATION NOT STARTED（实现尚未开始）**
 
 ## M4 — Project Workflow（项目工作流）
 
@@ -445,5 +445,21 @@ Cloud Verification（云端验证）：
 | bundled libjvm Mach-O minimum OS | <= 10.15 | PASS — 10.12 |
 | Core load probe（核心加载探针） | PASS | PASS |
 | Android dependency leak（安卓依赖泄漏） | none | PASS |
-| Catalina 10.15.7 real launch / exit（真实启动 / 退出） | PASS | REAL MAC PENDING |
-| M2 final status（M2 最终状态） | remains 4/6 until real Mac acceptance | IN PROGRESS |
+| Catalina 10.15.7 real launch / exit（真实启动 / 退出） | PASS | PASS — user confirmed（用户确认） |
+| M2 final status（M2 最终状态） | all 6 exit criteria satisfied | PASS / CLOSED（通过 / 关闭） |
+
+
+### M2 Final Real Mac Acceptance（M2 最终真实 Mac 验收）
+
+| Exit Criterion（退出条件） | Evidence（证据） | Result（结果） |
+| --- | --- | --- |
+| Real macOS App exists / builds（真实 macOS App 可构建） | macOS Host Skeleton Run #4; Catalina x64 artifact | PASS |
+| App launch / exit（应用启动 / 退出） | user-tested on macOS 10.15.7 Catalina | PASS |
+| Loads SiftAlpha Core（加载核心） | cloud probe + visible real-Mac capability window | PASS |
+| Reads PlatformCapabilitySnapshot（读取能力快照） | real-Mac window shows 3 UNKNOWN capability facts | PASS |
+| No Android Framework dependency（无安卓框架依赖） | dependency leak check | PASS |
+| Real Mac acceptance（真实 Mac 验收） | user confirmed launch and normal exit | PASS |
+
+**M2 final result（最终结果）: 6 / 6 — PASS / CLOSED（通过 / 关闭）**
+
+Next stage（下一阶段）: **M3 — Host Runtime Provider（主机运行提供者）**。

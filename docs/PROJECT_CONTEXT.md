@@ -1615,3 +1615,38 @@ Accepted behavior:
 `Developer Mode Run（开发者模式运行） → Open Termux（打开外部终端） → return（返回） → automatic provider reprobe（自动重新探测） → READY（就绪） → original Run resumes once（原运行仅恢复一次）`
 
 The previous infinite Termux reopen loop is closed. Normal Mode（普通模式） remains unchanged.
+
+
+## Cross-Platform M2 closure authority（跨平台 M2 关闭事实） — 2026-09-24
+
+M2 — macOS Host Skeleton（macOS 主机应用骨架）已完成并正式关闭。
+
+Final cloud evidence:
+
+- Catalina-compatible source HEAD: `0e138142117367452990a01e09e687a6a9bd53d4`
+- macOS Host Skeleton Run #4: PASS（通过）
+- W0 Android regression（安卓回归） #713: PASS（通过）
+- Intel x86_64 package
+- `LSMinimumSystemVersion=10.15`
+- launcher / bundled JVM Mach-O MIN_OS = 10.12
+- Core load probe: PASS
+- Android dependency isolation: PASS
+
+Final real-Mac evidence:
+
+- real machine: macOS 10.15.7 Catalina / Intel x86_64
+- `SiftAlpha.app` launch: PASS
+- host window rendering: PASS
+- visible capability snapshot: PASS
+- normal close / exit: PASS
+- user acceptance: PASS
+
+M2 Exit Criteria are 6 / 6 PASS.
+
+Stage Closure Rule applies: M2 is CLOSED and must not accumulate new required M2.x work.
+
+Current cross-platform stage:
+
+**M3 — Host Runtime Provider（主机运行提供者）**.
+
+macOS minimum supported version remains frozen at **10.15.7 Catalina** until a future mandatory capability requires a higher system version and the user is informed before any support-floor change.

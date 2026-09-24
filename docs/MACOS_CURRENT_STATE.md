@@ -5,14 +5,14 @@
 
 ## 1. 当前阶段
 
-状态：**M1 — Core Boundary（核心边界）已正式 PASS（通过）并关闭；当前阶段为 M2 — macOS Host Skeleton（macOS 主机应用骨架）。**
+状态：**M1 — Core Boundary（核心边界）与 M2 — macOS Host Skeleton（macOS 主机应用骨架）均已正式 PASS / CLOSED（通过 / 关闭）；当前阶段为 M3 — Host Runtime Provider（主机运行提供者）。**
 
 当前工作分支：
 - `feature/cross-platform-core`
 
 当前跨平台 Core（核心）版本：
 - `0.8.0-alpha43-r48d11-m1.6`
-- Android（安卓） versionCode = `231`
+- 最新已验收 Android（安卓）回归包：`0.8.0-alpha43-r48d11-m1.6-r1` / versionCode `232`
 
 当前 Core（核心）能力隔离规则：
 - `docs/PLATFORM_CAPABILITY_CONTRACT.md`
@@ -79,7 +79,7 @@ Android（安卓）现有 Embedded CPython（内嵌 CPython）、Internal Alpine
 
 以下内容尚未开始，因此不得宣称 macOS（苹果）版已经可运行：
 
-- macOS Platform Adapter（苹果平台适配层）
+- 完整 macOS Platform Adapter（苹果平台适配层）功能（M2 仅完成最小宿主/能力发布骨架）
 - macOS Host Process（苹果主机进程执行）
 - macOS filesystem bridge（苹果文件系统桥接）
 - macOS secure storage（苹果安全存储）
@@ -88,7 +88,7 @@ Android（安卓）现有 Embedded CPython（内嵌 CPython）、Internal Alpine
 - macOS Developer Mode UI（苹果开发者模式界面）
 - macOS Runtime Provider selection（苹果运行提供者选择）
 - Docker / Bun / Python host execution（容器 / Bun / Python 主机执行）
-- macOS packaging / signing / notarization（打包 / 签名 / 公证）
+- 正式 macOS signing / notarization / distribution packaging（签名 / 公证 / 分发打包；M2 内部测试 app-image 已完成）
 - OpenBot（开放机器人）真实运行验收
 
 ## 6. 开发顺序
@@ -174,21 +174,17 @@ Android（安卓）现有 Embedded CPython（内嵌 CPython）、Internal Alpine
 
 ## 8. 下一步唯一方向
 
-当前正式进入 **M2 — macOS Host Skeleton（macOS 主机应用骨架）**。
+当前正式进入 **M3 — Host Runtime Provider（主机运行提供者）**。
 
-当前 Implementation Slice（实现切片）：
+M3 的冻结目标：
 
-**M2.1 — Minimal macOS Host + Core Load（最小 macOS 主机应用 + Core 加载）**
+- 发现本机 Python / Node.js / Bun / Git（主机运行时 / 工具）；
+- 启动并观察主机项目进程；
+- 捕获 stdout / stderr（标准输出 / 标准错误）；
+- 建立 STATUS（状态）与 project-scoped STOP（项目级停止）；
+- 验证两个并行项目互不影响。
 
-本切片只负责：
-
-- 建立真正的 macOS App（苹果桌面应用）骨架；
-- macOS App（苹果桌面应用）直接依赖现有 `:core`；
-- 读取 `PlatformCapabilitySnapshot`（平台能力快照）；
-- 生成可供真实 Mac（苹果电脑）验收的 `SiftAlpha.app`；
-- 验证 macOS 模块不依赖 Android Framework（安卓框架）。
-
-本切片不进行 Python / Node.js / Bun / Git / Docker（Python / Node / Bun / Git / 容器）真实发现或项目进程执行；这些属于 M3（主机运行提供者）。
+M2 已关闭，不再新增 M2.x 必做切片。正式产品 UI（界面）仍属于 M5，项目导入/Prepare/Run 完整工作流仍属于 M4。
 
 ## 9. 固定开发方法
 
@@ -202,15 +198,11 @@ macOS（苹果桌面系统）开发采用“总路线提前规划、每个阶段
 
 当前唯一开发方向为：
 
-**M2 — macOS Host Skeleton（macOS 主机应用骨架）**
+**M3 — Host Runtime Provider（主机运行提供者）**
 
-当前切片：
+状态：**M2 PASS / CLOSED（通过 / 关闭）→ M3 CURRENT（当前阶段）**。
 
-**M2.1 — Minimal macOS Host + Core Load（最小 macOS 主机应用 + Core 加载）**
-
-状态：**CLOUD PASS（云端通过） / REAL MAC ACCEPTANCE PENDING（真实 Mac 验收待完成）**。
-
-M1（核心边界）已经 PASS / CLOSED（通过 / 关闭），不得重新打开。M2（macOS 主机应用骨架）只建立可构建、可启动、可加载 Core（核心）的真实 macOS App（苹果桌面应用）；完整产品 UI（界面）与复杂项目运行仍属于后续阶段。
+M1 与 M2 均已关闭，不得重新增加新的必做切片。M3 只负责主机运行时发现与项目级进程控制，不提前实现 M4 项目工作流或 M5 产品 UI。
 
 ## 10. macOS 分发策略
 
@@ -414,3 +406,36 @@ M2 stage（M2 阶段）本身仍保持 **4 / 6**，仅剩真实 macOS 10.15.7 �
 - `LSMinimumSystemVersion=10.15`
 - launcher / bundled JVM minimum OS = 10.12
 - 因此当前 M2.1 技术栈继续支持 macOS 10.15.7。
+
+
+## 21. M2 Real Mac Acceptance（真实 Mac 验收）— PASS / CLOSED
+
+真实验收机器：
+
+- OS（系统）: macOS 10.15.7 Catalina
+- Architecture（架构）: Intel x86_64
+- Test package（测试包）: M2.1 Catalina x64
+- source HEAD（源码提交）: `0e138142117367452990a01e09e687a6a9bd53d4`
+
+用户真实验收结果：
+
+1. `SiftAlpha.app` 可以在 macOS 10.15.7 正常启动：PASS（通过）。
+2. Swing GUI（桌面窗口）正常显示：PASS（通过）。
+3. SiftAlpha Core（跨平台核心）成功加载：PASS（通过）。
+4. Platform Capability Snapshot（平台能力快照）正常显示：
+   - `host_process_execution = UNKNOWN`
+   - `secure_secret_storage = UNKNOWN`
+   - `container_runtime = UNKNOWN`
+   这些 UNKNOWN（未知）符合 M2 设计，真实能力发现属于 M3。
+5. App（应用）可通过窗口关闭正常退出：PASS（通过）。
+6. 用户确认真实 Mac 验收完成：PASS（通过）。
+
+M2 Exit Criteria（退出条件）全部满足：**6 / 6**。
+
+最终结论：
+
+**M2 — macOS Host Skeleton（macOS 主机应用骨架）= PASS / CLOSED（通过 / 关闭）。**
+
+当前唯一阶段：
+
+**M3 — Host Runtime Provider（主机运行提供者）**。
