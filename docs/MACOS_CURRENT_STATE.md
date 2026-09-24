@@ -368,3 +368,25 @@ M2 仍未关闭；除上述两个真实 Mac（苹果电脑）阻塞项外，不�
 状态：**CATALINA REBUILD CLOUD PENDING（Catalina 兼容重构云端待验证）**。
 
 M2 仍保持 **4 / 6**；真实 Mac 启动 / 退出与最终真实 Mac 验收仍是唯一剩余 M2 Exit Criteria（退出条件）。
+
+
+### M2.1 Catalina rebuild cloud result — PASS（通过）
+
+- source HEAD（源码提交）: `0e138142117367452990a01e09e687a6a9bd53d4`
+- macOS Host Skeleton Run #4: PASS（通过）
+- W0 Android regression（安卓回归） #713: PASS（通过）
+- final artifact（最终制品）: `siftalpha-macos-m2.1-catalina-x64-4`
+- artifact ID: `10787246281`
+- artifact digest: `sha256:4af428ea7f75d07ba84de62d982c32ca923d37c9b8169318f3edf7ab0c130423`
+- inner test ZIP SHA-256: `6a426bdcc73392bddebad9eb89aa80657f8c64038b8dcb3d354e5212a9d6a654`
+- target architecture（目标架构）: Intel x86_64
+- `LSMinimumSystemVersion`: 10.15
+- launcher Mach-O MIN_OS: 10.12
+- bundled `libjli.dylib` MIN_OS: 10.12
+- bundled `libjvm.dylib` MIN_OS: 10.12
+- Core load probe（核心加载探针）: PASS（通过）
+- Android dependency leak check（安卓依赖泄漏检查）: PASS（通过）
+
+Catalina-compatible package rebuild（Catalina 兼容测试包重建）已完成。
+
+M2 stage（M2 阶段）本身仍保持 **4 / 6**，仅剩真实 macOS 10.15.7 机器上的 GUI launch / normal exit（图形界面启动 / 正常退出）与最终 Real Mac acceptance（真实 Mac 验收）。

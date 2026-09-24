@@ -1198,3 +1198,28 @@ macOS Host Skeleton Run #3 reached the real packaging step and proved:
 Run #3 then failed before Mach-O minimum-version assertions because the shell heredoc used by the assertion helper retained indentation after YAML decoding, causing `syntax error: unexpected end of file`.
 
 No compatibility rejection occurred. The assertion helper is replaced with a single-line Python version comparison so the next run can execute the actual launcher/libjli/libjvm minimum-OS checks.
+
+
+### Catalina rebuild final cloud verification — PASS（通过）
+
+Final source: `0e138142117367452990a01e09e687a6a9bd53d4`.
+
+macOS Host Skeleton Run #4 completed successfully. Evidence:
+
+- GitHub Intel x86_64 runner: PASS.
+- Liberica JDK 17 x64: PASS.
+- Core build/tests: PASS.
+- Core load probe: PASS.
+- Capability snapshot: PASS.
+- Android dependency isolation: PASS.
+- `SiftAlpha.app` packaging: PASS.
+- `LSMinimumSystemVersion=10.15`.
+- launcher minimum OS: 10.12.
+- bundled `libjli.dylib` minimum OS: 10.12.
+- bundled `libjvm.dylib` minimum OS: 10.12.
+- W0 Android regression #713: PASS.
+- artifact: `siftalpha-macos-m2.1-catalina-x64-4`, ID `10787246281`.
+- artifact digest: `sha256:4af428ea7f75d07ba84de62d982c32ca923d37c9b8169318f3edf7ab0c130423`.
+- final inner ZIP SHA-256: `6a426bdcc73392bddebad9eb89aa80657f8c64038b8dcb3d354e5212a9d6a654`.
+
+The Catalina-compatible M2.1 rebuild task is **PASS / COMPLETE（通过 / 完成）**. M2 remains open only for real-Mac launch/exit acceptance.
