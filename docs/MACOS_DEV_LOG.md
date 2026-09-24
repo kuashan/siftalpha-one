@@ -1338,3 +1338,32 @@ No new M3.2 slice is created. Core（核心）, Android（安卓） production s
 The first Shell-discovery test addition was syntactically valid Kotlin but appended at file scope, outside `MacHostRuntimeDiscoveryTest`. JUnit 4 would not execute it as a test method on the test class.
 
 The test is moved inside the class before accepting any cloud result. Production discovery logic is unchanged.
+
+
+## 2026-09-24 · M3.1 Cloud Verification PASS
+
+Latest accepted M3.1 functional HEAD:
+`54e9ed98a1d8b8a856aafc16786641adeb007fd3`.
+
+Cloud results:
+
+- macOS Host Runtime Run #9: PASS.
+- Android W0 Cloud Build #718: PASS.
+- Python discovery: AVAILABLE / Python 3.14.7.
+- Node.js discovery: AVAILABLE / v22.23.2.
+- Bun discovery: UNAVAILABLE (valid explicit fact).
+- Git discovery: AVAILABLE / git 2.55.0.
+- Shell discovery: AVAILABLE / /bin/zsh 5.9.
+- host process execution capability: AVAILABLE.
+- project A stop: STOPPED.
+- project B after stopping A: RUNNING.
+- project B stop: STOPPED.
+- packaged Catalina app: PASS.
+- launcher / libjli / libjvm MIN_OS: 10.12.
+- M3 Catalina test artifact ID: `10787089864`.
+- inner test ZIP SHA-256: `f9d2c8c04acd004f580f57ed7ebb50d4a464a84560753ba173bd469364ad1fec`.
+
+Current status:
+**Cloud PASS（云端通过） / Real Mac M3 Self-Test Pending（真实 Mac M3 自检待完成）**.
+
+No M3 Closure Audit may run until the real macOS 10.15.7 self-test passes.

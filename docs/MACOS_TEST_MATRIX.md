@@ -469,16 +469,16 @@ Next stage（下一阶段）: **M3 — Host Runtime Provider（主机运行提�
 
 | ID | Check（检查） | Expected（期望） | Status（状态） |
 | --- | --- | --- | --- |
-| M3-01 | Python discovery（Python 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PENDING |
-| M3-02 | Node.js discovery（Node 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PENDING |
-| M3-03 | Bun discovery（Bun 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PENDING |
-| M3-04 | Git discovery（Git 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PENDING |
-| M3-05 | Shell discovery（Shell 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PENDING |
-| M3-06 | Host process start（主机进程启动） | project-owned process starts | CLOUD PENDING |
-| M3-07 | stdout / stderr capture（输出采集） | both streams captured independently | CLOUD PENDING |
-| M3-08 | STATUS（状态） | RUNNING / EXITED / STOPPED facts are correct | CLOUD PENDING |
-| M3-09 | Project STOP（项目停止） | selected project stops | CLOUD PENDING |
-| M3-10 | Concurrent A/B isolation（并行项目隔离） | STOP A leaves B RUNNING | CLOUD PENDING |
-| M3-11 | Android regression（安卓回归） | W0 PASS | CLOUD PENDING |
-| M3-12 | Catalina compatibility（Catalina 兼容） | packaged app remains compatible with 10.15.7 | CLOUD PENDING |
+| M3-01 | Python discovery（Python 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PASS |
+| M3-02 | Node.js discovery（Node 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PASS |
+| M3-03 | Bun discovery（Bun 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PASS — UNAVAILABLE is valid |
+| M3-04 | Git discovery（Git 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PASS |
+| M3-05 | Shell discovery（Shell 发现） | explicit AVAILABLE / UNAVAILABLE fact | CLOUD PASS |
+| M3-06 | Host process start（主机进程启动） | project-owned process starts | CLOUD PASS |
+| M3-07 | stdout / stderr capture（输出采集） | both streams captured independently | CLOUD PASS |
+| M3-08 | STATUS（状态） | RUNNING / EXITED / STOPPED facts are correct | CLOUD PASS |
+| M3-09 | Project STOP（项目停止） | selected project stops | CLOUD PASS |
+| M3-10 | Concurrent A/B isolation（并行项目隔离） | STOP A leaves B RUNNING | CLOUD PASS |
+| M3-11 | Android regression（安卓回归） | W0 PASS | PASS — W0 #718 |
+| M3-12 | Catalina compatibility（Catalina 兼容） | packaged app remains compatible with 10.15.7 | CLOUD PASS |
 | M3-13 | Real Mac M3 Self-Test（真实 Mac 自检） | diagnostic button reports PASS | REAL MAC PENDING |

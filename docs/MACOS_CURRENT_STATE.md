@@ -490,4 +490,31 @@ M3 使用一个有限实现切片完成主机运行提供者的核心闭环，�
 
 Cloud（云端）与真实 Catalina Mac（苹果电脑）关键验证通过后，只执行一次 M3 Closure Audit（关闭审计），随后 M3 必须 PASS / CLOSED（通过 / 关闭）并进入 M4。
 
-当前状态：**IMPLEMENTED / CLOUD RE-VERIFICATION IN PROGRESS（已实现 / 云端重新验证进行中）**。
+当前状态：**CLOUD PASS（云端通过） / REAL MAC M3 SELF-TEST PENDING（真实 Mac M3 自检待完成）**。
+
+
+### M3.1 Cloud Verification（云端验证）— PASS
+
+- source HEAD: `54e9ed98a1d8b8a856aafc16786641adeb007fd3`
+- macOS Host Runtime Run #9: PASS
+- Android W0 Cloud Build #718: PASS
+- macOS artifact: `siftalpha-macos-m3.1-catalina-x64-9`
+- artifact ID: `10787089864`
+- artifact digest: `sha256:30f98467a31e3c9a975fa18c10ff6787b9cd04ffd41c5979c5f7aac3633d4b04`
+- inner Catalina test ZIP SHA-256: `f9d2c8c04acd004f580f57ed7ebb50d4a464a84560753ba173bd469364ad1fec`
+- Android W0 artifact: `siftalpha-w0-718`
+- Android W0 artifact digest: `sha256:8dc6a6538f5ebc4dd67e48822ffdf340f755201ea673bde379bba03412e794bc`
+
+Cloud runtime facts:
+
+- Python: AVAILABLE — Python 3.14.7
+- Node.js: AVAILABLE — v22.23.2
+- Bun: UNAVAILABLE（合法不可用事实）
+- Git: AVAILABLE — 2.55.0
+- Shell: AVAILABLE — /bin/zsh 5.9
+- host_process_execution: AVAILABLE
+- project-scoped process self-test: PASS
+- STOP A leaves B RUNNING: PASS
+- Catalina binary minimum OS checks: 10.12 / 10.12 / 10.12
+
+M3 尚未关闭。唯一剩余阶段阻塞项是 Real Mac M3 Self-Test（真实 Mac M3 自检）。
