@@ -13,12 +13,12 @@ import java.net.URI
  */
 object RuntimeWebEndpointProbe {
 
-    internal data class Target(
+    data class Target(
         val host: String,
         val port: Int,
     )
 
-    internal fun targets(url: String): List<Target> {
+    fun targets(url: String): List<Target> {
         val validated = RuntimeWebUrl.extractLocalHttpUrl("SIFTALPHA_WEB_URL=$url") ?: return emptyList()
         val uri = runCatching { URI(validated) }.getOrNull() ?: return emptyList()
         val scheme = uri.scheme?.lowercase() ?: return emptyList()
