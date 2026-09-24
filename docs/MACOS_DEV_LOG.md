@@ -1888,3 +1888,28 @@ M5.2 state:
 **CLOUD PASS / REAL MAC PENDING**.
 
 Do not perform the M5 Final Closure Audit until the real Catalina M5.2 acceptance passes.
+
+
+## 2026-09-24 · M5.2 real-Mac repair: direct import + Simplified Chinese
+
+Real Catalina screenshot/acceptance feedback identified two M5.2 presentation blockers:
+1. Developer Mode could be opened with an empty shared project list but had no Import Project action;
+2. Developer Mode was still presented mostly in English.
+
+Approved minimal repair:
+- added direct `导入项目` to Developer Mode;
+- import still calls the existing shared `MacProductController.importProject()`;
+- no new coordinator, lifecycle, runtime state or import implementation was introduced;
+- localized Developer Mode user-visible chrome and diagnostic labels to Simplified Chinese while retaining technical values such as RUNNING/PID/stdout/stderr;
+- added explicit Chinese empty-state guidance.
+
+Verification:
+- repair functional HEAD `9e6f3ccb9259704f3efe4f898a97ae3f054f1b33`;
+- macOS Run #34 PASS;
+- Android W0 #743 PASS;
+- M5.2 parity probe PASS;
+- M5.1 / M4.2 / M3 regressions PASS;
+- Catalina minimum unchanged.
+
+Status remains:
+**M5.2 CLOUD PASS / REAL MAC PENDING**.
