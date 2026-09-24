@@ -253,6 +253,38 @@ class MacProductController(
 
     fun prepare(projectId: String): MacPrepareResult {
         lastErrors.remove(projectId)
+
+        val product = synchronized(this) { projects[projectId] }
+        if (product?.isCompose == true && !coordinator.status(projectId).environmentReady) {
+            refreshContainerProviders()
+            val refreshed = refreshProject(projectId) ?: product
+            val advice = adviceFor(refreshed)
+            val installPlan = installPlanFor(refreshed)
+            if (advice != null &&
+                advice.state != MacContainerAdviceState.READY &&
+                installPlan != null
+            ) {
+                val provisioned = installRecommendedContainerAndPrepare(projectId)
+                return if (provisioned) {
+                    MacPrepareResult(
+                        success = true,
+                        cancelled = false,
+                        environment = null,
+                        lines = listOf("SIFTALPHA_ENVIRONMENT_PROVISION=PASS"),
+                        detail = null,
+                    )
+                } else {
+                    MacPrepareResult(
+                        success = false,
+                        cancelled = false,
+                        environment = null,
+                        lines = listOf("SIFTALPHA_ENVIRONMENT_PROVISION=FAILED"),
+                        detail = lastErrors[projectId] ?: "运行环境准备失败",
+                    )
+                }
+            }
+        }
+
         val result = coordinator.prepare(projectId)
         if (!result.success) {
             lastErrors[projectId] = result.detail ?: if (result.cancelled) {
