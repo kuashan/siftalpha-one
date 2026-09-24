@@ -1978,7 +1978,7 @@ This supersedes the previous Catalina minimum-support constraint for future stag
 
 M6.1 — Container Capability + Compose Detection/Plan（容器能力 + Compose 检测/计划） has reached:
 
-**CLOUD PASS / REAL VENTURA PENDING**.
+**PASS / COMPLETE**.
 
 Authority:
 - functional HEAD `8fe74e86ed90490b84d63c894b0de5d37da2d45e`;
@@ -1995,6 +1995,32 @@ Authority:
 - current supported macOS baseline is Ventura 13+; packaged LSMinimumSystemVersion is now 13.0.
 
 Current authority:
-**M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CLOSED → M6 CURRENT / M6.1 CLOUD PASS / REAL VENTURA PENDING / M6.2 NOT STARTED**.
+**M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CLOSED → M6 CURRENT / M6.1 COMPLETE / M6.2 NOT STARTED**.
 
-Next action is real macOS 13.7.8 Ventura / Intel x86_64 M6.1 capability/detection acceptance. M6.2 remains a separate implementation slice.
+Real macOS 13.7.8 Ventura / Intel x86_64 M6.1 capability/detection acceptance is PASS. M6.2 remains a separate implementation slice and requires explicit approval before coding.
+
+
+## M6.1 real-machine closure authority — 2026-09-24
+
+M6.1 — Container Capability + Compose Detection/Plan（容器能力 + Compose 检测/计划） is now:
+
+**PASS / COMPLETE**.
+
+Real acceptance machine:
+- macOS 13.7.8 Ventura;
+- Intel x86_64.
+
+Real probe authority:
+- container runtime = UNAVAILABLE;
+- Docker = UNAVAILABLE;
+- Podman = UNAVAILABLE;
+- managed Python 3.14.7 = AVAILABLE;
+- host process execution = AVAILABLE;
+- shell = AVAILABLE.
+
+This proves the M6.1 capability contract on a real supported Mac: absence of Docker/Podman is published as a valid capability fact, not treated as an architecture error.
+
+Current authority:
+**M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CLOSED → M6 CURRENT / M6.1 COMPLETE / M6.2 NOT STARTED**.
+
+M6.2 must not begin without explicit implementation approval. No M6.1.x follow-up slice is required.
