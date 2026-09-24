@@ -2076,3 +2076,28 @@ Current authority:
 **M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CLOSED → M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS / REAL MANAGED-CONTAINER ACCEPTANCE PENDING**.
 
 After real managed install + real Compose A/B isolation pass, run exactly one M6 Final Closure Audit. Do not create M6.3.
+
+
+## M6.2 unified prepare authority — 2026-09-24
+
+Latest approved product principle:
+
+**Users should only need to import a project and ask SiftAlpha to prepare/run it. SiftAlpha is responsible for detecting and satisfying the required environment whenever the platform capability can be provided safely.**
+
+For M6.2:
+- Normal Mode exposes **准备环境**, not a container-installer workflow;
+- environment provisioning is an internal step of Prepare;
+- existing host Docker/Podman + Compose is reused when available;
+- SiftAlpha-managed container provisioning remains available when needed;
+- Developer Mode owns detailed provider/provisioning diagnosis and explicit repair controls;
+- no second controller, coordinator, installer or runtime state machine is introduced;
+- Core remains provider-neutral; macOS-specific provisioning stays in the macOS adapter.
+
+Authority:
+- functional HEAD `29a1ddd9709e07d5b17cd6cc9561f68bd2fee170`;
+- macOS Run #69 PASS;
+- Android W0 #778 PASS;
+- real Ventura unified-prepare acceptance remains pending.
+
+Roadmap remains:
+**M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CLOSED → M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS → M7 NOT STARTED → M8 NOT STARTED**.
