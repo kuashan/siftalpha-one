@@ -2110,3 +2110,39 @@ Verification:
 
 State remains:
 **M6.2 CLOUD PASS / REAL VENTURA MANAGED-INSTALL ACCEPTANCE PENDING**.
+
+
+## 2026-09-24 · M6.2 Unified Prepare + Developer Environment Diagnostics PASS
+
+Approved correction:
+- ordinary users interact with one concept: **准备环境**;
+- the shared controller decides whether an existing host capability is sufficient or a managed environment must be provisioned;
+- container installation details were removed from Normal Mode;
+- Developer Mode now exposes the environment provisioning plan, phase and raw installer log and provides an explicit **安装/修复环境** action;
+- both modes still use the same Controller / Coordinator / provisioner.
+
+Implementation authority:
+`29a1ddd9709e07d5b17cd6cc9561f68bd2fee170`
+
+Verification:
+- macOS Run #69 PASS;
+- Android W0 #778 PASS;
+- managed environment probe: PASS;
+- Normal primary before provisioning = PREPARE;
+- one installer invocation;
+- Prepare + provision = PASS;
+- re-detect = READY;
+- environmentReady = true;
+- Developer Mode sees provisioning phase COMPLETE;
+- Normal primary after preparation = RUN;
+- M6.2 Compose workflow / A-B STOP isolation regression = PASS;
+- M4/M5/M6.1 regressions = PASS.
+
+User-facing ZIP:
+`SiftAlpha-X-m6.2-unified-prepare-r2-ventura-x64.zip`
+
+SHA-256:
+`a95b215a2dcb3de909260b37e4cd18c06a551ca5b4d942c0fc0c67cbc4f50df5`
+
+State:
+**CLOUD PASS / REAL VENTURA UNIFIED-PREPARE ACCEPTANCE PENDING**.
