@@ -1015,3 +1015,37 @@ Current state:
 **M6.2 CLOUD PASS / REAL VENTURA UNIFIED-PREPARE ACCEPTANCE PENDING**.
 
 M6 remains open until real managed-environment preparation and real Compose A/B isolation pass. Do not create M6.3.
+
+
+## 33. M6.2 R3 checksum manifest repair — CLOUD PASS
+
+Real Ventura Developer Mode evidence exposed a checksum-manifest parsing bug during managed environment preparation:
+
+`lima-2.2.0-Darwin-x86_64.tar.gz`
+- downloaded SHA-256: `0d6f99c19f6e4bc3c92730c4c29d929e6927f0cb0a0ba1a84383367135a8ff31`;
+- official GitHub Release asset digest: the same value;
+- previous installer incorrectly selected a different digest from Lima's multi-file `SHA256SUMS` manifest.
+
+Root cause:
+the checksum parser accepted the first line beginning with any 64-character SHA-256 digest, even when that line belonged to a different asset.
+
+Repair:
+- multi-file checksum manifests now require an exact asset filename match;
+- a bare checksum is accepted only for a true single-digest sidecar;
+- missing filenames fail closed rather than selecting another asset's digest;
+- regression tests cover exact Intel Lima selection, unknown-file rejection, and single-digest sidecars.
+
+Authority:
+- functional HEAD `d1cf3ba4b90a8b47ded7e07f3c09140c5d754ae9`;
+- macOS Run #73 PASS;
+- Android W0 #782 PASS;
+- macOS Core / macOS tests PASS;
+- managed-container flow probe PASS;
+- Compose A/B isolation / STOP / Restart / Web regressions PASS;
+- artifact `siftalpha-macos-m6.2-unified-prepare-r3-ventura-x64-73`;
+- artifact ID `10819645032`;
+- artifact digest `sha256:27160dc93331dd2c545e559a8492953d43be2ff4f3d2d1455c3027a97a3487d8`;
+- user ZIP SHA-256 `5a7165eade86a179c3933543b578b84a45b273b735d5955882a21d3d73c100ba`.
+
+Current state:
+**M6.2 CLOUD PASS / REAL VENTURA MANAGED-ENVIRONMENT RETEST PENDING**.
