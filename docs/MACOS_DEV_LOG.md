@@ -2092,3 +2092,21 @@ SHA-256:
 
 State:
 **CLOUD PASS / REAL VENTURA MANAGED-INSTALL ACCEPTANCE PENDING**.
+
+
+## 2026-09-24 · M6.2 managed installer stale-error priority repair PASS
+
+Real UI evidence showed a stale failed Compose Prepare error taking presentation priority over the new managed-container install action. The product behavior was corrected so that when a Compose project is unprepared and a valid install plan exists, **INSTALL_CONTAINER** takes priority over the stale Prepare error.
+
+Verification:
+- functional HEAD `2e957e3130066ddc8fecbef04584afe470549cb9`;
+- macOS Run #61 PASS;
+- Android W0 #770 PASS;
+- controlled probe explicitly covers `failed_prepare_before_install=true` and `stale_error_present=true`;
+- before install primary action = `INSTALL_CONTAINER`;
+- install → re-detect → Prepare → primary action `RUN` remains PASS;
+- artifact `siftalpha-macos-m6.2-managed-container-r1-ventura-x64-61`;
+- user ZIP SHA-256 `5ac42a76cbaa5f77cf862d89074cff4071c65c83220e77d1a6022cb09d7d2ac3`.
+
+State remains:
+**M6.2 CLOUD PASS / REAL VENTURA MANAGED-INSTALL ACCEPTANCE PENDING**.
