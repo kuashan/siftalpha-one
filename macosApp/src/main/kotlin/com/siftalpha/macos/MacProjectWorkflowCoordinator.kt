@@ -12,6 +12,8 @@ import com.siftalpha.core.process.ProjectProcessLaunchRequest
 import com.siftalpha.core.process.ProjectProcessScope
 import com.siftalpha.core.process.ProjectProcessState
 import com.siftalpha.core.process.ProjectStopOutcome
+import com.siftalpha.studio.container.ComposeProjectPlan
+import com.siftalpha.studio.container.ComposeProjectPlanStatus
 import com.siftalpha.studio.project.EmbeddedPythonEntrypointPolicy
 import com.siftalpha.studio.runtime.NodeStartContractPolicy
 import com.siftalpha.studio.runtime.RuntimeKind
@@ -23,6 +25,7 @@ data class MacWorkflowContext(
     val project: MacImportedProject,
     val snapshot: MacProjectSnapshot,
     val plan: MacProjectEnvironmentPlan,
+    val composePlan: ComposeProjectPlan? = null,
 )
 
 data class MacWorkflowStatus(
@@ -43,6 +46,9 @@ data class MacWorkflowDiagnostics(
     val stderr: String,
     val combinedLogs: String,
     val logsTruncated: Boolean,
+    val containerProvider: String? = null,
+    val composeProjectName: String? = null,
+    val containerServices: List<MacComposeServiceStatus> = emptyList(),
 )
 
 class MacProjectWorkflowCoordinator(
@@ -51,11 +57,17 @@ class MacProjectWorkflowCoordinator(
         processControl = processControl,
         managedPython = MacManagedPythonRuntime.locate(),
     ),
+    private val containerProviderSource: () -> MacComposeContainerProvider? = {
+        MacComposeProviderSelector.select(MacContainerRuntimeDiscovery().discoverAll())
+    },
 ) {
     private data class MutableProjectState(
         @Volatile var context: MacWorkflowContext? = null,
         @Volatile var operation: ProjectOperationOwnership? = null,
         @Volatile var cancelRequested: Boolean = false,
+        @Volatile var composePrepared: Boolean = false,
+        @Volatile var cachedComposeStatus: MacComposeRuntimeStatus? = null,
+        @Volatile var cachedComposeStatusAtMs: Long = 0L,
         val generation: AtomicLong = AtomicLong(0),
         val history: StringBuilder = StringBuilder(),
     )
@@ -77,13 +89,20 @@ class MacProjectWorkflowCoordinator(
 
         state.cancelRequested = false
         append(state, "PREPARE generation=" + generation)
-        val result = environmentManager.prepare(
-            project = context.project,
-            snapshot = context.snapshot,
-            plan = context.plan,
-            cancelled = { state.cancelRequested },
-            log = { line -> append(state, line) },
-        )
+
+        val composePlan = context.composePlan?.takeIf { it.isComposeProject }
+        val result = if (composePlan != null) {
+            prepareCompose(state, context, composePlan)
+        } else {
+            environmentManager.prepare(
+                project = context.project,
+                snapshot = context.snapshot,
+                plan = context.plan,
+                cancelled = { state.cancelRequested },
+                log = { line -> append(state, line) },
+            )
+        }
+
         finish(
             projectId,
             generation,
@@ -96,9 +115,62 @@ class MacProjectWorkflowCoordinator(
         return result
     }
 
+    private fun prepareCompose(
+        state: MutableProjectState,
+        context: MacWorkflowContext,
+        plan: ComposeProjectPlan,
+    ): MacPrepareResult {
+        if (plan.status == ComposeProjectPlanStatus.INVALID_MANIFEST ||
+            plan.status == ComposeProjectPlanStatus.NOT_COMPOSE
+        ) {
+            return MacPrepareResult(
+                false,
+                false,
+                null,
+                listOf("SIFTALPHA_M62_PREPARE=FAILED"),
+                plan.issues.firstOrNull() ?: "Compose plan is invalid",
+            )
+        }
+        val provider = containerProviderSource()
+            ?: return MacPrepareResult(
+                false,
+                false,
+                null,
+                listOf("SIFTALPHA_M62_PREPARE=FAILED"),
+                "container runtime or Compose is unavailable; install/start a compatible provider and refresh",
+            )
+
+        val operation = provider.prepare(
+            project = context.project,
+            plan = plan,
+            cancelled = { state.cancelRequested },
+            log = { line -> append(state, line) },
+        )
+        if (operation.success) {
+            state.composePrepared = true
+            invalidateComposeStatus(state)
+        }
+        return MacPrepareResult(
+            success = operation.success,
+            cancelled = operation.cancelled,
+            environment = null,
+            lines = listOf(
+                "SIFTALPHA_M62_PREPARE=" + if (operation.success) "PASS" else "FAILED",
+                "SIFTALPHA_M62_PROVIDER=" + provider.snapshot.kind.id,
+                "SIFTALPHA_M62_COMPOSE_PROJECT=" + provider.projectName(context.project.projectId),
+            ),
+            detail = operation.detail,
+        )
+    }
+
     fun start(projectId: String): Boolean {
         val state = state(projectId)
         val context = state.context ?: return false
+        val composePlan = context.composePlan?.takeIf { it.isComposeProject }
+        if (composePlan != null) {
+            return startCompose(projectId, state, context, composePlan)
+        }
+
         val environment = environmentManager.currentEnvironment(projectId) ?: return false
         val generation = begin(projectId, ProjectOperationAction.START) ?: return false
 
@@ -172,8 +244,36 @@ class MacProjectWorkflowCoordinator(
         }
     }
 
+    private fun startCompose(
+        projectId: String,
+        state: MutableProjectState,
+        context: MacWorkflowContext,
+        plan: ComposeProjectPlan,
+    ): Boolean {
+        if (!state.composePrepared) return false
+        val provider = containerProviderSource() ?: return false
+        val generation = begin(projectId, ProjectOperationAction.START) ?: return false
+        val result = provider.start(context.project, plan)
+        appendProviderOutput(state, "compose up", result.output)
+        invalidateComposeStatus(state)
+        append(state, "COMPOSE_START=" + if (result.success) "PASS" else "FAILED")
+        result.detail?.let { append(state, "COMPOSE_START_DETAIL=" + it) }
+        finish(
+            projectId,
+            generation,
+            if (result.success) ProjectOperationPhase.SUCCESS else ProjectOperationPhase.FAILED,
+        )
+        return result.success
+    }
+
     fun stop(projectId: String): Boolean {
         val state = state(projectId)
+        val context = state.context
+        val composePlan = context?.composePlan?.takeIf { it.isComposeProject }
+        if (context != null && composePlan != null) {
+            return stopCompose(projectId, state, context, composePlan)
+        }
+
         val generation = begin(projectId, ProjectOperationAction.STOP) ?: return false
         state.cancelRequested = true
         val result = processControl.stopProject(ProjectProcessScope(projectId))
@@ -189,16 +289,58 @@ class MacProjectWorkflowCoordinator(
         return okay
     }
 
+    private fun stopCompose(
+        projectId: String,
+        state: MutableProjectState,
+        context: MacWorkflowContext,
+        plan: ComposeProjectPlan,
+    ): Boolean {
+        val generation = begin(projectId, ProjectOperationAction.STOP) ?: return false
+        state.cancelRequested = true
+        val provider = containerProviderSource()
+        if (provider == null) {
+            append(state, "COMPOSE_STOP=FAILED provider unavailable")
+            finish(projectId, generation, ProjectOperationPhase.FAILED)
+            return false
+        }
+        val result = provider.stop(context.project, plan)
+        appendProviderOutput(state, "compose down", result.output)
+        invalidateComposeStatus(state)
+        append(state, "COMPOSE_STOP=" + if (result.success) "PASS" else "FAILED")
+        result.detail?.let { append(state, "COMPOSE_STOP_DETAIL=" + it) }
+        finish(
+            projectId,
+            generation,
+            if (result.success) ProjectOperationPhase.SUCCESS else ProjectOperationPhase.FAILED,
+        )
+        return result.success
+    }
+
     fun restart(projectId: String): Boolean {
-        stop(projectId)
+        if (!stop(projectId)) return false
         state(projectId).cancelRequested = false
         return start(projectId)
     }
 
     fun logs(projectId: String, maxBytes: Int = 512 * 1024): String {
         val state = state(projectId)
-        val processLogs = processControl.logs(ProjectProcessScope(projectId), maxBytes)
+        val context = state.context
         val history = synchronized(state.history) { state.history.toString() }
+        val composePlan = context?.composePlan?.takeIf { it.isComposeProject }
+        if (context != null && composePlan != null) {
+            val containerLogs = containerProviderSource()
+                ?.logs(context.project, composePlan, maxBytes)
+                .orEmpty()
+            return buildString {
+                append(history)
+                if (containerLogs.isNotBlank()) {
+                    append("\n--- compose logs ---\n")
+                    append(containerLogs)
+                }
+            }.takeLast(maxBytes)
+        }
+
+        val processLogs = processControl.logs(ProjectProcessScope(projectId), maxBytes)
         return buildString {
             append(history)
             if (processLogs.stdout.isNotBlank()) {
@@ -212,11 +354,44 @@ class MacProjectWorkflowCoordinator(
         }.takeLast(maxBytes)
     }
 
-    fun webEndpoint(projectId: String): MacProjectWebEndpoint? =
-        webDiscovery.discover(ProjectProcessScope(projectId), logs(projectId))
+    fun webEndpoint(projectId: String): MacProjectWebEndpoint? {
+        val state = state(projectId)
+        val context = state.context ?: return null
+        val composePlan = context.composePlan?.takeIf { it.isComposeProject }
+        if (composePlan != null) {
+            val provider = containerProviderSource() ?: return null
+            return webDiscovery.discoverFromPorts(
+                ports = provider.publishedPorts(context.project, composePlan),
+                combinedOutput = logs(projectId),
+            )
+        }
+        return webDiscovery.discover(ProjectProcessScope(projectId), logs(projectId))
+    }
 
     fun diagnostics(projectId: String, maxBytes: Int = 512 * 1024): MacWorkflowDiagnostics {
         val state = state(projectId)
+        val context = state.context
+        val composePlan = context?.composePlan?.takeIf { it.isComposeProject }
+        if (context != null && composePlan != null) {
+            val provider = containerProviderSource()
+            val runtime = provider?.let { composeStatus(state, context, composePlan, it, force = true) }
+            val combined = logs(projectId, maxBytes)
+            return MacWorkflowDiagnostics(
+                status = status(projectId),
+                environment = null,
+                entrypoint = entrypoint(projectId),
+                ownedPids = emptySet(),
+                stdout = combined,
+                stderr = "",
+                combinedLogs = combined,
+                logsTruncated = combined.length >= maxBytes,
+                containerProvider = provider?.snapshot?.kind?.id,
+                composeProjectName = provider?.projectName(projectId)
+                    ?: MacComposeProjectIdentity.forProject(projectId),
+                containerServices = runtime?.services.orEmpty(),
+            )
+        }
+
         val scope = ProjectProcessScope(projectId)
         val processLogs = processControl.logs(scope, maxBytes)
         val history = synchronized(state.history) { state.history.toString() }
@@ -245,6 +420,9 @@ class MacProjectWorkflowCoordinator(
 
     fun entrypoint(projectId: String): String? {
         val context = state(projectId).context ?: return null
+        context.composePlan?.takeIf { it.isComposeProject }?.let { plan ->
+            return plan.manifestPath?.let { "compose:" + it }
+        }
         return when (context.plan.needs?.primaryRuntime) {
             RuntimeKind.PYTHON -> EmbeddedPythonEntrypointPolicy.resolve(
                 declaredEntry = null,
@@ -252,7 +430,7 @@ class MacProjectWorkflowCoordinator(
             )
             RuntimeKind.NODE_JS -> {
                 val packageText = context.snapshot.packageJsonText.orEmpty()
-                val hasStart = Regex("""["']start["']\\s*:""").containsMatchIn(packageText)
+                val hasStart = Regex("""["']start["']\s*:""").containsMatchIn(packageText)
                 val contract = NodeStartContractPolicy.resolve(null, hasStart)
                 if (contract is NodeStartContractPolicy.Result.Resolved) contract.command else null
             }
@@ -262,8 +440,7 @@ class MacProjectWorkflowCoordinator(
 
     fun status(projectId: String): MacWorkflowStatus {
         val state = state(projectId)
-        val envReady = environmentManager.currentEnvironment(projectId) != null
-        val processStatus = processControl.status(ProjectProcessScope(projectId))
+        val context = state.context
         val operation = state.operation
         val lifecycleOp = when (operation?.action) {
             ProjectOperationAction.PREPARE -> ProjectLifecycleOperation.PREPARE
@@ -274,6 +451,48 @@ class MacProjectWorkflowCoordinator(
             ProjectOperationAction.CLEAN -> ProjectLifecycleOperation.CLEAN
             null -> ProjectLifecycleOperation.NONE
         }
+
+        val composePlan = context?.composePlan?.takeIf { it.isComposeProject }
+        if (context != null && composePlan != null) {
+            val provider = containerProviderSource()
+            val composeStatus = provider?.let { composeStatus(state, context, composePlan, it) }
+            val processState = when {
+                composeStatus == null -> ProjectProcessState.UNKNOWN
+                composeStatus.anyRunning -> ProjectProcessState.RUNNING
+                composeStatus.services.any { it.state == MacComposeServiceState.UNKNOWN } ->
+                    ProjectProcessState.UNKNOWN
+                else -> ProjectProcessState.STOPPED
+            }
+            val runtimeState = when (processState) {
+                ProjectProcessState.RUNNING -> RuntimeExecutionState.RUNNING
+                ProjectProcessState.STOPPED -> RuntimeExecutionState.STOPPED_BY_USER
+                ProjectProcessState.STARTING -> RuntimeExecutionState.STARTING
+                ProjectProcessState.EXITED_SUCCESS -> RuntimeExecutionState.EXITED_SUCCESS
+                ProjectProcessState.EXITED_ERROR -> RuntimeExecutionState.EXITED_ERROR
+                ProjectProcessState.UNKNOWN -> RuntimeExecutionState.UNKNOWN
+            }
+            val endpoint = if (processState == ProjectProcessState.RUNNING) {
+                webEndpoint(projectId)
+            } else {
+                null
+            }
+            return MacWorkflowStatus(
+                projectId = projectId,
+                lifecycle = RuntimeLifecyclePolicy.resolve(
+                    environmentReady = state.composePrepared,
+                    runtimeState = runtimeState,
+                    operation = lifecycleOp,
+                    processActive = processState == ProjectProcessState.RUNNING,
+                ),
+                environmentReady = state.composePrepared,
+                processState = processState,
+                operation = operation,
+                webEndpoint = endpoint,
+            )
+        }
+
+        val envReady = environmentManager.currentEnvironment(projectId) != null
+        val processStatus = processControl.status(ProjectProcessScope(projectId))
         val runtimeState = when (processStatus.state) {
             ProjectProcessState.STARTING -> RuntimeExecutionState.STARTING
             ProjectProcessState.RUNNING -> RuntimeExecutionState.RUNNING
@@ -300,6 +519,39 @@ class MacProjectWorkflowCoordinator(
             operation = operation,
             webEndpoint = endpoint,
         )
+    }
+
+    private fun composeStatus(
+        state: MutableProjectState,
+        context: MacWorkflowContext,
+        plan: ComposeProjectPlan,
+        provider: MacComposeContainerProvider,
+        force: Boolean = false,
+    ): MacComposeRuntimeStatus {
+        val now = System.currentTimeMillis()
+        val cached = state.cachedComposeStatus
+        if (!force && cached != null && now - state.cachedComposeStatusAtMs < 800L) {
+            return cached
+        }
+        val latest = provider.status(context.project, plan)
+        state.cachedComposeStatus = latest
+        state.cachedComposeStatusAtMs = now
+        return latest
+    }
+
+    private fun invalidateComposeStatus(state: MutableProjectState) {
+        state.cachedComposeStatus = null
+        state.cachedComposeStatusAtMs = 0L
+    }
+
+    private fun appendProviderOutput(
+        state: MutableProjectState,
+        label: String,
+        output: String,
+    ) {
+        output.lineSequence()
+            .filter(String::isNotBlank)
+            .forEach { append(state, label + ": " + it.take(1000)) }
     }
 
     private fun begin(projectId: String, action: ProjectOperationAction): Long? {
