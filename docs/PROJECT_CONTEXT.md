@@ -1874,7 +1874,7 @@ M5.2 — Developer Mode + Shared State Parity（开发者模式 + 共享状态�
 **CLOUD PASS / REAL MAC PENDING**.
 
 Accepted cloud HEAD:
-`eeeadb01ed19a94f0ee4880ab0d96651a44a8b84`.
+`9e6f3ccb9259704f3efe4f898a97ae3f054f1b33`.
 
 Authority:
 - one `MacProductController` and one `MacProjectWorkflowCoordinator` remain the only macOS product mutation/state chain;
@@ -1884,8 +1884,8 @@ Authority:
 - Developer Stop is immediately reflected by Normal Mode;
 - Normal Run is immediately reflected by Developer Mode;
 - Project A/B STOP isolation remains intact;
-- macOS Run #32 PASS;
-- Android W0 #741 PASS;
+- macOS Run #34 PASS;
+- Android W0 #743 PASS;
 - Catalina minimum remains 10.15.7.
 
 Cloud probe specifically proved:
@@ -1903,3 +1903,26 @@ Current authority:
 **M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CURRENT / M5.1 COMPLETE / M5.2 CLOUD PASS / REAL MAC PENDING**.
 
 Next action is real macOS 10.15.7 Catalina / Intel x86_64 M5.2 acceptance. Only after it passes may the single M5 Final Closure Audit run. No M5.3 / M5.4 is permitted by the frozen finite plan.
+
+
+## M5.2 repaired real-Mac acceptance authority — 2026-09-24
+
+The first real Catalina M5.2 inspection did not pass closure because Developer Mode lacked a direct project-import entry and was not sufficiently localized to Simplified Chinese.
+
+The approved repair is presentation-only:
+- Developer Mode now imports through the same shared `MacProductController`;
+- Developer Mode user-visible UI is Simplified Chinese;
+- no second coordinator/lifecycle/runtime state was created;
+- Core / Runtime / project-scoped STOP / Android semantics are unchanged.
+
+Repair authority:
+- functional HEAD `9e6f3ccb9259704f3efe4f898a97ae3f054f1b33`;
+- macOS Run #34 PASS;
+- Android W0 #743 PASS;
+- M5.2 parity + M5.1 + M4.2 + M3 regression evidence remains PASS;
+- Catalina minimum remains 10.15.7.
+
+Current authority remains:
+**M5 CURRENT / M5.1 COMPLETE / M5.2 CLOUD PASS / REAL MAC PENDING**.
+
+The next action is to re-run the frozen real Catalina M5.2 acceptance on the repaired package. Do not perform M5 Final Closure Audit before that pass.
