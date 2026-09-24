@@ -1995,4 +1995,34 @@ Authority:
 - M4/M5/STOP regressions PASS;
 - Ventura app baseline `LSMinimumSystemVersion=13.0` PASS.
 
-M6.1 is **CLOUD PASS / REAL VENTURA PENDING**.
+M6.1 cloud state was **CLOUD PASS / REAL VENTURA PENDING** pending real-machine acceptance.
+
+
+## 2026-09-24 · M6.1 Real Ventura Acceptance PASS
+
+Real host:
+- macOS 13.7.8 Ventura
+- Intel x86_64
+
+Observed probe facts:
+- macOS host READY;
+- Core load PASS;
+- host process execution AVAILABLE;
+- container runtime UNAVAILABLE;
+- Docker UNAVAILABLE;
+- Podman UNAVAILABLE;
+- managed Python AVAILABLE / Python 3.14.7;
+- shell AVAILABLE / zsh 5.9 x86_64.
+
+Interpretation:
+- M6.1 correctly reports missing container providers as UNAVAILABLE;
+- this is the expected and valid pre-M6.2 state, not a failure;
+- no false AVAILABLE state was published;
+- no installation side effect was triggered by capability discovery.
+
+One first probe invocation was reported as `zsh: killed`; the immediate repeat of the identical binary completed successfully with all expected diagnostics, so it is not a blocking M6.1 defect.
+
+Final:
+**M6.1 = PASS / COMPLETE**.
+
+M6.2 remains NOT STARTED and requires its own implementation approval.
