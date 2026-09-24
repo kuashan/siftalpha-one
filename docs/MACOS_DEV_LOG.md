@@ -1822,3 +1822,25 @@ Verified:
 
 M5.1 remains open only for real Catalina visual/interaction acceptance.
 M5.2 Developer Mode has not started.
+
+
+## 2026-09-24 · M5.1 Real Mac Acceptance PASS / COMPLETE
+
+Acceptance host:
+- macOS 10.15.7 Catalina
+- Intel x86_64
+
+User confirmed that the approved M5.1 Normal Mode Product UI（普通模式产品界面） test passed on the real Mac.
+
+Closure evidence:
+- accepted functional HEAD `71e9dba0323aa35a531a3a1b26b55907ac8b907b`;
+- macOS Run #23 PASS;
+- Android W0 #732 PASS;
+- real Catalina visual / interaction acceptance PASS.
+
+No Runtime（运行时）, Process Control（进程控制）, Environment（环境）, STOP（停止） semantics, Android production UI, or Core（核心） architecture were changed by this closure.
+
+Final:
+**M5.1 = PASS / COMPLETE**.
+
+Per the finite M5 plan, the next implementation slice is M5.2 Developer Mode + Shared State Parity. M5.2 implementation has not started and requires the Change Discussion Gate before code changes.
