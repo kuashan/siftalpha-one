@@ -43,9 +43,11 @@ class MacDeveloperModeWindow(
     private val stdoutArea = diagnosticArea()
     private val stderrArea = diagnosticArea()
     private val combinedArea = diagnosticArea()
+    private val environmentArea = diagnosticArea()
 
     private val importButton = JButton("导入项目")
     private val prepareButton = JButton("准备")
+    private val installEnvironmentButton = JButton("安装/修复环境")
     private val runButton = JButton("运行")
     private val stopButton = JButton("停止")
     private val restartButton = JButton("重新运行")
@@ -112,6 +114,7 @@ class MacDeveloperModeWindow(
             isOpaque = false
             add(importButton)
             add(prepareButton)
+            add(installEnvironmentButton)
             add(runButton)
             add(stopButton)
             add(restartButton)
@@ -123,6 +126,9 @@ class MacDeveloperModeWindow(
 
         importButton.addActionListener { importProject() }
         prepareButton.addActionListener { runOperation { id -> controller.prepare(id).success } }
+        installEnvironmentButton.addActionListener {
+            runOperation(controller::installRecommendedContainerAndPrepare)
+        }
         runButton.addActionListener { runOperation(controller::start) }
         stopButton.addActionListener { runOperation(controller::stop) }
         restartButton.addActionListener { runOperation(controller::restart) }
@@ -208,6 +214,7 @@ class MacDeveloperModeWindow(
         })
 
         val tabs = JTabbedPane().apply {
+            addTab("环境准备", JScrollPane(environmentArea))
             addTab("综合日志", JScrollPane(combinedArea))
             addTab("标准输出 stdout", JScrollPane(stdoutArea))
             addTab("标准错误 stderr", JScrollPane(stderrArea))
@@ -309,6 +316,7 @@ class MacDeveloperModeWindow(
             stdoutArea.text = ""
             stderrArea.text = ""
             combinedArea.text = ""
+            environmentArea.text = ""
             setActionAvailability(null)
             return
         }
@@ -337,6 +345,19 @@ class MacDeveloperModeWindow(
                 }
                 view.containerAdvice?.warnings.orEmpty().forEach { warning ->
                     appendLine("  资源提示: " + warning)
+                }
+                view.containerInstallPlan?.let { plan ->
+                    appendLine("环境补齐方案: " + plan.kind)
+                    appendLine("  标题: " + plan.title)
+                    appendLine("  说明: " + plan.detail)
+                    appendLine("  组件: " + plan.components.joinToString(", "))
+                    plan.sideEffects.forEach { effect ->
+                        appendLine("  影响: " + effect)
+                    }
+                }
+                view.containerInstallProgress?.let { progress ->
+                    appendLine("环境补齐阶段: " + progress.phase)
+                    appendLine("环境补齐状态: " + progress.message)
                 }
                 if (view.containerServices.isNotEmpty()) {
                     appendLine("服务 Services:")
@@ -371,9 +392,36 @@ class MacDeveloperModeWindow(
             appendLine("最近错误: " + (view.lastError ?: "—"))
         }
 
+        environmentArea.text = buildString {
+            val plan = view.containerInstallPlan
+            val progress = view.containerInstallProgress
+            if (plan == null && progress == null) {
+                appendLine("当前没有待执行的环境补齐方案。")
+            }
+            plan?.let {
+                appendLine("PLAN=" + it.kind)
+                appendLine("TITLE=" + it.title)
+                appendLine("DETAIL=" + it.detail)
+                appendLine("COMPONENTS=" + it.components.joinToString(", "))
+                it.sideEffects.forEach { effect -> appendLine("SIDE_EFFECT=" + effect) }
+                appendLine()
+            }
+            progress?.let {
+                appendLine("PHASE=" + it.phase)
+                appendLine("MESSAGE=" + it.message)
+                it.logLines.forEach(::appendLine)
+                appendLine()
+            }
+            val rawInstallLog = controller.containerInstallLog(view.project.projectId)
+            if (rawInstallLog.isNotBlank()) {
+                appendLine("=== Installer Raw Log ===")
+                append(rawInstallLog)
+            }
+        }
         stdoutArea.text = view.stdout
         stderrArea.text = view.stderr
         combinedArea.text = view.combinedLogs
+        moveCaretToEnd(environmentArea)
         moveCaretToEnd(stdoutArea)
         moveCaretToEnd(stderrArea)
         moveCaretToEnd(combinedArea)
@@ -384,6 +432,7 @@ class MacDeveloperModeWindow(
         val selected = view != null
         if (!selected) {
             prepareButton.isEnabled = false
+            installEnvironmentButton.isEnabled = false
             runButton.isEnabled = false
             stopButton.isEnabled = false
             restartButton.isEnabled = false
@@ -394,8 +443,15 @@ class MacDeveloperModeWindow(
 
         val busy = view!!.workflow.operation != null
         val running = view.workflow.processState == ProjectProcessState.RUNNING
-        prepareButton.isEnabled = !busy && !running
-        runButton.isEnabled = !busy && view.workflow.environmentReady && !running
+        val environmentInstallActive = view.containerInstallProgress?.active == true
+        prepareButton.isEnabled = !busy && !running && !environmentInstallActive
+        installEnvironmentButton.isEnabled =
+            view.project.isCompose &&
+                view.containerInstallPlan != null &&
+                !busy &&
+                !running &&
+                !environmentInstallActive
+        runButton.isEnabled = !busy && view.workflow.environmentReady && !running && !environmentInstallActive
         stopButton.isEnabled = running || busy
         restartButton.isEnabled = !busy && view.workflow.environmentReady
         refreshButton.isEnabled = true
@@ -415,6 +471,7 @@ class MacDeveloperModeWindow(
 
     private fun setButtonsBusy() {
         prepareButton.isEnabled = false
+        installEnvironmentButton.isEnabled = false
         runButton.isEnabled = false
         stopButton.isEnabled = false
         restartButton.isEnabled = false
