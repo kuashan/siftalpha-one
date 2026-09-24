@@ -2050,3 +2050,29 @@ Current authority:
 **M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CLOSED → M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS / REAL VENTURA PENDING**.
 
 Next blocking evidence is real macOS 13+ container-provider acceptance. After that, execute exactly one M6 Final Closure Audit. Do not create M6.3.
+
+
+## M6.2 managed installer authority — 2026-09-24
+
+Approved M6.2 behavior now includes:
+
+**Detect → Recommend → User Confirm → Install → Re-detect → Continue**.
+
+Authority:
+- functional HEAD `1d3c8bcc23c94064c82b1ff652fc4eda7fd87ae4`;
+- macOS Run #56 PASS;
+- Android W0 #765 PASS;
+- managed installer probe PASS;
+- original Compose workflow/isolation probe PASS;
+- no Homebrew/MacPorts prerequisite;
+- no silent installation;
+- no device-model-specific branch;
+- x86_64 / arm64 selected by generic architecture facts;
+- managed container files/configuration remain under SiftAlpha-owned user data;
+- existing unresolved external provider is preserved;
+- successful installation re-detects and automatically continues project Prepare.
+
+Current authority:
+**M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CLOSED → M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS / REAL MANAGED-CONTAINER ACCEPTANCE PENDING**.
+
+After real managed install + real Compose A/B isolation pass, run exactly one M6 Final Closure Audit. Do not create M6.3.
