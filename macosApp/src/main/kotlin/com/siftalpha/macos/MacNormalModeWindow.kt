@@ -48,6 +48,7 @@ private enum class ProjectFilter(val label: String) {
     ALL("全部"),
     PYTHON("Python"),
     NODE("Node.js"),
+    COMPOSE("Compose"),
 }
 
 private class RoundedPanel(
@@ -502,6 +503,7 @@ class MacNormalModeWindow(
                     ProjectFilter.ALL -> true
                     ProjectFilter.PYTHON -> view.project.runtime?.id == "python"
                     ProjectFilter.NODE -> view.project.runtime?.id == "nodejs"
+                    ProjectFilter.COMPOSE -> view.project.isCompose
                 }
                 nameMatch && filterMatch
             }
