@@ -1844,3 +1844,47 @@ Final:
 **M5.1 = PASS / COMPLETE**.
 
 Per the finite M5 plan, the next implementation slice is M5.2 Developer Mode + Shared State Parity. M5.2 implementation has not started and requires the Change Discussion Gate before code changes.
+
+
+## 2026-09-24 · M5.2 Developer Mode + Shared State Parity implementation
+
+Approved finite slice implemented without changing the frozen architecture:
+- added a read-only shared workflow diagnostics snapshot to the existing `MacProjectWorkflowCoordinator`;
+- added `MacDeveloperProjectView` through the existing `MacProductController`;
+- added Swing Developer Mode with advanced Runtime / Environment / Process / Web / Logs facts;
+- Developer actions call the same controller as Normal Mode;
+- Normal → Developer switching is presentation-only and does not mutate Runtime state;
+- added a two-project M5.2 parity self-test covering shared state and STOP isolation.
+
+Implementation-local CI correction:
+- macOS Run #31 failed before creating a Job because the first workflow edit was malformed by JavaScript replacement-string `$'` handling inside grep patterns;
+- the workflow was restored from the last valid revision and the M5.2 step reinserted with a replacement callback;
+- this was CI YAML wiring only and did not alter product architecture or behavior.
+
+## 2026-09-24 · M5.2 Developer Mode + Shared State Parity cloud verification PASS
+
+Accepted cloud HEAD:
+`eeeadb01ed19a94f0ee4880ab0d96651a44a8b84`
+
+Evidence:
+- macOS Run #32 PASS;
+- Android W0 #741 PASS;
+- M5.2 parity probe PASS;
+- Normal and Developer both observed RUNNING for the same project;
+- Runtime Version = Python 3.14.7;
+- Entrypoint = main.py;
+- same Environment generation = true;
+- same result URL = true;
+- same raw logs = true;
+- presentation-switch PID stability = true;
+- Developer Stop propagated to Normal as RUN-ready;
+- Normal Run propagated to Developer as RUNNING;
+- Environment generation remained the same after rerun;
+- stopping Project A left Project B RUNNING;
+- M5.1, M4.2 and M3 regressions all PASS;
+- Catalina MIN_OS chain remains 10.12 / 10.15 / 10.15 / 10.12 / 10.12.
+
+M5.2 state:
+**CLOUD PASS / REAL MAC PENDING**.
+
+Do not perform the M5 Final Closure Audit until the real Catalina M5.2 acceptance passes.
