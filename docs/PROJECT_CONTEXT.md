@@ -1972,3 +1972,29 @@ Current macOS platform authority:
 - future Container / Compose / Bun / Virtualization work may rely on macOS 13-era supported tooling rather than obsolete Catalina-compatible versions.
 
 This supersedes the previous Catalina minimum-support constraint for future stages. It does not reopen M2～M5 and does not invalidate their historical real-Mac acceptance.
+
+
+## M6.1 cloud authority — 2026-09-24
+
+M6.1 — Container Capability + Compose Detection/Plan（容器能力 + Compose 检测/计划） has reached:
+
+**CLOUD PASS / REAL VENTURA PENDING**.
+
+Authority:
+- functional HEAD `8fe74e86ed90490b84d63c894b0de5d37da2d45e`;
+- accepted cloud HEAD `7d3c102032b1aeaae9182b5b972ec17391e80ee7`;
+- macOS Run #36 PASS;
+- Android W0 #745 PASS;
+- Core owns only platform-neutral Compose detection / plan semantics;
+- macOS Adapter owns Docker / Podman executable, runtime reachability and Compose discovery;
+- CONTAINER_RUNTIME availability remains optional and may be AVAILABLE / UNAVAILABLE / UNKNOWN;
+- Compose is not added to language `RuntimeKind`;
+- imported projects may carry both language-runtime evidence and a Compose multi-service plan;
+- no container execution lifecycle was added in M6.1;
+- existing single Controller / Coordinator / project-scoped STOP architecture remains unchanged;
+- current supported macOS baseline is Ventura 13+; packaged LSMinimumSystemVersion is now 13.0.
+
+Current authority:
+**M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CLOSED → M6 CURRENT / M6.1 CLOUD PASS / REAL VENTURA PENDING / M6.2 NOT STARTED**.
+
+Next action is real macOS 13.7.8 Ventura / Intel x86_64 M6.1 capability/detection acceptance. M6.2 remains a separate implementation slice.
