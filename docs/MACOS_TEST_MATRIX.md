@@ -654,7 +654,7 @@ M5.2 remains NOT STARTED. No additional M5.1 verification is required unless a l
 
 | ID | Check（检查） | Expected（期望） | Status（状态） |
 | --- | --- | --- | --- |
-| M5.2-01 | Developer Mode surface | advanced Project / Runtime / Process / Web / Logs facts visible | PASS — Run #32 |
+| M5.2-01 | Developer Mode surface | Simplified Chinese UI + direct Import + advanced Project / Runtime / Process / Web / Logs facts | PASS — Run #34 |
 | M5.2-02 | Single controller | Normal + Developer use one MacProductController | PASS — source + probe |
 | M5.2-03 | Single coordinator | no Developer coordinator/runtime state | PASS — source audit |
 | M5.2-04 | Normal running → Developer | Developer immediately reads RUNNING | PASS — M5.2 probe |
@@ -666,13 +666,18 @@ M5.2 remains NOT STARTED. No additional M5.1 verification is required unless a l
 | M5.2-10 | Developer Stop → Normal | Normal returns to RUN-ready | PASS — M5.2 probe |
 | M5.2-11 | Normal Run → Developer | Developer returns to RUNNING | PASS — M5.2 probe |
 | M5.2-12 | Project A/B STOP isolation | Stop A leaves B RUNNING | PASS — M5.2 + M3 probes |
-| M5.2-13 | M5.1 regression | Normal Mode product flow remains PASS | PASS — Run #32 |
-| M5.2-14 | M4.2 regression | managed-Python full workflow remains PASS | PASS — Run #32 |
-| M5.2-15 | Android regression | Android W0 PASS | PASS — W0 #741 |
-| M5.2-16 | Catalina packaging | minimum remains 10.15.7-compatible | PASS — Run #32 |
+| M5.2-13 | M5.1 regression | Normal Mode product flow remains PASS | PASS — Run #34 |
+| M5.2-14 | M4.2 regression | managed-Python full workflow remains PASS | PASS — Run #34 |
+| M5.2-15 | Android regression | Android W0 PASS | PASS — W0 #743 |
+| M5.2-16 | Catalina packaging | minimum remains 10.15.7-compatible | PASS — Run #34 |
 | M5.2-17 | Real Mac shared-state acceptance | frozen Normal ↔ Developer scenario on Catalina | REAL MAC PENDING |
 
 Current M5.2 result:
 **16 / 17 PASS — CLOUD PASS / REAL MAC PENDING**.
 
 M5 Final Closure Audit（最终关闭审计） remains blocked only by M5.2 real Mac acceptance. Do not create M5.3 / M5.4.
+
+
+#### M5.2 real-Mac repair note
+
+Before final real-Mac acceptance, the Developer Mode surface was repaired to add direct project import and Simplified Chinese presentation. Repair HEAD `9e6f3ccb9259704f3efe4f898a97ae3f054f1b33`; macOS Run #34 PASS; Android W0 #743 PASS. M5.2-17 remains REAL MAC PENDING and is the only closure blocker.
