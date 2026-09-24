@@ -12,8 +12,9 @@
 - M1 Core Boundary（核心边界）：PASS / CLOSED（通过 / 关闭）
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
-- 当前阶段：**M4 — Project Workflow（项目工作流）**
+- 当前阶段：**M5 — Product UI Parity（产品界面对齐）**
 - M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 PASS / COMPLETE；M4 PASS / CLOSED（M4 已通过并关闭）**
+- M5 implementation（实现）：**M5.1 PASS / COMPLETE；M5.2 NOT STARTED**
 
 M3 最后一个已验收功能 HEAD：
 `259d94fe7d7501a1232f1d7114445f4673cfc0a1`
@@ -570,6 +571,37 @@ Cloud evidence:
 
 Current M5.1 state:
 
-**CLOUD PASS / REAL MAC PENDING（云端通过 / 真实 Mac 待验收）**.
+**PASS / COMPLETE（通过 / 完成）**.
 
-M5.2 has not started.
+Real macOS 10.15.7 Catalina / Intel x86_64 acceptance: **PASS**.
+
+M5.1 final result: **PASS / COMPLETE（通过 / 完成）**.
+
+M5.2 has not started and must not begin before its Change Discussion Gate（修改前讨论门禁） discussion/approval.
+
+
+## 23. M5.1 Real Mac Acceptance（真实 Mac 验收）— PASS / COMPLETE
+
+Acceptance machine:
+- macOS 10.15.7 Catalina
+- Intel x86_64
+
+User-confirmed result:
+- M5.1 Normal Mode Product UI（普通模式产品界面）真实 Mac 验收：PASS
+- frozen M5.1 visual / interaction acceptance boundary：PASS
+- no new blocker was reported against the approved M5.1 scope
+
+Combined authority:
+- functional HEAD: `71e9dba0323aa35a531a3a1b26b55907ac8b907b`
+- macOS Run #23: PASS
+- Android W0 #732: PASS
+- real Catalina acceptance: PASS
+
+Final M5.1 result:
+
+**M5.1 = PASS / COMPLETE（通过 / 完成）**.
+
+Per Stage Closure Rule（阶段收尾规则）, M5.1 is closed. Do not reopen it for non-blocking polish; such items belong in Backlog（待办）.
+
+Next decision boundary:
+**M5.2 — Developer Mode + Shared State Parity（开发者模式 + 共享状态对齐） — NOT STARTED**.
