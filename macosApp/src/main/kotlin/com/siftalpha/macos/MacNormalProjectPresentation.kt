@@ -54,7 +54,19 @@ object MacNormalProjectPresentationPolicy {
         val hasResult = !resultUrl.isNullOrBlank()
         val error = view.lastError
 
-        if (!error.isNullOrBlank()) {
+        val composeInstallMustTakePriority =
+            isCompose &&
+                !view.workflow.environmentReady &&
+                (
+                    view.containerInstallProgress?.active == true ||
+                        (
+                            view.containerAdvice?.state != null &&
+                                view.containerAdvice.state != MacContainerAdviceState.READY &&
+                                view.containerInstallPlan != null
+                        )
+                )
+
+        if (!error.isNullOrBlank() && !composeInstallMustTakePriority) {
             val canRetry = view.workflow.lifecycle != ProjectLifecycleState.RUNNING
             return MacNormalProjectPresentation(
                 statusLabel = "需要处理",
