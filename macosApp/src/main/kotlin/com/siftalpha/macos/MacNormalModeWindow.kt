@@ -250,6 +250,9 @@ class MacNormalModeWindow(
             menu.add(JMenuItem("刷新项目").apply {
                 addActionListener { refreshProjects() }
             })
+            menu.add(JMenuItem("开发者模式").apply {
+                addActionListener { openDeveloperMode() }
+            })
             menu.add(JMenuItem("关于 SiftAlpha X").apply {
                 addActionListener {
                     JOptionPane.showMessageDialog(
@@ -644,6 +647,19 @@ class MacNormalModeWindow(
                 refreshProjects(selectProjectId = id)
             }
         }.start()
+    }
+
+    private fun openDeveloperMode() {
+        val selected = selectedProjectId
+        frame.isVisible = false
+        MacDeveloperModeWindow(
+            controller = controller,
+            initialProjectId = selected,
+            onReturnToNormal = {
+                frame.isVisible = true
+                refreshProjects(selectProjectId = selected)
+            },
+        ).show()
     }
 
     private fun openResult() {
