@@ -17,12 +17,14 @@ data class MacProductProject(
     val projectId: String get() = imported.projectId
     val name: String get() = imported.root.name
     val runtime: RuntimeKind? get() = plan.needs?.primaryRuntime
+    val isCompose: Boolean get() = composePlan?.isComposeProject == true
 }
 
 data class MacProductProjectView(
     val project: MacProductProject,
     val workflow: MacWorkflowStatus,
     val lastError: String?,
+    val containerAdvice: MacContainerEnvironmentAdvice? = null,
 ) {
     val resultUrl: String? get() = workflow.webEndpoint?.url
 }
@@ -39,6 +41,10 @@ data class MacDeveloperProjectView(
     val combinedLogs: String,
     val logsTruncated: Boolean,
     val lastError: String?,
+    val containerAdvice: MacContainerEnvironmentAdvice? = null,
+    val containerProvider: String? = null,
+    val composeProjectName: String? = null,
+    val containerServices: List<MacComposeServiceStatus> = emptyList(),
 ) {
     val resultUrl: String? get() = workflow.webEndpoint?.url
     val webSource: String? get() = workflow.webEndpoint?.source?.name
@@ -54,41 +60,43 @@ class MacProductController(
     private val discovery: List<MacHostToolSnapshot> = MacHostRuntimeDiscovery().discoverAll(),
     private val filesystem: MacProjectFilesystem = MacProjectFilesystem(),
     private val managedPython: MacManagedPythonRuntime? = MacManagedPythonRuntime.locate(),
-    private val containerProviders: List<MacContainerProviderSnapshot> =
-        MacContainerRuntimeDiscovery().discoverAll(),
+    private val containerProviderSnapshotSource: () -> List<MacContainerProviderSnapshot> = {
+        MacContainerRuntimeDiscovery().discoverAll()
+    },
+    private val systemFacts: MacSystemFacts = MacSystemFactsDiscovery.discover(),
     processControl: MacProjectProcessControl = MacProjectProcessControl(),
     dataRoot: File = MacProjectEnvironmentManager.defaultDataRoot(),
 ) {
+    @Volatile
+    private var latestContainerProviders: List<MacContainerProviderSnapshot> =
+        containerProviderSnapshotSource()
+
     private val environmentManager = MacProjectEnvironmentManager(
         processControl = processControl,
         managedPython = managedPython,
         dataRoot = dataRoot,
     )
-    private val coordinator = MacProjectWorkflowCoordinator(processControl, environmentManager)
+    private val coordinator = MacProjectWorkflowCoordinator(
+        processControl = processControl,
+        environmentManager = environmentManager,
+        containerProviderSource = {
+            MacComposeProviderSelector.select(latestContainerProviders)
+        },
+    )
     private val projects = LinkedHashMap<String, MacProductProject>()
     private val lastErrors = ConcurrentHashMap<String, String?>()
     private val managedPythonVersion: String? by lazy { managedPython?.version() }
 
     @Synchronized
     fun importProject(directory: File): MacProductProject {
+        refreshContainerProviders()
         val imported = filesystem.importDirectory(directory)
         val snapshot = MacProjectSnapshotBuilder(filesystem).build(imported)
-        val plan = MacProjectWorkflowPlanner.plan(
-            snapshot = snapshot,
-            hostTools = discovery,
-            managedPythonExecutable = managedPython
-                ?.takeIf { it.available }
-                ?.pythonExecutable
-                ?.absolutePath,
-        )
-        val composePlan = ComposeProjectPlanner.plan(
-            relativePaths = snapshot.relativePaths,
-            manifestText = snapshot.composeText,
-            containerAvailability = MacContainerRuntimeDiscovery.capabilityAvailability(containerProviders),
-        )
+        val plan = languagePlan(snapshot)
+        val composePlan = composePlan(snapshot)
         val product = MacProductProject(imported, snapshot, plan, composePlan)
         projects[product.projectId] = product
-        coordinator.attach(MacWorkflowContext(imported, snapshot, plan))
+        coordinator.attach(MacWorkflowContext(imported, snapshot, plan, composePlan))
         lastErrors.remove(product.projectId)
         return product
     }
@@ -96,23 +104,13 @@ class MacProductController(
     @Synchronized
     fun refreshProject(projectId: String): MacProductProject? {
         val existing = projects[projectId] ?: return null
+        refreshContainerProviders()
         val snapshot = MacProjectSnapshotBuilder(filesystem).build(existing.imported)
-        val plan = MacProjectWorkflowPlanner.plan(
-            snapshot = snapshot,
-            hostTools = discovery,
-            managedPythonExecutable = managedPython
-                ?.takeIf { it.available }
-                ?.pythonExecutable
-                ?.absolutePath,
-        )
-        val composePlan = ComposeProjectPlanner.plan(
-            relativePaths = snapshot.relativePaths,
-            manifestText = snapshot.composeText,
-            containerAvailability = MacContainerRuntimeDiscovery.capabilityAvailability(containerProviders),
-        )
+        val plan = languagePlan(snapshot)
+        val composePlan = composePlan(snapshot)
         val refreshed = existing.copy(snapshot = snapshot, plan = plan, composePlan = composePlan)
         projects[projectId] = refreshed
-        coordinator.attach(MacWorkflowContext(refreshed.imported, snapshot, plan))
+        coordinator.attach(MacWorkflowContext(refreshed.imported, snapshot, plan, composePlan))
         return refreshed
     }
 
@@ -128,16 +126,24 @@ class MacProductController(
             project = product,
             workflow = coordinator.status(projectId),
             lastError = lastErrors[projectId],
+            containerAdvice = adviceFor(product),
         )
     }
 
     fun developerView(projectId: String, maxLogBytes: Int = 512 * 1024): MacDeveloperProjectView? {
         val product = synchronized(this) { projects[projectId] } ?: return null
         val diagnostics = coordinator.diagnostics(projectId, maxLogBytes)
-        val runtimeVersion = when (product.runtime?.id) {
-            "python" -> managedPythonVersion
+        val runtimeVersion = when {
+            product.isCompose -> latestContainerProviders
+                .firstOrNull {
+                    it.kind.id == diagnostics.containerProvider &&
+                        it.availability.name == "AVAILABLE"
+                }
+                ?.let { it.version ?: it.composeVersion }
+            product.runtime?.id == "python" -> managedPythonVersion
                 ?: discovery.firstOrNull { it.kind == MacHostToolKind.PYTHON }?.version
-            "nodejs" -> discovery.firstOrNull { it.kind == MacHostToolKind.NODE_JS }?.version
+            product.runtime?.id == "nodejs" ->
+                discovery.firstOrNull { it.kind == MacHostToolKind.NODE_JS }?.version
             else -> null
         }
         return MacDeveloperProjectView(
@@ -152,6 +158,10 @@ class MacProductController(
             combinedLogs = diagnostics.combinedLogs,
             logsTruncated = diagnostics.logsTruncated,
             lastError = lastErrors[projectId],
+            containerAdvice = adviceFor(product),
+            containerProvider = diagnostics.containerProvider,
+            composeProjectName = diagnostics.composeProjectName,
+            containerServices = diagnostics.containerServices,
         )
     }
 
@@ -206,5 +216,35 @@ class MacProductController(
             Thread.sleep(delayMs)
         }
         return view(projectId)?.resultUrl
+    }
+
+    private fun languagePlan(snapshot: MacProjectSnapshot): MacProjectEnvironmentPlan =
+        MacProjectWorkflowPlanner.plan(
+            snapshot = snapshot,
+            hostTools = discovery,
+            managedPythonExecutable = managedPython
+                ?.takeIf { it.available }
+                ?.pythonExecutable
+                ?.absolutePath,
+        )
+
+    private fun composePlan(snapshot: MacProjectSnapshot): ComposeProjectPlan =
+        ComposeProjectPlanner.plan(
+            relativePaths = snapshot.relativePaths,
+            manifestText = snapshot.composeText,
+            containerAvailability = MacContainerRuntimeDiscovery.capabilityAvailability(
+                latestContainerProviders,
+            ),
+        )
+
+    private fun adviceFor(project: MacProductProject): MacContainerEnvironmentAdvice? =
+        if (project.isCompose) {
+            MacContainerEnvironmentAdvisor.advise(systemFacts, latestContainerProviders)
+        } else {
+            null
+        }
+
+    private fun refreshContainerProviders() {
+        latestContainerProviders = containerProviderSnapshotSource()
     }
 }
