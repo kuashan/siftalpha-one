@@ -1741,3 +1741,24 @@ Current M4.1 state:
 **CLOUD PASS / REAL MAC PENDING**.
 
 Do not begin M4.2 until M4.1 real-Mac acceptance is completed and the next-slice plan is discussed per the clarified Change Discussion Gate（修改前讨论门禁）.
+
+
+## M4.1 real-Mac authority — 2026-09-24
+
+M4.1 — Import + Detect + Plan（导入 + 检测 + 环境计划） is now **PASS / COMPLETE**.
+
+Real macOS 10.15.7 / Intel x86_64 evidence:
+- SiftAlpha X double-click launch PASS;
+- Import Project Folder PASS;
+- Python test project correctly detected;
+- `SIFTALPHA_M4_PLAN_STATUS=RUNTIME_MISSING`;
+- `SIFTALPHA_M4_PRIMARY_RUNTIME=python`;
+- direct dependency count = 1;
+- preparation sequence generated correctly.
+
+`RUNTIME_MISSING` is the expected host fact because the acceptance Mac does not have an accepted Python 3 Runtime; it is not an M4.1 failure.
+
+Current authority:
+**M4.1 PASS / COMPLETE → M4.2 NOT STARTED**.
+
+M4.2 requires plan discussion/approval before implementation.

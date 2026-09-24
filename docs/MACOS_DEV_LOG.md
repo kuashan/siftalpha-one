@@ -1683,3 +1683,23 @@ Evidence:
   `edad50c534e4579ab0f559cd8e72c0ebfa1b886f44c73c756018eccebb591357`.
 
 The original real-Mac failure is therefore isolated to the old package launcher configuration. Real macOS launch/import acceptance remains pending on the repaired package.
+
+
+## 2026-09-24 · M4.1 Real Mac Acceptance PASS
+
+Real macOS 10.15.7 / Intel x86_64 evidence from the repaired launcher package:
+
+- SiftAlpha X launches successfully by double-click;
+- Import Project Folder succeeds;
+- a project identity is generated;
+- the supplied Python test project is detected as `python`;
+- direct dependency count is `1`;
+- plan result is `RUNTIME_MISSING`, which is correct because the host does not have an accepted Python 3 Runtime;
+- the provider-neutral preparation sequence is generated:
+  `VALIDATE_PLAN → ACQUIRE_RUNTIME → CREATE_ENVIRONMENT → PYTHON_INSTALL → VERIFY_ENVIRONMENT`.
+
+This closes the M4.1 acceptance contract:
+
+**M4.1 — Import + Detect + Plan = PASS / COMPLETE**.
+
+No M4.2 implementation has started. The next development-decision boundary requires discussion/approval of the M4.2 plan before source changes.

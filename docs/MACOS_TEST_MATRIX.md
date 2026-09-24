@@ -548,7 +548,7 @@ This table is post-closure verification only; it does not add new M3 Exit Criter
 | M4.1-08 | Environment Needs（环境需求） | provider-neutral plan | PASS |
 | M4.1-09 | Android regression（安卓回归） | W0 PASS | PASS — W0 #724 |
 | M4.1-10 | Catalina packaging（Catalina 打包） | PASS, minimum unchanged | PASS — Run #15 |
-| M4.1-11 | Real Mac import/detect/plan（真实 Mac 导入/检测/计划） | PASS | REAL MAC PENDING |
+| M4.1-11 | Real Mac import/detect/plan（真实 Mac 导入/检测/计划） | PASS | PASS — real Catalina |
 
 
 ### M4.1 packaged launcher regression / repair
@@ -560,5 +560,15 @@ This table is post-closure verification only; it does not add new M3 Exit Criter
 | M3 process regression after launcher repair | PASS | PASS — Run #17 |
 | Catalina package after launcher repair | PASS / MIN_OS unchanged | PASS — Run #17 |
 | Android regression after launcher repair | W0 PASS | PASS — W0 #726 |
-| Real Mac double-click launch | app window opens | REAL MAC PENDING |
-| Real Mac Import → Detect → Plan | expected project facts | REAL MAC PENDING |
+| Real Mac double-click launch | app window opens | PASS — real Catalina |
+| Real Mac Import → Detect → Plan | expected project facts | PASS — python / RUNTIME_MISSING |
+
+
+### M4.1 Slice Completion（切片完成）
+
+All M4.1 verification items are now PASS, including real macOS 10.15.7 acceptance.
+
+**M4.1 = PASS / COMPLETE（通过 / 完成）**
+
+Next slice:
+**M4.2 — Prepare + Run + Observe + Stop/Restart（准备 + 运行 + 观察 + 停止/重启） — NOT STARTED**.

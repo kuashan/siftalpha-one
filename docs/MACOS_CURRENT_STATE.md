@@ -13,7 +13,7 @@
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
 - 当前阶段：**M4 — Project Workflow（项目工作流）**
-- M4 implementation（实现）：**M4.1 CLOUD PASS / REAL MAC PENDING（M4.1 云端通过 / 真实 Mac 待验收）**
+- M4 implementation（实现）：**M4.1 PASS / COMPLETE（M4.1 通过 / 完成）；M4.2 NOT STARTED（尚未开始）**
 
 M3 最后一个已验收功能 HEAD：
 `259d94fe7d7501a1232f1d7114445f4673cfc0a1`
@@ -105,7 +105,6 @@ Real Mac（真实 Mac）还确认：
 
 以下仍属于后续阶段，不得误报为已经完成：
 
-- macOS ProjectFilesystem（苹果项目文件系统）生产实现与真实项目导入
 - 完整 Import → Detect → Plan → Prepare → Run → Logs → Stop / Restart（导入 → 检测 → 计划 → 准备 → 运行 → 日志 → 停止 / 重启）工作流
 - Web Discovery / Endpoint Probe（网页发现 / 端点探测）的 macOS 项目工作流接线
 - macOS secure storage（苹果安全存储）
@@ -320,9 +319,39 @@ Cloud re-verification:
 
 M4.1 remains:
 
-**CLOUD PASS / REAL MAC PENDING**.
+**PASS / COMPLETE（通过 / 完成）**.
 
 Real Mac still needs to confirm:
 1. double-click launch succeeds;
 2. Import Project Folder works;
 3. Import → Detect → Plan returns the expected Python result on the Catalina host.
+
+
+## 16. M4.1 Real Mac Acceptance（真实 Mac 验收）— PASS
+
+Real acceptance machine:
+- macOS 10.15.7 Catalina
+- Intel x86_64
+
+Observed on the repaired M4.1 package:
+
+- `SiftAlpha X.app` double-click launch: PASS
+- `Import Project Folder`（导入项目目录）: PASS
+- project identity generated: PASS
+- `SIFTALPHA_M4_PLAN_STATUS=RUNTIME_MISSING`
+- `SIFTALPHA_M4_PRIMARY_RUNTIME=python`
+- `SIFTALPHA_M4_DIRECT_DEPENDENCIES=1`
+- preparation plan generated:
+  `VALIDATE_PLAN, ACQUIRE_RUNTIME, CREATE_ENVIRONMENT, PYTHON_INSTALL, VERIFY_ENVIRONMENT`
+
+Interpretation:
+- Import（导入）succeeded;
+- Detect（检测）correctly identified the test project as Python;
+- Plan（计划）correctly reported that this Catalina host is missing a usable Python 3 Runtime;
+- the result is expected and proves provider-neutral planning rather than a failure.
+
+M4.1 final result:
+
+**PASS / COMPLETE（通过 / 完成）**.
+
+The next approved development decision boundary is **M4.2 — Prepare + Run + Observe + Stop/Restart（准备 + 运行 + 观察 + 停止/重启）**. M4.2 code must not begin until its implementation plan is discussed and approved.
