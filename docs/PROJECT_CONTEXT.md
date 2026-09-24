@@ -1958,3 +1958,17 @@ Governance:
 - M5 must not be reopened for optional polish;
 - do not create M5.3 / M5.4;
 - M6 — Container / Multi-service requires its own Change Discussion Gate before implementation begins.
+
+
+## macOS Ventura support authority — 2026-09-24
+
+The user upgraded the real macOS test machine to **macOS 13.7.8 Ventura / Intel x86_64** and explicitly confirmed that SiftAlpha X no longer needs to preserve macOS 10.15.7 Catalina as its minimum supported version.
+
+Current macOS platform authority:
+- full-support minimum: **macOS 13 Ventura**;
+- real acceptance machine for M6/M7/M8: **macOS 13.7.8 Ventura / Intel x86_64**;
+- Intel Mac support remains in scope;
+- historical Catalina M2～M5 PASS evidence remains valid but does not constrain future development;
+- future Container / Compose / Bun / Virtualization work may rely on macOS 13-era supported tooling rather than obsolete Catalina-compatible versions.
+
+This supersedes the previous Catalina minimum-support constraint for future stages. It does not reopen M2～M5 and does not invalidate their historical real-Mac acceptance.
