@@ -2101,3 +2101,18 @@ Authority:
 
 Roadmap remains:
 **M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CLOSED → M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS → M7 NOT STARTED → M8 NOT STARTED**.
+
+
+## M6.2 checksum repair authority — 2026-09-24
+
+Real Ventura evidence proved the first managed-environment failure was a SiftAlpha checksum-manifest selection bug, not a corrupt Lima download. The official Lima Darwin x86_64 asset digest matched the downloaded file.
+
+Current authority:
+- functional HEAD `d1cf3ba4b90a8b47ded7e07f3c09140c5d754ae9`;
+- macOS Run #73 PASS;
+- Android W0 #782 PASS;
+- exact-name checksum parsing regression covered;
+- R3 real-machine retry pending.
+
+Roadmap unchanged:
+**M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS / REAL VENTURA PENDING → M7 NOT STARTED → M8 NOT STARTED**.
