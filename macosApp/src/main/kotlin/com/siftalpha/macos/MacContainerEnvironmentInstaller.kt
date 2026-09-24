@@ -226,6 +226,38 @@ object MacManagedContainerToolchain {
     }
 }
 
+internal object MacManagedContainerChecksum {
+    private val checksumLine = Regex("^([0-9a-fA-F]{64})(?:\\s+[*]?(.+))?$")
+
+    fun expectedFor(
+        checksumText: String,
+        fileName: String,
+    ): String? {
+        val entries = checksumText
+            .lineSequence()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .mapNotNull { line ->
+                val match = checksumLine.matchEntire(line) ?: return@mapNotNull null
+                val digest = match.groupValues[1].lowercase()
+                val listedName = match.groupValues.getOrNull(2)
+                    ?.trim()
+                    ?.removePrefix("./")
+                    ?.takeIf(String::isNotBlank)
+                digest to listedName
+            }
+            .toList()
+
+        entries.firstOrNull { (_, listedName) ->
+            listedName == fileName
+        }?.let { return it.first }
+
+        return entries
+            .singleOrNull { it.second == null }
+            ?.first
+    }
+}
+
 class MacManagedContainerInstaller(
     private val facts: MacSystemFacts = MacSystemFactsDiscovery.discover(),
     private val userHome: File = File(System.getProperty("user.home")),
@@ -528,16 +560,10 @@ class MacManagedContainerInstaller(
         val checksumUrl = asset.checksumUrl
         if (checksumUrl != null) {
             val checksumText = downloadText(checksumUrl)
-            val expected = checksumText
-                .lineSequence()
-                .map(String::trim)
-                .filter(String::isNotBlank)
-                .firstOrNull { line ->
-                    line.contains(asset.checksumMatchName) ||
-                        Regex("^[0-9a-fA-F]{64}(\\s|$)").containsMatchIn(line)
-                }
-                ?.let { Regex("[0-9a-fA-F]{64}").find(it)?.value?.lowercase() }
-                ?: error("checksum not found for " + asset.name)
+            val expected = MacManagedContainerChecksum.expectedFor(
+                checksumText = checksumText,
+                fileName = asset.checksumMatchName,
+            ) ?: error("checksum not found for " + asset.name)
             check(actual == expected) {
                 "checksum mismatch for " + asset.name + ": expected=" + expected + " actual=" + actual
             }
