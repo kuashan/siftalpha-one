@@ -141,6 +141,13 @@ fun main(args: Array<String>) {
         if (!result.passed) error("M6.2 Compose workflow / isolation probe failed")
         return
     }
+    if ("--m6-container-install-probe" in args) {
+        val result = MacM62InstallerSelfTest.run()
+        println("SIFTALPHA_M62_CONTAINER_INSTALL_PROBE=" + if (result.passed) "PASS" else "FAIL")
+        result.lines.forEach { line -> println("SIFTALPHA_M62_INSTALL=" + line) }
+        if (!result.passed) error("M6.2 managed container install flow probe failed")
+        return
+    }
 
     SwingUtilities.invokeLater {
         runCatching {
