@@ -38,16 +38,23 @@ macOS 窗口标题、应用标题与测试包显示名称使用 `SiftAlpha X`。
 
 ## 3. macOS 最低系统版本
 
-当前最低支持版本冻结为：
+当前完整支持最低版本冻结为：
 
-**macOS 10.15.7 Catalina**
+**macOS 13 Ventura**
+
+当前真实验收机：
+
+- macOS **13.7.8 Ventura**
+- Intel x86_64
+- MacBook Pro 13-inch, 2017
 
 规则：
 
-- 能继续兼容 10.15.7 时，不主动提高最低系统版本。
-- 不得为了开发方便静默提高系统要求。
-- 如果未来必要 Apple API（系统接口）、Runtime（运行时）、Container / Virtualization（容器 / 虚拟化）、Signing / Notarization（签名 / 公证）或其他硬依赖要求更高系统，修改前必须先说明具体原因、新最低版本和影响，并获得用户确认。
-- 当前 Catalina 测试包 launcher / libjli / libjvm 的 Mach-O MIN_OS 均已验证为 10.12。
+- 从 M6 开始，不再把 macOS 10.15.7 Catalina 兼容性作为必须维持的 Blocking Requirement（阻塞要求）。
+- 可以使用需要 macOS 13+ 的现代 Container / Runtime / Virtualization（容器 / 运行时 / 虚拟化）能力，只要仍满足 M6/M7/M8 的其他冻结边界。
+- 不需要为了保留 Catalina 兼容而固定旧版 Docker / Podman / Colima / Compose。
+- 历史 M2～M5 在 Catalina 10.15.7 / Intel x86_64 上的 PASS 记录继续保留，作为历史兼容证据；它不再定义当前最低支持版本。
+- 现有构建产物如果仍具有低于 macOS 13 的 Mach-O deployment target（部署目标），可以继续保留，直到后续实现确实需要提高；但后续验收不再要求 10.15.7 可运行。
 
 ## 4. M3 最终能力事实
 
@@ -737,3 +744,15 @@ Next stage:
 **M6 — Container / Multi-service（容器 / 多服务） — NOT STARTED**.
 
 M6 implementation must begin only after its Change Discussion Gate（修改前讨论门禁） plan is discussed and approved.
+
+
+## 26. macOS 13 Ventura Support Baseline（macOS 13 支持基线）— 2026-09-24
+
+User-confirmed platform boundary change:
+- the real acceptance machine has been upgraded from macOS 10.15.7 Catalina to macOS 13.7.8 Ventura;
+- Intel x86_64 remains a supported architecture target;
+- the current full-support minimum is now **macOS 13 Ventura**;
+- future M6 / M7 / M8 work no longer needs to preserve Catalina compatibility;
+- historical Catalina PASS evidence remains valid historical evidence and is not deleted or rewritten.
+
+This change specifically removes the need to constrain Container / Compose / Bun / virtualization work to legacy Catalina-era tool versions.
