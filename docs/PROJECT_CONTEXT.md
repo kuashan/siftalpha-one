@@ -1672,16 +1672,22 @@ M3 final evidence includes macOS Host Runtime Run #10 PASS, Android W0 #719 PASS
 
 ### Change Discussion Gate（修改前讨论门禁） — authoritative
 
-Before every source / CI / architecture / behavior / product-display mutation:
+User approval is required at the development-decision boundary, not for every line-level correction.
 
-1. re-read real remote HEAD;
-2. read `MACOS_CURRENT_STATE.md`, `MACOS_DEV_LOG.md`, `MACOS_TEST_MATRIX.md`, `PLATFORM_CAPABILITY_CONTRACT.md`, and `CROSS_PLATFORM_CORE.md`;
-3. perform read-only source audit;
-4. explain Problem / Root Cause / Repair Plan;
-5. state Modification Scope / Frozen Boundary / Risk / Acceptance;
-6. obtain explicit user approval;
-7. re-check remote HEAD immediately before writing;
-8. only then implement, run cloud verification, obtain required real-device / real-Mac evidence, update docs, and close.
+Require discussion + explicit approval before:
+- starting a new Stage or Implementation Slice;
+- changing an approved functional plan or user-visible behavior;
+- expanding scope;
+- changing Core / cross-platform architecture;
+- crossing a frozen boundary;
+- raising the macOS minimum version;
+- adopting a new runtime/provider/dependency strategy.
+
+After an Implementation Slice has been approved, implementation-level corrections inside that approved scope may be fixed directly without repeated user confirmation, including compile errors, Gradle/YAML/CI wiring errors, test/probe wiring errors, escaping/path/config mistakes, and minimal bugs that do not change the approved design.
+
+If a fix would change the approved plan, expand scope, alter architecture, or cross a frozen boundary, stop and return to user approval.
+
+Remote HEAD must still be re-checked before writes, and all automatic corrections must be documented and re-verified.
 
 If remote HEAD changed from the approved starting point, stop and report `REMOTE_HEAD_CHANGED`. Do not automatically rebase, merge, or force-push.
 
@@ -1711,6 +1717,6 @@ This is post-M3 housekeeping and does not reopen M3.
 
 Current authority remains:
 
-**M3 PASS / CLOSED → M4 CURRENT / IMPLEMENTATION NOT STARTED**.
+**M3 PASS / CLOSED → M4 CURRENT / M4.1 IN PROGRESS**.
 
 The Change Discussion Gate（修改前讨论门禁） and Remote HEAD Drift Gate（远端漂移门禁） are mandatory for the next M4 modification task.

@@ -127,23 +127,35 @@ Real Mac（真实 Mac）还确认：
 
 ## 8. Change Discussion Gate（修改前讨论门禁）
 
-从现在起，每一个源码、CI（持续集成）、架构、行为或产品显示修改任务，都必须按以下顺序执行：
+确认边界以“阶段 / 功能方案 / 范围变化”为单位，而不是以每一行代码为单位。
 
-1. **Read-only Audit（只读审查）**
-   - 重新读取真实远端 HEAD；
-   - 读取本文件、`MACOS_DEV_LOG.md`、`MACOS_TEST_MATRIX.md`、`PLATFORM_CAPABILITY_CONTRACT.md`、`CROSS_PLATFORM_CORE.md`；
-   - 读取与问题直接相关的真实源码。
-2. **Problem（问题）** — 用明确语言说明哪里异常。
-3. **Root Cause（根因）** — 说明为什么发生。
-4. **Repair Plan（修复方案）** — 说明准备怎样修。
-5. **Modification Scope（修改范围）** — 明确会改哪些模块/文件。
-6. **Frozen Boundary（冻结边界）** — 明确哪些模块/行为不会改。
-7. **Risk（风险）** — 明确可能影响。
-8. **Acceptance（验收）** — 说明什么证据才算 PASS。
-9. **User Approval（用户确认）** — 未获得明确“开始 / 同意 / 执行”等授权前，不得写代码或修改 CI/文档事实。
-10. 获得授权后才进入 Implementation → Cloud Verification → Real Device / Real Mac Acceptance → Documentation → Closure（实现 → 云端验证 → 真机验收 → 文档 → 关闭）。
+### 需要用户确认的情况
 
-这条门禁适用于“已知怎么修”的问题；知道答案不能替代修改前讨论。
+在以下情况开始前，必须先完成 Read-only Audit（只读审查），并说明 Problem / Root Cause / Plan / Scope / Boundary / Risk / Acceptance，再取得用户明确确认：
+
+- 开始新的一级 Stage（阶段）或新的 Implementation Slice（实现切片）；
+- 改变已批准的功能方案或用户可见行为；
+- 扩大修改范围；
+- 修改 Core（核心）架构或跨平台边界；
+- 触碰 Frozen Boundary（冻结边界）；
+- 提高 macOS 最低版本；
+- 引入新的运行提供者、依赖体系或重大技术路线；
+- 发现问题后，修复方案需要改变原批准设计。
+
+### 已批准范围内可直接修复的情况
+
+一旦某个 Implementation Slice（实现切片）已经获得用户批准，以下问题由开发执行方直接修复、继续验证，不需要逐项再次请求确认：
+
+- 编译错误；
+- Gradle / YAML / CI（构建 / 工作流）语法或接线错误；
+- 单元测试 / 探针 / 测试接线错误；
+- 明确的拼写、路径、转义、配置错误；
+- 已批准方案内部的实现 bug；
+- 不改变功能目标、架构、冻结边界和用户行为的最小修复。
+
+这些修复必须记录根因和证据，并继续运行原定 Cloud Verification / Real Device / Real Mac Acceptance（云端 / 真机验收）。
+
+如果修复过程中发现需要改变原方案、扩大范围或突破冻结边界，则立即停止自动修复，重新进入用户确认。
 
 ## 9. Remote HEAD Drift Gate（远端漂移门禁）
 
@@ -222,7 +234,7 @@ M4 只负责把现有 Core（核心）与 macOS Host Runtime Provider（主机�
 
 当前阶段保持：
 
-**M4 — Project Workflow（项目工作流） / IMPLEMENTATION NOT STARTED（实现尚未开始）**。
+**M4 — Project Workflow（项目工作流） / M4.1 IN PROGRESS（M4.1 进行中）**。
 
 
 ## 13. M4.1 Implementation（实现）

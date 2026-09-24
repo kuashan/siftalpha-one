@@ -1560,3 +1560,23 @@ Repair:
 - retain the existing M3 process probe, Android-dependency isolation check, Catalina packaging, and artifact upload steps unchanged.
 
 Acceptance requires the next macOS workflow to create a real Job and execute Core/macOS tests plus the M4.1 plan probe.
+
+
+### Governance clarification — approval boundary is stage / plan scope, not line-level repairs
+
+The user clarified the intended Change Discussion Gate（修改前讨论门禁）:
+
+- discuss and obtain approval before a new stage/slice, functional-plan change, scope expansion, architecture change, frozen-boundary change, or other material development decision;
+- once a slice is approved, fix implementation-local errors directly without repeatedly asking for confirmation;
+- examples: compile errors, Gradle/YAML/CI wiring, test/probe wiring, escaping/path/config mistakes, and minimal implementation bugs inside the approved plan;
+- if a repair would alter the approved design or cross a frozen boundary, stop and return to user approval.
+
+This clarification replaces the overly strict interpretation that every source/CI mutation required a fresh confirmation.
+
+### M4.1 Gradle wiring correction
+
+W0 #721 proved the M4.1 build had not reached Android runtime tests. Gradle configuration failed because `macosApp/build.gradle.kts` contained a literal `\\n` between two dependency declarations:
+
+`implementation(project(":core"))\\n implementation("org.tomlj:tomlj:1.1.1")`
+
+The approved-scope correction replaces the literal characters with a real newline. No M4.1 functional logic, Android runtime source, Core architecture, or M3 process semantics change.
