@@ -610,7 +610,7 @@ Next decision boundary:
 ## 24. M5.2 Developer Mode + Shared State Parity（开发者模式 + 共享状态对齐）— CLOUD PASS
 
 Accepted cloud HEAD:
-`eeeadb01ed19a94f0ee4880ab0d96651a44a8b84`
+`9e6f3ccb9259704f3efe4f898a97ae3f054f1b33`
 
 Implementation facts:
 - Developer Mode（开发者模式）is a second Presentation（表现层） over the existing single `MacProductController`;
@@ -622,8 +622,8 @@ Implementation facts:
 - Core（核心）, Android production behavior, Runtime provider rules and project-scoped STOP semantics are unchanged.
 
 Cloud evidence:
-- SiftAlpha X macOS Host Runtime Run #32: PASS;
-- Android W0 Cloud Build #741: PASS;
+- SiftAlpha X macOS Host Runtime Run #34: PASS;
+- Android W0 Cloud Build #743: PASS;
 - M5.2 shared-state parity probe: PASS;
 - Normal Mode running state = RUNNING;
 - Developer Mode running state = RUNNING;
@@ -649,18 +649,43 @@ Catalina packaging remains unchanged:
 - libjvm MIN_OS = 10.12.
 
 Artifact:
-- `siftalpha-macos-m5.2-catalina-x64-32`;
-- artifact ID: `10794285467`;
-- artifact digest: `sha256:713c37ea283736b5cfe7e7e529a7164fc9275cd908ced22a2cc6952a284ffb5b`;
-- user-facing app ZIP SHA-256: `8326a47972566a25dd81c315120380fa0cd699bda5fca74815cd1e6e1116f267`.
+- `siftalpha-macos-m5.2-catalina-x64-34`;
+- artifact ID: `10793889753`;
+- artifact digest: `sha256:5cf4d44918280a8bd05a84cbd3f5a66d21c4a37d5c5b8aafd45227dd09a960a3`;
+- user-facing app ZIP SHA-256: `f38fbc492b1dbc9958a498661412e5cf09fae9c3957acb3ab30f6c1e8d22b34e`.
 
 Android W0 artifact:
-- `siftalpha-w0-741`;
-- artifact ID: `10794265428`;
-- artifact digest: `sha256:4593855e16660dad7bd97556f20ed8f8f7c8d3e8999ec98d22b9602ae9ed5d70`.
+- `siftalpha-w0-743`;
+- artifact ID: `10794027577`;
+- artifact digest: `sha256:f56f93c0d03ec7607c94b7699109a4a01f1bf622805be3807b7b077b265603fa`.
 
 Current M5.2 state:
 
 **CLOUD PASS / REAL MAC PENDING（云端通过 / 真实 Mac 待验收）**.
 
 M5.2 must not be marked COMPLETE until the frozen real Catalina Normal ↔ Developer shared-state acceptance passes.
+
+
+### M5.2 Real-Mac Repair — Developer Import + Simplified Chinese（开发者导入 + 简体中文）
+
+Real Catalina acceptance exposed two presentation-layer blockers before M5.2 closure:
+- Developer Mode had no direct Import Project（导入项目） entry when the shared project list was empty;
+- the Developer Mode user-visible surface was primarily English rather than Simplified Chinese（简体中文）.
+
+Approved minimal repair completed:
+- Developer Mode now has a direct **导入项目** action;
+- that action delegates to the same `MacProductController.importProject()` used by the product layer and does not create a second import path or coordinator;
+- empty-state guidance is explicit in Simplified Chinese;
+- window title, toolbar actions, Projects label, shared-state heading, diagnostic labels and log tabs are localized to Simplified Chinese;
+- technical values such as `RUNNING`, PID, `stdout` and `stderr` remain visible as technical facts;
+- Core / Runtime / STOP semantics / Android production code remain unchanged.
+
+Repair cloud verification:
+- functional repair HEAD `9e6f3ccb9259704f3efe4f898a97ae3f054f1b33`;
+- macOS Run #34 PASS;
+- Android W0 #743 PASS;
+- M5.2 shared-state parity probe remains PASS;
+- M5.1 / M4.2 / M3 regressions remain PASS;
+- Catalina MIN_OS chain unchanged.
+
+M5.2 remains **CLOUD PASS / REAL MAC PENDING** until this repaired UI is re-accepted on the real Catalina machine.
