@@ -969,3 +969,49 @@ Authority:
 
 Current state:
 **M6.2 CLOUD PASS / REAL VENTURA MANAGED-INSTALL ACCEPTANCE PENDING**.
+
+
+## 32. M6.2 Unified Prepare UX — CLOUD PASS
+
+Latest user-approved M6.2 UX correction restores the product goal:
+
+**the user imports a project and asks SiftAlpha to prepare it; SiftAlpha decides how the required environment is satisfied.**
+
+Normal Mode:
+- no separate `INSTALL_CONTAINER` primary action;
+- missing Compose/container capability appears as ordinary **准备环境**;
+- clicking Prepare may reuse an existing host provider or invoke the approved SiftAlpha-managed environment provisioner;
+- Normal Mode only shows simple preparation state, not Colima/Lima/Docker/Buildx installation details;
+- successful provisioning automatically continues project Prepare and ends at **运行**.
+
+Developer Mode:
+- retains the same shared Controller / Coordinator / provisioning path;
+- adds **安装/修复环境** for explicit diagnostics/retry;
+- exposes environment plan, provider/advisor facts, components, side effects, phase, status and installer raw log;
+- does not create a second installer or second runtime state machine.
+
+Cloud authority:
+- functional HEAD `29a1ddd9709e07d5b17cd6cc9561f68bd2fee170`;
+- macOS Run #69 PASS;
+- Android W0 #778 PASS;
+- `SIFTALPHA_M62_CONTAINER_INSTALL_PROBE=PASS`;
+- before primary = PREPARE;
+- installer calls = 1;
+- Prepare + environment provision = PASS;
+- after advice = READY;
+- after environment ready = true;
+- developer install phase = COMPLETE;
+- after primary = RUN;
+- original M6.2 Compose A/B isolation / STOP / Restart / Web probe remains PASS;
+- Ventura package minimum remains macOS 13.0.
+
+Artifact:
+- `siftalpha-macos-m6.2-unified-prepare-r2-ventura-x64-69`;
+- artifact ID `10817335040`;
+- artifact digest `sha256:7a6921d51d0853800bc2fc5588a2a515b6fe55e13088ab0855e5b11cff4ed8c7`;
+- user ZIP SHA-256 `a95b215a2dcb3de909260b37e4cd18c06a551ca5b4d942c0fc0c67cbc4f50df5`.
+
+Current state:
+**M6.2 CLOUD PASS / REAL VENTURA UNIFIED-PREPARE ACCEPTANCE PENDING**.
+
+M6 remains open until real managed-environment preparation and real Compose A/B isolation pass. Do not create M6.3.
