@@ -24,6 +24,29 @@ data class MacProductProjectView(
     val resultUrl: String? get() = workflow.webEndpoint?.url
 }
 
+data class MacDeveloperProjectView(
+    val project: MacProductProject,
+    val workflow: MacWorkflowStatus,
+    val environment: MacPreparedEnvironment?,
+    val entrypoint: String?,
+    val runtimeVersion: String?,
+    val ownedPids: Set<Long>,
+    val stdout: String,
+    val stderr: String,
+    val combinedLogs: String,
+    val logsTruncated: Boolean,
+    val lastError: String?,
+) {
+    val resultUrl: String? get() = workflow.webEndpoint?.url
+    val webSource: String? get() = workflow.webEndpoint?.source?.name
+    val endpointState: String
+        get() = when {
+            workflow.webEndpoint != null -> "AVAILABLE"
+            workflow.processState.name == "RUNNING" -> "NOT_DISCOVERED"
+            else -> "INACTIVE"
+        }
+}
+
 class MacProductController(
     private val discovery: List<MacHostToolSnapshot> = MacHostRuntimeDiscovery().discoverAll(),
     private val filesystem: MacProjectFilesystem = MacProjectFilesystem(),
@@ -39,6 +62,7 @@ class MacProductController(
     private val coordinator = MacProjectWorkflowCoordinator(processControl, environmentManager)
     private val projects = LinkedHashMap<String, MacProductProject>()
     private val lastErrors = ConcurrentHashMap<String, String?>()
+    private val managedPythonVersion: String? by lazy { managedPython?.version() }
 
     @Synchronized
     fun importProject(directory: File): MacProductProject {
@@ -88,6 +112,30 @@ class MacProductController(
         return MacProductProjectView(
             project = product,
             workflow = coordinator.status(projectId),
+            lastError = lastErrors[projectId],
+        )
+    }
+
+    fun developerView(projectId: String, maxLogBytes: Int = 512 * 1024): MacDeveloperProjectView? {
+        val product = synchronized(this) { projects[projectId] } ?: return null
+        val diagnostics = coordinator.diagnostics(projectId, maxLogBytes)
+        val runtimeVersion = when (product.runtime?.id) {
+            "python" -> managedPythonVersion
+                ?: discovery.firstOrNull { it.kind == MacHostToolKind.PYTHON }?.version
+            "nodejs" -> discovery.firstOrNull { it.kind == MacHostToolKind.NODE_JS }?.version
+            else -> null
+        }
+        return MacDeveloperProjectView(
+            project = product,
+            workflow = diagnostics.status,
+            environment = diagnostics.environment,
+            entrypoint = diagnostics.entrypoint,
+            runtimeVersion = runtimeVersion,
+            ownedPids = diagnostics.ownedPids,
+            stdout = diagnostics.stdout,
+            stderr = diagnostics.stderr,
+            combinedLogs = diagnostics.combinedLogs,
+            logsTruncated = diagnostics.logsTruncated,
             lastError = lastErrors[projectId],
         )
     }
