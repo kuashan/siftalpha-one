@@ -785,3 +785,26 @@ M6 Final Closure Audit remains NOT STARTED.
 
 Current managed-installer result:
 **11 / 13 PASS — CLOUD PASS / REAL VENTURA ACCEPTANCE PENDING**.
+
+
+### M6.2 Unified Prepare UX Verification（验证）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| M6.2-U01 | Normal Mode primary action | missing managed capability is shown as PREPARE, not INSTALL_CONTAINER | PASS — Run #69 |
+| M6.2-U02 | One-click preparation | PREPARE invokes required environment provisioning exactly once | PASS — Run #69 |
+| M6.2-U03 | Shared provisioning | Normal / Developer use the same controller/provisioner | PASS |
+| M6.2-U04 | Developer diagnostics | install plan / phase / components / side effects / raw log exposed | PASS |
+| M6.2-U05 | Developer repair action | explicit install/repair entry available when a plan exists | PASS |
+| M6.2-U06 | Re-detect | provider becomes READY after controlled provision | PASS |
+| M6.2-U07 | Auto-continue | successful provision continues project Prepare | PASS |
+| M6.2-U08 | Final Normal state | environmentReady=true and primary action RUN | PASS |
+| M6.2-U09 | Existing Compose lifecycle | Run / Logs / Web / Stop / Restart unchanged | PASS |
+| M6.2-U10 | A/B project isolation | Stop A leaves B RUNNING | PASS |
+| M6.2-U11 | Android regression | W0 remains PASS | PASS — #778 |
+| M6.2-U12 | Real Ventura one-click Prepare | real machine provisions required environment and reaches RUN | PENDING |
+| M6.2-U13 | Real Developer diagnostics | real failure/success phases and installer log visible | PENDING |
+| M6.2-U14 | Real Compose A/B isolation | A/B run, Stop A leaves B RUNNING, Restart A | PENDING |
+
+Current result:
+**11 / 14 PASS — CLOUD PASS / REAL VENTURA ACCEPTANCE PENDING**.
