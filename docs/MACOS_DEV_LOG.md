@@ -1913,3 +1913,40 @@ Verification:
 
 Status remains:
 **M5.2 CLOUD PASS / REAL MAC PENDING**.
+
+
+## 2026-09-24 · M5.2 Real Mac Acceptance PASS + M5 Final Closure Audit
+
+Real host:
+- macOS 10.15.7 Catalina
+- Intel x86_64
+
+User confirmed the repaired M5.2 Developer Mode on the real Mac:
+- Simplified Chinese presentation PASS;
+- direct Developer Mode project import PASS;
+- shared running project visible as RUNNING PASS;
+- Python 3.14.7 / Environment / Entrypoint / PID / Web URL / Logs visible PASS;
+- Developer Stop immediately reflected in Normal Mode as stopped / run-ready PASS;
+- Normal Mode Run immediately reflected in Developer Mode as RUNNING PASS.
+
+Final closure evidence combined with:
+- M5.1 real Catalina PASS;
+- macOS Run #34 PASS;
+- Android W0 #743 PASS;
+- M5.2 shared-state parity probe PASS;
+- Project A/B STOP isolation PASS;
+- M4.2 and M3 regressions PASS;
+- Catalina minimum remains 10.15.7.
+
+Final Closure Audit:
+- all frozen M5 Exit Criteria PASS;
+- no Blocking Issues remain;
+- optional polish belongs to Backlog and must not reopen M5;
+- no M5.3 / M5.4.
+
+Final:
+**M5.1 = PASS / COMPLETE**  
+**M5.2 = PASS / COMPLETE**  
+**M5 — Product UI Parity = PASS / CLOSED**.
+
+The next stage is M6 — Container / Multi-service, NOT STARTED. Its implementation requires a new Change Discussion Gate approval.
