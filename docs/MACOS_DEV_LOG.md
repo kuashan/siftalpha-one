@@ -1490,3 +1490,32 @@ User-visible macOS product display identity is standardized to:
 This changes the macOS window/app display and packaging name only. Technical identities remain stable, including `com.siftalpha.macos` and Android `com.siftalpha.studio`.
 
 No Core（核心） or Android（安卓） runtime behavior is changed.
+
+
+### Post-closure SiftAlpha X / governance verification — PASS
+
+Source / cleanup HEAD:
+`a0b4bb739840d05fc0ab2cb59d4fd08ade42503e`
+
+Cloud verification:
+
+- SiftAlpha X macOS Host Runtime Run #11: PASS.
+- Android W0 Cloud Build #720: PASS.
+- packaged app: `SiftAlpha X.app`.
+- app launcher: x86_64.
+- launcher MIN_OS: 10.12.
+- bundled `libjli.dylib` MIN_OS: 10.12.
+- bundled `libjvm.dylib` MIN_OS: 10.12.
+- runtime discovery probe: PASS.
+- M3 project process probe: PASS.
+- project A stop: STOPPED.
+- project B after A stop: RUNNING.
+- project B stop: STOPPED.
+- macOS artifact ID: `10788263661`.
+- artifact digest: `sha256:9c2febc8da42b1dfd39b9bfce75138c28eaa8b6432c18ffd4862b4c3c0db867e`.
+- inner `SiftAlpha-X-m3.1-catalina-x64.zip` SHA-256:
+  `af39515bd544978f1ee0056b5839ab20e1d84f5aa0fa1dec0ee24caf45f34624`.
+- Android W0 artifact digest:
+  `sha256:d72f875cbf18ea96ef5ae4790be826d62cb4af4313c77c9d8f8fc1e080666746`.
+
+This verification is post-M3 housekeeping evidence. It does not reopen M3. M3 remains PASS / CLOSED and the active stage remains M4, with M4 implementation not yet started.

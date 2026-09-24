@@ -519,3 +519,16 @@ Next stage（下一阶段）: **M3 — Host Runtime Provider（主机运行提�
 **M3 final result（最终结果）: PASS / CLOSED（通过 / 关闭）**
 
 Next stage（下一阶段）: **M4 — Project Workflow（项目工作流）**.
+
+
+### Post-M3 Governance / Brand Verification（M3 后治理 / 品牌复验）
+
+| Check（检查） | Evidence（证据） | Result（结果） |
+| --- | --- | --- |
+| SiftAlpha X macOS display/package identity | Run #11 packages `SiftAlpha X.app` | PASS |
+| Catalina compatibility after rename（改名后 Catalina 兼容） | launcher / libjli / libjvm MIN_OS = 10.12 | PASS |
+| M3 process behavior after rename（改名后 M3 进程行为） | process probe + A/B STOP isolation | PASS |
+| Android regression after governance/brand cleanup（治理/品牌清理后安卓回归） | W0 #720 | PASS |
+| Stage boundary（阶段边界） | M3 remains closed; M4 not implemented | PASS |
+
+This table is post-closure verification only; it does not add new M3 Exit Criteria（退出条件）.

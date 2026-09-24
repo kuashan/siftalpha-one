@@ -106,7 +106,7 @@ Real Mac（真实 Mac）还确认：
 以下仍属于后续阶段，不得误报为已经完成：
 
 - macOS ProjectFilesystem（苹果项目文件系统）生产实现与真实项目导入
--完整 Import → Detect → Plan → Prepare → Run → Logs → Stop / Restart（导入 → 检测 → 计划 → 准备 → 运行 → 日志 → 停止 / 重启）工作流
+- 完整 Import → Detect → Plan → Prepare → Run → Logs → Stop / Restart（导入 → 检测 → 计划 → 准备 → 运行 → 日志 → 停止 / 重启）工作流
 - Web Discovery / Endpoint Probe（网页发现 / 端点探测）的 macOS 项目工作流接线
 - macOS secure storage（苹果安全存储）
 - Normal Mode / Developer Mode（普通模式 / 开发者模式）正式产品 UI
@@ -186,3 +186,35 @@ M4 只负责把现有 Core（核心）与 macOS Host Runtime Provider（主机�
 - 真实 Mac 验收通过。
 
 **当前不开始 M4 实现，直到下一轮按照 Change Discussion Gate（修改前讨论门禁）先讨论具体实现方案。**
+
+
+## 12. M3 Post-Closure Brand / Governance Verification（M3 关闭后品牌 / 治理复验）
+
+收口提交：
+`a0b4bb739840d05fc0ab2cb59d4fd08ade42503e`
+
+验证结果：
+
+- SiftAlpha X macOS Host Runtime Run #11: PASS（通过）
+- Android W0 Cloud Build #720: PASS（通过）
+- macOS artifact（苹果制品）: `siftalpha-macos-m3.1-catalina-x64-11`
+- artifact ID: `10788263661`
+- artifact digest: `sha256:9c2febc8da42b1dfd39b9bfce75138c28eaa8b6432c18ffd4862b4c3c0db867e`
+- inner SiftAlpha X test ZIP SHA-256:
+  `af39515bd544978f1ee0056b5839ab20e1d84f5aa0fa1dec0ee24caf45f34624`
+- Android W0 artifact: `siftalpha-w0-720`
+- Android W0 artifact digest:
+  `sha256:d72f875cbf18ea96ef5ae4790be826d62cb4af4313c77c9d8f8fc1e080666746`
+- packaged app（打包应用）: `SiftAlpha X.app`
+- launcher architecture（启动器架构）: Intel x86_64
+- launcher / libjli / libjvm MIN_OS: 10.12 / 10.12 / 10.12
+- M3 process probe（M3 进程探针）: PASS
+- STOP A → B remains RUNNING（停止 A、B 继续运行）: PASS
+
+结论：
+
+品牌显示与治理清理没有重新打开 M3，也没有引入 Android（安卓）或 Catalina（苹果 10.15）回归。
+
+当前阶段保持：
+
+**M4 — Project Workflow（项目工作流） / IMPLEMENTATION NOT STARTED（实现尚未开始）**。

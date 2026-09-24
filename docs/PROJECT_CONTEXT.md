@@ -1692,3 +1692,25 @@ Closed stages are not reopened for non-blocking polish. Non-blocking improvement
 ### Display identity boundary
 
 macOS user-visible app identity is `SiftAlpha X`. Internal technical identifiers remain stable unless a separately approved architecture change requires migration.
+
+
+## SiftAlpha X macOS governance / brand cleanup verified — 2026-09-24
+
+Cleanup HEAD:
+`a0b4bb739840d05fc0ab2cb59d4fd08ade42503e`.
+
+Verification:
+
+- SiftAlpha X macOS Host Runtime Run #11: PASS.
+- Android W0 #720: PASS.
+- `SiftAlpha X.app` packages successfully for Intel x86_64.
+- Catalina MIN_OS remains 10.12 for launcher / libjli / libjvm.
+- M3 process probe and project-scoped STOP isolation remain PASS.
+
+This is post-M3 housekeeping and does not reopen M3.
+
+Current authority remains:
+
+**M3 PASS / CLOSED → M4 CURRENT / IMPLEMENTATION NOT STARTED**.
+
+The Change Discussion Gate（修改前讨论门禁） and Remote HEAD Drift Gate（远端漂移门禁） are mandatory for the next M4 modification task.
