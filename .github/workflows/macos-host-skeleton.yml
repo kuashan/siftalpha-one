@@ -134,6 +134,7 @@ jobs:
           grep -q '^SIFTALPHA_M62=b_after_a_stop=RUNNING$' macos-evidence/m6-compose-workflow-probe.txt
           grep -q '^SIFTALPHA_M62=restart_a=true$' macos-evidence/m6-compose-workflow-probe.txt
           grep -q '^SIFTALPHA_M62=a_after_restart=RUNNING$' macos-evidence/m6-compose-workflow-probe.txt
+          grep -q '^SIFTALPHA_M62=web_source=CONTAINER_PORT$' macos-evidence/m6-compose-workflow-probe.txt
 
       - name: Prove M4.1 import detect plan
         run: |
