@@ -604,7 +604,7 @@ Final M5.1 result:
 Per Stage Closure Rule（阶段收尾规则）, M5.1 is closed. Do not reopen it for non-blocking polish; such items belong in Backlog（待办）.
 
 Next decision boundary:
-**M5.2 — Developer Mode + Shared State Parity（开发者模式 + 共享状态对齐） — NOT STARTED**.
+**M5.2 — Developer Mode + Shared State Parity（开发者模式 + 共享状态对齐） — PASS / COMPLETE**.
 
 
 ## 24. M5.2 Developer Mode + Shared State Parity（开发者模式 + 共享状态对齐）— CLOUD PASS
