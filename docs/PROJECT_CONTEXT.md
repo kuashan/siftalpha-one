@@ -1865,3 +1865,41 @@ Current authority:
 **M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CURRENT / M5.1 COMPLETE / M5.2 NOT STARTED**.
 
 Per the Stage Closure Rule, M5.1 must not be reopened for optional polish. The next allowed implementation slice is M5.2 Developer Mode + Shared State Parity, after its Change Discussion Gate discussion and approval.
+
+
+## M5.2 cloud authority — 2026-09-24
+
+M5.2 — Developer Mode + Shared State Parity（开发者模式 + 共享状态对齐） has reached:
+
+**CLOUD PASS / REAL MAC PENDING**.
+
+Accepted cloud HEAD:
+`eeeadb01ed19a94f0ee4880ab0d96651a44a8b84`.
+
+Authority:
+- one `MacProductController` and one `MacProjectWorkflowCoordinator` remain the only macOS product mutation/state chain;
+- Developer Mode is presentation + diagnostics over that existing chain;
+- Normal Mode and Developer Mode share Lifecycle, Environment, Web result and Logs facts;
+- mode switching itself does not mutate the Runtime;
+- Developer Stop is immediately reflected by Normal Mode;
+- Normal Run is immediately reflected by Developer Mode;
+- Project A/B STOP isolation remains intact;
+- macOS Run #32 PASS;
+- Android W0 #741 PASS;
+- Catalina minimum remains 10.15.7.
+
+Cloud probe specifically proved:
+- Normal RUNNING = Developer RUNNING;
+- Python 3.14.7;
+- same environment generation;
+- same result URL;
+- same raw logs;
+- stable owned PID across presentation reads;
+- Developer Stop → Normal RUN;
+- Normal Run → Developer RUNNING;
+- Stop A → B remains RUNNING.
+
+Current authority:
+**M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CURRENT / M5.1 COMPLETE / M5.2 CLOUD PASS / REAL MAC PENDING**.
+
+Next action is real macOS 10.15.7 Catalina / Intel x86_64 M5.2 acceptance. Only after it passes may the single M5 Final Closure Audit run. No M5.3 / M5.4 is permitted by the frozen finite plan.
