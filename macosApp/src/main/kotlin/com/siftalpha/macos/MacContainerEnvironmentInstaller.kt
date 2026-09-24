@@ -158,7 +158,7 @@ object MacContainerInstallPlanner {
                 "下载并校验官方发布文件到 SiftAlpha 用户数据目录",
                 "创建当前用户的本地 Linux 容器虚拟机（首次启动会继续下载 VM 镜像）",
                 "使用 SiftAlpha 自己的 Docker/Colima/Lima 数据目录，不覆盖用户已有配置",
-                "不会静默安装；本操作只在用户确认后执行",
+                "只在用户主动执行“准备环境”或开发者环境修复时执行",
             ),
         )
     }
