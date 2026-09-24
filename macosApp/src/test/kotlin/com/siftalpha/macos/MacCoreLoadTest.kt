@@ -12,7 +12,7 @@ class MacCoreLoadTest {
         val snapshot = MacPlatformCapabilities.snapshot()
 
         assertEquals(
-            CapabilityAvailability.UNKNOWN,
+            CapabilityAvailability.AVAILABLE,
             snapshot.availabilityOf(StandardPlatformCapabilities.HOST_PROCESS_EXECUTION),
         )
         assertEquals(
