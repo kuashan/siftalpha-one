@@ -1786,3 +1786,34 @@ Current authority:
 **M4.1 PASS / COMPLETE → M4.2 CLOUD PASS / REAL MAC PENDING**.
 
 Do not close M4.2 or M4 until the real Catalina full-workflow acceptance passes.
+
+
+## M4 final authority — 2026-09-24
+
+M4 — Project Workflow（项目工作流） is now **PASS / CLOSED**.
+
+Real macOS 10.15.7 / Intel x86_64 acceptance proved:
+- bundled SiftAlpha-managed CPython 3.14.7 works without user-installed Python;
+- project environment generation works;
+- wheel dependency installation works;
+- environment verification and atomic commit work;
+- project Run / Logs / Web work;
+- project-scoped STOP works;
+- Restart works and returns the project to RUNNING;
+- no Homebrew, Xcode CLT, Termux, or manual Python installation is required.
+
+Cloud authority remains:
+- accepted functional HEAD `50a87264e3b5f8d5c352b345a1bc61d7d499c6d1`;
+- macOS Run #21 PASS;
+- Android W0 #730 PASS;
+- Catalina minimum remains 10.15.7.
+
+Stage closure rule applies:
+- M4 must not gain new mandatory M4.x work;
+- non-blocking M4 refinements go to Backlog;
+- current stage advances to **M5 — Product UI Parity（产品界面对齐）**.
+
+Current authority:
+**M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CURRENT / NOT STARTED**.
+
+Before M5 implementation, perform its Read-only Audit and discuss/approve the M5 implementation plan per the Change Discussion Gate.

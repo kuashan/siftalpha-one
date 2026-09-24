@@ -592,6 +592,29 @@ Next slice:
 | M4.2-12 | M3 A/B isolation regression（M3 隔离回归） | M3 process probe | PASS |
 | M4.2-13 | Android regression（安卓回归） | W0 #730 | PASS |
 | M4.2-14 | Catalina app packaging（Catalina 应用打包） | Run #21 | PASS |
-| M4.2-15 | Real Mac full workflow（真实 Mac 完整闭环） | user acceptance | REAL MAC PENDING |
+| M4.2-15 | Real Mac full workflow（真实 Mac 完整闭环） | user acceptance | PASS — real Catalina |
 
 M4.2 is not closed until M4.2-15 passes.
+
+
+### M4 Final Closure Audit（M4 最终关闭审计）
+
+| Exit Criterion（退出条件） | Final Evidence（最终证据） | Result（结果） |
+| --- | --- | --- |
+| Import（导入） | M4.1 real Catalina | PASS |
+| Detect + Plan（检测 + 计划） | M4.1 real Catalina | PASS |
+| Prepare（准备） | bundled CPython 3.14.7, real Catalina | PASS |
+| Dependency install（依赖安装） | idna 3.10 real install | PASS |
+| Run（运行） | real START SUCCESS | PASS |
+| Logs（日志） | real stdout evidence | PASS |
+| Web entry（Web 入口） | real loopback endpoint verified | PASS |
+| STOP（停止） | real STOPPED + M3 isolation | PASS |
+| Restart（重新运行） | second START SUCCESS | PASS |
+| Diagnosability（可诊断） | structured lifecycle/process/prepare facts | PASS |
+| Catalina support（Catalina 支持） | real 10.15.7 + MIN_OS checks | PASS |
+| Android regression（安卓回归） | W0 #730 | PASS |
+
+**M4 = PASS / CLOSED（通过 / 关闭）**
+
+Next stage:
+**M5 — Product UI Parity（产品界面对齐） — CURRENT / NOT STARTED**.

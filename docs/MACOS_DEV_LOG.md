@@ -1745,3 +1745,39 @@ Final cloud evidence:
 
 Current state:
 **M4.2 CLOUD PASS / REAL MAC PENDING**.
+
+
+## 2026-09-24 · M4.2 Real Mac Acceptance PASS
+
+Real macOS 10.15.7 / Intel x86_64 evidence:
+
+- SiftAlpha-managed CPython 3.14.7 was acquired from the bundled app Runtime;
+- project venv creation succeeded;
+- `idna==3.10` was installed successfully;
+- `Python 3.14.7` verification passed;
+- `pip check` reported no broken requirements;
+- environment generation was committed;
+- project started successfully and reached RUNNING;
+- a real loopback Web endpoint was discovered/probed;
+- STOP returned STOPPED;
+- Restart safely tolerated an already-stopped process and then started the project again;
+- post-restart output again exposed the Web URL and confirmed `idna:3.10`.
+
+No Homebrew, Xcode Command Line Tools, manual Python 3 install, or Termux was required.
+
+M4.2 result:
+**PASS / COMPLETE**.
+
+### M4 Final Closure Audit
+
+The frozen M4 exit contract is fully satisfied by:
+- M4.1 real Import → Detect → Plan acceptance;
+- M4.2 real Prepare → Run → Logs/Web → STOP → Restart acceptance;
+- macOS Run #21 cloud full-workflow evidence;
+- Android W0 #730 regression evidence;
+- Catalina 10.15 compatibility evidence.
+
+Final:
+**M4 — Project Workflow = PASS / CLOSED**.
+
+Per governance, do not create further mandatory M4.x slices. Move to M5 Product UI Parity after its plan is discussed and approved.

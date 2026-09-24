@@ -13,7 +13,7 @@
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
 - 当前阶段：**M4 — Project Workflow（项目工作流）**
-- M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 CLOUD PASS / REAL MAC PENDING（云端通过 / 真实 Mac 待验收）**
+- M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 PASS / COMPLETE；M4 PASS / CLOSED（M4 已通过并关闭）**
 
 M3 最后一个已验收功能 HEAD：
 `259d94fe7d7501a1232f1d7114445f4673cfc0a1`
@@ -423,3 +423,81 @@ M4.2 remains OPEN until real macOS 10.15.7 acceptance proves:
 Import → Prepare → Run → Logs/Web → Stop → Restart.
 
 No Homebrew, Xcode Command Line Tools, system Python 3, or manual runtime installation may be required.
+
+
+## 19. M4.2 Real Mac Acceptance（真实 Mac 验收）— PASS
+
+Real acceptance machine:
+- macOS 10.15.7 Catalina
+- Intel x86_64
+- no preinstalled accepted Python 3 was required
+
+Observed real-device evidence:
+
+- managed Runtime acquisition: PASS
+  - bundled Python path used from SiftAlpha X app bundle
+  - Python 3.14.7
+- project environment creation: PASS
+- dependency installation: PASS
+  - `idna==3.10`
+- environment verification: PASS
+  - `Python 3.14.7`
+  - `No broken requirements found.`
+- environment commit: PASS
+- project Run（运行）: PASS
+- lifecycle: `RUNNING`
+- environmentReady: `true`
+- processState: `RUNNING`
+- Web endpoint discovery/probe: PASS
+  - real loopback URL observed
+- STOP（停止）: PASS
+  - `STOP=STOPPED`
+- safe repeated STOP during Restart: PASS
+  - `STOP=ALREADY_STOPPED`
+- Restart（重新运行）: PASS
+  - second `START:PASS`
+  - second `START:SUCCESS`
+  - project returned to RUNNING
+- project output after restart: PASS
+  - Web URL emitted
+  - `SIFTALPHA_TEST_DEPENDENCY=idna:3.10`
+
+Interpretation:
+
+The real Catalina machine completed the frozen M4.2 workflow without Homebrew, Xcode Command Line Tools, manual Python installation, or Termux:
+
+Import → Detect → Plan → Prepare → dependency install → verify → Run → Logs/Web → STOP → Restart.
+
+M4.2 final result:
+
+**PASS / COMPLETE（通过 / 完成）**.
+
+
+## 20. M4 Final Closure Audit（M4 最终关闭审计）— PASS / CLOSED
+
+Frozen M4 Exit Criteria（退出条件）:
+
+| Exit Criterion | Evidence | Result |
+| --- | --- | --- |
+| ordinary Python project Import（导入） | M4.1 real Catalina | PASS |
+| Detect + Plan（检测 + 计划） | M4.1 real Catalina | PASS |
+| Prepare without user-installed Python | M4.2 bundled CPython 3.14.7 real Catalina | PASS |
+| Project environment + dependency install | real venv + idna 3.10 | PASS |
+| Run（运行） | real `START:SUCCESS` | PASS |
+| Logs（日志） | real project stdout | PASS |
+| Web entry verifiable（Web 入口可验证） | real loopback endpoint + endpoint probe | PASS |
+| STOP project-scoped（项目级停止） | real STOPPED + M3 isolation regression | PASS |
+| Restart（重新运行） | real second START success | PASS |
+| Errors remain diagnosable（错误可诊断） | structured lifecycle/prepare/process evidence | PASS |
+| Catalina compatibility | managed Python/libpython MIN_OS=10.15 + real 10.15.7 | PASS |
+| Android regression | W0 #730 | PASS |
+
+Final result:
+
+**M4 — Project Workflow（项目工作流） = PASS / CLOSED（通过 / 关闭）**
+
+Per Stage Closure Rule（阶段关闭规则）:
+- no new mandatory M4.x slices may be created;
+- non-blocking refinements move to Backlog（待办）;
+- current stage advances to:
+  **M5 — Product UI Parity（产品界面对齐）**.
