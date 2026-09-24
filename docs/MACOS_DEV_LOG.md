@@ -1801,3 +1801,24 @@ Implementation architecture:
 - Developer Mode is intentionally deferred to M5.2 and will reuse the same controller.
 
 No M4 runtime/provider behavior or Android production UI is changed.
+
+
+## 2026-09-24 · M5.1 Cloud Verification PASS
+
+Accepted functional HEAD:
+`71e9dba0323aa35a531a3a1b26b55907ac8b907b`
+
+Verified:
+- Normal Mode uses one `MacProductController` over the existing M4 `MacProjectWorkflowCoordinator`;
+- lifecycle-derived primary action transitions:
+  PREPARE → RUN → OPEN_RESULT → RUN after STOP;
+- Open Result does not hide project Stop while the process is still running;
+- M4.2 workflow regression PASS;
+- M3 project-scoped STOP isolation regression PASS;
+- Android W0 #732 PASS;
+- original SiftAlpha X logo resource packaged;
+- Catalina 10.15 floor unchanged;
+- macOS Run #23 PASS.
+
+M5.1 remains open only for real Catalina visual/interaction acceptance.
+M5.2 Developer Mode has not started.

@@ -1817,3 +1817,29 @@ Current authority:
 **M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CURRENT / NOT STARTED**.
 
 Before M5 implementation, perform its Read-only Audit and discuss/approve the M5 implementation plan per the Change Discussion Gate.
+
+
+## M5.1 cloud authority — 2026-09-24
+
+M5.1 — Normal Mode Product UI（普通模式产品界面） is now:
+
+**CLOUD PASS / REAL MAC PENDING**.
+
+Accepted functional HEAD:
+`71e9dba0323aa35a531a3a1b26b55907ac8b907b`.
+
+Key product facts:
+- desktop Projects + Workspace shell implemented;
+- original SiftAlpha X brand artwork packaged;
+- search and All/Python/Node filters implemented;
+- ordinary-user state card is derived from shared Core lifecycle facts;
+- one primary action transitions PREPARE → RUN → OPEN_RESULT and returns to RUN after STOP;
+- Open Result keeps Stop available while the project is still running;
+- Normal Mode has no raw PID/runtime/log diagnostics;
+- one `MacProductController` delegates all mutation to the existing single M4 `MacProjectWorkflowCoordinator`;
+- M5.2 Developer Mode must reuse this same controller;
+- macOS Run #23 PASS;
+- Android W0 #732 PASS;
+- Catalina minimum remains 10.15.7.
+
+Do not start M5.2 until M5.1 real-Mac visual/interaction acceptance is complete.

@@ -527,3 +527,49 @@ M5.1 scope:
 - no Runtime / Process Control / Environment / STOP semantics change.
 
 M5.1 remains IN PROGRESS until cloud product-state verification and real Catalina UI acceptance pass.
+
+
+## 22. M5.1 Cloud Verification（云端验证）— PASS
+
+Accepted M5.1 functional HEAD:
+`71e9dba0323aa35a531a3a1b26b55907ac8b907b`
+
+Cloud evidence:
+
+- SiftAlpha X macOS Host Runtime Run #23: PASS
+- Android W0 Cloud Build #732: PASS
+- M4.2 managed-Python full workflow regression: PASS
+- M3 project-scoped process isolation regression: PASS
+- M5.1 Normal Mode product-state probe: PASS
+  - Import = PASS
+  - initial primary action = PREPARE
+  - Prepare = true
+  - after Prepare primary action = RUN
+  - Run = true
+  - verified loopback result URL discovered
+  - while result is available, primary action = OPEN_RESULT
+  - secondary Stop remains available = true
+  - Stop = true
+  - after Stop primary action returns to RUN
+- original SiftAlpha X logo artwork is packaged as `siftalpha_logo.png` inside `macosApp.jar`
+- Catalina package remains `LSMinimumSystemVersion=10.15`
+- launcher / managed Python / managed libpython / libjli / libjvm MIN_OS:
+  `10.12 / 10.15 / 10.15 / 10.12 / 10.12`
+- macOS artifact:
+  `siftalpha-macos-m5.1-catalina-x64-23`
+- artifact ID: `10792990618`
+- artifact digest:
+  `sha256:449915d6af966ea998e67338915e235b1410ccacb742fa1ef5baa00f6594a6ee`
+- user-facing app ZIP SHA-256:
+  `33bd2725e63b89fe80884449d2a017845ce6518a5398c48555cdfeb1c7307fc3`
+- Android W0 artifact:
+  `siftalpha-w0-732`
+- W0 artifact ID: `10791464850`
+- W0 artifact digest:
+  `sha256:fe994b167c52ab67eb81db17bbb802f5c4710fc240d8e9ca779c388784535cae`
+
+Current M5.1 state:
+
+**CLOUD PASS / REAL MAC PENDING（云端通过 / 真实 Mac 待验收）**.
+
+M5.2 has not started.

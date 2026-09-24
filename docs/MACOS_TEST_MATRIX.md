@@ -126,7 +126,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - 两种模式读取同一个 Runtime（运行时）状态。
 - 不存在两套独立生命周期。
 
-当前状态：**M5.1 IN PROGRESS（M5.1 进行中）**
+当前状态：**M5.1 CLOUD PASS / REAL MAC PENDING（M5.1 云端通过 / 真实 Mac 待验收）**
 
 ## M6 — Container / Multi-service（容器 / 多服务）
 
@@ -624,15 +624,15 @@ Next stage:
 
 | ID | Check（检查） | Expected（期望） | Status（状态） |
 | --- | --- | --- | --- |
-| M5.1-01 | Product shell（产品外壳） | SiftAlpha X desktop Projects + Workspace | CLOUD PENDING |
-| M5.1-02 | Project search/filter（项目搜索/筛选） | All / Python / Node | CLOUD PENDING |
-| M5.1-03 | One Primary Action（单一主操作） | lifecycle-derived, no second state machine | CLOUD PENDING |
-| M5.1-04 | Import → Prepare | primary PREPARE then RUN | CLOUD PENDING |
-| M5.1-05 | Run → Result | result becomes primary Open Result | CLOUD PENDING |
-| M5.1-06 | Running result stop access | secondary Stop remains available | CLOUD PENDING |
-| M5.1-07 | Stop → Run | primary returns to RUN | CLOUD PENDING |
-| M5.1-08 | Original brand artwork（原始品牌图） | packaged resource present | CLOUD PENDING |
-| M5.1-09 | M4 workflow regression（M4 工作流回归） | M4.2 full workflow PASS | CLOUD PENDING |
-| M5.1-10 | Android regression（安卓回归） | W0 PASS | CLOUD PENDING |
-| M5.1-11 | Catalina packaging（Catalina 打包） | minimum unchanged | CLOUD PENDING |
+| M5.1-01 | Product shell（产品外壳） | SiftAlpha X desktop Projects + Workspace | PASS — Run #23 |
+| M5.1-02 | Project search/filter（项目搜索/筛选） | All / Python / Node | PASS — compiled product UI |
+| M5.1-03 | One Primary Action（单一主操作） | lifecycle-derived, no second state machine | PASS — M5.1 probe |
+| M5.1-04 | Import → Prepare | primary PREPARE then RUN | PASS — M5.1 probe |
+| M5.1-05 | Run → Result | result becomes primary Open Result | PASS — M5.1 probe |
+| M5.1-06 | Running result stop access | secondary Stop remains available | PASS — M5.1 probe |
+| M5.1-07 | Stop → Run | primary returns to RUN | PASS — M5.1 probe |
+| M5.1-08 | Original brand artwork（原始品牌图） | packaged resource present | PASS — packaged jar |
+| M5.1-09 | M4 workflow regression（M4 工作流回归） | M4.2 full workflow PASS | PASS — Run #23 |
+| M5.1-10 | Android regression（安卓回归） | W0 PASS | PASS — W0 #732 |
+| M5.1-11 | Catalina packaging（Catalina 打包） | minimum unchanged | PASS — Run #23 |
 | M5.1-12 | Real Mac Normal Mode acceptance（真实 Mac 普通模式验收） | full ordinary-user flow PASS | REAL MAC PENDING |
