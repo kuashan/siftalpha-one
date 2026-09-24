@@ -1,6 +1,7 @@
 package com.siftalpha.macos
 
 import com.siftalpha.core.lifecycle.ProjectLifecycleState
+import com.siftalpha.studio.container.ComposeProjectPlanStatus
 import com.siftalpha.studio.runtime.RuntimeKind
 
 enum class MacNormalPrimaryAction {
@@ -28,16 +29,25 @@ data class MacNormalProjectPresentation(
 
 object MacNormalProjectPresentationPolicy {
     fun resolve(view: MacProductProjectView): MacNormalProjectPresentation {
-        val runtimeLabel = when (view.project.runtime) {
-            RuntimeKind.PYTHON -> "Python"
-            RuntimeKind.NODE_JS -> "Node.js"
-            null -> "未知"
-            else -> view.project.runtime?.id ?: "未知"
+        val isCompose = view.project.isCompose
+        val runtimeLabel = if (isCompose) {
+            "Compose"
+        } else {
+            when (view.project.runtime) {
+                RuntimeKind.PYTHON -> "Python"
+                RuntimeKind.NODE_JS -> "Node.js"
+                null -> "未知"
+                else -> view.project.runtime?.id ?: "未知"
+            }
         }
-        val location = when (view.project.runtime) {
-            RuntimeKind.PYTHON -> "SiftAlpha X 托管环境"
-            RuntimeKind.NODE_JS -> "Mac 主机运行环境"
-            else -> "SiftAlpha X"
+        val location = if (isCompose) {
+            "容器运行环境"
+        } else {
+            when (view.project.runtime) {
+                RuntimeKind.PYTHON -> "SiftAlpha X 托管环境"
+                RuntimeKind.NODE_JS -> "Mac 主机运行环境"
+                else -> "SiftAlpha X"
+            }
         }
         val resultUrl = view.resultUrl
         val hasResult = !resultUrl.isNullOrBlank()
@@ -62,7 +72,52 @@ object MacNormalProjectPresentationPolicy {
             )
         }
 
-        if (view.project.plan.status == MacProjectPlanStatus.BLOCKED) {
+        if (isCompose) {
+            val composePlan = view.project.composePlan
+            if (composePlan?.status == ComposeProjectPlanStatus.INVALID_MANIFEST) {
+                return MacNormalProjectPresentation(
+                    statusLabel = "需要处理",
+                    title = "Compose 项目需要修复",
+                    detail = composePlan.issues.firstOrNull() ?: "Compose 配置无法生成安全运行计划。",
+                    primaryAction = MacNormalPrimaryAction.NONE,
+                    primaryLabel = null,
+                    primaryEnabled = false,
+                    resultAvailable = false,
+                    resultUrl = null,
+                    showSecondaryStop = false,
+                    runtimeLabel = runtimeLabel,
+                    locationLabel = location,
+                )
+            }
+            val advice = view.containerAdvice
+            if (
+                !view.workflow.environmentReady &&
+                advice != null &&
+                advice.state != MacContainerAdviceState.READY
+            ) {
+                val option = advice.suggestedOptions.firstOrNull()
+                val detail = buildString {
+                    append(advice.detail)
+                    if (!option.isNullOrBlank()) append(" 建议：" + option + "。")
+                    advice.warnings.firstOrNull()?.let { append(" " + it) }
+                }
+                return MacNormalProjectPresentation(
+                    statusLabel = "需要容器环境",
+                    title = advice.title,
+                    detail = detail,
+                    primaryAction = MacNormalPrimaryAction.NONE,
+                    primaryLabel = null,
+                    primaryEnabled = false,
+                    resultAvailable = false,
+                    resultUrl = null,
+                    showSecondaryStop = false,
+                    runtimeLabel = runtimeLabel,
+                    locationLabel = location,
+                )
+            }
+        }
+
+        if (!isCompose && view.project.plan.status == MacProjectPlanStatus.BLOCKED) {
             return MacNormalProjectPresentation(
                 statusLabel = "需要处理",
                 title = "项目还不能准备",
@@ -98,7 +153,11 @@ object MacNormalProjectPresentationPolicy {
             ProjectLifecycleState.ENVIRONMENT_NOT_PREPARED -> MacNormalProjectPresentation(
                 statusLabel = "未准备",
                 title = "项目还没准备好",
-                detail = "SiftAlpha X 会准备运行环境并安装项目需要的依赖。",
+                detail = if (isCompose) {
+                    "SiftAlpha X 会准备 Compose 所需镜像和构建内容，但不会在准备阶段启动服务。"
+                } else {
+                    "SiftAlpha X 会准备运行环境并安装项目需要的依赖。"
+                },
                 primaryAction = MacNormalPrimaryAction.PREPARE,
                 primaryLabel = "准备项目",
                 primaryEnabled = true,
@@ -112,7 +171,11 @@ object MacNormalProjectPresentationPolicy {
             ProjectLifecycleState.PREPARING -> MacNormalProjectPresentation(
                 statusLabel = "准备中",
                 title = "正在准备项目",
-                detail = "SiftAlpha X 正在准备运行环境和依赖。",
+                detail = if (isCompose) {
+                    "SiftAlpha X 正在拉取或构建当前项目需要的容器镜像。"
+                } else {
+                    "SiftAlpha X 正在准备运行环境和依赖。"
+                },
                 primaryAction = MacNormalPrimaryAction.STOP,
                 primaryLabel = "停止",
                 primaryEnabled = true,
@@ -128,7 +191,11 @@ object MacNormalProjectPresentationPolicy {
             -> MacNormalProjectPresentation(
                 statusLabel = if (view.workflow.lifecycle == ProjectLifecycleState.STOPPED) "已停止" else "已准备",
                 title = "可以运行",
-                detail = "环境和项目依赖已经准备完成。",
+                detail = if (isCompose) {
+                    "容器镜像和项目运行条件已经准备完成。"
+                } else {
+                    "环境和项目依赖已经准备完成。"
+                },
                 primaryAction = MacNormalPrimaryAction.RUN,
                 primaryLabel = "运行",
                 primaryEnabled = true,
@@ -247,6 +314,9 @@ object MacNormalProjectPresentationPolicy {
     }
 
     private fun friendlyError(error: String): String = when {
+        error.contains("container runtime", ignoreCase = true) ||
+            error.contains("Compose", ignoreCase = true) ->
+            "当前容器环境还不能完成这一步，请检查容器环境后刷新项目。"
         error.contains("managed Python", ignoreCase = true) ->
             "SiftAlpha X 的 Python 运行环境暂时不可用。"
         error.contains("operation is busy", ignoreCase = true) ->
