@@ -95,7 +95,7 @@ object MacContainerInstallPlanner {
                 components = listOf("Docker Compose " + MacManagedContainerToolchain.COMPOSE_VERSION),
                 sideEffects = listOf(
                     "下载官方 Compose 发布文件到 SiftAlpha 数据目录",
-                    "在当前用户的 ~/.docker/cli-plugins 中注册 Compose 插件（不会覆盖非 SiftAlpha 文件）",
+                    "使用 SiftAlpha 自己的 Docker 配置目录，不覆盖用户已有 Docker 配置",
                 ),
             )
         }
@@ -143,7 +143,7 @@ object MacContainerInstallPlanner {
             sideEffects = listOf(
                 "下载并校验官方发布文件到 SiftAlpha 用户数据目录",
                 "创建当前用户的本地 Linux 容器虚拟机（首次启动会继续下载 VM 镜像）",
-                "在 ~/.docker/cli-plugins 注册 SiftAlpha 管理的 Compose 插件（不会覆盖非 SiftAlpha 文件）",
+                "使用 SiftAlpha 自己的 Docker/Colima/Lima 数据目录，不覆盖用户已有配置",
                 "不会静默安装；本操作只在用户确认后执行",
             ),
         )
@@ -181,6 +181,34 @@ object MacManagedContainerToolchain {
 
     fun managedBin(userHome: File = File(System.getProperty("user.home"))): File? =
         currentRoot(userHome)?.resolve("bin")?.takeIf { it.isDirectory }
+
+    fun environment(
+        root: File,
+        base: Map<String, String> = System.getenv(),
+    ): Map<String, String> = buildMap {
+        putAll(base)
+        put("PATH", File(root, "bin").absolutePath + File.pathSeparator + base["PATH"].orEmpty())
+        put("COLIMA_HOME", File(root, "state/colima").absolutePath)
+        put("COLIMA_CACHE_HOME", File(root, "cache/colima").absolutePath)
+        put("LIMA_HOME", File(root, "state/lima").absolutePath)
+        put("DOCKER_CONFIG", File(root, "docker-config").absolutePath)
+        put("COLIMA_PROFILE", "siftalpha")
+    }
+
+    fun environmentForExecutable(
+        executable: String,
+        userHome: File = File(System.getProperty("user.home")),
+        base: Map<String, String> = System.getenv(),
+    ): Map<String, String> {
+        val root = currentRoot(userHome) ?: return base
+        val managed = runCatching { File(executable).canonicalPath }.getOrNull()
+        val prefix = runCatching { root.canonicalPath + File.separator }.getOrNull()
+        return if (managed != null && prefix != null && managed.startsWith(prefix)) {
+            environment(root, base)
+        } else {
+            base
+        }
+    }
 }
 
 class MacManagedContainerInstaller(
@@ -231,7 +259,10 @@ class MacManagedContainerInstaller(
             staging.deleteRecursively()
             downloads.mkdirs()
             File(staging, "bin").mkdirs()
-            File(staging, "lib/docker/cli-plugins").mkdirs()
+            File(staging, "docker-config/cli-plugins").mkdirs()
+            File(staging, "state/colima").mkdirs()
+            File(staging, "state/lima").mkdirs()
+            File(staging, "cache/colima").mkdirs()
 
             progress(MacContainerInstallPhase.DOWNLOADING, "正在下载并校验容器工具…")
             val assets = assets(arch)
@@ -267,14 +298,14 @@ class MacManagedContainerInstaller(
             downloaded.getValue(colimaAssetName(arch))
                 .copyTo(File(staging, "bin/colima"), overwrite = true)
             downloaded.getValue(composeAssetName(arch))
-                .copyTo(File(staging, "lib/docker/cli-plugins/docker-compose"), overwrite = true)
+                .copyTo(File(staging, "docker-config/cli-plugins/docker-compose"), overwrite = true)
 
             listOf(
                 File(staging, "bin/colima"),
                 File(staging, "bin/docker"),
                 File(staging, "bin/limactl"),
                 File(staging, "bin/lima"),
-                File(staging, "lib/docker/cli-plugins/docker-compose"),
+                File(staging, "docker-config/cli-plugins/docker-compose"),
             ).filter { it.exists() }.forEach { file ->
                 check(file.setExecutable(true, true) || file.canExecute()) {
                     "failed to mark executable: " + file.absolutePath
@@ -329,13 +360,20 @@ class MacManagedContainerInstaller(
             ?: return MacContainerInstallResult(false, "unsupported macOS architecture: " + facts.architecture)
         return try {
             val base = MacManagedContainerToolchain.root(userHome).apply { mkdirs() }
-            val dir = File(base, "compose-" + MacManagedContainerToolchain.COMPOSE_VERSION + "-" + arch)
-                .apply { mkdirs() }
-            val plugin = File(dir, "docker-compose")
+            val existing = MacManagedContainerToolchain.currentRoot(userHome)
+            val dir = existing ?: File(
+                base,
+                "managed-compose-" + MacManagedContainerToolchain.COMPOSE_VERSION + "-" + arch,
+            ).apply {
+                File(this, "bin").mkdirs()
+                File(this, "docker-config/cli-plugins").mkdirs()
+            }
+            val plugin = File(dir, "docker-config/cli-plugins/docker-compose")
             progress(MacContainerInstallPhase.DOWNLOADING, "正在下载并校验 Docker Compose…")
             downloadAndVerify(composeAsset(arch), plugin, log)
             plugin.setExecutable(true, true)
             registerComposePluginTarget(plugin, log)
+            if (existing == null) commitCurrent(base, dir.name)
             progress(MacContainerInstallPhase.VERIFYING, "正在重新检测 Compose…")
             MacContainerInstallResult(true)
         } catch (error: Throwable) {
@@ -359,7 +397,7 @@ class MacManagedContainerInstaller(
             registerComposePlugin(root, log)
             progress(MacContainerInstallPhase.STARTING, "正在启动本地容器环境…")
             runChecked(
-                listOf(colima.absolutePath, "start", "--vm-type", "vz"),
+                listOf(colima.absolutePath, "start", "--runtime", "docker"),
                 environmentFor(root),
                 30 * 60,
                 log,
@@ -500,30 +538,17 @@ class MacManagedContainerInstaller(
     }
 
     private fun registerComposePlugin(root: File, log: (String) -> Unit) {
-        val plugin = File(root, "lib/docker/cli-plugins/docker-compose")
+        val plugin = File(root, "docker-config/cli-plugins/docker-compose")
         check(plugin.isFile) { "managed Compose plugin is missing" }
         registerComposePluginTarget(plugin, log)
     }
 
     private fun registerComposePluginTarget(plugin: File, log: (String) -> Unit) {
-        val pluginDir = File(userHome, ".docker/cli-plugins").apply { mkdirs() }
-        val link = File(pluginDir, "docker-compose")
-        if (link.exists() || Files.isSymbolicLink(link.toPath())) {
-            val existingManaged = Files.isSymbolicLink(link.toPath()) &&
-                runCatching {
-                    val target = Files.readSymbolicLink(link.toPath())
-                    val resolved = if (target.isAbsolute) target else link.parentFile.toPath().resolve(target)
-                    resolved.normalize().toFile().canonicalPath
-                        .startsWith(MacManagedContainerToolchain.root(userHome).canonicalPath)
-                }.getOrDefault(false)
-            if (!existingManaged) {
-                log("COMPOSE_PLUGIN=EXISTING_USER_PLUGIN_PRESERVED|" + link.absolutePath)
-                return
-            }
-            Files.deleteIfExists(link.toPath())
+        check(plugin.isFile) { "managed Compose plugin is missing" }
+        check(plugin.canExecute() || plugin.setExecutable(true, true)) {
+            "managed Compose plugin is not executable"
         }
-        Files.createSymbolicLink(link.toPath(), plugin.canonicalFile.toPath())
-        log("COMPOSE_PLUGIN=REGISTERED|" + link.absolutePath)
+        log("COMPOSE_PLUGIN=MANAGED|" + plugin.absolutePath)
     }
 
     private fun commitCurrent(base: File, name: String) {
@@ -549,12 +574,8 @@ class MacManagedContainerInstaller(
         }
     }
 
-    private fun environmentFor(root: File): Map<String, String> = buildMap {
-        putAll(System.getenv())
-        val managedBin = File(root, "bin").absolutePath
-        val existing = System.getenv("PATH").orEmpty()
-        put("PATH", managedBin + File.pathSeparator + existing)
-    }
+    private fun environmentFor(root: File): Map<String, String> =
+        MacManagedContainerToolchain.environment(root)
 
     private fun runChecked(
         command: List<String>,
