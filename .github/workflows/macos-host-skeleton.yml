@@ -123,13 +123,77 @@ jobs:
             --input macosApp/build/install/macosApp/lib \
             --main-jar macosApp.jar \
             --main-class com.siftalpha.macos.SiftAlphaMacAppKt \
-            --mac-package-identifier com.siftalpha.macos \
-            --java-options "-Dapple.awt.application.name=SiftAlpha X"
+            --mac-package-identifier com.siftalpha.macos
 
           APP="macos-dist/SiftAlpha X.app"
           PLIST="$APP/Contents/Info.plist"
           test -d "$APP"
           test -f "$PLIST"
+
+          CFG="$APP/Contents/app/SiftAlpha X.cfg"
+          test -f "$CFG"
+          if grep -q '^java-options=X
+          /usr/libexec/PlistBuddy -c "Delete :LSMinimumSystemVersion" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :LSMinimumSystemVersion string 10.15" "$PLIST"
+
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict "$APP"
+
+          plutil -p "$PLIST" | tee macos-evidence/info-plist.txt
+          test "$(plutil -extract LSMinimumSystemVersion raw -o - "$PLIST")" = "10.15"
+
+          file "$APP/Contents/MacOS/SiftAlpha X" | tee macos-evidence/app-launcher-file.txt
+          grep -q 'x86_64' macos-evidence/app-launcher-file.txt
+
+          inspect_minos() {
+            binary="$1"
+            label="$2"
+            echo "=== $label ===" | tee -a macos-evidence/catalina-minos.txt
+            file "$binary" | tee -a macos-evidence/catalina-minos.txt
+            otool -l "$binary" > "macos-evidence/${label}-otool.txt"
+            minos="$(awk '
+              /cmd LC_BUILD_VERSION/ { build=1; legacy=0; next }
+              /cmd LC_VERSION_MIN_MACOSX/ { legacy=1; build=0; next }
+              build && $1=="minos" { print $2; exit }
+              legacy && $1=="version" { print $2; exit }
+            ' "macos-evidence/${label}-otool.txt")"
+            test -n "$minos"
+            echo "MIN_OS=$minos" | tee -a macos-evidence/catalina-minos.txt
+            python3 -c 'import sys; parts=tuple(int(p) for p in sys.argv[1].split(".")[:2]); sys.exit(f"binary requires macOS {sys.argv[1]}, newer than Catalina 10.15") if parts > (10, 15) else None' "$minos"
+          }
+
+          inspect_minos "$APP/Contents/MacOS/SiftAlpha X" "launcher"
+
+          LIBJLI="$(find "$APP/Contents/runtime" -type f -name 'libjli.dylib' -print -quit)"
+          LIBJVM="$(find "$APP/Contents/runtime" -type f -name 'libjvm.dylib' -print -quit)"
+          test -n "$LIBJLI"
+          test -n "$LIBJVM"
+          inspect_minos "$LIBJLI" "libjli"
+          inspect_minos "$LIBJVM" "libjvm"
+
+          find "$APP" -maxdepth 4 -type f | sort | tee macos-evidence/app-files.txt
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$APP" \
+            macos-dist/SiftAlpha-X-m4.1-catalina-x64.zip
+          shasum -a 256 macos-dist/SiftAlpha-X-m4.1-catalina-x64.zip \
+            | tee macos-evidence/app-zip-sha256.txt
+
+      - name: Upload macOS app and evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: siftalpha-macos-m4.1-catalina-x64-${{ github.run_number }}
+          path: |
+            macos-dist/SiftAlpha-X-m4.1-catalina-x64.zip
+            macos-evidence
+          if-no-files-found: warn
+          retention-days: 14
+ "$CFG"; then
+            echo "Invalid split JVM option detected in packaged app" >&2
+            cat "$CFG" >&2
+            exit 1
+          fi
+          cat "$CFG" | tee macos-evidence/app-launcher-config.txt
 
           /usr/libexec/PlistBuddy -c "Delete :LSMinimumSystemVersion" "$PLIST" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :LSMinimumSystemVersion string 10.15" "$PLIST"
@@ -172,17 +236,17 @@ jobs:
           find "$APP" -maxdepth 4 -type f | sort | tee macos-evidence/app-files.txt
           ditto -c -k --sequesterRsrc --keepParent \
             "$APP" \
-            macos-dist/SiftAlpha-X-m3.1-catalina-x64.zip
-          shasum -a 256 macos-dist/SiftAlpha-X-m3.1-catalina-x64.zip \
+            macos-dist/SiftAlpha-X-m4.1-catalina-x64.zip
+          shasum -a 256 macos-dist/SiftAlpha-X-m4.1-catalina-x64.zip \
             | tee macos-evidence/app-zip-sha256.txt
 
       - name: Upload macOS app and evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: siftalpha-macos-m3.1-catalina-x64-${{ github.run_number }}
+          name: siftalpha-macos-m4.1-catalina-x64-${{ github.run_number }}
           path: |
-            macos-dist/SiftAlpha-X-m3.1-catalina-x64.zip
+            macos-dist/SiftAlpha-X-m4.1-catalina-x64.zip
             macos-evidence
           if-no-files-found: warn
           retention-days: 14

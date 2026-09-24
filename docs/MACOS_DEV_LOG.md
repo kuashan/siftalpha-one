@@ -1624,3 +1624,29 @@ Artifacts:
 
 Current M4.1 status:
 **CLOUD PASS（云端通过） / REAL MAC IMPORT-DETECT-PLAN PENDING（真实 Mac 导入-检测-计划待验收）**.
+
+
+### M4.1 real-Mac double-click launch failure — packaged JVM option split
+
+Real macOS 10.15.7 acceptance exposed a packaging-only launch blocker before project import:
+
+- double-clicking the M4.1 `SiftAlpha X.app` produced no usable application window;
+- inspection of the actual shipped app bundle showed `Contents/app/SiftAlpha X.cfg` contained:
+  - `java-options=-Dapple.awt.application.name=SiftAlpha`
+  - `java-options=X`
+
+Root cause:
+
+- the jpackage invocation passed `--java-options "-Dapple.awt.application.name=SiftAlpha X"`;
+- jpackage split the value containing the space and emitted a standalone JVM option `X`;
+- the packaged launcher therefore exits before Swing UI startup on real macOS;
+- cloud tests had verified compilation/probes/packaging but did not execute the packaged GUI launcher.
+
+Approved-scope repair:
+
+- remove the packaging-time `apple.awt.application.name` JVM option entirely;
+- keep the existing runtime `System.setProperty("apple.awt.application.name", "SiftAlpha X")`, which sets the display name before UI creation without launcher-option parsing;
+- add a CI packaging assertion that rejects any generated config containing standalone `java-options=X`;
+- rename the M4.1 package/artifact filenames from stale `m3.1` labels to `m4.1`.
+
+No M4.1 project detection logic, Core architecture, Android runtime behavior, Catalina support floor, or M3 process semantics change.
