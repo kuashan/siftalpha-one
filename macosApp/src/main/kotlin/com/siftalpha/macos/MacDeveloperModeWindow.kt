@@ -16,8 +16,10 @@ import javax.swing.DefaultListCellRenderer
 import javax.swing.DefaultListModel
 import javax.swing.JButton
 import javax.swing.JFrame
+import javax.swing.JFileChooser
 import javax.swing.JLabel
 import javax.swing.JList
+import javax.swing.JOptionPane
 import javax.swing.JPanel
 import javax.swing.JScrollPane
 import javax.swing.JSplitPane
@@ -33,7 +35,7 @@ class MacDeveloperModeWindow(
     private val initialProjectId: String? = null,
     private val onReturnToNormal: () -> Unit,
 ) {
-    private val frame = JFrame("SiftAlpha X — Developer Mode")
+    private val frame = JFrame("SiftAlpha X — 开发者模式")
     private val projectModel = DefaultListModel<MacProductProject>()
     private val projectList = JList(projectModel)
     private val factsArea = diagnosticArea()
@@ -41,13 +43,15 @@ class MacDeveloperModeWindow(
     private val stderrArea = diagnosticArea()
     private val combinedArea = diagnosticArea()
 
-    private val prepareButton = JButton("Prepare")
-    private val runButton = JButton("Run")
-    private val stopButton = JButton("Stop")
-    private val restartButton = JButton("Restart")
-    private val refreshButton = JButton("Refresh")
-    private val copyButton = JButton("Copy Logs")
+    private val importButton = JButton("导入项目")
+    private val prepareButton = JButton("准备")
+    private val runButton = JButton("运行")
+    private val stopButton = JButton("停止")
+    private val restartButton = JButton("重新运行")
+    private val refreshButton = JButton("刷新")
+    private val copyButton = JButton("复制日志")
     private val normalButton = JButton("普通模式")
+    private val emptyProjectHint = JLabel("尚未导入项目，请点击“导入项目”开始。")
 
     private val refreshTimer = Timer(900) { refreshLiveState() }
 
@@ -98,13 +102,14 @@ class MacDeveloperModeWindow(
             BorderFactory.createEmptyBorder(10, 14, 10, 14),
         )
 
-        add(JLabel("Developer Mode").apply {
+        add(JLabel("开发者模式").apply {
             font = MacDesignTokens.headingFont
             foreground = MacDesignTokens.foreground
         }, BorderLayout.WEST)
 
         val actions = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0)).apply {
             isOpaque = false
+            add(importButton)
             add(prepareButton)
             add(runButton)
             add(stopButton)
@@ -115,6 +120,7 @@ class MacDeveloperModeWindow(
         }
         add(actions, BorderLayout.EAST)
 
+        importButton.addActionListener { importProject() }
         prepareButton.addActionListener { runOperation { id -> controller.prepare(id).success } }
         runButton.addActionListener { runOperation(controller::start) }
         stopButton.addActionListener { runOperation(controller::stop) }
@@ -128,7 +134,7 @@ class MacDeveloperModeWindow(
         background = MacDesignTokens.surface
         border = BorderFactory.createMatteBorder(0, 0, 0, 1, MacDesignTokens.border)
 
-        add(JLabel("Projects").apply {
+        add(JLabel("项目").apply {
             font = MacDesignTokens.headingFont
             foreground = MacDesignTokens.foreground
             border = BorderFactory.createEmptyBorder(14, 14, 10, 14)
@@ -157,7 +163,7 @@ class MacDeveloperModeWindow(
                     val state = controller.view(project.projectId)?.workflow?.lifecycle?.name ?: "UNKNOWN"
                     label.text = "<html><b>" + escape(project.name) + "</b><br>" +
                         "<span style='color:#64748B'>" +
-                        escape(project.runtime?.id ?: "unknown") + " · " + escape(state) +
+                        escape(project.runtime?.id ?: "未知") + " · " + escape(state) +
                         "</span></html>"
                 }
                 label.font = MacDesignTokens.bodyFont
@@ -172,13 +178,19 @@ class MacDeveloperModeWindow(
             }
         }
         add(JScrollPane(projectList).apply { border = null }, BorderLayout.CENTER)
+
+        emptyProjectHint.horizontalAlignment = JLabel.CENTER
+        emptyProjectHint.font = MacDesignTokens.smallFont
+        emptyProjectHint.foreground = MacDesignTokens.muted
+        emptyProjectHint.border = BorderFactory.createEmptyBorder(10, 10, 14, 10)
+        add(emptyProjectHint, BorderLayout.SOUTH)
     }
 
     private fun buildDiagnostics(): JPanel = JPanel(BorderLayout()).apply {
         background = MacDesignTokens.background
         border = BorderFactory.createEmptyBorder(16, 18, 18, 18)
 
-        val header = JLabel("Shared Runtime State").apply {
+        val header = JLabel("共享运行状态").apply {
             font = MacDesignTokens.titleFont
             foreground = MacDesignTokens.foreground
             border = BorderFactory.createEmptyBorder(0, 0, 12, 0)
@@ -190,22 +202,51 @@ class MacDeveloperModeWindow(
         }
 
         body.add(JScrollPane(factsArea).apply {
-            border = BorderFactory.createTitledBorder("Project / Runtime / Web Facts")
+            border = BorderFactory.createTitledBorder("项目 / 运行时 / Web 信息")
         })
 
         val tabs = JTabbedPane().apply {
-            addTab("Combined", JScrollPane(combinedArea))
-            addTab("stdout", JScrollPane(stdoutArea))
-            addTab("stderr", JScrollPane(stderrArea))
+            addTab("综合日志", JScrollPane(combinedArea))
+            addTab("标准输出 stdout", JScrollPane(stdoutArea))
+            addTab("标准错误 stderr", JScrollPane(stderrArea))
         }
         body.add(tabs)
         add(body, BorderLayout.CENTER)
+    }
+
+    private fun importProject() {
+        val chooser = JFileChooser().apply {
+            fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+            isAcceptAllFileFilterUsed = false
+            dialogTitle = "导入 SiftAlpha X 项目"
+        }
+        if (chooser.showOpenDialog(frame) != JFileChooser.APPROVE_OPTION) return
+
+        importButton.isEnabled = false
+        Thread {
+            val outcome = runCatching { controller.importProject(chooser.selectedFile) }
+            SwingUtilities.invokeLater {
+                importButton.isEnabled = true
+                outcome.onSuccess { project ->
+                    selectedProjectId = project.projectId
+                    refreshProjects(project.projectId)
+                }.onFailure { error ->
+                    JOptionPane.showMessageDialog(
+                        frame,
+                        "无法导入这个项目。\n" + (error.message ?: "未知错误"),
+                        "导入失败",
+                        JOptionPane.ERROR_MESSAGE,
+                    )
+                }
+            }
+        }.start()
     }
 
     private fun refreshProjects(preferredProjectId: String? = selectedProjectId) {
         val projects = controller.projects()
         projectModel.clear()
         projects.forEach(projectModel::addElement)
+        emptyProjectHint.isVisible = projects.isEmpty()
 
         val target = preferredProjectId
         if (target != null) {
@@ -262,7 +303,7 @@ class MacDeveloperModeWindow(
 
     private fun render(view: MacDeveloperProjectView?) {
         if (view == null) {
-            factsArea.text = "No project selected."
+            factsArea.text = "尚未导入或选择项目。\n请点击“导入项目”开始。"
             stdoutArea.text = ""
             stderrArea.text = ""
             combinedArea.text = ""
@@ -272,34 +313,34 @@ class MacDeveloperModeWindow(
 
         val operation = view.workflow.operation
         factsArea.text = buildString {
-            appendLine("Project ID: " + view.project.projectId)
-            appendLine("Project Name: " + view.project.name)
-            appendLine("Project Root: " + view.project.imported.canonicalRootPath)
+            appendLine("项目 ID: " + view.project.projectId)
+            appendLine("项目名称: " + view.project.name)
+            appendLine("项目位置: " + view.project.imported.canonicalRootPath)
             appendLine()
-            appendLine("Runtime: " + (view.project.runtime?.id ?: "unresolved"))
-            appendLine("Runtime Version: " + (view.runtimeVersion ?: "—"))
-            appendLine("Environment Ready: " + view.workflow.environmentReady)
-            appendLine("Environment Generation: " + (view.environment?.generation ?: "—"))
-            appendLine("Environment Root: " + (view.environment?.root?.absolutePath ?: "—"))
-            appendLine("Entrypoint: " + (view.entrypoint ?: "—"))
+            appendLine("运行时 Runtime: " + (view.project.runtime?.id ?: "未解析"))
+            appendLine("运行时版本: " + (view.runtimeVersion ?: "—"))
+            appendLine("环境已就绪: " + view.workflow.environmentReady)
+            appendLine("环境代际 Generation: " + (view.environment?.generation ?: "—"))
+            appendLine("环境位置: " + (view.environment?.root?.absolutePath ?: "—"))
+            appendLine("入口 Entrypoint: " + (view.entrypoint ?: "—"))
             appendLine()
-            appendLine("Lifecycle: " + view.workflow.lifecycle)
-            appendLine("Process State: " + view.workflow.processState)
+            appendLine("生命周期 Lifecycle: " + view.workflow.lifecycle)
+            appendLine("进程状态: " + view.workflow.processState)
             appendLine(
-                "Operation: " + (
+                "当前操作: " + (
                     operation?.let {
                         it.action.name + " / " + it.phase.name + " / generation=" + it.generation
                     } ?: "NONE"
                 ),
             )
-            appendLine("Owned PID(s): " + view.ownedPids.sorted().joinToString(", ").ifBlank { "—" })
+            appendLine("项目归属 PID: " + view.ownedPids.sorted().joinToString(", ").ifBlank { "—" })
             appendLine()
             appendLine("Web URL: " + (view.resultUrl ?: "—"))
-            appendLine("Web Discovery Source: " + (view.webSource ?: "—"))
-            appendLine("Endpoint State: " + view.endpointState)
+            appendLine("Web 发现来源: " + (view.webSource ?: "—"))
+            appendLine("端点状态: " + view.endpointState)
             appendLine()
-            appendLine("Logs Truncated: " + view.logsTruncated)
-            appendLine("Last Error: " + (view.lastError ?: "—"))
+            appendLine("日志已截断: " + view.logsTruncated)
+            appendLine("最近错误: " + (view.lastError ?: "—"))
         }
 
         stdoutArea.text = view.stdout
