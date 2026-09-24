@@ -134,6 +134,13 @@ fun main(args: Array<String>) {
         if (!result.passed) error("M6.1 container capability / Compose plan probe failed")
         return
     }
+    if ("--m6-compose-workflow-probe" in args) {
+        val result = MacM62SelfTest.run()
+        println("SIFTALPHA_M62_COMPOSE_WORKFLOW_PROBE=" + if (result.passed) "PASS" else "FAIL")
+        result.lines.forEach { line -> println("SIFTALPHA_M62=" + line) }
+        if (!result.passed) error("M6.2 Compose workflow / isolation probe failed")
+        return
+    }
 
     SwingUtilities.invokeLater {
         runCatching {
@@ -141,7 +148,7 @@ fun main(args: Array<String>) {
         }
         val controller = MacProductController(
             discovery = discovery,
-            containerProviders = containerProviders,
+            containerProviderSnapshotSource = { MacContainerRuntimeDiscovery().discoverAll() },
         )
         MacNormalModeWindow(controller).show()
     }
