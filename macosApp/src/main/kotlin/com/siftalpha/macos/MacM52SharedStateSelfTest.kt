@@ -100,8 +100,8 @@ object MacM52SharedStateSelfTest {
                     normalRunA &&
                     !resultAfterNormalRun.isNullOrBlank() &&
                     developerAfterNormalRun?.workflow?.lifecycle == ProjectLifecycleState.RUNNING &&
-                    developerAfterNormalRun.environment?.generation == environmentGeneration &&
-                    developerAfterNormalRun.resultUrl == resultAfterNormalRun &&
+                    developerAfterNormalRun?.environment?.generation == environmentGeneration &&
+                    developerAfterNormalRun?.resultUrl == resultAfterNormalRun &&
                     finalStopA &&
                     finalStopB
 
