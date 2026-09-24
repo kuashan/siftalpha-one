@@ -1738,7 +1738,7 @@ Evidence:
 - Catalina minimum remains unchanged.
 
 Current M4.1 state:
-**PASS / COMPLETE**.
+**CLOUD PASS / REAL MAC PENDING**.
 
 Do not begin M4.2 until M4.1 real-Mac acceptance is completed and the next-slice plan is discussed per the clarified Change Discussion Gate（修改前讨论门禁）.
 
