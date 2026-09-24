@@ -126,7 +126,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - 两种模式读取同一个 Runtime（运行时）状态。
 - 不存在两套独立生命周期。
 
-当前状态：**M5.1 CLOUD PASS / REAL MAC PENDING（M5.1 云端通过 / 真实 Mac 待验收）**
+当前状态：**M5.1 PASS / COMPLETE（M5.1 通过 / 完成）；M5.2 NOT STARTED**
 
 ## M6 — Container / Multi-service（容器 / 多服务）
 
@@ -635,4 +635,16 @@ Next stage:
 | M5.1-09 | M4 workflow regression（M4 工作流回归） | M4.2 full workflow PASS | PASS — Run #23 |
 | M5.1-10 | Android regression（安卓回归） | W0 PASS | PASS — W0 #732 |
 | M5.1-11 | Catalina packaging（Catalina 打包） | minimum unchanged | PASS — Run #23 |
-| M5.1-12 | Real Mac Normal Mode acceptance（真实 Mac 普通模式验收） | full ordinary-user flow PASS | REAL MAC PENDING |
+| M5.1-12 | Real Mac Normal Mode acceptance（真实 Mac 普通模式验收） | full ordinary-user flow PASS | PASS — real Catalina 10.15.7 / Intel x86_64 |
+
+
+### M5.1 Final Closure（M5.1 最终收尾）
+
+M5.1 final status: **12 / 12 PASS — PASS / COMPLETE**.
+
+Authority:
+- macOS Run #23 PASS;
+- Android W0 #732 PASS;
+- real macOS 10.15.7 Catalina / Intel x86_64 acceptance PASS.
+
+M5.2 remains NOT STARTED. No additional M5.1 verification is required unless a later regression explicitly touches this surface.
