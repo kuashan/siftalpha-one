@@ -2024,3 +2024,29 @@ Current authority:
 **M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CLOSED → M6 CURRENT / M6.1 COMPLETE / M6.2 NOT STARTED**.
 
 M6.2 must not begin without explicit implementation approval. No M6.1.x follow-up slice is required.
+
+
+## M6.2 cloud authority — 2026-09-24
+
+M6.2 — Compose Runtime Workflow + Project Isolation（Compose 运行工作流 + 项目隔离） has reached:
+
+**CLOUD PASS / REAL VENTURA PENDING**.
+
+Authority:
+- accepted HEAD `abde6c6a311d0c3c722ad7385bd44351df566f94`;
+- macOS Run #39 PASS;
+- Android W0 #748 PASS;
+- one shared Controller / Coordinator remains authoritative;
+- generic Container Environment Advisor uses machine facts only for advice, never product hardcoding;
+- Docker / Podman are adapter/provider capabilities, not Core platform branches;
+- Compose project identity is stable and project-scoped;
+- Prepare / Run / Status / Logs / Web / Stop / Restart share the existing lifecycle;
+- Stop A leaves B RUNNING;
+- runtime container ports still require Endpoint Probe;
+- Normal and Developer Mode share the same lifecycle facts;
+- no automatic provider installation or VM resource changes were introduced.
+
+Current authority:
+**M0 CLOSED → M1 CLOSED → M2 CLOSED → M3 CLOSED → M4 CLOSED → M5 CLOSED → M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS / REAL VENTURA PENDING**.
+
+Next blocking evidence is real macOS 13+ container-provider acceptance. After that, execute exactly one M6 Final Closure Audit. Do not create M6.3.
