@@ -952,3 +952,20 @@ Real acceptance must still prove on macOS 13+:
 6. A/B Compose isolation and Restart still pass with the real provider.
 
 M6 Final Closure Audit remains blocked until those real-device checks pass.
+
+
+## 31. M6.2 Managed Installer R1 stale-error repair — CLOUD PASS
+
+The Normal Mode presentation now prioritizes a valid managed-container install plan over stale Compose Prepare failure state. This repairs the real-machine case where the user previously saw “上一步没有完成 / 重新准备” instead of “安装推荐容器环境”.
+
+Authority:
+- functional HEAD `2e957e3130066ddc8fecbef04584afe470549cb9`;
+- macOS Run #61 PASS;
+- Android W0 #770 PASS;
+- managed installer stale-error regression probe PASS;
+- artifact ID `10814991305`;
+- artifact digest `sha256:2c7e8a1e0018121e04f7aa92c4724e845e79fa89a857122e5d7bec40c5b4d303`;
+- user-facing ZIP SHA-256 `5ac42a76cbaa5f77cf862d89074cff4071c65c83220e77d1a6022cb09d7d2ac3`.
+
+Current state:
+**M6.2 CLOUD PASS / REAL VENTURA MANAGED-INSTALL ACCEPTANCE PENDING**.
