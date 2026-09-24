@@ -808,3 +808,18 @@ Current managed-installer result:
 
 Current result:
 **11 / 14 PASS — CLOUD PASS / REAL VENTURA ACCEPTANCE PENDING**.
+
+
+### M6.2 Checksum Manifest Regression Verification（校验清单回归）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| M6.2-C01 | Multi-file manifest exact match | Lima x86_64 selects its own digest, not the first manifest line | PASS |
+| M6.2-C02 | Unknown named asset | no unrelated digest fallback | PASS |
+| M6.2-C03 | Single-digest sidecar | bare SHA-256 remains accepted | PASS |
+| M6.2-C04 | macOS regression | Core/macOS tests and M6 probes pass | PASS — Run #73 |
+| M6.2-C05 | Android regression | W0 remains PASS | PASS — #782 |
+| M6.2-C06 | Real Ventura retry | Prepare passes checksum and proceeds to next installer phase | PENDING |
+
+Current checksum-repair result:
+**5 / 6 PASS — CLOUD PASS / REAL VENTURA RETEST PENDING**.
