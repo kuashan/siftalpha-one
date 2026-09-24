@@ -697,3 +697,16 @@ Before final real-Mac acceptance, the Developer Mode surface was repaired to add
 **M5 = PASS / CLOSED（通过 / 关闭）**.
 
 Backlog-only polish cannot reopen M5. Next stage is M6 — Container / Multi-service（容器 / 多服务）, currently NOT STARTED.
+
+
+### Current macOS support baseline for M6+
+
+| Item | Current Authority |
+| --- | --- |
+| Full-support minimum | macOS 13 Ventura |
+| Real acceptance OS | macOS 13.7.8 Ventura |
+| Real acceptance architecture | Intel x86_64 |
+| Historical Catalina M2～M5 evidence | retained as historical PASS evidence |
+| Catalina compatibility required for M6/M7/M8 | NO |
+
+Future M6/M7/M8 verification must use the current Ventura baseline. Older Catalina deployment-target evidence remains historical only and must not block modern container/runtime implementation.
