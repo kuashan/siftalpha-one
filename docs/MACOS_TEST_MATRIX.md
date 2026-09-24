@@ -103,7 +103,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 
 ## M4 — Project Workflow（项目工作流）
 
-当前状态：**CURRENT STAGE（当前阶段） / M4.2 CLOUD PASS / REAL MAC PENDING（云端通过 / 真实 Mac 待验收）**
+当前状态：**PASS / CLOSED（通过 / 关闭）**
 
 必须证明：
 
@@ -126,7 +126,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - 两种模式读取同一个 Runtime（运行时）状态。
 - 不存在两套独立生命周期。
 
-当前状态：**M5.1 PASS / COMPLETE（M5.1 通过 / 完成）；M5.2 NOT STARTED**
+当前状态：**M5.1 PASS / COMPLETE；M5.2 CLOUD PASS / REAL MAC PENDING**
 
 ## M6 — Container / Multi-service（容器 / 多服务）
 
@@ -617,7 +617,7 @@ M4.2 is not closed until M4.2-15 passes.
 **M4 = PASS / CLOSED（通过 / 关闭）**
 
 Next stage:
-**M5 — Product UI Parity（产品界面对齐） — CURRENT / NOT STARTED**.
+**M5 — Product UI Parity（产品界面对齐） — CURRENT / M5.2 CLOUD PASS / REAL MAC PENDING**.
 
 
 ### M5.1 Normal Mode Product UI Verification（验证）
@@ -648,3 +648,31 @@ Authority:
 - real macOS 10.15.7 Catalina / Intel x86_64 acceptance PASS.
 
 M5.2 remains NOT STARTED. No additional M5.1 verification is required unless a later regression explicitly touches this surface.
+
+
+### M5.2 Developer Mode + Shared State Parity Verification（验证）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| M5.2-01 | Developer Mode surface | advanced Project / Runtime / Process / Web / Logs facts visible | PASS — Run #32 |
+| M5.2-02 | Single controller | Normal + Developer use one MacProductController | PASS — source + probe |
+| M5.2-03 | Single coordinator | no Developer coordinator/runtime state | PASS — source audit |
+| M5.2-04 | Normal running → Developer | Developer immediately reads RUNNING | PASS — M5.2 probe |
+| M5.2-05 | Shared Runtime version | Managed Python 3.14.7 | PASS — M5.2 probe |
+| M5.2-06 | Shared Environment | same generation in both presentations | PASS — M5.2 probe |
+| M5.2-07 | Shared Web result | same result URL | PASS — M5.2 probe |
+| M5.2-08 | Shared Logs | same raw/combined logs | PASS — M5.2 probe |
+| M5.2-09 | Mode switch side effect | owned PID stable; no restart/stop | PASS — M5.2 probe |
+| M5.2-10 | Developer Stop → Normal | Normal returns to RUN-ready | PASS — M5.2 probe |
+| M5.2-11 | Normal Run → Developer | Developer returns to RUNNING | PASS — M5.2 probe |
+| M5.2-12 | Project A/B STOP isolation | Stop A leaves B RUNNING | PASS — M5.2 + M3 probes |
+| M5.2-13 | M5.1 regression | Normal Mode product flow remains PASS | PASS — Run #32 |
+| M5.2-14 | M4.2 regression | managed-Python full workflow remains PASS | PASS — Run #32 |
+| M5.2-15 | Android regression | Android W0 PASS | PASS — W0 #741 |
+| M5.2-16 | Catalina packaging | minimum remains 10.15.7-compatible | PASS — Run #32 |
+| M5.2-17 | Real Mac shared-state acceptance | frozen Normal ↔ Developer scenario on Catalina | REAL MAC PENDING |
+
+Current M5.2 result:
+**16 / 17 PASS — CLOUD PASS / REAL MAC PENDING**.
+
+M5 Final Closure Audit（最终关闭审计） remains blocked only by M5.2 real Mac acceptance. Do not create M5.3 / M5.4.
