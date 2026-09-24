@@ -2026,3 +2026,37 @@ Final:
 **M6.1 = PASS / COMPLETE**.
 
 M6.2 remains NOT STARTED and requires its own implementation approval.
+
+
+## 2026-09-24 · M6.2 Compose Runtime Workflow cloud PASS
+
+Approved M6.2 boundary implemented under Universal-First Rule:
+- Detect → Advise → Operate;
+- generic container environment advice based on system/resource/provider facts;
+- generic Compose provider contract;
+- Docker / Podman capability selection without vendor-specific Core logic;
+- Compose lifecycle routed through the existing shared macOS Coordinator;
+- stable per-project Compose identity;
+- project-scoped Prepare / Run / Status / Logs / Web / Stop / Restart;
+- runtime port discovery still requires Endpoint Probe;
+- Normal / Developer Mode share the same backend state;
+- Developer Mode exposes per-service status;
+- no automatic installation or resource reconfiguration;
+- no device-model-specific or OpenBot-specific patch.
+
+First cloud attempt Run #38 exposed one Kotlin compile defect in `MacComposeContainerProvider.runCompose()`: a `try` expression with non-local returns caused the function body to infer `Any`. The implementation was changed to an explicit statement-form try/catch with explicit `MacContainerOperationResult` returns. No architecture or product behavior changed.
+
+Final cloud verification:
+- accepted HEAD `abde6c6a311d0c3c722ad7385bd44351df566f94`;
+- macOS Run #39 PASS;
+- Android W0 #748 PASS;
+- M6.2 workflow/isolation probe PASS;
+- A/B concurrent RUNNING PASS;
+- Stop A leaves B RUNNING PASS;
+- Restart A PASS;
+- service-state diagnostics PASS;
+- runtime container-port Web discovery PASS;
+- all M4/M5/M6.1 regressions PASS.
+
+State:
+**M6.2 = CLOUD PASS / REAL VENTURA PENDING**.
