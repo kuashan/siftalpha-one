@@ -92,6 +92,7 @@ class MacContainerRuntimeDiscovery(
             add("/opt/homebrew/bin")
             add("/opt/local/bin")
             add(File(userHome, ".local/bin").absolutePath)
+            MacManagedContainerToolchain.managedBin(userHome)?.absolutePath?.let(::add)
             if (kind == MacContainerProviderKind.DOCKER) {
                 add("/Applications/Docker.app/Contents/Resources/bin")
             } else {
