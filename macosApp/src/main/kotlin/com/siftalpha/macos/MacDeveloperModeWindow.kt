@@ -26,6 +26,7 @@ import javax.swing.JSplitPane
 import javax.swing.JTabbedPane
 import javax.swing.JTextArea
 import javax.swing.ListSelectionModel
+import javax.swing.SwingConstants
 import javax.swing.SwingUtilities
 import javax.swing.Timer
 import javax.swing.WindowConstants
@@ -179,7 +180,7 @@ class MacDeveloperModeWindow(
         }
         add(JScrollPane(projectList).apply { border = null }, BorderLayout.CENTER)
 
-        emptyProjectHint.horizontalAlignment = JLabel.CENTER
+        emptyProjectHint.horizontalAlignment = SwingConstants.CENTER
         emptyProjectHint.font = MacDesignTokens.smallFont
         emptyProjectHint.foreground = MacDesignTokens.muted
         emptyProjectHint.border = BorderFactory.createEmptyBorder(10, 10, 14, 10)
