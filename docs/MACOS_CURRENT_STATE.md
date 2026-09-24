@@ -14,7 +14,7 @@
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
 - 当前阶段：**M5 — Product UI Parity（产品界面对齐）**
 - M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 PASS / COMPLETE；M4 PASS / CLOSED（M4 已通过并关闭）**
-- M5 implementation（实现）：**M5.1 PASS / COMPLETE；M5.2 NOT STARTED**
+- M5 implementation（实现）：**M5.1 PASS / COMPLETE；M5.2 CLOUD PASS / REAL MAC PENDING**
 
 M3 最后一个已验收功能 HEAD：
 `259d94fe7d7501a1232f1d7114445f4673cfc0a1`
@@ -605,3 +605,62 @@ Per Stage Closure Rule（阶段收尾规则）, M5.1 is closed. Do not reopen it
 
 Next decision boundary:
 **M5.2 — Developer Mode + Shared State Parity（开发者模式 + 共享状态对齐） — NOT STARTED**.
+
+
+## 24. M5.2 Developer Mode + Shared State Parity（开发者模式 + 共享状态对齐）— CLOUD PASS
+
+Accepted cloud HEAD:
+`eeeadb01ed19a94f0ee4880ab0d96651a44a8b84`
+
+Implementation facts:
+- Developer Mode（开发者模式）is a second Presentation（表现层） over the existing single `MacProductController`;
+- `MacProductController` still delegates mutations to the same single `MacProjectWorkflowCoordinator`;
+- no second Runtime State（运行状态）, Lifecycle（生命周期） or Coordinator（协调器） was introduced;
+- Developer Mode exposes Project ID / Runtime / Runtime Version / Environment generation / Entrypoint / Lifecycle / Process State / Operation / owned PID(s) / Web URL / discovery source / endpoint state / stdout / stderr / combined logs;
+- Developer Prepare / Run / Stop / Restart / Refresh all call the same controller used by Normal Mode;
+- switching Normal Mode ↔ Developer Mode only changes the visible window and does not start, stop or restart the project;
+- Core（核心）, Android production behavior, Runtime provider rules and project-scoped STOP semantics are unchanged.
+
+Cloud evidence:
+- SiftAlpha X macOS Host Runtime Run #32: PASS;
+- Android W0 Cloud Build #741: PASS;
+- M5.2 shared-state parity probe: PASS;
+- Normal Mode running state = RUNNING;
+- Developer Mode running state = RUNNING;
+- Managed Python = Python 3.14.7;
+- same Environment generation = true;
+- same Web result URL = true;
+- same raw/combined logs = true;
+- presentation switching keeps owned PID stable = true;
+- Developer Stop → Normal primary action RUN = PASS;
+- Normal Run → Developer RUNNING = PASS;
+- Environment generation reused after Normal Run = true;
+- Project A stop leaves Project B RUNNING = PASS;
+- M5.1 Normal Mode regression: PASS;
+- M4.2 full workflow regression: PASS;
+- M3 project-scoped process isolation regression: PASS.
+
+Catalina packaging remains unchanged:
+- LSMinimumSystemVersion = 10.15;
+- launcher MIN_OS = 10.12;
+- managed Python MIN_OS = 10.15;
+- managed libpython MIN_OS = 10.15;
+- libjli MIN_OS = 10.12;
+- libjvm MIN_OS = 10.12.
+
+Artifact:
+- `siftalpha-macos-m5.2-catalina-x64-32`;
+- artifact ID: `10794285467`;
+- artifact digest: `sha256:713c37ea283736b5cfe7e7e529a7164fc9275cd908ced22a2cc6952a284ffb5b`;
+- user-facing app ZIP SHA-256: `8326a47972566a25dd81c315120380fa0cd699bda5fca74815cd1e6e1116f267`.
+
+Android W0 artifact:
+- `siftalpha-w0-741`;
+- artifact ID: `10794265428`;
+- artifact digest: `sha256:4593855e16660dad7bd97556f20ed8f8f7c8d3e8999ec98d22b9602ae9ed5d70`.
+
+Current M5.2 state:
+
+**CLOUD PASS / REAL MAC PENDING（云端通过 / 真实 Mac 待验收）**.
+
+M5.2 must not be marked COMPLETE until the frozen real Catalina Normal ↔ Developer shared-state acceptance passes.
