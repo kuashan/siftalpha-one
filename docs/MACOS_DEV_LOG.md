@@ -1175,3 +1175,10 @@ This is a packaging compatibility repair inside the existing M2.1 slice, not M2.
 Cloud verification can prove architecture, Core load, capability snapshot, dependency isolation, packaging, and binary minimum OS metadata. Only the user's real macOS 10.15.7 machine can close launch / exit and final M2 real-Mac acceptance.
 
 Cloud status at implementation commit: **PENDING（待完成）**.
+
+
+### Workflow parse correction
+
+Initial Catalina rebuild push triggered macOS Run #2, but GitHub rejected the workflow before creating any job because the embedded Python heredoc body was not indented as YAML block content. No macOS build or compatibility check executed in that run.
+
+The workflow-only correction indents the heredoc correctly; functional macOS host source and Core（核心） remain unchanged.

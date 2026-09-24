@@ -136,11 +136,11 @@ jobs:
             test -n "$minos"
             echo "MIN_OS=$minos" | tee -a macos-evidence/catalina-minos.txt
             python3 - "$minos" <<'PY'
-import sys
-parts = tuple(int(p) for p in sys.argv[1].split(".")[:2])
-if parts > (10, 15):
-    raise SystemExit(f"binary requires macOS {sys.argv[1]}, newer than Catalina 10.15")
-PY
+            import sys
+            parts = tuple(int(p) for p in sys.argv[1].split(".")[:2])
+            if parts > (10, 15):
+                raise SystemExit(f"binary requires macOS {sys.argv[1]}, newer than Catalina 10.15")
+            PY
           }
 
           inspect_minos "$APP/Contents/MacOS/SiftAlpha" "launcher"
