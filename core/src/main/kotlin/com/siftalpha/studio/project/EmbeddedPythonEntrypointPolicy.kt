@@ -28,7 +28,7 @@ object EmbeddedPythonEntrypointPolicy {
         return rootPythonFiles.singleOrNull()
     }
 
-    internal fun safeRelativePath(raw: String): String? {
+    fun safeRelativePath(raw: String): String? {
         val value = raw.trim()
         if (value.isBlank() || value.startsWith("/") || value.contains('\\') || value.contains('\u0000')) {
             return null
