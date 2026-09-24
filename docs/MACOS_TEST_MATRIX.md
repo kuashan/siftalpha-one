@@ -763,3 +763,25 @@ Current M6.2 result:
 **15 / 16 PASS — CLOUD PASS / REAL VENTURA PENDING**.
 
 M6 Final Closure Audit remains NOT STARTED.
+
+
+### M6.2 Managed Container Installer Verification（验证）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| M6.2-I01 | Missing provider detection | Compose project receives install recommendation | PASS |
+| M6.2-I02 | User confirmation boundary | no install before explicit confirmation | PASS |
+| M6.2-I03 | Managed install plan | INSTALL_MANAGED_DOCKER generated generically | PASS |
+| M6.2-I04 | Intel / ARM architecture selection | x86_64 and arm64 supported without model-specific branches | PASS |
+| M6.2-I05 | Package manager independence | no Homebrew/MacPorts required | PASS |
+| M6.2-I06 | Config isolation | managed Docker/Colima/Lima state does not overwrite user Docker config | PASS |
+| M6.2-I07 | Re-detect | provider becomes READY after controlled install | PASS |
+| M6.2-I08 | Auto-continue | successful install automatically continues Prepare | PASS |
+| M6.2-I09 | Normal Mode transition | INSTALL_CONTAINER → RUN | PASS |
+| M6.2-I10 | Upstream assets | Intel + ARM managed assets reachable | PASS — Run #56 |
+| M6.2-I11 | Android regression | W0 remains PASS | PASS — #765 |
+| M6.2-I12 | Real Ventura managed install | real download/start/verify/Prepare on supported Mac | PENDING |
+| M6.2-I13 | Real provider A/B isolation | A/B Run, Stop A leaves B RUNNING, Restart A | PENDING |
+
+Current managed-installer result:
+**11 / 13 PASS — CLOUD PASS / REAL VENTURA ACCEPTANCE PENDING**.
