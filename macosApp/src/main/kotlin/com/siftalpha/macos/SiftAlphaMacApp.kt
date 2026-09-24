@@ -99,6 +99,13 @@ fun main(args: Array<String>) {
         if (!result.passed) error("M5.1 Normal Mode probe failed")
         return
     }
+    if ("--m5-shared-state-probe" in args) {
+        val result = MacM52SharedStateSelfTest.run()
+        println("SIFTALPHA_M52_SHARED_STATE_PROBE=" + if (result.passed) "PASS" else "FAIL")
+        result.lines.forEach { line -> println("SIFTALPHA_M52=" + line) }
+        if (!result.passed) error("M5.2 shared state parity probe failed")
+        return
+    }
 
     SwingUtilities.invokeLater {
         runCatching {
