@@ -142,7 +142,34 @@ jobs:
           "$JAVA_HOME/bin/java" -cp "macosApp/build/install/macosApp/lib/*" \
             com.siftalpha.macos.SiftAlphaMacAppKt --m6-container-install-probe \
             | tee macos-evidence/m6-container-install-probe.txt
-          grep -q '^SIFTALPHA_M62_CONTAINER_INSTALL_PROBE=PASS
+          grep -q '^SIFTALPHA_M62_CONTAINER_INSTALL_PROBE=PASS$' macos-evidence/m6-container-install-probe.txt
+          grep -q '^SIFTALPHA_M62_INSTALL=compose_detect=true$' macos-evidence/m6-container-install-probe.txt
+          grep -q '^SIFTALPHA_M62_INSTALL=before_install_plan=INSTALL_MANAGED_DOCKER$' macos-evidence/m6-container-install-probe.txt
+          grep -q '^SIFTALPHA_M62_INSTALL=before_primary=INSTALL_CONTAINER$' macos-evidence/m6-container-install-probe.txt
+          grep -q '^SIFTALPHA_M62_INSTALL=installer_calls=1$' macos-evidence/m6-container-install-probe.txt
+          grep -q '^SIFTALPHA_M62_INSTALL=install_and_prepare=true$' macos-evidence/m6-container-install-probe.txt
+          grep -q '^SIFTALPHA_M62_INSTALL=after_advice=READY$' macos-evidence/m6-container-install-probe.txt
+          grep -q '^SIFTALPHA_M62_INSTALL=after_environment_ready=true$' macos-evidence/m6-container-install-probe.txt
+          grep -q '^SIFTALPHA_M62_INSTALL=after_install_phase=COMPLETE$' macos-evidence/m6-container-install-probe.txt
+          grep -q '^SIFTALPHA_M62_INSTALL=after_primary=RUN$' macos-evidence/m6-container-install-probe.txt
+
+      - name: Verify managed container upstream assets are reachable
+        run: |
+          set -euo pipefail
+          for url in \
+            "https://github.com/abiosoft/colima/releases/download/v0.10.3/colima-Darwin-x86_64" \
+            "https://github.com/abiosoft/colima/releases/download/v0.10.3/colima-Darwin-arm64" \
+            "https://github.com/lima-vm/lima/releases/download/v2.2.0/lima-2.2.0-Darwin-x86_64.tar.gz" \
+            "https://github.com/lima-vm/lima/releases/download/v2.2.0/lima-2.2.0-Darwin-arm64.tar.gz" \
+            "https://download.docker.com/mac/static/stable/x86_64/docker-29.8.1.tgz" \
+            "https://download.docker.com/mac/static/stable/aarch64/docker-29.8.1.tgz" \
+            "https://github.com/docker/compose/releases/download/v5.5.1/docker-compose-darwin-x86_64" \
+            "https://github.com/docker/compose/releases/download/v5.5.1/docker-compose-darwin-aarch64"
+          do
+            curl --fail --silent --show-error --location --range 0-0 --output /dev/null "$url"
+          done
+
+      - name: Prove M4.1 import detect plan
         run: |
           set -euo pipefail
           "$JAVA_HOME/bin/java" -cp "macosApp/build/install/macosApp/lib/*" \
