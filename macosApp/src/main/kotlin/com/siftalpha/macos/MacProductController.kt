@@ -1,6 +1,8 @@
 package com.siftalpha.macos
 
 import com.siftalpha.core.lifecycle.ProjectLifecycleState
+import com.siftalpha.studio.container.ComposeProjectPlan
+import com.siftalpha.studio.container.ComposeProjectPlanner
 import com.siftalpha.studio.runtime.RuntimeKind
 import java.io.File
 import java.util.LinkedHashMap
@@ -10,6 +12,7 @@ data class MacProductProject(
     val imported: MacImportedProject,
     val snapshot: MacProjectSnapshot,
     val plan: MacProjectEnvironmentPlan,
+    val composePlan: ComposeProjectPlan? = null,
 ) {
     val projectId: String get() = imported.projectId
     val name: String get() = imported.root.name
@@ -51,6 +54,8 @@ class MacProductController(
     private val discovery: List<MacHostToolSnapshot> = MacHostRuntimeDiscovery().discoverAll(),
     private val filesystem: MacProjectFilesystem = MacProjectFilesystem(),
     private val managedPython: MacManagedPythonRuntime? = MacManagedPythonRuntime.locate(),
+    private val containerProviders: List<MacContainerProviderSnapshot> =
+        MacContainerRuntimeDiscovery().discoverAll(),
     processControl: MacProjectProcessControl = MacProjectProcessControl(),
     dataRoot: File = MacProjectEnvironmentManager.defaultDataRoot(),
 ) {
@@ -76,7 +81,12 @@ class MacProductController(
                 ?.pythonExecutable
                 ?.absolutePath,
         )
-        val product = MacProductProject(imported, snapshot, plan)
+        val composePlan = ComposeProjectPlanner.plan(
+            relativePaths = snapshot.relativePaths,
+            manifestText = snapshot.composeText,
+            containerAvailability = MacContainerRuntimeDiscovery.capabilityAvailability(containerProviders),
+        )
+        val product = MacProductProject(imported, snapshot, plan, composePlan)
         projects[product.projectId] = product
         coordinator.attach(MacWorkflowContext(imported, snapshot, plan))
         lastErrors.remove(product.projectId)
@@ -95,7 +105,12 @@ class MacProductController(
                 ?.pythonExecutable
                 ?.absolutePath,
         )
-        val refreshed = existing.copy(snapshot = snapshot, plan = plan)
+        val composePlan = ComposeProjectPlanner.plan(
+            relativePaths = snapshot.relativePaths,
+            manifestText = snapshot.composeText,
+            containerAvailability = MacContainerRuntimeDiscovery.capabilityAvailability(containerProviders),
+        )
+        val refreshed = existing.copy(snapshot = snapshot, plan = plan, composePlan = composePlan)
         projects[projectId] = refreshed
         coordinator.attach(MacWorkflowContext(refreshed.imported, snapshot, plan))
         return refreshed

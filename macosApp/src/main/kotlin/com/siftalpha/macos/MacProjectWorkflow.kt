@@ -3,6 +3,7 @@ package com.siftalpha.macos
 import com.siftalpha.core.environment.EnvironmentPreparationStep
 import com.siftalpha.core.environment.ProjectEnvironmentNeedPolicy
 import com.siftalpha.core.environment.ProjectEnvironmentNeeds
+import com.siftalpha.studio.container.ComposeProjectDetector
 import com.siftalpha.studio.runtime.NodePackageManagerPolicy
 import com.siftalpha.studio.runtime.ProjectRuntimeExecutionPlanner
 import com.siftalpha.studio.runtime.RuntimeKind
@@ -17,6 +18,8 @@ data class MacProjectSnapshot(
     val requirementsText: String?,
     val pyprojectText: String?,
     val packageJsonText: String?,
+    val composeFileName: String? = null,
+    val composeText: String? = null,
 )
 
 enum class MacProjectPlanStatus {
@@ -91,13 +94,17 @@ class MacProjectSnapshotBuilder(
 
         walk(root, 0)
 
+        val sortedPaths = paths.sorted()
+        val composeFileName = ComposeProjectDetector.primaryManifest(sortedPaths)
         return MacProjectSnapshot(
             projectId = project.projectId,
             rootPath = root.absolutePath,
-            relativePaths = paths.sorted(),
+            relativePaths = sortedPaths,
             requirementsText = readRootText(root, "requirements.txt"),
             pyprojectText = readRootText(root, "pyproject.toml"),
             packageJsonText = readRootText(root, "package.json"),
+            composeFileName = composeFileName,
+            composeText = composeFileName?.let { readRootText(root, it) },
         )
     }
 

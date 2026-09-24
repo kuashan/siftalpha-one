@@ -4,6 +4,7 @@ import com.siftalpha.studio.platform.CapabilityAvailability
 import com.siftalpha.studio.platform.StandardPlatformCapabilities
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MacCoreLoadTest {
@@ -24,5 +25,16 @@ class MacCoreLoadTest {
             snapshot.availabilityOf(StandardPlatformCapabilities.CONTAINER_RUNTIME),
         )
         assertFalse(snapshot.supports(StandardPlatformCapabilities.CONTAINER_RUNTIME))
+    }
+
+    @Test
+    fun macHostPublishesContainerCapabilityFromAdapterDiscovery() {
+        val snapshot = MacPlatformCapabilities.snapshot(CapabilityAvailability.AVAILABLE)
+
+        assertEquals(
+            CapabilityAvailability.AVAILABLE,
+            snapshot.availabilityOf(StandardPlatformCapabilities.CONTAINER_RUNTIME),
+        )
+        assertTrue(snapshot.supports(StandardPlatformCapabilities.CONTAINER_RUNTIME))
     }
 }
