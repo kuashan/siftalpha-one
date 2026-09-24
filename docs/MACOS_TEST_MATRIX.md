@@ -103,7 +103,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 
 ## M4 — Project Workflow（项目工作流）
 
-当前状态：**CURRENT STAGE（当前阶段） / M4.1 IMPLEMENTATION IN PROGRESS（M4.1 实现进行中）**
+当前状态：**CURRENT STAGE（当前阶段） / M4.2 CLOUD PASS / REAL MAC PENDING（云端通过 / 真实 Mac 待验收）**
 
 必须证明：
 
@@ -572,3 +572,26 @@ All M4.1 verification items are now PASS, including real macOS 10.15.7 acceptanc
 
 Next slice:
 **M4.2 — Prepare + Run + Observe + Stop/Restart（准备 + 运行 + 观察 + 停止/重启） — NOT STARTED**.
+
+
+### M4.2 Prepare + Run + Observe + Stop/Restart Verification（验证）
+
+| ID | Check（检查） | Evidence（证据） | Status（状态） |
+| --- | --- | --- | --- |
+| M4.2-01 | Bundled managed Python（内置托管 Python） | CPython 3.14.7 x86_64 + checksum | PASS |
+| M4.2-02 | Catalina runtime compatibility（运行时 Catalina 兼容） | Python/libpython MIN_OS=10.15 | PASS |
+| M4.2-03 | Project environment generation（项目环境代际） | venv + atomic current pointer | PASS |
+| M4.2-04 | Wheel-only dependency install（仅 wheel 依赖安装） | idna==3.10 prepare probe | PASS |
+| M4.2-05 | Environment verification（环境验证） | python version + pip check | PASS |
+| M4.2-06 | Python entrypoint run（Python 入口运行） | run=PASS | PASS |
+| M4.2-07 | Logs（日志） | Web URL observed from project output | PASS |
+| M4.2-08 | Web discovery + endpoint probe（网页发现 + 端点探测） | loopback endpoint verified | PASS |
+| M4.2-09 | Project STOP（项目停止） | stopped_state=STOPPED | PASS |
+| M4.2-10 | Restart（重新运行） | new Web endpoint after restart | PASS |
+| M4.2-11 | Final STOP（最终停止） | final_stop=true | PASS |
+| M4.2-12 | M3 A/B isolation regression（M3 隔离回归） | M3 process probe | PASS |
+| M4.2-13 | Android regression（安卓回归） | W0 #730 | PASS |
+| M4.2-14 | Catalina app packaging（Catalina 应用打包） | Run #21 | PASS |
+| M4.2-15 | Real Mac full workflow（真实 Mac 完整闭环） | user acceptance | REAL MAC PENDING |
+
+M4.2 is not closed until M4.2-15 passes.

@@ -13,7 +13,7 @@
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
 - 当前阶段：**M4 — Project Workflow（项目工作流）**
-- M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 IN PROGRESS（M4.2 进行中）**
+- M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 CLOUD PASS / REAL MAC PENDING（云端通过 / 真实 Mac 待验收）**
 
 M3 最后一个已验收功能 HEAD：
 `259d94fe7d7501a1232f1d7114445f4673cfc0a1`
@@ -377,3 +377,49 @@ User-approved scope:
 Managed Python build input is pinned to CPython 3.14.7 / python-build-standalone release 20260901, x86_64-apple-darwin install_only_stripped, with SHA-256 verification in CI.
 
 M4.2 remains IN PROGRESS until cloud and real Catalina full-workflow acceptance pass.
+
+
+## 18. M4.2 Cloud Verification（云端验证）— PASS
+
+Accepted functional HEAD:
+`50a87264e3b5f8d5c352b345a1bc61d7d499c6d1`
+
+Cloud evidence:
+
+- SiftAlpha X macOS Host Runtime Run #21: PASS
+- Android W0 Cloud Build #730: PASS
+- Managed Python artifact checksum verification: PASS
+- Managed Python: CPython 3.14.7 / Intel x86_64
+- bundled pip: 26.2.1
+- M4.2 full workflow probe:
+  - managed_python=Python 3.14.7
+  - prepare=PASS
+  - run=PASS
+  - web discovery/probe=PASS
+  - stop=true
+  - stopped_state=STOPPED
+  - restart=true
+  - web_after_restart=PASS
+  - final_stop=true
+- M3 project-scoped process regression: PASS
+- Catalina package: PASS
+- launcher MIN_OS: 10.12
+- managed Python executable MIN_OS: 10.15
+- managed libpython3.14 MIN_OS: 10.15
+- bundled libjli MIN_OS: 10.12
+- bundled libjvm MIN_OS: 10.12
+- macOS artifact: `siftalpha-macos-m4.2-catalina-x64-21`
+- macOS artifact ID: `10791113378`
+- macOS artifact digest:
+  `sha256:7a36e17e87a59ba55007a22cd57170d3b01b7969b71b8ffe92a50e39bb36ea9f`
+- extracted user-facing app ZIP SHA-256:
+  `3797ec78d2d2422c46932a7f4b887d4818aee6b2d14d5de9dbbe8e16b460b172`
+- Android W0 artifact ID: `10791815841`
+- Android W0 artifact digest:
+  `sha256:371e84271918d0b7eedcabd3470c80d5c2f5a420d5b84c07369f035cceeb88ef`
+
+M4.2 remains OPEN until real macOS 10.15.7 acceptance proves:
+
+Import → Prepare → Run → Logs/Web → Stop → Restart.
+
+No Homebrew, Xcode Command Line Tools, system Python 3, or manual runtime installation may be required.

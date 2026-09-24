@@ -1762,3 +1762,27 @@ Current authority:
 **M4.1 PASS / COMPLETE → M4.2 NOT STARTED**.
 
 M4.2 requires plan discussion/approval before implementation.
+
+
+## M4.2 cloud authority — 2026-09-24
+
+M4.2 — Prepare + Run + Observe + Stop/Restart has reached **CLOUD PASS / REAL MAC PENDING**.
+
+Accepted functional HEAD:
+`50a87264e3b5f8d5c352b345a1bc61d7d499c6d1`.
+
+Key facts:
+- SiftAlpha X bundles its own CPython 3.14.7 x86_64 Runtime;
+- no Homebrew / Xcode CLT / preinstalled Python is required by the design;
+- project Python dependencies are installed into project-owned environment generations;
+- M4.2 uses wheel-only pip installation for this slice;
+- source/editable/VCS/direct-URL/local-path dependency installation is intentionally outside the M4.2 boundary;
+- macOS Run #21 PASS;
+- Android W0 #730 PASS;
+- full cloud Import/Plan → Prepare → Run → Web → STOP → Restart workflow PASS;
+- managed Python and libpython MIN_OS are 10.15, preserving macOS 10.15.7 Catalina support.
+
+Current authority:
+**M4.1 PASS / COMPLETE → M4.2 CLOUD PASS / REAL MAC PENDING**.
+
+Do not close M4.2 or M4 until the real Catalina full-workflow acceptance passes.

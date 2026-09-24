@@ -1718,3 +1718,30 @@ Approved architecture:
 - STOP supersedes/cancels only the selected project's active Prepare/Run work.
 - Web discovery prefers explicit/ordinary local URLs from project logs, then uses only owned process PIDs with macOS lsof fallback and a Core endpoint probe.
 - No Android runtime/provider behavior is modified.
+
+
+## 2026-09-24 · M4.2 Cloud Verification PASS
+
+Accepted functional HEAD:
+`50a87264e3b5f8d5c352b345a1bc61d7d499c6d1`
+
+Implementation-local corrections made during verification:
+- Run #18: added missing `java.io.File` import and corrected Kotlin `runCommand` return control flow;
+- W0 #727: moving Python entrypoint policy into Core exposed a former same-module `internal` dependency; `safeRelativePath` is now an explicit shared Core API;
+- W0 #729: existing Android tests also depended on endpoint target parsing; `RuntimeWebEndpointProbe.Target/targets` are now shared Core API and the focused endpoint test was moved into Core.
+
+These were wiring/visibility corrections inside the approved M4.2 architecture and did not alter Android runtime semantics.
+
+Final cloud evidence:
+- macOS Run #21 PASS;
+- Android W0 #730 PASS;
+- managed Python checksum verified;
+- CPython 3.14.7 + pip 26.2.1 present;
+- M4.2 managed-Python full workflow probe PASS;
+- Prepare / Run / Web / STOP / Restart / final STOP all PASS;
+- M3 process isolation regression PASS;
+- packaged managed Python and libpython both require macOS 10.15, matching the frozen Catalina floor;
+- Android W0 regression PASS.
+
+Current state:
+**M4.2 CLOUD PASS / REAL MAC PENDING**.
