@@ -412,6 +412,27 @@ class MacDeveloperModeWindow(
                 it.logLines.forEach(::appendLine)
                 appendLine()
             }
+            view.lastError?.takeIf(String::isNotBlank)?.let { error ->
+                appendLine("LAST_ERROR=" + error)
+                appendLine()
+            }
+            if (view.project.isCompose) {
+                val composeDiagnostics = view.combinedLogs
+                    .lineSequence()
+                    .filter { line ->
+                        line.contains("compose pull:", ignoreCase = true) ||
+                            line.contains("compose build:", ignoreCase = true) ||
+                            line.contains("SIFTALPHA_M62_PREPARE=") ||
+                            line.contains("PREPARE_DETAIL=")
+                    }
+                    .takeLast(120)
+                    .toList()
+                if (composeDiagnostics.isNotEmpty()) {
+                    appendLine("=== Compose Prepare Diagnostics ===")
+                    composeDiagnostics.forEach(::appendLine)
+                    appendLine()
+                }
+            }
             val rawInstallLog = controller.containerInstallLog(view.project.projectId)
             if (rawInstallLog.isNotBlank()) {
                 appendLine("=== Installer Raw Log ===")
