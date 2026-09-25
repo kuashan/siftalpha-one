@@ -399,29 +399,42 @@ internal object MacSystemProxyDiscovery {
 }
 
 internal object MacManagedContainerProxy {
-    fun colimaEnvironmentArguments(settings: MacSystemProxySettings): List<String> =
-        listOf(
-            "--env", "HTTP_PROXY=" + settings.httpProxy.orEmpty(),
-            "--env", "HTTPS_PROXY=" + settings.httpsProxy.orEmpty(),
-            "--env", "NO_PROXY=" + settings.noProxy.orEmpty(),
+    fun effectiveDockerSettings(settings: MacSystemProxySettings): MacSystemProxySettings {
+        val socks = settings.socksProxy
+            ?.let(::preferRemoteDnsSocks)
+            ?.takeIf(String::isNotBlank)
+        if (socks != null) {
+            return settings.copy(
+                httpProxy = socks,
+                httpsProxy = socks,
+            )
+        }
+        return settings
+    }
+
+    fun strategy(settings: MacSystemProxySettings): String =
+        if (settings.socksProxy != null) "SOCKS5H_SYSTEM_PROXY" else
+            if (settings.hasDockerProxy) "HTTP_SYSTEM_PROXY" else "DIRECT_OR_TUN"
+
+    fun colimaEnvironmentArguments(settings: MacSystemProxySettings): List<String> {
+        val effective = effectiveDockerSettings(settings)
+        return listOf(
+            "--env", "HTTP_PROXY=" + effective.httpProxy.orEmpty(),
+            "--env", "HTTPS_PROXY=" + effective.httpsProxy.orEmpty(),
+            "--env", "NO_PROXY=" + effective.noProxy.orEmpty(),
         )
+    }
 
     fun applyToProcessEnvironment(
         base: Map<String, String>,
         settings: MacSystemProxySettings,
-    ): Map<String, String> = buildMap {
-        putAll(base)
-        settings.httpProxy?.let {
-            put("HTTP_PROXY", it)
-            put("http_proxy", it)
-        }
-        settings.httpsProxy?.let {
-            put("HTTPS_PROXY", it)
-            put("https_proxy", it)
-        }
-        settings.noProxy?.takeIf(String::isNotBlank)?.let {
-            put("NO_PROXY", it)
-            put("no_proxy", it)
+    ): Map<String, String> {
+        val effective = effectiveDockerSettings(settings)
+        return buildMap {
+            putAll(base)
+            putOrRemoveProxy("HTTP_PROXY", "http_proxy", effective.httpProxy)
+            putOrRemoveProxy("HTTPS_PROXY", "https_proxy", effective.httpsProxy)
+            putOrRemoveProxy("NO_PROXY", "no_proxy", effective.noProxy?.takeIf(String::isNotBlank))
         }
     }
 
@@ -429,21 +442,43 @@ internal object MacManagedContainerProxy {
         settings: MacSystemProxySettings,
         dockerInfo: String,
     ): Boolean {
-        if (!settings.hasDockerProxy) return true
+        val effective = effectiveDockerSettings(settings)
+        if (!effective.hasDockerProxy) return true
         val values = dockerInfo.trim().split("|", limit = 3)
         if (values.size < 2) return false
-        val actualHttp = values[0].trim()
-        val actualHttps = values[1].trim()
-
-        fun samePort(expected: String?, actual: String): Boolean {
-            if (expected == null) return true
-            val port = runCatching { URI(expected).port }.getOrDefault(-1)
-            return actual.isNotBlank() && port > 0 && actual.contains(":$port")
-        }
-
-        return samePort(settings.httpProxy, actualHttp) &&
-            samePort(settings.httpsProxy, actualHttps)
+        return sameProxyTransport(effective.httpProxy, values[0].trim()) &&
+            sameProxyTransport(effective.httpsProxy, values[1].trim())
     }
+
+    private fun MutableMap<String, String>.putOrRemoveProxy(
+        upper: String,
+        lower: String,
+        value: String?,
+    ) {
+        if (value == null) {
+            remove(upper)
+            remove(lower)
+        } else {
+            put(upper, value)
+            put(lower, value)
+        }
+    }
+
+    private fun sameProxyTransport(expected: String?, actual: String): Boolean {
+        if (expected == null) return true
+        val expectedUri = runCatching { URI(expected) }.getOrNull() ?: return false
+        val actualUri = runCatching { URI(actual) }.getOrNull() ?: return false
+        return expectedUri.port > 0 &&
+            expectedUri.port == actualUri.port &&
+            expectedUri.scheme.equals(actualUri.scheme, ignoreCase = true)
+    }
+
+    private fun preferRemoteDnsSocks(value: String): String =
+        if (value.startsWith("socks5://", ignoreCase = true)) {
+            "socks5h://" + value.substringAfter("://")
+        } else {
+            value
+        }
 }
 
 internal object MacManagedContainerDns {
@@ -464,10 +499,16 @@ internal object MacManagedContainerDns {
                     )
         val composeRegistryTransportFailure =
             text.contains("failed to resolve reference") &&
-                text.contains("dial tcp") &&
                 (
-                    text.contains("i/o timeout") ||
-                        text.contains("connection refused")
+                    (
+                        text.contains("dial tcp") &&
+                            (
+                                text.contains("i/o timeout") ||
+                                    text.contains("connection refused")
+                                )
+                        ) ||
+                        text.contains("proxyconnect tcp") ||
+                        Regex("""(?:^|[:\\s])eof(?:$|[\\s])""").containsMatchIn(text)
                     )
         return loopbackDnsFailure || composeRegistryTransportFailure
     }
@@ -1082,9 +1123,14 @@ class MacManagedContainerInstaller(
         log("MANAGED_SYSTEM_PROXY_HTTP=" + if (settings.httpProxy != null) "ON" else "OFF")
         log("MANAGED_SYSTEM_PROXY_HTTPS=" + if (settings.httpsProxy != null) "ON" else "OFF")
         log("MANAGED_SYSTEM_PROXY_SOCKS=" + if (settings.socksProxy != null) "ON" else "OFF")
+        log("MANAGED_EGRESS_POLICY=" + MacManagedContainerProxy.strategy(settings))
+        val effective = MacManagedContainerProxy.effectiveDockerSettings(settings)
         log(
-            "MANAGED_EGRESS_POLICY=" +
-                if (settings.hasDockerProxy) "HOST_SYSTEM_PROXY" else "DIRECT_OR_TUN",
+            "MANAGED_DOCKER_PROXY_SCHEME=" +
+                effective.httpsProxy
+                    ?.let { runCatching { URI(it).scheme }.getOrNull() }
+                    .orEmpty()
+                    .ifBlank { "NONE" },
         )
         return settings
     }

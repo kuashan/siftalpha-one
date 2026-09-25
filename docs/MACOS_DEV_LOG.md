@@ -2439,3 +2439,18 @@ Compose `composePrepared` 目前仍是进程内状态，App 重启/升级后会�
 10. Android W0 必须 PASS。
 
 本轮不新增 M6.x，不重开 M2～M5，不修改 Core / Android。
+
+
+### M6.2 EOF Closure — Adaptive Proxy Transport（自适应代理传输）
+
+真实 Ventura + VPN 在 HTTP system proxy 已成功进入 Docker daemon 后，registry failure 从 `dial tcp ... timeout` 进一步变为 `EOF`。这证明 DNS、daemon proxy provisioning（后台代理补齐）都已跨过，剩余失败发生在 proxy transport（代理传输）本身。
+
+新增冻结规则：
+
+- macOS 同时提供 SOCKS proxy 时，SiftAlpha-managed Docker daemon 优先使用 `socks5h://`；
+- `socks5h` 让 Docker/Go transport 把目标 hostname（主机名）交给 proxy 解析，避免 guest DNS / VPN fake-IP / HTTP CONNECT 链路产生第二套网络语义；
+- 若系统没有 SOCKS proxy，继续使用 macOS HTTP/HTTPS proxy；
+- 不硬编码端口、VPN 品牌、用户名或代理地址；
+- `EOF` / `proxyconnect tcp: EOF` 正式纳入 managed registry transport recoverable failure（托管仓库传输可恢复失败）；
+- 自动恢复仍严格保持一次 repair + 一次 retry，不增加循环；
+- Docker daemon proof 同时校验 proxy scheme（协议）与动态端口，避免“只看到同一个端口就误判成功”。

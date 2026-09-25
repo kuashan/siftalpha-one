@@ -1300,3 +1300,16 @@ State remains:
 并增加 post-start `docker info` 验证；只有 Docker daemon 确认真正继承当前 HTTP/HTTPS proxy 后 repair 才能成功。
 
 当前 M6.2 状态仍为 CURRENT，最终仍需真实 Ventura + VPN A/B Compose 固定验收链通过。
+
+
+### M6.2 Adaptive Proxy Transport（自适应代理传输）
+
+最新真机 failure 已从 timeout 变为 registry `EOF`。当前 managed Docker egress 规则调整为：
+
+1. macOS 系统 SOCKS 可用 → Docker daemon 使用 `socks5h`，目标域名由宿主代理链解析；
+2. SOCKS 不可用 → 使用系统 HTTP/HTTPS proxy；
+3. 无系统代理 → direct / TUN；
+4. 任何策略都由当前 `scutil --proxy` 动态事实生成；
+5. `EOF` 纳入唯一一次自动网络 repair + retry。
+
+这不是新 M6 切片，仍属于 M6.2 当前唯一网络阻塞的关闭修复。

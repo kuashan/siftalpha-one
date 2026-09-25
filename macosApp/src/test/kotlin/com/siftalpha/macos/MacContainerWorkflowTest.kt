@@ -125,10 +125,40 @@ class MacContainerWorkflowTest {
         )
         val args = MacManagedContainerProxy.colimaEnvironmentArguments(settings)
 
-        assertTrue(args.contains("HTTP_PROXY=http://127.0.0.1:7897"))
-        assertTrue(args.contains("HTTPS_PROXY=http://127.0.0.1:7897"))
+        assertTrue(args.contains("HTTP_PROXY=socks5h://127.0.0.1:7897"))
+        assertTrue(args.contains("HTTPS_PROXY=socks5h://127.0.0.1:7897"))
         assertTrue(args.contains("NO_PROXY=localhost,127.0.0.1"))
         assertTrue(!args.any { it.startsWith("--dns") })
+    }
+
+    @Test
+    fun managedProxyFallsBackToHttpWhenSystemHasNoSocksProxy() {
+        val settings = MacSystemProxySettings(
+            httpProxy = "http://127.0.0.1:8080",
+            httpsProxy = "http://127.0.0.1:8080",
+            socksProxy = null,
+            noProxy = "localhost",
+        )
+        val args = MacManagedContainerProxy.colimaEnvironmentArguments(settings)
+
+        assertTrue(args.contains("HTTP_PROXY=http://127.0.0.1:8080"))
+        assertTrue(args.contains("HTTPS_PROXY=http://127.0.0.1:8080"))
+        assertEquals("HTTP_SYSTEM_PROXY", MacManagedContainerProxy.strategy(settings))
+    }
+
+    @Test
+    fun managedProxyPrefersSocks5hSoRegistryDnsStaysInsideProxyPath() {
+        val settings = MacSystemProxySettings(
+            httpProxy = "http://127.0.0.1:7897",
+            httpsProxy = "http://127.0.0.1:7897",
+            socksProxy = "socks5://127.0.0.1:7897",
+            noProxy = "localhost",
+        )
+        val effective = MacManagedContainerProxy.effectiveDockerSettings(settings)
+
+        assertEquals("socks5h://127.0.0.1:7897", effective.httpProxy)
+        assertEquals("socks5h://127.0.0.1:7897", effective.httpsProxy)
+        assertEquals("SOCKS5H_SYSTEM_PROXY", MacManagedContainerProxy.strategy(settings))
     }
 
     @Test
@@ -154,7 +184,7 @@ class MacContainerWorkflowTest {
         assertTrue(
             MacManagedContainerProxy.dockerInfoMatches(
                 settings,
-                "http://192.168.5.2:7897|http://192.168.5.2:7897|localhost",
+                "socks5h://192.168.5.2:7897|socks5h://192.168.5.2:7897|localhost",
             ),
         )
         assertTrue(
@@ -215,6 +245,16 @@ class MacContainerWorkflowTest {
         assertTrue(
             MacManagedContainerDns.isRecoverableManagedNetworkFailure(
                 "failed to resolve reference image: dial tcp 203.0.113.10:443: i/o timeout",
+            ),
+        )
+        assertTrue(
+            MacManagedContainerDns.isRecoverableManagedNetworkFailure(
+                "failed to resolve reference image: failed to do request: Head https://registry.example/v2/: EOF",
+            ),
+        )
+        assertTrue(
+            MacManagedContainerDns.isRecoverableManagedNetworkFailure(
+                "failed to resolve reference image: proxyconnect tcp: EOF",
             ),
         )
         assertTrue(

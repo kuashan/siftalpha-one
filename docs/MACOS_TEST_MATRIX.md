@@ -993,3 +993,18 @@ macOS 后续每个实现/修复在进入代码前必须增加以下证据：
 | External providers | Docker / Podman 外部安装不修改 |
 | Android regression | W0 PASS |
 | Real Ventura + VPN | Compose A Prepare PASS |
+
+
+### M6.2 EOF / SOCKS5h Closure Verification
+
+| Check | Expected |
+|---|---|
+| SOCKS preference | 系统 SOCKS 存在时 daemon HTTP/HTTPS proxy 均使用 `socks5h` |
+| Remote DNS | `socks5h` 保留 hostname 到宿主代理链，不依赖 guest registry Fake-IP |
+| HTTP fallback | 无 SOCKS 时保持当前 HTTP/HTTPS system proxy |
+| Docker proof | `docker info` 的 proxy scheme + port 与选定策略一致 |
+| EOF classifier | registry `EOF` / `proxyconnect tcp: EOF` 可进入唯一一次 repair |
+| Retry bound | 仍只有一次 repair + retry |
+| No hard-code | 无固定 7897 / VPN 产品 / 用户路径 |
+| Android regression | W0 PASS |
+| Real Mac | VPN 开启下 Compose A Prepare PASS |
