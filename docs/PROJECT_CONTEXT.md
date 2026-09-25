@@ -2130,3 +2130,24 @@ Authority:
 
 Roadmap unchanged:
 **M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS / REAL VENTURA PENDING → M7 NOT STARTED → M8 NOT STARTED**.
+
+
+## M6.2 R5 Universal-First path-safety authority — 2026-09-25
+
+R5 must be interpreted as a class-wide macOS capability repair. The acceptance Mac is evidence only and is not an architecture template.
+
+Frozen rule reinforced:
+- no code keyed to a username, Mac model, one user's directory, or one acceptance machine;
+- macOS path differences are handled by generic capability/path selection;
+- Unix socket safety uses UTF-8 byte length;
+- managed toolchain storage and VM runtime state are separate concerns;
+- Android/Core boundaries remain unchanged.
+
+Authority:
+- functional HEAD `4eba7802ed351734e23ca2c3cd81007765b11d61`;
+- macOS Run #85 PASS;
+- Android W0 #794 PASS;
+- real Ventura R5 acceptance pending.
+
+Distribution remains M8:
+ZIP is still a development-test artifact; DMG/signing/notarization/upgrade installation remain M8 scope.
