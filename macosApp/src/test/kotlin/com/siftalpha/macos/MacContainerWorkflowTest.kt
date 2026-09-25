@@ -105,18 +105,44 @@ class MacContainerWorkflowTest {
         val limaHome = MacManagedContainerToolchain.limaHome(home)
 
         assertEquals(".siftalpha", limaHome.parentFile.name)
+        assertEquals("l", limaHome.name)
         assertTrue(MacManagedContainerToolchain.projectedLimaSocketPathLength(home) < 104)
         assertTrue(!limaHome.absolutePath.contains("Library/Application Support"))
+        assertTrue(!MacManagedContainerToolchain.usesFallbackStateRoot(home))
     }
 
     @Test
-    fun managedLimaStateFallsBackToCompactPathForLongHome() {
-        val home = java.io.File("/Users/" + "x".repeat(38))
+    fun managedLimaStateFallsBackToCompactHomePathWhenNeeded() {
+        val home = java.io.File("/Users/" + "x".repeat(50))
         val limaHome = MacManagedContainerToolchain.limaHome(home)
 
         assertEquals(".sa", limaHome.parentFile.name)
         assertEquals("l", limaHome.name)
         assertTrue(MacManagedContainerToolchain.projectedLimaSocketPathLength(home) < 104)
+        assertTrue(!MacManagedContainerToolchain.usesFallbackStateRoot(home))
+    }
+
+    @Test
+    fun managedLimaStateMeasuresUtf8BytesForNonAsciiHomePaths() {
+        val home = java.io.File("/Users/" + "用户".repeat(8))
+        val limaHome = MacManagedContainerToolchain.limaHome(home)
+
+        assertEquals(".sa", limaHome.parentFile.name)
+        assertTrue(MacManagedContainerToolchain.projectedLimaSocketPathLength(home) < 104)
+    }
+
+    @Test
+    fun managedLimaStateUsesGenericSystemFallbackWhenHomeCannotFitSocket() {
+        val firstHome = java.io.File("/Users/" + "用户".repeat(10))
+        val secondHome = java.io.File("/Users/" + "账户".repeat(10))
+        val firstRoot = MacManagedContainerToolchain.managedStateRoot(firstHome)
+        val secondRoot = MacManagedContainerToolchain.managedStateRoot(secondHome)
+
+        assertEquals("/private/var/tmp", firstRoot.parentFile.absolutePath)
+        assertTrue(firstRoot.name.startsWith("sax-"))
+        assertNotEquals(firstRoot.name, secondRoot.name)
+        assertTrue(MacManagedContainerToolchain.usesFallbackStateRoot(firstHome))
+        assertTrue(MacManagedContainerToolchain.projectedLimaSocketPathLength(firstHome) < 104)
     }
 
     @Test
@@ -133,9 +159,10 @@ class MacContainerWorkflowTest {
         )
 
         assertTrue(env.getValue("PATH").startsWith(java.io.File(toolchain, "bin").absolutePath))
-        assertEquals(java.io.File(home, ".siftalpha/lima").absolutePath, env["LIMA_HOME"])
-        assertEquals(java.io.File(home, ".siftalpha/colima").absolutePath, env["COLIMA_HOME"])
+        assertEquals(java.io.File(home, ".siftalpha/l").absolutePath, env["LIMA_HOME"])
+        assertEquals(java.io.File(home, ".siftalpha/c").absolutePath, env["COLIMA_HOME"])
         assertEquals(java.io.File(toolchain, "cache/colima").absolutePath, env["COLIMA_CACHE_HOME"])
+        assertEquals("sa", env["COLIMA_PROFILE"])
     }
 
     @Test
