@@ -443,13 +443,22 @@ class MacProjectEnvironmentManager(
         }
     }
 
+    internal fun managedProjectDirectory(projectId: String): File =
+        projectRootFile(projectId)
+
     private fun projectRootFile(projectId: String): File {
         val safe = projectId.replace(Regex("[^A-Za-z0-9._-]"), "_").take(96)
         return File(root, "projects/" + safe)
     }
 
     private fun projectRoot(projectId: String): File =
-        projectRootFile(projectId).apply { mkdirs() }
+        projectRootFile(projectId).apply {
+            mkdirs()
+            val identity = File(this, ".siftalpha-project-id")
+            if (!identity.isFile || identity.readText().trim() != projectId) {
+                identity.writeText(projectId + "\n")
+            }
+        }
 
     private fun failure(detail: String): MacPrepareResult =
         MacPrepareResult(

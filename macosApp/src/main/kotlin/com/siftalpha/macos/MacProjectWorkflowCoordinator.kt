@@ -446,7 +446,7 @@ class MacProjectWorkflowCoordinator(
         }
 
         val processLogs = processControl.logs(ProjectProcessScope(projectId), maxBytes)
-        return buildString {
+        val combined = buildString {
             append(history)
             if (processLogs.stdout.isNotBlank()) {
                 append("\n--- stdout ---\n")
@@ -457,6 +457,7 @@ class MacProjectWorkflowCoordinator(
                 append(processLogs.stderr)
             }
         }.takeLast(maxBytes)
+        return redactProjectText(projectId, combined)
     }
 
     fun webEndpoint(projectId: String): MacProjectWebEndpoint? {
@@ -516,9 +517,9 @@ class MacProjectWorkflowCoordinator(
             environment = environmentManager.currentEnvironment(projectId),
             entrypoint = entrypoint(projectId),
             ownedPids = processControl.ownedPids(scope),
-            stdout = processLogs.stdout,
-            stderr = processLogs.stderr,
-            combinedLogs = combined,
+            stdout = redactProjectText(projectId, processLogs.stdout),
+            stderr = redactProjectText(projectId, processLogs.stderr),
+            combinedLogs = redactProjectText(projectId, combined),
             logsTruncated = processLogs.truncated,
         )
     }
@@ -754,6 +755,15 @@ class MacProjectWorkflowCoordinator(
             .sorted()
             .mapNotNull { name -> store.read(projectId, name)?.let { value -> name to value } }
             .toMap(linkedMapOf())
+    }
+
+    private fun redactProjectText(projectId: String, text: String): String {
+        if (text.isBlank()) return text
+        return projectEnvironment(projectId).values
+            .filter(String::isNotBlank)
+            .distinct()
+            .sortedByDescending(String::length)
+            .fold(text) { safe, secret -> safe.replace(secret, "[REDACTED]") }
     }
 
     private fun containerProvider(projectId: String): MacComposeContainerProvider? =

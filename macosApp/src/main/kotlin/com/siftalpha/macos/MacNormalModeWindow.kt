@@ -252,6 +252,13 @@ class MacNormalModeWindow(
                 addActionListener { refreshProjects() }
             })
             if (selectedProjectId != null) {
+                menu.add(JMenuItem("项目配置…").apply {
+                    addActionListener {
+                        selectedProjectId?.let { id ->
+                            MacProjectConfigurationDialog.show(frame, controller, id)
+                        }
+                    }
+                })
                 menu.add(JMenuItem("清理项目环境…").apply {
                     addActionListener { clearSelectedEnvironment() }
                 })
@@ -260,6 +267,9 @@ class MacNormalModeWindow(
                 })
                 menu.addSeparator()
             }
+            menu.add(JMenuItem("运行空间管理…").apply {
+                addActionListener { MacRuntimeStorageDialog.show(frame, controller) }
+            })
             menu.add(JMenuItem("开发者模式").apply {
                 addActionListener { openDeveloperMode() }
             })

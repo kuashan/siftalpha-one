@@ -52,7 +52,9 @@ class MacDeveloperModeWindow(
     private val stopButton = JButton("停止")
     private val restartButton = JButton("重新运行")
     private val refreshButton = JButton("刷新")
+    private val configureButton = JButton("项目配置")
     private val cleanButton = JButton("清理环境")
+    private val storageButton = JButton("运行空间")
     private val removeButton = JButton("移除项目")
     private val copyButton = JButton("复制日志")
     private val normalButton = JButton("普通模式")
@@ -121,7 +123,9 @@ class MacDeveloperModeWindow(
             add(stopButton)
             add(restartButton)
             add(refreshButton)
+            add(configureButton)
             add(cleanButton)
+            add(storageButton)
             add(removeButton)
             add(copyButton)
             add(normalButton)
@@ -137,7 +141,13 @@ class MacDeveloperModeWindow(
         stopButton.addActionListener { runOperation(controller::stop) }
         restartButton.addActionListener { runOperation(controller::restart) }
         refreshButton.addActionListener { refreshSelectedProject() }
+        configureButton.addActionListener {
+            selectedProjectId?.let { id ->
+                MacProjectConfigurationDialog.show(frame, controller, id)
+            }
+        }
         cleanButton.addActionListener { clearSelectedEnvironment() }
+        storageButton.addActionListener { MacRuntimeStorageDialog.show(frame, controller) }
         removeButton.addActionListener { removeSelectedProject() }
         copyButton.addActionListener { copyCombinedLogs() }
         normalButton.addActionListener { returnToNormal() }
@@ -464,7 +474,9 @@ class MacDeveloperModeWindow(
             stopButton.isEnabled = false
             restartButton.isEnabled = false
             refreshButton.isEnabled = false
+            configureButton.isEnabled = false
             cleanButton.isEnabled = false
+            storageButton.isEnabled = true
             removeButton.isEnabled = false
             copyButton.isEnabled = false
             return
@@ -484,7 +496,9 @@ class MacDeveloperModeWindow(
         stopButton.isEnabled = running || busy
         restartButton.isEnabled = !busy && view.workflow.environmentReady
         refreshButton.isEnabled = true
+        configureButton.isEnabled = !busy && !environmentInstallActive
         cleanButton.isEnabled = !busy && !running && !environmentInstallActive
+        storageButton.isEnabled = !busy && !environmentInstallActive
         removeButton.isEnabled = !busy && !running && !environmentInstallActive
         copyButton.isEnabled = view.combinedLogs.isNotBlank()
     }
@@ -507,7 +521,9 @@ class MacDeveloperModeWindow(
         stopButton.isEnabled = false
         restartButton.isEnabled = false
         refreshButton.isEnabled = false
+        configureButton.isEnabled = false
         cleanButton.isEnabled = false
+        storageButton.isEnabled = false
         removeButton.isEnabled = false
     }
 

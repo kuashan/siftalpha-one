@@ -3,6 +3,7 @@ package com.siftalpha.macos
 import com.siftalpha.core.lifecycle.ProjectLifecycleState
 import com.siftalpha.core.storage.DurableRuntimeOwnershipStore
 import com.siftalpha.core.storage.PlatformStateStorage
+import com.siftalpha.core.storage.RuntimeStorageSnapshot
 import com.siftalpha.studio.container.ComposeProjectPlan
 import com.siftalpha.studio.container.ComposeProjectPlanner
 import com.siftalpha.studio.runtime.RuntimeKind
@@ -75,8 +76,8 @@ class MacProductController(
     private val systemFacts: MacSystemFacts = MacSystemFactsDiscovery.discover(),
     private val containerInstaller: MacContainerEnvironmentInstaller =
         MacManagedContainerInstaller(systemFacts),
-    processControl: MacProjectProcessControl = MacProjectProcessControl(),
-    dataRoot: File = MacProjectEnvironmentManager.defaultDataRoot(),
+    private val processControl: MacProjectProcessControl = MacProjectProcessControl(),
+    private val dataRoot: File = MacProjectEnvironmentManager.defaultDataRoot(),
     private val stateStorage: PlatformStateStorage =
         MacFileStateStorage(File(dataRoot, "state/platform-state.properties")),
 ) {
@@ -91,6 +92,16 @@ class MacProductController(
     )
     private val ownershipStore = DurableRuntimeOwnershipStore(stateStorage)
     private val projectSecretStore = MacKeychainProjectSecretStore(stateStorage)
+    private val runtimeStorageManager = MacRuntimeStorageManager(
+        dataRoot = dataRoot,
+        environmentManager = environmentManager,
+        isProjectActive = { projectId ->
+            val scope = com.siftalpha.core.process.ProjectProcessScope(projectId)
+            processControl.recover(scope)
+            processControl.status(scope).state ==
+                com.siftalpha.core.process.ProjectProcessState.RUNNING
+        },
+    )
     private val coordinator = MacProjectWorkflowCoordinator(
         processControl = processControl,
         environmentManager = environmentManager,
@@ -135,6 +146,28 @@ class MacProductController(
         containerInstallProgress.remove(projectId)
         containerInstallLogs.remove(projectId)
         return true
+    }
+
+    fun runtimeStorageSnapshot(): RuntimeStorageSnapshot {
+        val projectIds = synchronized(this) { projects.keys.toList() }
+        val containerActive = projectIds.any { projectId ->
+            val project = synchronized(this) { projects[projectId] }
+            project?.isCompose == true &&
+                coordinator.status(projectId).processState ==
+                com.siftalpha.core.process.ProjectProcessState.RUNNING
+        }
+        return runtimeStorageManager.snapshot(projectIds, containerActive)
+    }
+
+    fun cleanSafeRuntimeStorage(): RuntimeStorageSnapshot {
+        val projectIds = synchronized(this) { projects.keys.toList() }
+        val containerActive = projectIds.any { projectId ->
+            val project = synchronized(this) { projects[projectId] }
+            project?.isCompose == true &&
+                coordinator.status(projectId).processState ==
+                com.siftalpha.core.process.ProjectProcessState.RUNNING
+        }
+        return runtimeStorageManager.cleanSafeEntries(projectIds, containerActive)
     }
 
     fun configuredEnvironmentKeys(projectId: String): Set<String> =
