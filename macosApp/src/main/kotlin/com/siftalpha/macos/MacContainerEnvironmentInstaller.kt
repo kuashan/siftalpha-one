@@ -204,44 +204,53 @@ object MacManagedContainerToolchain {
         currentRoot(userHome)?.resolve("bin")?.takeIf { it.isDirectory }
 
     private const val MACOS_UNIX_PATH_MAX = 104
+    private const val COLIMA_PROFILE = "sa"
     private const val LIMA_LONGEST_COLIMA_SOCKET_SUFFIX =
-        "colima-siftalpha/ssh.sock.1234567890123456"
+        "colima-sa/ssh.sock.1234567890123456"
+    private val FALLBACK_STATE_PARENT = File("/private/var/tmp")
 
     fun managedStateRoot(
         userHome: File = File(System.getProperty("user.home")),
     ): File {
-        val preferred = File(userHome, ".siftalpha")
-        if (limaSocketPathLength(File(preferred, "lima")) < MACOS_UNIX_PATH_MAX) {
-            return preferred
-        }
-
-        val compact = File(userHome, ".sa")
-        check(limaSocketPathLength(File(compact, "l")) < MACOS_UNIX_PATH_MAX) {
-            "user home path is too long for the macOS Lima socket limit"
-        }
-        return compact
+        val candidates = listOf(
+            File(userHome, ".siftalpha"),
+            File(userHome, ".sa"),
+            File(FALLBACK_STATE_PARENT, "sax-" + stableHomeKey(userHome)),
+        )
+        return candidates.firstOrNull { candidate ->
+            limaSocketPathBytes(File(candidate, "l")) < MACOS_UNIX_PATH_MAX
+        } ?: error(
+            "CONTAINER_RUNTIME_PATH_TOO_LONG: no safe Lima state root for current macOS user path",
+        )
     }
 
     fun limaHome(
         userHome: File = File(System.getProperty("user.home")),
-    ): File {
-        val stateRoot = managedStateRoot(userHome)
-        return if (stateRoot.name == ".sa") File(stateRoot, "l") else File(stateRoot, "lima")
-    }
+    ): File = File(managedStateRoot(userHome), "l")
 
     fun colimaHome(
         userHome: File = File(System.getProperty("user.home")),
-    ): File {
-        val stateRoot = managedStateRoot(userHome)
-        return if (stateRoot.name == ".sa") File(stateRoot, "c") else File(stateRoot, "colima")
-    }
+    ): File = File(managedStateRoot(userHome), "c")
 
     fun projectedLimaSocketPathLength(
         userHome: File = File(System.getProperty("user.home")),
-    ): Int = limaSocketPathLength(limaHome(userHome))
+    ): Int = limaSocketPathBytes(limaHome(userHome))
 
-    private fun limaSocketPathLength(limaHome: File): Int =
-        File(limaHome, LIMA_LONGEST_COLIMA_SOCKET_SUFFIX).absolutePath.length
+    fun usesFallbackStateRoot(
+        userHome: File = File(System.getProperty("user.home")),
+    ): Boolean = managedStateRoot(userHome).parentFile == FALLBACK_STATE_PARENT
+
+    private fun limaSocketPathBytes(limaHome: File): Int =
+        File(limaHome, LIMA_LONGEST_COLIMA_SOCKET_SUFFIX)
+            .absolutePath
+            .toByteArray(Charsets.UTF_8)
+            .size
+
+    private fun stableHomeKey(userHome: File): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(userHome.absolutePath.toByteArray(Charsets.UTF_8))
+            .take(6)
+            .joinToString("") { "%02x".format(it) }
 
     fun environment(
         root: File,
@@ -254,7 +263,7 @@ object MacManagedContainerToolchain {
         put("COLIMA_CACHE_HOME", File(root, "cache/colima").absolutePath)
         put("LIMA_HOME", limaHome(userHome).absolutePath)
         put("DOCKER_CONFIG", File(root, "docker-config").absolutePath)
-        put("COLIMA_PROFILE", "siftalpha")
+        put("COLIMA_PROFILE", COLIMA_PROFILE)
     }
 
     fun environmentForExecutable(
