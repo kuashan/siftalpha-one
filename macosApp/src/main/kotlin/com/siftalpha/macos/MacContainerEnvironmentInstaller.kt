@@ -307,6 +307,7 @@ internal data class MacManagedContainerDnsSelection(
 
 internal object MacManagedContainerDns {
     private val nameserverLine = Regex("""nameserver\[\d+\]\s*:\s*([^\s]+)""")
+    private val resolvConfNameserverLine = Regex("""(?m)^\s*nameserver\s+([^\s#]+)""")
     private val fallbackResolvers = listOf("1.1.1.1", "8.8.8.8")
 
     fun select(scutilDns: String): MacManagedContainerDnsSelection {
@@ -351,6 +352,20 @@ internal object MacManagedContainerDns {
             add("--dns")
             add(resolver)
         }
+    }
+
+    fun hasUsableVmResolver(resolvConf: String): Boolean =
+        resolvConfNameserverLine
+            .findAll(resolvConf)
+            .map { it.groupValues[1].trim() }
+            .any(::isUsableResolver)
+
+    fun renderVmResolvConf(resolvers: List<String>): String = buildString {
+        appendLine("# Managed by SiftAlpha container DNS recovery")
+        resolvers
+            .filter(::isUsableResolver)
+            .distinct()
+            .forEach { resolver -> appendLine("nameserver " + resolver) }
     }
 
     private fun isUsableResolver(value: String): Boolean {
@@ -454,6 +469,12 @@ class MacManagedContainerInstaller(
                 environment,
                 30 * 60,
                 log,
+            )
+            ensureManagedVmResolver(
+                colima = colima,
+                environment = environment,
+                dns = dns,
+                log = log,
             )
             progress(MacContainerInstallPhase.VERIFYING, "正在验证修复后的 Docker 网络环境…")
             runChecked(
@@ -642,6 +663,12 @@ class MacManagedContainerInstaller(
                 managedEnvironment,
                 30 * 60,
                 log,
+            )
+            ensureManagedVmResolver(
+                colima = colima,
+                environment = managedEnvironment,
+                dns = dns,
+                log = log,
             )
 
             progress(MacContainerInstallPhase.VERIFYING, "正在验证 Docker 与 Compose…")
@@ -850,6 +877,78 @@ class MacManagedContainerInstaller(
     private fun environmentFor(root: File): Map<String, String> =
         MacManagedContainerToolchain.environment(root, userHome = userHome)
 
+    private fun ensureManagedVmResolver(
+        colima: File,
+        environment: Map<String, String>,
+        dns: MacManagedContainerDnsSelection,
+        log: (String) -> Unit,
+    ) {
+        val readCommand = listOf(
+            colima.absolutePath,
+            "ssh",
+            "--",
+            "cat",
+            "/etc/resolv.conf",
+        )
+        val current = runCatching {
+            captureCommand(
+                command = readCommand,
+                timeoutSeconds = 20,
+                environment = environment,
+            )
+        }.getOrNull()
+
+        if (current != null && MacManagedContainerDns.hasUsableVmResolver(current)) {
+            log("MANAGED_VM_RESOLV_CONF=HEALTHY")
+            return
+        }
+
+        val rendered = MacManagedContainerDns.renderVmResolvConf(dns.resolvers)
+        check(MacManagedContainerDns.hasUsableVmResolver(rendered)) {
+            "no usable resolver available for managed VM recovery"
+        }
+
+        log("MANAGED_VM_RESOLV_CONF=RECOVERY_REQUIRED")
+        runChecked(
+            command = listOf(
+                colima.absolutePath,
+                "ssh",
+                "--",
+                "sudo",
+                "rm",
+                "-f",
+                "/etc/resolv.conf",
+            ),
+            environment = environment,
+            timeoutSeconds = 30,
+            log = log,
+        )
+        runChecked(
+            command = listOf(
+                colima.absolutePath,
+                "ssh",
+                "--",
+                "sudo",
+                "tee",
+                "/etc/resolv.conf",
+            ),
+            environment = environment,
+            timeoutSeconds = 30,
+            log = log,
+            input = rendered,
+        )
+
+        val verified = captureCommand(
+            command = readCommand,
+            timeoutSeconds = 20,
+            environment = environment,
+        )
+        check(MacManagedContainerDns.hasUsableVmResolver(verified)) {
+            "managed VM resolver recovery did not materialize a usable /etc/resolv.conf"
+        }
+        log("MANAGED_VM_RESOLV_CONF=RECOVERED")
+    }
+
     private fun discoverManagedDns(log: (String) -> Unit): MacManagedContainerDnsSelection {
         val scutilOutput = runCatching {
             captureCommand(
@@ -866,9 +965,11 @@ class MacManagedContainerInstaller(
     private fun captureCommand(
         command: List<String>,
         timeoutSeconds: Long,
+        environment: Map<String, String> = System.getenv(),
     ): String {
         val process = ProcessBuilder(command)
             .redirectErrorStream(true)
+            .apply { environment().putAll(environment) }
             .start()
         if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
             process.destroy()
@@ -915,6 +1016,7 @@ class MacManagedContainerInstaller(
         environment: Map<String, String>,
         timeoutSeconds: Long,
         log: (String) -> Unit,
+        input: String? = null,
     ) {
         val output = File.createTempFile("siftalpha-container-install-", ".log")
         try {
@@ -923,6 +1025,11 @@ class MacManagedContainerInstaller(
                 .redirectOutput(output)
                 .apply { environment().putAll(environment) }
                 .start()
+            if (input != null) {
+                process.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
+                    writer.write(input)
+                }
+            }
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
             while (!process.waitFor(250, TimeUnit.MILLISECONDS)) {
                 if (System.nanoTime() >= deadline) {
