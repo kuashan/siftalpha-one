@@ -823,3 +823,19 @@ Current result:
 
 Current checksum-repair result:
 **5 / 6 PASS — CLOUD PASS / REAL VENTURA RETEST PENDING**.
+
+
+### M6.2 Buildx Darwin Digest Verification（验证）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| M6.2-B01 | Buildx Darwin manifest behavior | installer does not expect Darwin in generic checksums.txt | PASS |
+| M6.2-B02 | Buildx x86_64 digest | official v0.37.1 release digest pinned | PASS |
+| M6.2-B03 | Buildx arm64 digest | official v0.37.1 release digest pinned | PASS |
+| M6.2-B04 | Binary-mode checksum syntax | `*filename` entries parse correctly | PASS |
+| M6.2-B05 | macOS regression | Core/macOS + M6 probes PASS | PASS — Run #77 |
+| M6.2-B06 | Android regression | W0 PASS | PASS — #786 |
+| M6.2-B07 | Real Ventura retry | Buildx verifies and installer advances beyond download phase | PENDING |
+
+Current Buildx repair result:
+**6 / 7 PASS — CLOUD PASS / REAL VENTURA RETEST PENDING**.
