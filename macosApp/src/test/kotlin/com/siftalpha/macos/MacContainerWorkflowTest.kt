@@ -430,6 +430,26 @@ class MacContainerWorkflowTest {
     }
 
     @Test
+    fun managedEnvironmentPinsDockerClientToDedicatedColimaProfileSocket() {
+        val home = java.io.File("/Users/tester")
+        val toolchain = java.io.File(
+            home,
+            "Library/Application Support/SiftAlpha X/container-runtime/managed-test",
+        )
+
+        val environment = MacManagedContainerToolchain.environment(
+            root = toolchain,
+            base = mapOf("PATH" to "/usr/bin"),
+            userHome = home,
+        )
+
+        assertEquals(
+            "unix:///Users/tester/.siftalpha/c/sa/docker.sock",
+            environment["DOCKER_HOST"],
+        )
+    }
+
+    @Test
     fun advisorDistinguishesReadyInstalledButStoppedAndMissingProvider() {
         val ready = MacContainerProviderSnapshot(
             kind = MacContainerProviderKind.DOCKER,
