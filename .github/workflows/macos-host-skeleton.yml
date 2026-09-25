@@ -340,17 +340,17 @@ jobs:
           find "$APP" -maxdepth 4 -type f | sort | tee macos-evidence/app-files.txt
           ditto -c -k --sequesterRsrc --keepParent \
             "$APP" \
-            macos-dist/SiftAlpha-X-m6.2-unified-prepare-r3-ventura-x64.zip
-          shasum -a 256 macos-dist/SiftAlpha-X-m6.2-unified-prepare-r3-ventura-x64.zip \
+            macos-dist/SiftAlpha-X-m6.2-unified-prepare-r4-ventura-x64.zip
+          shasum -a 256 macos-dist/SiftAlpha-X-m6.2-unified-prepare-r4-ventura-x64.zip \
             | tee macos-evidence/app-zip-sha256.txt
 
       - name: Upload macOS app and evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: siftalpha-macos-m6.2-unified-prepare-r3-ventura-x64-${{ github.run_number }}
+          name: siftalpha-macos-m6.2-unified-prepare-r4-ventura-x64-${{ github.run_number }}
           path: |
-            macos-dist/SiftAlpha-X-m6.2-unified-prepare-r3-ventura-x64.zip
+            macos-dist/SiftAlpha-X-m6.2-unified-prepare-r4-ventura-x64.zip
             macos-evidence
           if-no-files-found: warn
           retention-days: 14
