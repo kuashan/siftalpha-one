@@ -1148,3 +1148,46 @@ R6 verification:
 
 Current state:
 **M6.2 R5 REAL PATH PASS / R6 CLOUD PASS / REAL COMPOSE PREPARE ROOT-CAUSE RETEST PENDING**.
+
+
+## 36. Installed-test DMG + App Translocation Guard — CLOUD PASS
+
+User-approved acceptance-order change:
+before continuing M6.2 real Compose diagnosis, macOS acceptance must run from an installed application under `/Applications`, not from ZIP extraction, Downloads, a mounted DMG, or macOS App Translocation.
+
+This pulls forward only the minimum installation substrate required for clean M6.2 evidence. It does **not** declare the full M8 Distribution stage complete.
+
+Implemented:
+- CI now builds a standard macOS DMG containing:
+  - `SiftAlpha X.app`;
+  - an `Applications` symlink targeting `/Applications`;
+- DMG is created with `hdiutil`, verified with `hdiutil verify`, mounted read-only in CI, and checked for the application bundle and Applications target;
+- GUI startup now blocks packaged launches when:
+  - the executable path is inside macOS `AppTranslocation`;
+  - the packaged app is outside global `/Applications`;
+- command-line/self-test probes remain allowed so CI/development workflows are not blocked;
+- the guard is generic and path-based, with no user/machine-specific conditions.
+
+Cloud authority:
+- functional HEAD `9910bb5ad200d94f7ae837374b1037df9cf8f432`;
+- macOS Run #95 PASS;
+- Android W0 #804 PASS;
+- DMG validation PASS;
+- `LSMinimumSystemVersion=13.0`;
+- DMG artifact: `siftalpha-macos-m6.2-installed-r7-ventura-x64-95`;
+- artifact ID `10842757338`;
+- artifact digest `sha256:d91b7d606ed6d9cb7c02d4114e0011ec1517976ded97b31aab2a483215c55d37`;
+- DMG SHA-256 `c7ed357fa19173cc91d8528ff60eb934c15a2590cffbd60cfab832e9d6b52c11`.
+
+Important limitation:
+this is still an **installed test build** using the repository's existing ad-hoc app signature. Developer ID signing, Hardened Runtime, Apple notarization, release-update policy, and public-distribution hardening remain full M8 scope.
+
+Next real acceptance:
+1. open the DMG;
+2. drag `SiftAlpha X.app` to `/Applications` and replace the prior copy when Finder asks;
+3. launch only from `/Applications`;
+4. confirm no App Translocation warning;
+5. only then resume M6.2 Compose real-machine testing.
+
+Current state:
+**M6.2 CLOUD PASS / INSTALLED-DMG REAL ACCEPTANCE PENDING**.
