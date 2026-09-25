@@ -1082,3 +1082,37 @@ Authority:
 
 Current state:
 **M6.2 CLOUD PASS / REAL VENTURA R4 RETEST PENDING**.
+
+
+## 35. M6.2 R5 Managed Container Path Safety — CLOUD PASS
+
+R5 is a Universal-First macOS adapter repair, not a device-specific workaround.
+
+Problem class:
+- Lima/Colima Unix-domain sockets must remain below the macOS socket pathname byte limit;
+- user home paths may be long or non-ASCII, so character count is not sufficient;
+- the toolchain cache path must not force the VM state/socket path to inherit long versioned directories.
+
+Implementation:
+- toolchain binaries remain under SiftAlpha's versioned Application Support container-runtime catalog;
+- Colima/Lima runtime state is separated onto a short state root;
+- selection is capability/path based: `~/.siftalpha` → `~/.sa` → stable isolated `/private/var/tmp/sax-<home-hash>` fallback;
+- path safety is measured in UTF-8 bytes, not Kotlin/Java character count;
+- Colima managed profile is shortened to `sa`;
+- fallback roots are per-home stable and owner-restricted;
+- no username, Mac model, Intel-device, or user-specific product branch was introduced.
+
+Verification authority:
+- functional HEAD `4eba7802ed351734e23ca2c3cd81007765b11d61`;
+- macOS Run #85 PASS;
+- Android W0 #794 PASS;
+- macOS unit tests cover normal, long ASCII, non-ASCII UTF-8, and extreme-home fallback paths;
+- M6.2 managed-environment probe PASS;
+- Compose workflow / A-B isolation / STOP / Restart / Web regressions PASS;
+- artifact `siftalpha-macos-m6.2-unified-prepare-r5-ventura-x64-85`;
+- artifact ID `10841368625`;
+- artifact digest `sha256:21f1df74a3877f617971c9f70b3ccc15e560c37feb78f6ea37fb5ee3914a126f`;
+- user ZIP SHA-256 `32d85e69d5f6466f77f44d1da6d591b89fd5a271e036f3e44d2824283fae1f58`.
+
+Current state:
+**M6.2 CLOUD PASS / REAL VENTURA R5 RETEST PENDING**.
