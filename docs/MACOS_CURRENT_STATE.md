@@ -1049,3 +1049,36 @@ Authority:
 
 Current state:
 **M6.2 CLOUD PASS / REAL VENTURA MANAGED-ENVIRONMENT RETEST PENDING**.
+
+
+## 34. M6.2 R4 Buildx Darwin checksum repair — CLOUD PASS
+
+Real Ventura retry progressed past Colima, Lima, Docker CLI and Docker Compose verification, then failed at Docker Buildx with:
+
+`checksum not found for buildx-v0.37.1.darwin-amd64`
+
+Root cause:
+- Buildx v0.37.1 release automation intentionally removes Darwin entries from `checksums.txt`;
+- the Darwin release assets still publish official SHA-256 digests in GitHub Release metadata;
+- therefore the installer must not expect the generic Buildx checksum manifest to contain macOS binaries.
+
+Repair:
+- macOS Buildx assets now use version-pinned official GitHub Release digests:
+  - x86_64 / amd64: `7003a7bae20e7741283db1e23dafdcb957776a8be85de3f459630b1dd4c19db0`;
+  - arm64: `c3cbbc820d578b0aa8158dd62ef1af25a0c8a75ef53331dbe4e219471e1dbe8c`;
+- checksum parsing also accepts standard `*filename` binary-mode manifest entries;
+- verification remains fail-closed.
+
+Authority:
+- functional HEAD `a44c83f00f820c68ab7a542ac2d8788f0098fe4f`;
+- macOS Run #77 PASS;
+- Android W0 #786 PASS;
+- managed environment flow probe PASS;
+- Compose workflow / A-B isolation / STOP / Restart / Web regressions PASS;
+- artifact `siftalpha-macos-m6.2-unified-prepare-r4-ventura-x64-77`;
+- artifact ID `10840515497`;
+- artifact digest `sha256:5a194b0de29a8f16df6f43173c9148b9fee77188ea5f8c01dad5fb5d52c548e1`;
+- user ZIP SHA-256 `3f60ec593e0f5c454407572da3e986750c9439806d856d2eff25c0a1940fbd3c`.
+
+Current state:
+**M6.2 CLOUD PASS / REAL VENTURA R4 RETEST PENDING**.
