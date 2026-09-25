@@ -338,19 +338,51 @@ jobs:
           inspect_minos "$LIBJVM" "libjvm"
 
           find "$APP" -maxdepth 4 -type f | sort | tee macos-evidence/app-files.txt
-          ditto -c -k --sequesterRsrc --keepParent \
-            "$APP" \
-            macos-dist/SiftAlpha-X-m6.2-compose-diagnostics-r6-ventura-x64.zip
-          shasum -a 256 macos-dist/SiftAlpha-X-m6.2-compose-diagnostics-r6-ventura-x64.zip \
-            | tee macos-evidence/app-zip-sha256.txt
 
-      - name: Upload macOS app and evidence
+          DMG_ROOT="macos-dist/dmg-root"
+          DMG="macos-dist/SiftAlpha-X-m6.2-installed-r7-ventura-x64.dmg"
+          rm -rf "$DMG_ROOT" "$DMG"
+          mkdir -p "$DMG_ROOT"
+          ditto "$APP" "$DMG_ROOT/SiftAlpha X.app"
+          ln -s /Applications "$DMG_ROOT/Applications"
+
+          hdiutil create \
+            -volname "SiftAlpha X" \
+            -srcfolder "$DMG_ROOT" \
+            -ov \
+            -format UDZO \
+            "$DMG"
+
+          hdiutil verify "$DMG" | tee macos-evidence/dmg-verify.txt
+
+          MOUNT_POINT="$(mktemp -d /tmp/siftalpha-dmg-mount.XXXXXX)"
+          hdiutil attach "$DMG" -readonly -nobrowse -mountpoint "$MOUNT_POINT" \
+            | tee macos-evidence/dmg-attach.txt
+          trap 'hdiutil detach "$MOUNT_POINT" -force >/dev/null 2>&1 || true; rmdir "$MOUNT_POINT" >/dev/null 2>&1 || true' EXIT
+
+          test -d "$MOUNT_POINT/SiftAlpha X.app"
+          test -L "$MOUNT_POINT/Applications"
+          test "$(readlink "$MOUNT_POINT/Applications")" = "/Applications"
+          codesign --verify --deep --strict "$MOUNT_POINT/SiftAlpha X.app"
+          plutil -p "$MOUNT_POINT/SiftAlpha X.app/Contents/Info.plist" \
+            | tee macos-evidence/dmg-app-info-plist.txt
+          find "$MOUNT_POINT" -maxdepth 2 -print | sort \
+            | tee macos-evidence/dmg-contents.txt
+
+          hdiutil detach "$MOUNT_POINT"
+          rmdir "$MOUNT_POINT"
+          trap - EXIT
+          rm -rf "$DMG_ROOT"
+
+          shasum -a 256 "$DMG" | tee macos-evidence/app-dmg-sha256.txt
+
+      - name: Upload macOS DMG and evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: siftalpha-macos-m6.2-compose-diagnostics-r6-ventura-x64-${{ github.run_number }}
+          name: siftalpha-macos-m6.2-installed-r7-ventura-x64-${{ github.run_number }}
           path: |
-            macos-dist/SiftAlpha-X-m6.2-compose-diagnostics-r6-ventura-x64.zip
+            macos-dist/SiftAlpha-X-m6.2-installed-r7-ventura-x64.dmg
             macos-evidence
           if-no-files-found: warn
           retention-days: 14
