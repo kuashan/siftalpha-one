@@ -135,7 +135,7 @@ object MacContainerEnvironmentAdvisor {
         return MacContainerEnvironmentAdvice(
             state = state,
             title = "需要安装或启用容器环境",
-            detail = "当前没有可用的 Docker/Podman + Compose。SiftAlpha 可以根据系统能力生成推荐安装方案；真正安装前会要求用户确认，也不会自动修改 CPU、内存或磁盘资源配置。",
+            detail = "当前没有可用的 Docker/Podman + Compose。SiftAlpha 可以根据系统能力生成推荐环境方案；只会在用户主动点击“准备环境”或开发者环境修复时执行，也不会自动修改 CPU、内存或磁盘资源配置。",
             suggestedOptions = options,
             warnings = warnings,
         )
