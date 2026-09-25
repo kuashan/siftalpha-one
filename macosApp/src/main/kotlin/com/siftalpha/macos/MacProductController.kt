@@ -286,6 +286,37 @@ class MacProductController(
         }
 
         val result = coordinator.prepare(projectId)
+        if (
+            product?.isCompose == true &&
+            !result.success &&
+            !result.cancelled &&
+            MacManagedContainerDns.isLoopbackFailure(result.detail) &&
+            managedDockerProviderAvailable()
+        ) {
+            val repaired = repairManagedContainerNetwork(projectId)
+            if (repaired) {
+                refreshContainerProviders()
+                val retry = coordinator.prepare(projectId)
+                if (retry.success) {
+                    containerInstallProgress[projectId] = MacContainerInstallProgress(
+                        phase = MacContainerInstallPhase.COMPLETE,
+                        message = "托管容器网络已自动修复，项目准备已完成。",
+                        logLines = installLogTail(projectId),
+                    )
+                    lastErrors.remove(projectId)
+                    return retry
+                }
+                val retryDetail = retry.detail ?: "网络修复后项目准备仍然失败。"
+                lastErrors[projectId] = retryDetail
+                containerInstallProgress[projectId] = MacContainerInstallProgress(
+                    phase = MacContainerInstallPhase.FAILED,
+                    message = retryDetail,
+                    logLines = installLogTail(projectId),
+                )
+                return retry
+            }
+        }
+
         if (!result.success) {
             lastErrors[projectId] = result.detail ?: if (result.cancelled) {
                 "准备已停止"
@@ -294,6 +325,55 @@ class MacProductController(
             }
         }
         return result
+    }
+
+    private fun managedDockerProviderAvailable(): Boolean =
+        latestContainerProviders.any { provider ->
+            provider.kind == MacContainerProviderKind.DOCKER &&
+                provider.availability.name == "AVAILABLE" &&
+                MacManagedContainerToolchain.isManagedExecutable(provider.executablePath)
+        }
+
+    private fun repairManagedContainerNetwork(projectId: String): Boolean {
+        containerInstallLogs[projectId] = StringBuilder()
+        fun updateProgress(phase: MacContainerInstallPhase, message: String) {
+            containerInstallProgress[projectId] = MacContainerInstallProgress(
+                phase = phase,
+                message = message,
+                logLines = installLogTail(projectId),
+            )
+        }
+        val result = containerInstaller.repairManagedNetwork(
+            progress = ::updateProgress,
+            log = { appendInstallLog(projectId, it) },
+        )
+        if (!result.success) {
+            val detail = result.detail ?: "托管容器网络自动修复失败。"
+            lastErrors[projectId] = detail
+            updateProgress(MacContainerInstallPhase.FAILED, detail)
+        }
+        return result.success
+    }
+
+    private fun appendInstallLog(projectId: String, line: String) {
+        val buffer = containerInstallLogs.computeIfAbsent(projectId) { StringBuilder() }
+        synchronized(buffer) {
+            buffer.append(line).append('\n')
+            if (buffer.length > 200_000) {
+                buffer.delete(0, buffer.length - 160_000)
+            }
+        }
+    }
+
+    private fun installLogTail(projectId: String): List<String> {
+        val buffer = containerInstallLogs[projectId] ?: return emptyList()
+        return synchronized(buffer) {
+            buffer.toString()
+                .lineSequence()
+                .filter(String::isNotBlank)
+                .toList()
+                .takeLast(80)
+        }
     }
 
     fun start(projectId: String): Boolean {
