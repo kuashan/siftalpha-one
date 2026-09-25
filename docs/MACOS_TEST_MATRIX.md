@@ -839,3 +839,22 @@ Current checksum-repair result:
 
 Current Buildx repair result:
 **6 / 7 PASS — CLOUD PASS / REAL VENTURA RETEST PENDING**.
+
+
+### M6.2 R5 Managed Container Path Safety Verification（路径安全验证）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| M6.2-P01 | Normal home path | short home-local state root selected | PASS |
+| M6.2-P02 | Long ASCII home path | compact home-local state root selected | PASS |
+| M6.2-P03 | Non-ASCII home path | UTF-8 byte length determines safe root | PASS |
+| M6.2-P04 | Extreme home path | deterministic isolated short system fallback selected | PASS |
+| M6.2-P05 | Toolchain/state separation | versioned toolchain path does not lengthen Lima socket path | PASS |
+| M6.2-P06 | Project/provider isolation | no user Docker/Colima configuration override | PASS |
+| M6.2-P07 | macOS regressions | Core/macOS, M4/M5/M6 probes PASS | PASS — Run #85 |
+| M6.2-P08 | Android regression | W0 PASS | PASS — #794 |
+| M6.2-P09 | Real Ventura VM start | Colima/Lima advances beyond socket creation | PENDING |
+| M6.2-P10 | Real Compose acceptance | Prepare → Run → A/B isolation → Restart | PENDING |
+
+Current R5 result:
+**8 / 10 PASS — CLOUD PASS / REAL VENTURA RETEST PENDING**.
