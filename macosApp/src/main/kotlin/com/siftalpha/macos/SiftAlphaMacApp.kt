@@ -4,6 +4,7 @@ import com.siftalpha.studio.platform.CapabilityAvailability
 import com.siftalpha.studio.platform.PlatformCapability
 import com.siftalpha.studio.platform.PlatformCapabilitySnapshot
 import com.siftalpha.studio.platform.StandardPlatformCapabilities
+import javax.swing.JOptionPane
 import javax.swing.SwingUtilities
 import javax.swing.UIManager
 
@@ -146,6 +147,19 @@ fun main(args: Array<String>) {
         println("SIFTALPHA_M62_CONTAINER_INSTALL_PROBE=" + if (result.passed) "PASS" else "FAIL")
         result.lines.forEach { line -> println("SIFTALPHA_M62_INSTALL=" + line) }
         if (!result.passed) error("M6.2 managed container install flow probe failed")
+        return
+    }
+
+    val installation = MacInstallationGuard.assess()
+    if (!installation.allowed) {
+        SwingUtilities.invokeLater {
+            JOptionPane.showMessageDialog(
+                null,
+                MacInstallationGuard.userMessage(installation),
+                "请先安装 SiftAlpha X",
+                JOptionPane.WARNING_MESSAGE,
+            )
+        }
         return
     }
 
