@@ -2206,3 +2206,33 @@ Verification:
 
 State:
 **CLOUD PASS / REAL VENTURA R4 RETEST PENDING**.
+
+
+## 2026-09-25 · M6.2 R5 universal Lima socket path safety PASS
+
+Real acceptance exposed a generic macOS constraint: Lima's generated Unix socket path exceeded the platform limit when runtime state inherited a long SiftAlpha/versioned directory.
+
+Universal repair:
+- separate toolchain storage from VM runtime state;
+- use short managed state roots selected by projected socket-path capability;
+- measure the full projected socket path in UTF-8 bytes;
+- support long ASCII and non-ASCII home paths;
+- use a deterministic per-home short system fallback only when home-relative roots cannot fit;
+- keep state isolated from user Docker/Colima configuration;
+- no machine/user/model-specific conditional code.
+
+Cloud verification:
+- functional HEAD `4eba7802ed351734e23ca2c3cd81007765b11d61`;
+- macOS Run #85 PASS;
+- Android W0 #794 PASS;
+- Gradle macOS tests PASS;
+- managed environment / Compose lifecycle regressions PASS.
+
+R5 ZIP:
+`SiftAlpha-X-m6.2-unified-prepare-r5-ventura-x64.zip`
+
+SHA-256:
+`32d85e69d5f6466f77f44d1da6d591b89fd5a271e036f3e44d2824283fae1f58`
+
+State remains:
+**CLOUD PASS / REAL VENTURA RETEST PENDING**.
