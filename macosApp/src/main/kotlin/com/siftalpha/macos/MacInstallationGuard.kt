@@ -42,7 +42,7 @@ object MacInstallationGuard {
         }
 
         val bundlePath = raw.substring(0, markerIndex + ".app".length)
-        val normalized = File(bundlePath).absoluteFile.normalize().path
+        val normalized = File(bundlePath).absoluteFile.toPath().normalize().toString()
 
         if (normalized.contains("/AppTranslocation/")) {
             return MacInstallationAssessment(
