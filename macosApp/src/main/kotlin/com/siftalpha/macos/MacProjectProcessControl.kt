@@ -9,9 +9,10 @@ import com.siftalpha.core.process.ProjectProcessState
 import com.siftalpha.core.process.ProjectProcessStatus
 import com.siftalpha.core.process.ProjectStopOutcome
 import com.siftalpha.core.process.ProjectStopResult
+import com.siftalpha.core.storage.DurableRuntimeOwnership
+import com.siftalpha.core.storage.DurableRuntimeOwnershipStore
 import java.io.File
 import java.io.InputStream
-import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
@@ -24,20 +25,54 @@ import kotlin.concurrent.thread
  */
 class MacProjectProcessControl : ProjectProcessControl {
     private data class Record(
-        val process: Process,
+        val process: Process?,
+        val root: ProcessHandle,
         val handle: ProjectProcessHandle,
+        val startedAtEpochMs: Long,
         val stdout: BoundedLogBuffer = BoundedLogBuffer(),
         val stderr: BoundedLogBuffer = BoundedLogBuffer(),
         @Volatile var stoppedByUser: Boolean = false,
     )
 
     private val records = ConcurrentHashMap<String, Record>()
+    @Volatile
+    private var ownershipStore: DurableRuntimeOwnershipStore? = null
+
+    internal fun bindOwnershipStore(store: DurableRuntimeOwnershipStore) {
+        ownershipStore = store
+    }
+
+    internal fun recover(scope: ProjectProcessScope): Boolean {
+        synchronized(records) {
+            val existing = records[scope.projectId]
+            if (existing?.root?.isAlive == true) return true
+
+            val identity = ownershipStore?.read(scope.projectId) ?: return false
+            val pid = identity.platformHandle.removePrefix("macos-pid:").toLongOrNull()
+                ?: run {
+                    ownershipStore?.clear(scope.projectId)
+                    return false
+                }
+            val root = ProcessHandle.of(pid).orElse(null)
+            if (root == null || !root.isAlive || !matchesStartTime(root, identity.startedAtEpochMs)) {
+                ownershipStore?.clear(scope.projectId)
+                return false
+            }
+            records[scope.projectId] = Record(
+                process = null,
+                root = root,
+                handle = ProjectProcessHandle(scope, identity.platformHandle),
+                startedAtEpochMs = identity.startedAtEpochMs,
+            )
+            return true
+        }
+    }
 
     override fun start(request: ProjectProcessLaunchRequest): ProjectProcessHandle {
         val projectId = request.scope.projectId
         synchronized(records) {
             val existing = records[projectId]
-            if (existing?.process?.isAlive == true) {
+            if (existing?.root?.isAlive == true) {
                 error("project already owns a running process: " + projectId)
             }
 
@@ -47,12 +82,33 @@ class MacProjectProcessControl : ProjectProcessControl {
             builder.environment().putAll(request.environment)
 
             val process = builder.start()
+            val root = process.toHandle()
+            val startedAtEpochMs = root.info().startInstant().orElse(null)
+                ?.toEpochMilli()
+                ?: System.currentTimeMillis()
             val handle = ProjectProcessHandle(
                 scope = request.scope,
-                platformHandle = "macos:" + process.pid() + ":" + UUID.randomUUID(),
+                platformHandle = "macos-pid:" + process.pid(),
             )
-            val record = Record(process = process, handle = handle)
+            val record = Record(
+                process = process,
+                root = root,
+                handle = handle,
+                startedAtEpochMs = startedAtEpochMs,
+            )
             records[projectId] = record
+            val generation = request.environment["SIFTALPHA_OPERATION_GENERATION"]
+                ?.toLongOrNull()
+                ?.takeIf { it > 0L }
+                ?: 1L
+            ownershipStore?.write(
+                DurableRuntimeOwnership(
+                    projectId = projectId,
+                    generation = generation,
+                    platformHandle = handle.platformHandle,
+                    startedAtEpochMs = startedAtEpochMs,
+                ),
+            )
             pump(process.inputStream, record.stdout, "stdout", projectId)
             pump(process.errorStream, record.stderr, "stderr", projectId)
             return handle
@@ -63,11 +119,14 @@ class MacProjectProcessControl : ProjectProcessControl {
         val record = records[scope.projectId]
             ?: return ProjectProcessStatus(scope, ProjectProcessState.UNKNOWN)
 
-        if (record.process.isAlive) {
+        if (record.root.isAlive) {
             return ProjectProcessStatus(scope, ProjectProcessState.RUNNING)
         }
 
-        val exitCode = runCatching { record.process.exitValue() }.getOrNull()
+        ownershipStore?.clear(scope.projectId)
+        val exitCode = record.process?.let { process ->
+            runCatching { process.exitValue() }.getOrNull()
+        }
         val state = when {
             record.stoppedByUser -> ProjectProcessState.STOPPED
             exitCode == 0 -> ProjectProcessState.EXITED_SUCCESS
@@ -97,7 +156,7 @@ class MacProjectProcessControl : ProjectProcessControl {
 
     internal fun ownedPids(scope: ProjectProcessScope): Set<Long> {
         val record = records[scope.projectId] ?: return emptySet()
-        val root = record.process.toHandle()
+        val root = record.root
         return buildSet {
             if (root.isAlive) add(root.pid())
             root.descendants().forEach { handle ->
@@ -109,7 +168,8 @@ class MacProjectProcessControl : ProjectProcessControl {
     internal fun forget(scope: ProjectProcessScope): Boolean {
         synchronized(records) {
             val record = records[scope.projectId] ?: return true
-            if (record.process.isAlive) return false
+            if (record.root.isAlive) return false
+            ownershipStore?.clear(scope.projectId)
             return records.remove(scope.projectId, record)
         }
     }
@@ -118,20 +178,22 @@ class MacProjectProcessControl : ProjectProcessControl {
         val record = records[scope.projectId]
             ?: return ProjectStopResult(scope, ProjectStopOutcome.NOT_FOUND)
 
-        if (!record.process.isAlive) {
+        if (!record.root.isAlive) {
+            ownershipStore?.clear(scope.projectId)
             return ProjectStopResult(scope, ProjectStopOutcome.ALREADY_STOPPED)
         }
 
         record.stoppedByUser = true
         return runCatching {
-            terminateOwnedTree(record.process)
-            if (record.process.isAlive) {
+            terminateOwnedTree(record.root)
+            if (record.root.isAlive) {
                 ProjectStopResult(
                     scope,
                     ProjectStopOutcome.FAILED,
                     "project process remained alive after termination",
                 )
             } else {
+                ownershipStore?.clear(scope.projectId)
                 ProjectStopResult(scope, ProjectStopOutcome.STOPPED)
             }
         }.getOrElse { error ->
@@ -143,34 +205,39 @@ class MacProjectProcessControl : ProjectProcessControl {
         }
     }
 
-    private fun terminateOwnedTree(process: Process) {
+    private fun terminateOwnedTree(root: ProcessHandle) {
         repeat(3) {
-            val descendants = process.descendants().toList().asReversed()
+            val descendants = root.descendants().toList().asReversed()
             descendants.forEach { handle ->
                 if (handle.isAlive) handle.destroy()
             }
-            if (process.isAlive) process.destroy()
-            if (awaitStopped(process, descendants, 700)) return
+            if (root.isAlive) root.destroy()
+            if (awaitStopped(root, descendants, 700)) return
 
             descendants.forEach { handle ->
                 if (handle.isAlive) handle.destroyForcibly()
             }
-            if (process.isAlive) process.destroyForcibly()
-            if (awaitStopped(process, descendants, 700)) return
+            if (root.isAlive) root.destroyForcibly()
+            if (awaitStopped(root, descendants, 700)) return
         }
     }
 
     private fun awaitStopped(
-        process: Process,
+        root: ProcessHandle,
         descendants: List<ProcessHandle>,
         timeoutMs: Long,
     ): Boolean {
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
         while (System.nanoTime() < deadline) {
-            if (!process.isAlive && descendants.none { it.isAlive }) return true
+            if (!root.isAlive && descendants.none { it.isAlive }) return true
             Thread.sleep(25)
         }
-        return !process.isAlive && descendants.none { it.isAlive }
+        return !root.isAlive && descendants.none { it.isAlive }
+    }
+
+    private fun matchesStartTime(handle: ProcessHandle, expectedEpochMs: Long): Boolean {
+        val actual = handle.info().startInstant().orElse(null)?.toEpochMilli() ?: return false
+        return kotlin.math.abs(actual - expectedEpochMs) <= 2_000L
     }
 
     private fun pump(

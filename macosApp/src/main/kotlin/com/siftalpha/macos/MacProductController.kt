@@ -1,6 +1,7 @@
 package com.siftalpha.macos
 
 import com.siftalpha.core.lifecycle.ProjectLifecycleState
+import com.siftalpha.core.storage.DurableRuntimeOwnershipStore
 import com.siftalpha.core.storage.PlatformStateStorage
 import com.siftalpha.studio.container.ComposeProjectPlan
 import com.siftalpha.studio.container.ComposeProjectPlanner
@@ -76,7 +77,8 @@ class MacProductController(
         MacManagedContainerInstaller(systemFacts),
     processControl: MacProjectProcessControl = MacProjectProcessControl(),
     dataRoot: File = MacProjectEnvironmentManager.defaultDataRoot(),
-    stateStorage: PlatformStateStorage = MacFileStateStorage(File(dataRoot, "state/platform-state.properties")),
+    private val stateStorage: PlatformStateStorage =
+        MacFileStateStorage(File(dataRoot, "state/platform-state.properties")),
 ) {
     @Volatile
     private var latestContainerProviders: List<MacContainerProviderSnapshot> =
@@ -87,12 +89,16 @@ class MacProductController(
         managedPython = managedPython,
         dataRoot = dataRoot,
     )
+    private val ownershipStore = DurableRuntimeOwnershipStore(stateStorage)
+    private val projectSecretStore = MacKeychainProjectSecretStore(stateStorage)
     private val coordinator = MacProjectWorkflowCoordinator(
         processControl = processControl,
         environmentManager = environmentManager,
         containerProviderSource = {
             composeProviderFactory(latestContainerProviders)
         },
+        stateStorage = stateStorage,
+        projectSecretStorage = projectSecretStore,
     )
     private val projects = LinkedHashMap<String, MacProductProject>()
     private val projectCatalog = MacProjectCatalog(stateStorage)
@@ -102,6 +108,7 @@ class MacProductController(
     private val managedPythonVersion: String? by lazy { managedPython?.version() }
 
     init {
+        processControl.bindOwnershipStore(ownershipStore)
         restoreProjects()
     }
 
@@ -128,6 +135,31 @@ class MacProductController(
         containerInstallProgress.remove(projectId)
         containerInstallLogs.remove(projectId)
         return true
+    }
+
+    fun configuredEnvironmentKeys(projectId: String): Set<String> =
+        if (project(projectId) == null) emptySet() else projectSecretStore.configuredKeys(projectId)
+
+    fun saveEnvironmentValue(projectId: String, name: String, value: String): Boolean {
+        if (project(projectId) == null) return false
+        return runCatching {
+            projectSecretStore.write(projectId, name, value)
+            true
+        }.getOrElse { error ->
+            lastErrors[projectId] = error.message ?: error.javaClass.simpleName
+            false
+        }
+    }
+
+    fun clearEnvironmentValue(projectId: String, name: String): Boolean {
+        if (project(projectId) == null) return false
+        return runCatching {
+            projectSecretStore.remove(projectId, name)
+            true
+        }.getOrElse { error ->
+            lastErrors[projectId] = error.message ?: error.javaClass.simpleName
+            false
+        }
     }
 
     fun clearProjectEnvironment(projectId: String): Boolean {

@@ -28,6 +28,19 @@ class MacCoreLoadTest {
     }
 
     @Test
+    fun macHostPublishesSecureSecretCapabilityWhenKeychainAdapterIsAvailable() {
+        val snapshot = MacPlatformCapabilities.snapshot(
+            secureSecretStorageAvailability = CapabilityAvailability.AVAILABLE,
+        )
+
+        assertEquals(
+            CapabilityAvailability.AVAILABLE,
+            snapshot.availabilityOf(StandardPlatformCapabilities.SECURE_SECRET_STORAGE),
+        )
+        assertTrue(snapshot.supports(StandardPlatformCapabilities.SECURE_SECRET_STORAGE))
+    }
+
+    @Test
     fun macHostPublishesContainerCapabilityFromAdapterDiscovery() {
         val snapshot = MacPlatformCapabilities.snapshot(CapabilityAvailability.AVAILABLE)
 

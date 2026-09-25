@@ -17,6 +17,7 @@ object MacPlatformCapabilities {
 
     fun snapshot(
         containerRuntimeAvailability: CapabilityAvailability = CapabilityAvailability.UNKNOWN,
+        secureSecretStorageAvailability: CapabilityAvailability = CapabilityAvailability.UNKNOWN,
     ): PlatformCapabilitySnapshot =
         PlatformCapabilitySnapshot(
             publishedCapabilities.associateWith { capability ->
@@ -25,6 +26,8 @@ object MacPlatformCapabilities {
                         CapabilityAvailability.AVAILABLE
                     StandardPlatformCapabilities.CONTAINER_RUNTIME ->
                         containerRuntimeAvailability
+                    StandardPlatformCapabilities.SECURE_SECRET_STORAGE ->
+                        secureSecretStorageAvailability
                     else -> CapabilityAvailability.UNKNOWN
                 }
             },
@@ -86,7 +89,10 @@ fun main(args: Array<String>) {
 
     val containerProviders = MacContainerRuntimeDiscovery().discoverAll()
     val capabilitySnapshot = MacPlatformCapabilities.snapshot(
-        MacContainerRuntimeDiscovery.capabilityAvailability(containerProviders),
+        containerRuntimeAvailability =
+            MacContainerRuntimeDiscovery.capabilityAvailability(containerProviders),
+        secureSecretStorageAvailability =
+            MacKeychainProjectSecretStore.capabilityAvailability(),
     )
     val discovery = MacHostRuntimeDiscovery().discoverAll()
     if ("--probe" in args) {

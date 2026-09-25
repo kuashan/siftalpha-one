@@ -4,6 +4,7 @@ import com.siftalpha.studio.container.ComposeProjectPlan
 import com.siftalpha.studio.platform.CapabilityAvailability
 import java.io.File
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 enum class MacComposeServiceState {
@@ -71,6 +72,11 @@ internal object MacComposePreparePolicy {
 
 interface MacComposeContainerProvider {
     val snapshot: MacContainerProviderSnapshot
+
+    fun configureProjectEnvironment(
+        projectId: String,
+        environment: Map<String, String>,
+    ) = Unit
 
     fun prepare(
         project: MacImportedProject,
@@ -150,6 +156,18 @@ class MacCliComposeContainerProvider(
     }
 
     private val executable = snapshot.executablePath!!
+    private val projectEnvironment = ConcurrentHashMap<String, Map<String, String>>()
+
+    override fun configureProjectEnvironment(
+        projectId: String,
+        environment: Map<String, String>,
+    ) {
+        if (environment.isEmpty()) {
+            projectEnvironment.remove(projectId)
+        } else {
+            projectEnvironment[projectId] = environment.toMap()
+        }
+    }
 
     override fun prepare(
         project: MacImportedProject,
@@ -414,6 +432,7 @@ class MacCliComposeContainerProvider(
             processBuilder.environment().putAll(
                 MacManagedContainerToolchain.environmentForExecutable(executable),
             )
+            processBuilder.environment().putAll(projectEnvironment[project.projectId].orEmpty())
             val process = processBuilder.start()
 
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
@@ -427,11 +446,11 @@ class MacCliComposeContainerProvider(
                         success = false,
                         cancelled = true,
                         detail = "container operation cancelled",
-                        output = readOutput(outputFile, maxOutputBytes),
+                        output = redact(project.projectId, readOutput(outputFile, maxOutputBytes)),
                     )
                 }
                 if (process.waitFor(200, TimeUnit.MILLISECONDS)) {
-                    val output = readOutput(outputFile, maxOutputBytes)
+                    val output = redact(project.projectId, readOutput(outputFile, maxOutputBytes))
                     val code = process.exitValue()
                     return MacContainerOperationResult(
                         success = code == 0,
@@ -452,7 +471,7 @@ class MacCliComposeContainerProvider(
                     if (!process.waitFor(2, TimeUnit.SECONDS)) {
                         process.destroyForcibly()
                     }
-                    val output = readOutput(outputFile, maxOutputBytes)
+                    val output = redact(project.projectId, readOutput(outputFile, maxOutputBytes))
                     return MacContainerOperationResult(
                         success = false,
                         detail = buildString {
@@ -472,12 +491,19 @@ class MacCliComposeContainerProvider(
             return MacContainerOperationResult(
                 success = false,
                 detail = error.message ?: error.javaClass.simpleName,
-                output = readOutput(outputFile, maxOutputBytes),
+                output = redact(project.projectId, readOutput(outputFile, maxOutputBytes)),
             )
         } finally {
             outputFile.delete()
         }
     }
+
+    private fun redact(projectId: String, text: String): String =
+        projectEnvironment[projectId].orEmpty().values
+            .filter(String::isNotBlank)
+            .distinct()
+            .sortedByDescending(String::length)
+            .fold(text) { safe, secret -> safe.replace(secret, "[REDACTED]") }
 
     private fun isPortAvailable(port: Int): Boolean = runCatching {
         java.net.ServerSocket(port).use { true }

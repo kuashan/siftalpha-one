@@ -4,6 +4,8 @@ import com.siftalpha.core.process.ProjectProcessLaunchRequest
 import com.siftalpha.core.process.ProjectProcessScope
 import com.siftalpha.core.process.ProjectProcessState
 import com.siftalpha.core.process.ProjectStopOutcome
+import com.siftalpha.core.storage.DurableRuntimeOwnershipStore
+import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -64,6 +66,43 @@ class MacProjectProcessControlTest {
         } finally {
             control.stopProject(a)
             control.stopProject(b)
+        }
+    }
+
+    @Test
+    fun processOwnershipSurvivesControlRecreationAndRemainsProjectScoped() {
+        val root = Files.createTempDirectory("siftalpha-process-recovery-").toFile()
+        val storage = MacFileStateStorage(root.resolve("state.properties"))
+        val scope = ProjectProcessScope("recover-project")
+        val first = MacProjectProcessControl().also {
+            it.bindOwnershipStore(DurableRuntimeOwnershipStore(storage))
+        }
+        val second = MacProjectProcessControl().also {
+            it.bindOwnershipStore(DurableRuntimeOwnershipStore(storage))
+        }
+        try {
+            first.start(
+                ProjectProcessLaunchRequest(
+                    scope = scope,
+                    executable = "/bin/sh",
+                    arguments = listOf("-c", "while :; do sleep 1; done"),
+                    environment = mapOf("SIFTALPHA_OPERATION_GENERATION" to "9"),
+                ),
+            )
+            waitUntil(2_000) {
+                first.status(scope).state == ProjectProcessState.RUNNING
+            }
+
+            assertTrue(second.recover(scope))
+            assertEquals(ProjectProcessState.RUNNING, second.status(scope).state)
+            assertEquals(ProjectStopOutcome.STOPPED, second.stopProject(scope).outcome)
+            waitUntil(2_000) {
+                first.status(scope).state != ProjectProcessState.RUNNING
+            }
+        } finally {
+            second.stopProject(scope)
+            first.stopProject(scope)
+            root.deleteRecursively()
         }
     }
 

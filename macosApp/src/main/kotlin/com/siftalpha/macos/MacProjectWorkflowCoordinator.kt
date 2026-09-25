@@ -60,6 +60,8 @@ class MacProjectWorkflowCoordinator(
     private val containerProviderSource: () -> MacComposeContainerProvider? = {
         MacComposeProviderSelector.select(MacContainerRuntimeDiscovery().discoverAll())
     },
+    stateStorage: PlatformStateStorage? = null,
+    private val projectSecretStorage: ProjectSecretStorage? = null,
 ) {
     private data class MutableProjectState(
         @Volatile var context: MacWorkflowContext? = null,
@@ -68,25 +70,56 @@ class MacProjectWorkflowCoordinator(
         @Volatile var composePrepared: Boolean = false,
         @Volatile var cachedComposeStatus: MacComposeRuntimeStatus? = null,
         @Volatile var cachedComposeStatusAtMs: Long = 0L,
+        @Volatile var recoveryInProgress: Boolean = false,
         val generation: AtomicLong = AtomicLong(0),
         val history: StringBuilder = StringBuilder(),
     )
 
     private val states = ConcurrentHashMap<String, MutableProjectState>()
     private val webDiscovery = MacProjectWebDiscovery(processControl)
+    private val runtimeStateStore = stateStorage?.let(::DurableRuntimeStateStore)
+    private val operationStore = stateStorage?.let(::DurableProjectOperationStore)
 
     fun attach(context: MacWorkflowContext) {
-        val state = state(context.project.projectId)
+        val projectId = context.project.projectId
+        val state = state(projectId)
         state.context = context
         if (context.composePlan?.isComposeProject == true) {
-            state.composePrepared = environmentManager.isComposePrepared(context.project.projectId)
+            state.composePrepared = environmentManager.isComposePrepared(projectId)
+        }
+
+        operationStore?.let { store ->
+            val persistedGeneration = store.lastGeneration(projectId)
+            if (persistedGeneration > state.generation.get()) {
+                state.generation.set(persistedGeneration)
+            }
+            val persisted = store.read(projectId)
+            if (persisted != null && !persisted.phase.terminal) {
+                state.recoveryInProgress = true
+                append(
+                    state,
+                    "RECOVERY_PENDING=" +
+                        persisted.action.name +
+                        " generation=" +
+                        persisted.generation,
+                )
+                store.clearCurrent(projectId)
+            }
+        }
+
+        if (context.composePlan?.isComposeProject != true && processControl.recover(ProjectProcessScope(projectId))) {
+            state.recoveryInProgress = true
+            append(state, "PROCESS_OWNERSHIP_RECOVERED=1")
         }
     }
 
     fun detach(projectId: String): Boolean {
         val state = states[projectId] ?: return true
-        if (state.operation != null) return false
-        if (status(projectId).processState == ProjectProcessState.RUNNING) return false
+        val decision = ProjectCleanupPolicy.evaluate(
+            processRunning = status(projectId).processState == ProjectProcessState.RUNNING,
+            operationActive = state.operation != null,
+        )
+        if (!decision.allowed) return false
         if (!processControl.forget(ProjectProcessScope(projectId))) return false
         return states.remove(projectId, state)
     }
@@ -94,13 +127,19 @@ class MacProjectWorkflowCoordinator(
     fun clearEnvironment(projectId: String): Boolean {
         val state = states[projectId] ?: return false
         val context = state.context ?: return false
-        if (state.operation != null) return false
-        if (status(projectId).processState == ProjectProcessState.RUNNING) return false
+        val cleanupDecision = ProjectCleanupPolicy.evaluate(
+            processRunning = status(projectId).processState == ProjectProcessState.RUNNING,
+            operationActive = state.operation != null,
+        )
+        if (!cleanupDecision.allowed) {
+            append(state, "CLEAN_BLOCKED=" + cleanupDecision.reason.orEmpty())
+            return false
+        }
         val generation = begin(projectId, ProjectOperationAction.CLEAN) ?: return false
 
         val composePlan = context.composePlan?.takeIf { it.isComposeProject }
         val success = if (composePlan != null) {
-            val provider = containerProviderSource()
+            val provider = containerProvider(projectId)
             if (provider == null) {
                 append(state, "CLEAN_FAILED=container provider unavailable")
                 false
@@ -121,6 +160,7 @@ class MacProjectWorkflowCoordinator(
             environmentManager.clearComposePrepared(projectId)
             invalidateComposeStatus(state)
             processControl.forget(ProjectProcessScope(projectId))
+            runtimeStateStore?.clear(projectId, providerId(state))
             synchronized(state.history) { state.history.setLength(0) }
         }
         finish(
@@ -183,7 +223,7 @@ class MacProjectWorkflowCoordinator(
                 plan.issues.firstOrNull() ?: "Compose plan is invalid",
             )
         }
-        val provider = containerProviderSource()
+        val provider = containerProvider(context.project.projectId)
             ?: return MacPrepareResult(
                 false,
                 false,
@@ -246,10 +286,12 @@ class MacProjectWorkflowCoordinator(
                     executable = python.absolutePath,
                     arguments = listOf("-u", entry),
                     workingDirectory = context.project.canonicalRootPath,
-                    environment = mapOf(
-                        "PYTHONUNBUFFERED" to "1",
-                        "SIFTALPHA_PROJECT_ID" to projectId,
-                    ),
+                    environment = buildMap {
+                        put("PYTHONUNBUFFERED", "1")
+                        put("SIFTALPHA_PROJECT_ID", projectId)
+                        put("SIFTALPHA_OPERATION_GENERATION", generation.toString())
+                        putAll(projectEnvironment(projectId))
+                    },
                 )
             }
 
@@ -275,7 +317,11 @@ class MacProjectWorkflowCoordinator(
                     executable = npm.absolutePath,
                     arguments = listOf("start"),
                     workingDirectory = context.project.canonicalRootPath,
-                    environment = mapOf("SIFTALPHA_PROJECT_ID" to projectId),
+                    environment = buildMap {
+                        put("SIFTALPHA_PROJECT_ID", projectId)
+                        put("SIFTALPHA_OPERATION_GENERATION", generation.toString())
+                        putAll(projectEnvironment(projectId))
+                    },
                 )
             }
 
@@ -304,7 +350,7 @@ class MacProjectWorkflowCoordinator(
         plan: ComposeProjectPlan,
     ): Boolean {
         if (!state.composePrepared) return false
-        val provider = containerProviderSource() ?: return false
+        val provider = containerProvider(projectId) ?: return false
         val generation = begin(projectId, ProjectOperationAction.START) ?: return false
         val result = provider.start(context.project, plan)
         appendProviderOutput(state, "compose up", result.output)
@@ -350,7 +396,7 @@ class MacProjectWorkflowCoordinator(
     ): Boolean {
         val generation = begin(projectId, ProjectOperationAction.STOP) ?: return false
         state.cancelRequested = true
-        val provider = containerProviderSource()
+        val provider = containerProvider(projectId)
         if (provider == null) {
             append(state, "COMPOSE_STOP=FAILED provider unavailable")
             finish(projectId, generation, ProjectOperationPhase.FAILED)
@@ -381,7 +427,7 @@ class MacProjectWorkflowCoordinator(
         val history = synchronized(state.history) { state.history.toString() }
         val composePlan = context?.composePlan?.takeIf { it.isComposeProject }
         if (context != null && composePlan != null) {
-            val containerLogs = containerProviderSource()
+            val containerLogs = containerProvider(projectId)
                 ?.logs(context.project, composePlan, maxBytes)
                 .orEmpty()
             return buildString {
@@ -412,7 +458,7 @@ class MacProjectWorkflowCoordinator(
         val context = state.context ?: return null
         val composePlan = context.composePlan?.takeIf { it.isComposeProject }
         if (composePlan != null) {
-            val provider = containerProviderSource() ?: return null
+            val provider = containerProvider(projectId) ?: return null
             return webDiscovery.discoverFromPorts(
                 ports = provider.publishedPorts(context.project, composePlan),
                 combinedOutput = logs(projectId),
@@ -426,7 +472,7 @@ class MacProjectWorkflowCoordinator(
         val context = state.context
         val composePlan = context?.composePlan?.takeIf { it.isComposeProject }
         if (context != null && composePlan != null) {
-            val provider = containerProviderSource()
+            val provider = containerProvider(projectId)
             val runtime = provider?.let { composeStatus(state, context, composePlan, it, force = true) }
             val combined = logs(projectId, maxBytes)
             return MacWorkflowDiagnostics(
@@ -507,7 +553,7 @@ class MacProjectWorkflowCoordinator(
 
         val composePlan = context?.composePlan?.takeIf { it.isComposeProject }
         if (context != null && composePlan != null) {
-            val provider = containerProviderSource()
+            val provider = containerProvider(projectId)
             val composeStatus = provider?.let { composeStatus(state, context, composePlan, it) }
             val processState = when {
                 composeStatus == null -> ProjectProcessState.UNKNOWN
@@ -529,19 +575,30 @@ class MacProjectWorkflowCoordinator(
             } else {
                 null
             }
-            return MacWorkflowStatus(
+            runtimeStateStore?.write(
+                projectId = projectId,
+                providerId = "container",
+                environmentReady = state.composePrepared,
+                runtimeState = runtimeState,
+                failureReason = null,
+            )
+            val recovering = state.recoveryInProgress
+            val resolved = MacWorkflowStatus(
                 projectId = projectId,
                 lifecycle = RuntimeLifecyclePolicy.resolve(
                     environmentReady = state.composePrepared,
                     runtimeState = runtimeState,
                     operation = lifecycleOp,
                     processActive = processState == ProjectProcessState.RUNNING,
+                    recoveryInProgress = recovering,
                 ),
                 environmentReady = state.composePrepared,
                 processState = processState,
                 operation = operation,
                 webEndpoint = endpoint,
             )
+            if (recovering) state.recoveryInProgress = false
+            return resolved
         }
 
         val envReady = environmentManager.currentEnvironment(projectId) != null
@@ -559,19 +616,30 @@ class MacProjectWorkflowCoordinator(
         } else {
             null
         }
-        return MacWorkflowStatus(
+        runtimeStateStore?.write(
+            projectId = projectId,
+            providerId = "host",
+            environmentReady = envReady,
+            runtimeState = runtimeState,
+            failureReason = null,
+        )
+        val recovering = state.recoveryInProgress
+        val resolved = MacWorkflowStatus(
             projectId = projectId,
             lifecycle = RuntimeLifecyclePolicy.resolve(
                 environmentReady = envReady,
                 runtimeState = runtimeState,
                 operation = lifecycleOp,
                 processActive = processStatus.state == ProjectProcessState.RUNNING,
+                recoveryInProgress = recovering,
             ),
             environmentReady = envReady,
             processState = processStatus.state,
             operation = operation,
             webEndpoint = endpoint,
         )
+        if (recovering) state.recoveryInProgress = false
+        return resolved
     }
 
     private fun composeStatus(
@@ -619,12 +687,24 @@ class MacProjectWorkflowCoordinator(
             ) {
                 state.cancelRequested = true
             }
-            val generation = state.generation.incrementAndGet()
+            val durableGeneration = operationStore?.lastGeneration(projectId) ?: 0L
+            val generation = maxOf(state.generation.get(), durableGeneration) + 1L
+            state.generation.set(generation)
             state.operation = ProjectOperationOwnership(
                 projectId = projectId,
                 action = action,
                 phase = ProjectOperationPhase.ACTIVE,
                 generation = generation,
+            )
+            operationStore?.write(
+                DurableProjectOperationRecord(
+                    projectId = projectId,
+                    providerId = providerId(state),
+                    action = action,
+                    phase = ProjectOperationPhase.ACTIVE,
+                    generation = generation,
+                    startedAtEpochMs = System.currentTimeMillis(),
+                ),
             )
             return generation
         }
@@ -639,6 +719,12 @@ class MacProjectWorkflowCoordinator(
         synchronized(state) {
             val current = state.operation
             if (current?.generation != generation) return
+            operationStore?.read(projectId)?.let { persisted ->
+                if (persisted.generation == generation) {
+                    operationStore.write(persisted.copy(phase = phase))
+                }
+            }
+            operationStore?.clearCurrent(projectId)
             state.operation = null
             append(state, current.action.name + ":" + phase.name)
         }
@@ -652,6 +738,22 @@ class MacProjectWorkflowCoordinator(
             }
         }
     }
+
+    private fun providerId(state: MutableProjectState): String =
+        if (state.context?.composePlan?.isComposeProject == true) "container" else "host"
+
+    private fun projectEnvironment(projectId: String): Map<String, String> {
+        val store = projectSecretStorage ?: return emptyMap()
+        return store.configuredKeys(projectId)
+            .sorted()
+            .mapNotNull { name -> store.read(projectId, name)?.let { value -> name to value } }
+            .toMap(linkedMapOf())
+    }
+
+    private fun containerProvider(projectId: String): MacComposeContainerProvider? =
+        containerProviderSource()?.also { provider ->
+            provider.configureProjectEnvironment(projectId, projectEnvironment(projectId))
+        }
 
     private fun state(projectId: String): MutableProjectState =
         states.computeIfAbsent(projectId) { MutableProjectState() }
