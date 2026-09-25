@@ -203,15 +203,56 @@ object MacManagedContainerToolchain {
     fun managedBin(userHome: File = File(System.getProperty("user.home"))): File? =
         currentRoot(userHome)?.resolve("bin")?.takeIf { it.isDirectory }
 
+    private const val MACOS_UNIX_PATH_MAX = 104
+    private const val LIMA_LONGEST_COLIMA_SOCKET_SUFFIX =
+        "colima-siftalpha/ssh.sock.1234567890123456"
+
+    fun managedStateRoot(
+        userHome: File = File(System.getProperty("user.home")),
+    ): File {
+        val preferred = File(userHome, ".siftalpha")
+        if (limaSocketPathLength(File(preferred, "lima")) < MACOS_UNIX_PATH_MAX) {
+            return preferred
+        }
+
+        val compact = File(userHome, ".sa")
+        check(limaSocketPathLength(File(compact, "l")) < MACOS_UNIX_PATH_MAX) {
+            "user home path is too long for the macOS Lima socket limit"
+        }
+        return compact
+    }
+
+    fun limaHome(
+        userHome: File = File(System.getProperty("user.home")),
+    ): File {
+        val stateRoot = managedStateRoot(userHome)
+        return if (stateRoot.name == ".sa") File(stateRoot, "l") else File(stateRoot, "lima")
+    }
+
+    fun colimaHome(
+        userHome: File = File(System.getProperty("user.home")),
+    ): File {
+        val stateRoot = managedStateRoot(userHome)
+        return if (stateRoot.name == ".sa") File(stateRoot, "c") else File(stateRoot, "colima")
+    }
+
+    fun projectedLimaSocketPathLength(
+        userHome: File = File(System.getProperty("user.home")),
+    ): Int = limaSocketPathLength(limaHome(userHome))
+
+    private fun limaSocketPathLength(limaHome: File): Int =
+        File(limaHome, LIMA_LONGEST_COLIMA_SOCKET_SUFFIX).absolutePath.length
+
     fun environment(
         root: File,
         base: Map<String, String> = System.getenv(),
+        userHome: File = File(System.getProperty("user.home")),
     ): Map<String, String> = buildMap {
         putAll(base)
         put("PATH", File(root, "bin").absolutePath + File.pathSeparator + base["PATH"].orEmpty())
-        put("COLIMA_HOME", File(root, "state/colima").absolutePath)
+        put("COLIMA_HOME", colimaHome(userHome).absolutePath)
         put("COLIMA_CACHE_HOME", File(root, "cache/colima").absolutePath)
-        put("LIMA_HOME", File(root, "state/lima").absolutePath)
+        put("LIMA_HOME", limaHome(userHome).absolutePath)
         put("DOCKER_CONFIG", File(root, "docker-config").absolutePath)
         put("COLIMA_PROFILE", "siftalpha")
     }
@@ -315,9 +356,9 @@ class MacManagedContainerInstaller(
             downloads.mkdirs()
             File(staging, "bin").mkdirs()
             File(staging, "docker-config/cli-plugins").mkdirs()
-            File(staging, "state/colima").mkdirs()
-            File(staging, "state/lima").mkdirs()
             File(staging, "cache/colima").mkdirs()
+            MacManagedContainerToolchain.colimaHome(userHome).mkdirs()
+            MacManagedContainerToolchain.limaHome(userHome).mkdirs()
 
             progress(MacContainerInstallPhase.DOWNLOADING, "正在下载并校验容器工具…")
             val assets = assets(arch)
@@ -392,7 +433,6 @@ class MacManagedContainerInstaller(
             }
             commitCurrent(base, final.name)
             registerComposePlugin(final, log)
-            clearQuarantine(final, log)
 
             startManaged(final, progress, log)
         } catch (error: Throwable) {
@@ -665,21 +705,8 @@ class MacManagedContainerInstaller(
         )
     }
 
-    private fun clearQuarantine(root: File, log: (String) -> Unit) {
-        val xattr = File("/usr/bin/xattr")
-        if (!xattr.canExecute()) return
-        runCatching {
-            runChecked(
-                listOf(xattr.absolutePath, "-rc", root.absolutePath),
-                environmentFor(root),
-                30,
-                log,
-            )
-        }
-    }
-
     private fun environmentFor(root: File): Map<String, String> =
-        MacManagedContainerToolchain.environment(root)
+        MacManagedContainerToolchain.environment(root, userHome = userHome)
 
     private fun runChecked(
         command: List<String>,
