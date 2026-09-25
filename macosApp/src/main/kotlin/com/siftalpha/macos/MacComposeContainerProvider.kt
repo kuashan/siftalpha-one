@@ -193,22 +193,47 @@ class MacCliComposeContainerProvider(
     ): MacContainerOperationResult {
         val manifest = plan.manifestPath
             ?: return MacContainerOperationResult(false, detail = "Compose manifest is missing")
-        fun launch(excluded: Set<Int>): MacContainerOperationResult {
-            val override = MacComposePortOverride.resolve(plan) { port -> port !in excluded && isPortAvailable(port) }
-            val overrideFile = override.yaml.takeIf(String::isNotBlank)?.let { yaml ->
-                File.createTempFile("siftalpha-compose-port-", ".yaml").apply { writeText(yaml) }
-            }
-            return try {
-                runCompose(project, manifest, projectName(project.projectId), listOf("up", "-d"), 5 * 60, { false }, additionalManifest = overrideFile)
-            } finally {
-                overrideFile?.delete()
-            }
-        }
-        val first = launch(emptySet())
+        val first = runCompose(
+            project,
+            manifest,
+            projectName(project.projectId),
+            listOf("up", "-d"),
+            5 * 60,
+            { false },
+        )
         if (first.success || !first.output.contains("port is already allocated", ignoreCase = true)) return first
-        val occupied = Regex("(?:0\\.0\\.0\\.0:|:)\\s*(\\d{1,5})")
-            .findAll(first.output).mapNotNull { it.groupValues[1].toIntOrNull() }.toSet()
-        return launch(occupied)
+        val override = MacComposePortOverride.resolve(plan, ::isPortAvailable)
+        if (override.yaml.isBlank()) {
+            return first.copy(
+                detail = first.detail + "\nNo safe replacement port is available; the project was left unchanged.",
+            )
+        }
+        val overrideFile = File.createTempFile("siftalpha-compose-port-", ".yaml")
+            .apply { writeText(override.yaml) }
+        return try {
+            runCompose(
+                project,
+                manifest,
+                projectName(project.projectId),
+                listOf("up", "-d"),
+                5 * 60,
+                { false },
+                additionalManifest = overrideFile,
+            ).let { remapped ->
+                if (remapped.success) {
+                    remapped.copy(
+                        detail = "Port conflict resolved automatically: " +
+                            override.remappedPorts.entries.joinToString(", ") { (requested, actual) ->
+                                "$requested->$actual"
+                            },
+                    )
+                } else {
+                    remapped
+                }
+            }
+        } finally {
+            overrideFile.delete()
+        }
     }
 
     override fun status(
