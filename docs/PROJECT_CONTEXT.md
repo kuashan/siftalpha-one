@@ -2233,3 +2233,20 @@ R9 authority:
 
 Roadmap remains:
 **M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS / REAL INSTALLED-MAC PENDING → M7 NOT STARTED → M8 NOT STARTED**.
+
+
+### R9 final package authority
+
+Final packaging/documentation HEAD:
+`5c57293adf13feac7b5cc289179fe71d720ff3b6`
+
+Verification:
+- macOS Run #103 PASS;
+- Android W0 #812 PASS;
+- artifact `siftalpha-macos-m6.2-installed-r9-vm-dns-ventura-x64-103`;
+- artifact ID `10844679726`;
+- artifact digest `sha256:a28424e98d183b539cc186cb22bdf85cd5ff40ae3f30350990ac7c08628f5c7f`;
+- DMG SHA-256 `ce9044d318be6b28ef9fbc2acd341739106aeeffe2c0bacd2ded887a080d2795`.
+
+State remains:
+**M6.2 R9 CLOUD PASS / REAL INSTALLED-MAC RETEST PENDING**.
