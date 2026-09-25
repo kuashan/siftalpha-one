@@ -509,7 +509,8 @@ internal object MacManagedContainerDns {
                         text.contains("dial tcp") &&
                             (
                                 text.contains("i/o timeout") ||
-                                    text.contains("connection refused")
+                                    text.contains("connection refused") ||
+                                    text.contains("connection reset by peer")
                                 )
                         ) ||
                         text.contains("proxyconnect tcp") ||

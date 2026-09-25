@@ -146,6 +146,33 @@ object MacComposeProviderSelector {
     }
 }
 
+internal object MacComposeProcessEnvironment {
+    fun build(
+        executable: String,
+        projectEnvironment: Map<String, String>,
+        userHome: File = File(System.getProperty("user.home")),
+        base: Map<String, String> = System.getenv(),
+        systemProxy: MacSystemProxySettings? = null,
+    ): Map<String, String> {
+        val managed = MacManagedContainerToolchain.isManagedExecutable(executable, userHome)
+        val runtimeEnvironment = MacManagedContainerToolchain.environmentForExecutable(
+            executable = executable,
+            userHome = userHome,
+            base = base,
+        )
+        val merged = buildMap {
+            putAll(runtimeEnvironment)
+            putAll(projectEnvironment)
+        }
+        if (!managed) return merged
+
+        return MacManagedContainerProxy.applyToProcessEnvironment(
+            merged,
+            systemProxy ?: MacSystemProxyDiscovery.discover(),
+        )
+    }
+}
+
 class MacCliComposeContainerProvider(
     override val snapshot: MacContainerProviderSnapshot,
 ) : MacComposeContainerProvider {
@@ -430,9 +457,11 @@ class MacCliComposeContainerProvider(
                 .redirectErrorStream(true)
                 .redirectOutput(outputFile)
             processBuilder.environment().putAll(
-                MacManagedContainerToolchain.environmentForExecutable(executable),
+                MacComposeProcessEnvironment.build(
+                    executable = executable,
+                    projectEnvironment = projectEnvironment[project.projectId].orEmpty(),
+                ),
             )
-            processBuilder.environment().putAll(projectEnvironment[project.projectId].orEmpty())
             val process = processBuilder.start()
 
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
