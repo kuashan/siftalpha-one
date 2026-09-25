@@ -2285,3 +2285,38 @@ Verification:
 
 This is intentionally not full M8 closure:
 Developer ID / notarization / Hardened Runtime / public release update flow remain pending.
+
+
+## 2026-09-25 · M6.2 R8 managed DNS auto-repair PASS
+
+Clean installed-app evidence showed repeated Compose Pull failures:
+
+`lookup registry-1.docker.io on [::1]:53 ... connection refused`
+
+The managed container itself was otherwise healthy: VM, Docker daemon, Compose and Buildx were already operational.
+
+Fix:
+- add macOS DNS resolver discovery via `scutil --dns`;
+- reject loopback / unspecified / link-local / multicast resolvers for the managed VM;
+- use discovered non-loopback macOS resolvers when available;
+- use explicit fallback resolvers only when the host exposes no usable non-loopback resolver;
+- configure Colima with explicit `--dns` arguments;
+- recognize the loopback-DNS Compose failure signature;
+- for SiftAlpha-managed Docker only, automatically restart the managed profile with repaired DNS and retry Prepare once;
+- preserve external providers unchanged;
+- add unit tests for resolver selection, fallback, failure classification and generated Colima arguments.
+
+Cloud:
+- functional HEAD `6a6f663d1b5e9b38a1f1d85a85075f354a957f91`;
+- macOS Run #100 PASS;
+- Android W0 #809 PASS;
+- DMG build + verify PASS.
+
+Test DMG:
+`SiftAlpha-X-m6.2-installed-r8-dns-ventura-x64.dmg`
+
+SHA-256:
+`51ef1c325f37899a156280a77a62829aa7511386bd9639d04b50ef056246050d`
+
+State:
+**CLOUD PASS / REAL INSTALLED-MAC RETEST PENDING**.
