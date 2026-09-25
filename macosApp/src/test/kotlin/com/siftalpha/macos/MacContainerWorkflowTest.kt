@@ -56,6 +56,32 @@ class MacContainerWorkflowTest {
     }
 
     @Test
+    fun composeFailureDiagnosticsPreserveOperationAndOutput() {
+        val detail = MacComposeFailureDiagnostics.detail(
+            operation = "pull",
+            exitCode = 1,
+            output = "web Pulling\nError response from daemon: registry unavailable\n",
+        )
+
+        assertTrue(detail.startsWith("docker compose pull failed exit=1"))
+        assertTrue(detail.contains("web Pulling"))
+        assertTrue(detail.contains("registry unavailable"))
+    }
+
+    @Test
+    fun composeFailureDiagnosticsBoundVeryLargeOutput() {
+        val detail = MacComposeFailureDiagnostics.detail(
+            operation = "build",
+            exitCode = 17,
+            output = "prefix-" + "x".repeat(20_000) + "-useful-tail",
+        )
+
+        assertTrue(detail.startsWith("docker compose build failed exit=17"))
+        assertTrue(detail.endsWith("useful-tail"))
+        assertTrue(detail.length < 9_000)
+    }
+
+    @Test
     fun checksumParserSelectsExactAssetFromMultiFileManifest() {
         val manifest = """
             bbdef91774885a0d05f7b048c4eb89ae2bcf3a0c252ae7ca7934e63df76d93c3 *lima-2.2.0-Darwin-arm64.tar.gz
