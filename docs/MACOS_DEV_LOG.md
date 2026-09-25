@@ -2361,3 +2361,50 @@ Verification:
 
 State remains:
 **M6.2 R9 CLOUD PASS / REAL INSTALLED-MAC RETEST PENDING**.
+
+
+## 2026-09-25 · Cross-platform Route Correction Audit（跨平台路线纠偏审计）
+
+### 审计目的
+
+用户指出 macOS（苹果）开发开始重复验证和重新发明 Android（安卓）已经成熟的体系。本次只做架构纠偏，不重新打开已经关闭的 M2～M5。
+
+### 冻结规则
+
+- Android = Reference Implementation（成熟参考实现）。
+- SiftAlpha Core = 通用行为唯一事实源。
+- macOS Adapter = 只实现 macOS 平台机制，不重新定义通用行为。
+- macOS 遇到 Runtime / Prepare / Environment Identity / Recovery / Network / STOP / Web Discovery / Lifecycle 问题时，必须先审查 Android 的已验收实现与开发日志。
+- 已关闭阶段只有发现真实边界破坏或回归才允许重开；“可以再优化”不能重开阶段。
+
+### M2～M5 回看结论
+
+- M2 Host Skeleton：PASS 保持。macOS 独立构建、直接加载 :core，没有 Android Framework 泄漏。
+- M3 Host Runtime Provider：PASS 保持。主机工具发现与 macOS 进程实现属于 Adapter；project-scoped process ownership / STOP 继续服从 Core 契约。
+- M4 Project Workflow：PASS 保持。Runtime detection、Environment Needs、Lifecycle、Operation、Process Scope、Web URL / Endpoint Probe 等通用规则已经复用 Core；macOS 环境创建和主机执行属于平台实现。
+- M5 Product UI Parity：PASS 保持。Normal Mode 与 Developer Mode 共用同一个 MacProductController / MacProjectWorkflowCoordinator，没有第二套 UI 状态机。
+- M6：发现真实路线偏离。R8/R9 为 Colima VM 自行选择并注入 macOS DNS / public fallback，绕过了 Android 已成熟的“Runtime 跟随 Host Effective Network（宿主有效网络）”原则。
+
+### M6 当前纠偏
+
+审查 Colima 0.10.3 官方源码确认：
+
+- `Network.DNSResolvers` 非空时，Colima 会关闭 Lima `HostResolver`；
+- `Network.DNSResolvers` 为空时，Lima Host Resolver 才保持启用；
+- Lima Host Resolver 的设计目的正是让 guest（客体）通过 host system resolver（宿主系统解析器）感知 VPN、条件 DNS 和网络变化。
+
+因此 R8/R9 的显式 `--dns` 是方向性错误：它把 VPN / split DNS（分流 DNS）的宿主语义降级成“几个 DNS IP”。
+
+本轮修复边界：
+
+- 只修改 SiftAlpha 自己管理的 Colima profile `sa`；
+- 清除该 profile 的显式 DNS resolver，恢复 `dns: []`；
+- Colima 启动不再传 `--dns`，让 Lima Host Resolver 生效；
+- 若 VM 仍残留 R9 手工写入的 resolv.conf 或 loopback resolver，只恢复到 Colima host gateway（宿主网关），不写 1.1.1.1 / 8.8.8.8；
+- 外部 Docker / Podman 不修改；
+- Compose Prepare 网络失败仍最多自动修复并重试一次，不建立无限 retry；
+- 不修改 Core，不修改 Android。
+
+### Backlog Boundary（待办边界）
+
+Compose `composePrepared` 目前仍是进程内状态，App 重启/升级后会遗忘“已准备”事实。Android 已有 Environment Identity / READY proof（环境身份 / 就绪证明）的成熟原则。该问题记录为跨平台行为差距，但本次不与网络阻塞混修；不得用一个持久化 boolean 草率修复。后续必须先复用 Android 的“身份 + 指纹 + 实际资源再验证”原则再设计。

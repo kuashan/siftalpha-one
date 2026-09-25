@@ -126,3 +126,27 @@ The initial standard capability identifiers are intentionally optional:
 - virtual machine runtime（虚拟机运行时）
 
 Adding an identifier does not mean all platforms must implement it.
+
+
+## Android Reference First（安卓成熟实现优先）— 2026-09-25 冻结
+
+从本条开始，Android（安卓）是跨平台开发的 **Reference Implementation（成熟参考实现）**，不是一个与 macOS（苹果）平行、互不参考的历史产品。
+
+任何 macOS / Windows（苹果 / 微软）新增能力或故障修复，在提出新设计前必须先执行：
+
+1. 查找 Android（安卓）是否已经处理过同类问题；
+2. 提取 Android 已真机验证的 invariant / behavior contract（不变量 / 行为契约），不得只复制平台代码；
+3. 判断该契约属于 Core（共享核心）、optional capability（可选能力）还是 Platform Adapter（平台适配层）；
+4. 已属于 Core 的规则必须直接复用 Core，禁止在 macOS / Windows 再实现第二套策略；
+5. 平台专属机制只留在 Adapter，但必须实现同一行为契约；
+6. 只有 Android 不存在成熟答案、且问题确属新平台特有时，才允许提出新的平台方案。
+
+禁止模式新增：
+
+- 未审查 Android 成熟实现就直接为 macOS 发明新的生命周期、准备、恢复、网络、STOP、Web Discovery、状态持久化或环境身份规则；
+- 为了修复单台设备/单个网络，把平台临时 workaround（绕行方案）升级成 Core 规则；
+- 让 Android、macOS、Windows 名义上共享 Core，实际各自维护第二套行为语义。
+
+开发顺序冻结为：
+
+`Android 成熟事实 → 通用行为契约 → Core / Capability 分类 → 平台 Adapter 实现 → 跨平台回归`。

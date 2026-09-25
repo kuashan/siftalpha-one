@@ -139,7 +139,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - 端口映射可发现。
 - project-scoped STOP（项目级停止）不影响其他项目。
 
-当前状态：**NOT STARTED（未开始）**
+当前状态：**M6.1 PASS / COMPLETE；M6.2 CURRENT（进行中，真实 Ventura 网络阻塞待验收）**
 
 ## M7 — OpenBot Acceptance（OpenBot 验收）
 
@@ -949,3 +949,30 @@ Verification:
 
 State remains:
 **M6.2 R9 CLOUD PASS / REAL INSTALLED-MAC RETEST PENDING**.
+
+
+### Cross-platform Reference Gate（跨平台参考门禁）— 2026-09-25
+
+macOS 后续每个实现/修复在进入代码前必须增加以下证据：
+
+| 检查项 | 要求 |
+|---|---|
+| Android reference audit（安卓成熟实现审查） | 已检索同类成熟实现 / 开发日志；若不存在，明确记录 NONE |
+| Shared behavior ownership（共享行为归属） | Core / Optional Capability / Platform Adapter 三选一明确 |
+| Duplicate policy guard（重复策略防护） | 不得在 Mac* 代码中复制 Core 已有行为规则 |
+| Closed-stage protection（已关闭阶段保护） | M2～M5 无真实回归不得重开 |
+| Finite repair（有限修复） | 一个阻塞问题最多一个自动恢复链；失败后返回证据，不无限重试 |
+
+### M6.2 Host Network Inheritance Correction（宿主网络继承纠偏）
+
+必须验证：
+
+- managed Colima profile 的 `network.dns` 为空；
+- Colima start 不传显式 `--dns`；
+- R8/R9 legacy resolver（旧解析器配置）能够在托管 profile 内迁移；
+- VM 不再使用 `::1 / 127.x` 失败 resolver；
+- 不写入 1.1.1.1 / 8.8.8.8 作为产品级 fallback；
+- VPN 开启时 A Compose Prepare 实机验证；
+- A/B Compose 原冻结验收链保持不变；
+- 外部 Docker / Podman 未被修改；
+- Android W0 回归 PASS。

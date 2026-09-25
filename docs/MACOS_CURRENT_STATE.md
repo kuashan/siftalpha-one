@@ -1273,3 +1273,17 @@ Verification:
 
 State remains:
 **M6.2 R9 CLOUD PASS / REAL INSTALLED-MAC RETEST PENDING**.
+
+
+## Cross-platform Route Correction（跨平台路线纠偏）— 2026-09-25
+
+当前永久开发规则新增：
+
+- Android（安卓）作为 Reference Implementation（成熟参考实现）。
+- macOS（苹果）发现通用问题时，必须先审查 Android 已验收方案，再决定 Core / Capability / Adapter 归属。
+- M2～M5 本次审计未发现需要重开阶段的架构破坏，继续保持 PASS / CLOSED。
+- M6.2 当前唯一 Blocking Issue（阻塞问题）仍是 Managed Container（托管容器）真实网络访问。
+- R8/R9 的显式 DNS 注入被判定为偏离路线：Colima 0.10.3 在配置显式 DNS 时会关闭 Lima Host Resolver（宿主解析器）。
+- 当前纠偏方案恢复 Host Network Inheritance（宿主网络继承）：SiftAlpha-managed Colima profile 使用 `dns: []`，不再注入公共 DNS，让 Lima Host Resolver 跟随 macOS 当前有效网络 / VPN 解析语义。
+- 本轮不重开 M2～M5，不修改 Core / Android，不扩展 M6 新切片。
+- M6.2 只有当前网络阻塞解除并完成既定 A/B Compose 真机验收后才能 COMPLETE；随后只允许一次 M6 Final Closure Audit。

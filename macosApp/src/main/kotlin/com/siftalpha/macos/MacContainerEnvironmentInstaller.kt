@@ -2,7 +2,6 @@ package com.siftalpha.macos
 
 import com.siftalpha.studio.platform.CapabilityAvailability
 import java.io.File
-import java.net.InetAddress
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -250,6 +249,10 @@ object MacManagedContainerToolchain {
         userHome: File = File(System.getProperty("user.home")),
     ): File = File(managedStateRoot(userHome), "c")
 
+    fun colimaProfileConfig(
+        userHome: File = File(System.getProperty("user.home")),
+    ): File = File(colimaHome(userHome), "$COLIMA_PROFILE/colima.yaml")
+
     fun projectedLimaSocketPathLength(
         userHome: File = File(System.getProperty("user.home")),
     ): Int = limaSocketPathBytes(limaHome(userHome))
@@ -300,82 +303,111 @@ object MacManagedContainerToolchain {
     }
 }
 
-internal data class MacManagedContainerDnsSelection(
-    val resolvers: List<String>,
-    val source: String,
-)
-
 internal object MacManagedContainerDns {
-    private val nameserverLine = Regex("""nameserver\[\d+\]\s*:\s*([^\s]+)""")
-    private val resolvConfNameserverLine = Regex("""(?m)^\s*nameserver\s+([^\s#]+)""")
-    private val fallbackResolvers = listOf("1.1.1.1", "8.8.8.8")
+    private val resolvConfNameserverLine = Regex("""(?m)^\\s*nameserver\\s+([^\\s#]+)""")
+    private val gatewayAddressLine = Regex("""^\\s{2}gatewayAddress:\\s*["']?([^"'#\\s]+)""")
+    private const val DEFAULT_HOST_RESOLVER_GATEWAY = "192.168.5.2"
+    private const val LEGACY_R9_RESOLV_MARKER = "# Managed by SiftAlpha container DNS recovery"
 
-    fun select(scutilDns: String): MacManagedContainerDnsSelection {
-        val discovered = nameserverLine
-            .findAll(scutilDns)
-            .map { it.groupValues[1].trim() }
-            .filter(String::isNotBlank)
-            .distinct()
-            .toList()
-
-        val usable = discovered
-            .filter(::isUsableResolver)
-            .take(4)
-
-        return if (usable.isNotEmpty()) {
-            MacManagedContainerDnsSelection(
-                resolvers = usable,
-                source = "MACOS_SCUTIL",
-            )
-        } else {
-            MacManagedContainerDnsSelection(
-                resolvers = fallbackResolvers,
-                source = "PUBLIC_FALLBACK_AFTER_LOOPBACK_OR_EMPTY",
-            )
-        }
-    }
-
-    fun isLoopbackFailure(detail: String?): Boolean {
+    fun isRecoverableManagedNetworkFailure(detail: String?): Boolean {
         val text = detail.orEmpty().lowercase()
-        if (!text.contains("lookup ")) return false
-        if (!text.contains(":53")) return false
-        return text.contains("on [::1]:53") ||
-            text.contains("on ::1:53") ||
-            Regex("""on\s+127(?:\.\d{1,3}){3}:53""").containsMatchIn(text)
+        val loopbackDnsFailure =
+            text.contains("lookup ") &&
+                text.contains(":53") &&
+                (
+                    text.contains("on [::1]:53") ||
+                        text.contains("on ::1:53") ||
+                        Regex("""on\\s+127(?:\\.\\d{1,3}){3}:53""").containsMatchIn(text)
+                    )
+        val composeRegistryTransportFailure =
+            text.contains("failed to resolve reference") &&
+                text.contains("dial tcp") &&
+                (
+                    text.contains("i/o timeout") ||
+                        text.contains("connection refused")
+                    )
+        return loopbackDnsFailure || composeRegistryTransportFailure
     }
 
-    fun colimaStartArguments(resolvers: List<String>): List<String> = buildList {
-        add("start")
-        add("--runtime")
-        add("docker")
-        resolvers.forEach { resolver ->
-            add("--dns")
-            add(resolver)
+    fun colimaStartArguments(): List<String> =
+        listOf("start", "--runtime", "docker")
+
+    fun clearExplicitResolvers(configText: String): String {
+        val hadTrailingNewline = configText.endsWith("\n")
+        val lines = configText.split("\n").toMutableList()
+        if (hadTrailingNewline && lines.lastOrNull() == "") lines.removeAt(lines.lastIndex)
+
+        val networkIndex = lines.indexOfFirst { line ->
+            line.takeWhile { it == ' ' }.isEmpty() && line.trim() == "network:"
         }
+        if (networkIndex < 0) {
+            if (lines.isNotEmpty() && lines.last().isNotBlank()) lines += ""
+            lines += "network:"
+            lines += "  dns: []"
+            return lines.joinToString("\n") + if (hadTrailingNewline) "\n" else ""
+        }
+
+        val networkEnd = ((networkIndex + 1) until lines.size).firstOrNull { index ->
+            val line = lines[index]
+            line.isNotBlank() &&
+                !line.trimStart().startsWith("#") &&
+                line.takeWhile { it == ' ' }.isEmpty()
+        } ?: lines.size
+
+        val dnsIndex = ((networkIndex + 1) until networkEnd).firstOrNull { index ->
+            val line = lines[index]
+            line.takeWhile { it == ' ' }.length == 2 &&
+                line.trimStart().startsWith("dns:")
+        }
+
+        if (dnsIndex == null) {
+            lines.add(networkIndex + 1, "  dns: []")
+        } else {
+            lines[dnsIndex] = "  dns: []"
+            var index = dnsIndex + 1
+            while (index < lines.size) {
+                val line = lines[index]
+                if (line.trimStart().startsWith("-") &&
+                    line.takeWhile { it == ' ' }.length > 2
+                ) {
+                    lines.removeAt(index)
+                    continue
+                }
+                if (line.isBlank() || line.trimStart().startsWith("#")) {
+                    index += 1
+                    continue
+                }
+                break
+            }
+        }
+        return lines.joinToString("\n") + if (hadTrailingNewline) "\n" else ""
     }
 
-    fun hasUsableVmResolver(resolvConf: String): Boolean =
-        resolvConfNameserverLine
+    fun hostResolverGateway(configText: String): String =
+        configText.lineSequence()
+            .mapNotNull { gatewayAddressLine.find(it)?.groupValues?.getOrNull(1) }
+            .firstOrNull()
+            ?.takeIf { it.matches(Regex("""\\d{1,3}(?:\\.\\d{1,3}){3}""")) }
+            ?: DEFAULT_HOST_RESOLVER_GATEWAY
+
+    fun requiresVmResolverRecovery(resolvConf: String): Boolean {
+        if (resolvConf.contains(LEGACY_R9_RESOLV_MARKER)) return true
+        val nameservers = resolvConfNameserverLine
             .findAll(resolvConf)
             .map { it.groupValues[1].trim() }
-            .any(::isUsableResolver)
-
-    fun renderVmResolvConf(resolvers: List<String>): String = buildString {
-        appendLine("# Managed by SiftAlpha container DNS recovery")
-        resolvers
-            .filter(::isUsableResolver)
-            .distinct()
-            .forEach { resolver -> appendLine("nameserver " + resolver) }
+            .filter(String::isNotBlank)
+            .toList()
+        if (nameservers.isEmpty()) return true
+        return nameservers.all(::isLoopbackResolver)
     }
 
-    private fun isUsableResolver(value: String): Boolean {
-        if ('%' in value) return false
-        val address = runCatching { InetAddress.getByName(value) }.getOrNull() ?: return false
-        return !address.isLoopbackAddress &&
-            !address.isAnyLocalAddress &&
-            !address.isLinkLocalAddress &&
-            !address.isMulticastAddress
-    }
+    fun renderHostResolverResolvConf(gateway: String): String =
+        "# Managed by SiftAlpha host-network recovery\n\nnameserver $gateway\n"
+
+    private fun isLoopbackResolver(value: String): Boolean =
+        value == "::1" ||
+            value == "localhost" ||
+            value.startsWith("127.")
 }
 
 internal object MacManagedContainerChecksum {
@@ -456,7 +488,7 @@ class MacManagedContainerInstaller(
             registerComposePlugin(root, log)
             ensureManagedStateDirectories(log)
             val environment = environmentFor(root)
-            val dns = discoverManagedDns(log)
+            val hostResolverGateway = ensureManagedHostNetworkPolicy(log)
             progress(MacContainerInstallPhase.STARTING, "正在修复托管容器网络并重新启动…")
             runChecked(
                 listOf(colima.absolutePath, "stop"),
@@ -465,7 +497,7 @@ class MacManagedContainerInstaller(
                 log,
             )
             runChecked(
-                listOf(colima.absolutePath) + MacManagedContainerDns.colimaStartArguments(dns.resolvers),
+                listOf(colima.absolutePath) + MacManagedContainerDns.colimaStartArguments(),
                 environment,
                 30 * 60,
                 log,
@@ -473,7 +505,7 @@ class MacManagedContainerInstaller(
             ensureManagedVmResolver(
                 colima = colima,
                 environment = environment,
-                dns = dns,
+                hostResolverGateway = hostResolverGateway,
                 log = log,
             )
             progress(MacContainerInstallPhase.VERIFYING, "正在验证修复后的 Docker 网络环境…")
@@ -656,10 +688,10 @@ class MacManagedContainerInstaller(
                 "LIMA_SOCKET_PATH_LENGTH=" +
                     MacManagedContainerToolchain.projectedLimaSocketPathLength(userHome),
             )
-            val dns = discoverManagedDns(log)
+            val hostResolverGateway = ensureManagedHostNetworkPolicy(log)
             progress(MacContainerInstallPhase.STARTING, "正在启动本地容器环境…")
             runChecked(
-                listOf(colima.absolutePath) + MacManagedContainerDns.colimaStartArguments(dns.resolvers),
+                listOf(colima.absolutePath) + MacManagedContainerDns.colimaStartArguments(),
                 managedEnvironment,
                 30 * 60,
                 log,
@@ -667,7 +699,7 @@ class MacManagedContainerInstaller(
             ensureManagedVmResolver(
                 colima = colima,
                 environment = managedEnvironment,
-                dns = dns,
+                hostResolverGateway = hostResolverGateway,
                 log = log,
             )
 
@@ -877,10 +909,38 @@ class MacManagedContainerInstaller(
     private fun environmentFor(root: File): Map<String, String> =
         MacManagedContainerToolchain.environment(root, userHome = userHome)
 
+    private fun ensureManagedHostNetworkPolicy(log: (String) -> Unit): String {
+        val configFile = MacManagedContainerToolchain.colimaProfileConfig(userHome)
+        if (!configFile.isFile) {
+            log("MANAGED_NETWORK_POLICY=HOST_RESOLVER")
+            log("MANAGED_COLIMA_DNS_OVERRIDE=NONE")
+            return MacManagedContainerDns.hostResolverGateway("")
+        }
+
+        val current = configFile.readText()
+        val gateway = MacManagedContainerDns.hostResolverGateway(current)
+        val updated = MacManagedContainerDns.clearExplicitResolvers(current)
+        if (updated != current) {
+            val temp = File(configFile.parentFile, configFile.name + ".tmp")
+            temp.writeText(updated)
+            Files.move(
+                temp.toPath(),
+                configFile.toPath(),
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+            log("MANAGED_COLIMA_DNS_OVERRIDE=CLEARED")
+        } else {
+            log("MANAGED_COLIMA_DNS_OVERRIDE=NONE")
+        }
+        log("MANAGED_NETWORK_POLICY=HOST_RESOLVER")
+        log("MANAGED_HOST_RESOLVER_GATEWAY=" + gateway)
+        return gateway
+    }
+
     private fun ensureManagedVmResolver(
         colima: File,
         environment: Map<String, String>,
-        dns: MacManagedContainerDnsSelection,
+        hostResolverGateway: String,
         log: (String) -> Unit,
     ) {
         val readCommand = listOf(
@@ -898,17 +958,13 @@ class MacManagedContainerInstaller(
             )
         }.getOrNull()
 
-        if (current != null && MacManagedContainerDns.hasUsableVmResolver(current)) {
-            log("MANAGED_VM_RESOLV_CONF=HEALTHY")
+        if (current != null && !MacManagedContainerDns.requiresVmResolverRecovery(current)) {
+            log("MANAGED_VM_RESOLV_CONF=HOST_INHERITED")
             return
         }
 
-        val rendered = MacManagedContainerDns.renderVmResolvConf(dns.resolvers)
-        check(MacManagedContainerDns.hasUsableVmResolver(rendered)) {
-            "no usable resolver available for managed VM recovery"
-        }
-
-        log("MANAGED_VM_RESOLV_CONF=RECOVERY_REQUIRED")
+        val rendered = MacManagedContainerDns.renderHostResolverResolvConf(hostResolverGateway)
+        log("MANAGED_VM_RESOLV_CONF=HOST_RECOVERY_REQUIRED")
         runChecked(
             command = listOf(
                 colima.absolutePath,
@@ -943,23 +999,10 @@ class MacManagedContainerInstaller(
             timeoutSeconds = 20,
             environment = environment,
         )
-        check(MacManagedContainerDns.hasUsableVmResolver(verified)) {
-            "managed VM resolver recovery did not materialize a usable /etc/resolv.conf"
+        check(!MacManagedContainerDns.requiresVmResolverRecovery(verified)) {
+            "managed VM resolver recovery did not connect the guest to the host resolver"
         }
-        log("MANAGED_VM_RESOLV_CONF=RECOVERED")
-    }
-
-    private fun discoverManagedDns(log: (String) -> Unit): MacManagedContainerDnsSelection {
-        val scutilOutput = runCatching {
-            captureCommand(
-                command = listOf("/usr/sbin/scutil", "--dns"),
-                timeoutSeconds = 10,
-            )
-        }.getOrDefault("")
-        val selection = MacManagedContainerDns.select(scutilOutput)
-        log("MANAGED_DNS_SOURCE=" + selection.source)
-        log("MANAGED_DNS_RESOLVERS=" + selection.resolvers.joinToString(","))
-        return selection
+        log("MANAGED_VM_RESOLV_CONF=HOST_RECOVERED")
     }
 
     private fun captureCommand(

@@ -290,7 +290,7 @@ class MacProductController(
             product?.isCompose == true &&
             !result.success &&
             !result.cancelled &&
-            MacManagedContainerDns.isLoopbackFailure(result.detail) &&
+            MacManagedContainerDns.isRecoverableManagedNetworkFailure(result.detail) &&
             managedDockerProviderAvailable()
         ) {
             val repaired = repairManagedContainerNetwork(projectId)
