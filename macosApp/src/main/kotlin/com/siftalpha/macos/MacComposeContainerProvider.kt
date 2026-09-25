@@ -193,14 +193,22 @@ class MacCliComposeContainerProvider(
     ): MacContainerOperationResult {
         val manifest = plan.manifestPath
             ?: return MacContainerOperationResult(false, detail = "Compose manifest is missing")
-        return runCompose(
-            project = project,
-            manifest = manifest,
-            projectName = projectName(project.projectId),
-            arguments = listOf("up", "-d"),
-            timeoutSeconds = 5 * 60,
-            cancelled = { false },
-        )
+        fun launch(excluded: Set<Int>): MacContainerOperationResult {
+            val override = MacComposePortOverride.resolve(plan) { port -> port !in excluded && isPortAvailable(port) }
+            val overrideFile = override.yaml.takeIf(String::isNotBlank)?.let { yaml ->
+                File.createTempFile("siftalpha-compose-port-", ".yaml").apply { writeText(yaml) }
+            }
+            return try {
+                runCompose(project, manifest, projectName(project.projectId), listOf("up", "-d"), 5 * 60, { false }, additionalManifest = overrideFile)
+            } finally {
+                overrideFile?.delete()
+            }
+        }
+        val first = launch(emptySet())
+        if (first.success || !first.output.contains("port is already allocated", ignoreCase = true)) return first
+        val occupied = Regex("(?:0\\.0\\.0\\.0:|:)\\s*(\\d{1,5})")
+            .findAll(first.output).mapNotNull { it.groupValues[1].toIntOrNull() }.toSet()
+        return launch(occupied)
     }
 
     override fun status(
@@ -339,6 +347,7 @@ class MacCliComposeContainerProvider(
         timeoutSeconds: Long,
         cancelled: () -> Boolean,
         maxOutputBytes: Int = 512 * 1024,
+        additionalManifest: File? = null,
     ): MacContainerOperationResult {
         val outputFile = File.createTempFile("siftalpha-compose-", ".log")
         try {
@@ -349,6 +358,10 @@ class MacCliComposeContainerProvider(
                 add(projectName)
                 add("-f")
                 add(manifest)
+                additionalManifest?.let { file ->
+                    add("-f")
+                    add(file.absolutePath)
+                }
                 addAll(arguments)
             }
             val processBuilder = ProcessBuilder(command)
@@ -422,6 +435,10 @@ class MacCliComposeContainerProvider(
             outputFile.delete()
         }
     }
+
+    private fun isPortAvailable(port: Int): Boolean = runCatching {
+        java.net.ServerSocket(port).use { true }
+    }.getOrDefault(false)
 
     private fun readOutput(file: File, maxBytes: Int): String {
         if (!file.isFile) return ""
