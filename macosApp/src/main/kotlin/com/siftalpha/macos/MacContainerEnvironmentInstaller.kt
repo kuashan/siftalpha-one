@@ -425,6 +425,50 @@ class MacManagedContainerInstaller(
             installComposeOnly(progress, log)
     }
 
+    override fun repairManagedNetwork(
+        progress: (MacContainerInstallPhase, String) -> Unit,
+        log: (String) -> Unit,
+    ): MacContainerInstallResult {
+        val root = MacManagedContainerToolchain.currentRoot(userHome)
+            ?: return MacContainerInstallResult(false, "managed container toolchain is missing")
+        val colima = File(root, "bin/colima")
+        val docker = File(root, "bin/docker")
+        if (!colima.isFile || !docker.isFile) {
+            return MacContainerInstallResult(false, "managed container executables are incomplete")
+        }
+
+        return try {
+            registerComposePlugin(root, log)
+            ensureManagedStateDirectories(log)
+            val environment = environmentFor(root)
+            val dns = discoverManagedDns(log)
+            progress(MacContainerInstallPhase.STARTING, "正在修复托管容器网络并重新启动…")
+            runChecked(
+                listOf(colima.absolutePath, "stop"),
+                environment,
+                5 * 60,
+                log,
+            )
+            runChecked(
+                listOf(colima.absolutePath) + MacManagedContainerDns.colimaStartArguments(dns.resolvers),
+                environment,
+                30 * 60,
+                log,
+            )
+            progress(MacContainerInstallPhase.VERIFYING, "正在验证修复后的 Docker 网络环境…")
+            runChecked(
+                listOf(docker.absolutePath, "info", "--format", "{{.ServerVersion}}"),
+                environment,
+                60,
+                log,
+            )
+            MacContainerInstallResult(true)
+        } catch (error: Throwable) {
+            progress(MacContainerInstallPhase.FAILED, "托管容器网络修复失败")
+            MacContainerInstallResult(false, error.message ?: error.javaClass.simpleName)
+        }
+    }
+
     private fun installFullStack(
         progress: (MacContainerInstallPhase, String) -> Unit,
         log: (String) -> Unit,
@@ -591,9 +635,10 @@ class MacManagedContainerInstaller(
                 "LIMA_SOCKET_PATH_LENGTH=" +
                     MacManagedContainerToolchain.projectedLimaSocketPathLength(userHome),
             )
+            val dns = discoverManagedDns(log)
             progress(MacContainerInstallPhase.STARTING, "正在启动本地容器环境…")
             runChecked(
-                listOf(colima.absolutePath, "start", "--runtime", "docker"),
+                listOf(colima.absolutePath) + MacManagedContainerDns.colimaStartArguments(dns.resolvers),
                 managedEnvironment,
                 30 * 60,
                 log,
@@ -804,6 +849,38 @@ class MacManagedContainerInstaller(
 
     private fun environmentFor(root: File): Map<String, String> =
         MacManagedContainerToolchain.environment(root, userHome = userHome)
+
+    private fun discoverManagedDns(log: (String) -> Unit): MacManagedContainerDnsSelection {
+        val scutilOutput = runCatching {
+            captureCommand(
+                command = listOf("/usr/sbin/scutil", "--dns"),
+                timeoutSeconds = 10,
+            )
+        }.getOrDefault("")
+        val selection = MacManagedContainerDns.select(scutilOutput)
+        log("MANAGED_DNS_SOURCE=" + selection.source)
+        log("MANAGED_DNS_RESOLVERS=" + selection.resolvers.joinToString(","))
+        return selection
+    }
+
+    private fun captureCommand(
+        command: List<String>,
+        timeoutSeconds: Long,
+    ): String {
+        val process = ProcessBuilder(command)
+            .redirectErrorStream(true)
+            .start()
+        if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
+            process.destroy()
+            if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
+            error("command timed out: " + command.firstOrNull().orEmpty())
+        }
+        val output = process.inputStream.bufferedReader().use { it.readText().take(128 * 1024) }
+        check(process.exitValue() == 0) {
+            "command failed exit=" + process.exitValue() + ": " + command.joinToString(" ")
+        }
+        return output
+    }
 
     private fun ensureManagedStateDirectories(log: (String) -> Unit) {
         val stateRoot = MacManagedContainerToolchain.managedStateRoot(userHome)
