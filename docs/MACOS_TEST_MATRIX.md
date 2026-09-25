@@ -894,3 +894,23 @@ R5 path acceptance is already REAL PASS. M6.2 remains open for real Compose Prep
 
 Current result:
 **9 / 11 PASS — CLOUD PASS / REAL INSTALLED-DMG ACCEPTANCE PENDING**.
+
+
+### M6.2 R8 Managed DNS Repair Verification（托管 DNS 修复验证）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| M6.2-D01 | macOS resolver discovery | non-loopback `scutil --dns` resolvers selected | PASS |
+| M6.2-D02 | loopback-only host DNS | safe fallback resolver set selected | PASS |
+| M6.2-D03 | failure classifier | `[::1]:53` / `127.x.x.x:53` connection failure recognized | PASS |
+| M6.2-D04 | external DNS error | non-loopback DNS/NXDOMAIN is not treated as managed-loopback repair | PASS |
+| M6.2-D05 | Colima launch args | explicit resolver list becomes repeated `--dns` arguments | PASS |
+| M6.2-D06 | managed-only repair boundary | automatic restart applies only to SiftAlpha-managed Docker | PASS |
+| M6.2-D07 | one retry boundary | Compose Prepare is retried only after a successful managed DNS repair | PASS |
+| M6.2-D08 | macOS regressions | M4/M5/M6 and package verification PASS | PASS — Run #100 |
+| M6.2-D09 | Android regression | W0 remains PASS | PASS — #809 |
+| M6.2-D10 | Real installed Mac | Docker Hub image pull succeeds after DNS repair | PENDING |
+| M6.2-D11 | Real Compose workflow | Prepare → Run → A/B isolation → Restart | PENDING |
+
+Current R8 result:
+**9 / 11 PASS — CLOUD PASS / REAL INSTALLED-MAC RETEST PENDING**.
