@@ -2489,3 +2489,77 @@ Exit gate：
 - 清理 A 不删除 A 源码、不影响 B；
 - 移除 A 后重启不再出现，B 仍存在；
 - `image + build` Compose Prepare 可进入 build 而不是 pull-access-denied。
+
+## 2026-09-25 · Pre-M7 Shared Core Realignment + Runtime Storage / Configuration Closure
+
+This closure was executed after the cross-platform route audit. It does not reopen M2-M6 and does not start M7.
+
+### Shared Core realignment
+
+Added platform-neutral durable contracts under Core:
+- durable runtime state snapshot;
+- durable project operation + generation fence;
+- pending-run intent store;
+- durable runtime ownership identity;
+- project cleanup safety policy;
+- project configuration naming/missing-value policy;
+- project secure-secret storage port;
+- runtime storage inventory / cleanup policy.
+
+Android RuntimeOperationStore now delegates to the Core durable operation store while preserving the Android storage namespace and behavior.
+
+### macOS adapter completion
+
+macOS now implements the same shared contracts with platform mechanisms:
+- operation/generation state persisted through PlatformStateStorage;
+- stale unfinished operations enter a bounded RECOVERING pass and converge back to live process/runtime facts;
+- host-process ownership is persisted with projectId + generation + PID + process start time;
+- restart recovery validates both PID and process start time before re-adopting ownership, preventing PID-reuse misidentification;
+- project STOP remains project-scoped;
+- secure environment values use macOS Keychain; SiftAlpha files store only configured variable names;
+- Python / Node / Compose launch paths consume the same project-scoped secure environment;
+- diagnostics redact configured secret values before presentation;
+- secure-secret capability reports AVAILABLE when /usr/bin/security is available.
+
+### Runtime Storage Manager
+
+Added a macOS Runtime Storage Manager that follows Android-style safety semantics without copying Android paths:
+- inventory before cleanup;
+- project source code is never part of managed cleanup;
+- active or ambiguous environments are never auto-cleaned;
+- only reproducible, inactive, SiftAlpha-managed orphan data or non-current managed toolchains are eligible for automatic cleanup;
+- Compose/VM state is conservatively retained when ownership cannot be proven;
+- Normal Mode and Developer Mode expose the storage manager.
+
+### Project Configuration entry
+
+Normal Mode and Developer Mode now expose project configuration:
+- users may add/update/remove project environment variables;
+- values are stored in macOS Keychain;
+- configured names are visible, values are not;
+- configuration is shared by the same MacProductController / MacProjectWorkflowCoordinator used by both modes.
+
+### Verification authority
+
+Functional HEAD before documentation closure:
+`19f4f218a2685b0d919ccd1114501ee203e31ada`
+
+Cloud verification:
+- macOS Host Runtime Run #116: PASS;
+- Android W0 Run #828: PASS;
+- Core + macOS compile/tests: PASS;
+- M4.1 import/detect/plan: PASS;
+- M4.2 managed Python workflow: PASS;
+- M5.1 Normal Mode flow: PASS;
+- M5.2 shared-state parity: PASS;
+- M6.1 container capability/Compose plan: PASS;
+- M6.2 Compose workflow/isolation: PASS;
+- project-scoped process control: PASS;
+- Android dependency isolation: PASS;
+- Ventura-baseline application packaging: PASS.
+
+Result:
+**PRE-M7 CORE REALIGNMENT = PASS / CLOSED.**
+
+M7 remains the next product stage. No additional M6.x or Pre-M7 substage is created.
+

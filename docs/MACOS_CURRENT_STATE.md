@@ -1345,3 +1345,30 @@ M6 remains CLOSED. M7 stays blocked until this finite repair passes real-Mac acc
 - Compose `image + build` prepare semantics using `pull --ignore-buildable` + `build`.
 
 This is not M6.3 and not M7.1.
+
+## Pre-M7 Core Realignment — CLOSED
+
+Current functional authority before documentation closure:
+`19f4f218a2685b0d919ccd1114501ee203e31ada`
+
+Status:
+- Shared Lifecycle / Operation / Generation policies remain in Core.
+- Operation + generation durability is now provided by Core and used by macOS.
+- macOS Host Process ownership survives app-process recreation using projectId + generation + PID + start-time validation.
+- stale unfinished operations converge through one bounded RECOVERING pass.
+- project cleanup is guarded by the shared cleanup policy.
+- macOS secure project configuration is backed by Keychain and exposed in both Normal and Developer modes.
+- Python / Node / Compose consume the same project-scoped secure environment.
+- diagnostic text is secret-redacted before presentation.
+- Runtime Storage Manager inventories project environments, orphan managed data, managed toolchains, cache/state categories and only auto-cleans entries proven inactive + reproducible + safe.
+- source projects, active/ambiguous environments, current managed toolchain and VM/runtime state are not auto-cleaned.
+
+Verification:
+- macOS Run #116 PASS.
+- Android W0 #828 PASS.
+- closed M4 / M5 / M6 cloud regressions remain PASS.
+
+Stage status:
+**Pre-M7 Functional Parity / Core Realignment = CLOSED.**
+**Next stage = M7 OpenBot Acceptance.**
+

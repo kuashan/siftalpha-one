@@ -1029,3 +1029,30 @@ macOS 后续每个实现/修复在进入代码前必须增加以下证据：
 | Compose image+build | 不 pull 同名 buildable image，直接进入 build |
 | Mixed Compose | pull --ignore-buildable → build |
 | Android regression | W0 PASS |
+
+## Pre-M7 Shared Core / Platform Parity Closure — 2026-09-25
+
+| Check | Expected | Status |
+|---|---|---|
+| Durable operation state | operation + generation survive process recreation through Core store | PASS — macOS #116 |
+| Generation fence | clearing current operation does not reset last generation | PASS |
+| Recovery convergence | stale unfinished operation enters bounded RECOVERING and returns to live facts | PASS |
+| Host process ownership | projectId + generation + PID + start time persisted | PASS |
+| PID reuse guard | recovered PID must match original process start time | PASS |
+| Project-scoped STOP | stopping A does not target unrelated project B | PASS |
+| Shared cleanup policy | running/busy project cleanup blocked | PASS |
+| macOS Keychain capability | secure-secret storage AVAILABLE when system security tool exists | PASS |
+| Secret file safety | secret values not written into SiftAlpha state files | PASS |
+| Launch configuration | Python / Node / Compose receive project-scoped secure environment | PASS |
+| Diagnostic redaction | configured secret values redacted before UI/log presentation | PASS |
+| Runtime storage inventory | managed project/toolchain/cache/state categories reported | PASS |
+| Safe orphan cleanup | only proven inactive + reproducible orphan data can auto-clean | PASS |
+| Ambiguous data guard | unowned/Compose-ambiguous runtime data conservatively retained | PASS |
+| Current toolchain guard | current managed toolchain never auto-cleaned | PASS |
+| Normal/Developer parity | both modes use same controller and expose config/storage entry points | PASS |
+| Closed-stage regression | M4.1/M4.2/M5.1/M5.2/M6.1/M6.2 probes remain PASS | PASS — macOS #116 |
+| Android regression | existing Android app remains green after Core changes | PASS — W0 #828 |
+
+Closure:
+**PRE-M7 SHARED CORE REALIGNMENT = PASS / CLOSED.**
+
