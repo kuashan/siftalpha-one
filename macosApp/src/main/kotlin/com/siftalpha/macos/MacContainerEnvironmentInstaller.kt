@@ -2,6 +2,7 @@ package com.siftalpha.macos
 
 import com.siftalpha.studio.platform.CapabilityAvailability
 import java.io.File
+import java.net.InetAddress
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -66,6 +67,12 @@ interface MacContainerEnvironmentInstaller {
         progress: (MacContainerInstallPhase, String) -> Unit,
         log: (String) -> Unit,
     ): MacContainerInstallResult
+
+    fun repairManagedNetwork(
+        progress: (MacContainerInstallPhase, String) -> Unit,
+        log: (String) -> Unit,
+    ): MacContainerInstallResult =
+        MacContainerInstallResult(false, "managed container network repair is unavailable")
 }
 
 object MacContainerInstallPlanner {
@@ -200,6 +207,17 @@ object MacManagedContainerToolchain {
     fun managedDockerExecutable(userHome: File = File(System.getProperty("user.home"))): File? =
         currentRoot(userHome)?.resolve("bin/docker")?.takeIf { it.isFile && it.canExecute() }
 
+    fun isManagedExecutable(
+        executable: String?,
+        userHome: File = File(System.getProperty("user.home")),
+    ): Boolean {
+        if (executable.isNullOrBlank()) return false
+        val root = currentRoot(userHome) ?: return false
+        val candidate = runCatching { File(executable).canonicalPath }.getOrNull() ?: return false
+        val prefix = runCatching { root.canonicalPath + File.separator }.getOrNull() ?: return false
+        return candidate.startsWith(prefix)
+    }
+
     fun managedBin(userHome: File = File(System.getProperty("user.home"))): File? =
         currentRoot(userHome)?.resolve("bin")?.takeIf { it.isDirectory }
 
@@ -279,6 +297,69 @@ object MacManagedContainerToolchain {
         } else {
             base
         }
+    }
+}
+
+internal data class MacManagedContainerDnsSelection(
+    val resolvers: List<String>,
+    val source: String,
+)
+
+internal object MacManagedContainerDns {
+    private val nameserverLine = Regex("""nameserver\[\d+\]\s*:\s*([^\s]+)""")
+    private val fallbackResolvers = listOf("1.1.1.1", "8.8.8.8")
+
+    fun select(scutilDns: String): MacManagedContainerDnsSelection {
+        val discovered = nameserverLine
+            .findAll(scutilDns)
+            .map { it.groupValues[1].trim() }
+            .filter(String::isNotBlank)
+            .distinct()
+            .toList()
+
+        val usable = discovered
+            .filter(::isUsableResolver)
+            .take(4)
+
+        return if (usable.isNotEmpty()) {
+            MacManagedContainerDnsSelection(
+                resolvers = usable,
+                source = "MACOS_SCUTIL",
+            )
+        } else {
+            MacManagedContainerDnsSelection(
+                resolvers = fallbackResolvers,
+                source = "PUBLIC_FALLBACK_AFTER_LOOPBACK_OR_EMPTY",
+            )
+        }
+    }
+
+    fun isLoopbackFailure(detail: String?): Boolean {
+        val text = detail.orEmpty().lowercase()
+        if (!text.contains("lookup ")) return false
+        if (!text.contains(":53")) return false
+        return text.contains("on [::1]:53") ||
+            text.contains("on ::1:53") ||
+            Regex("""on\s+127(?:\.\d{1,3}){3}:53""").containsMatchIn(text)
+    }
+
+    fun colimaStartArguments(resolvers: List<String>): List<String> = buildList {
+        add("start")
+        add("--runtime")
+        add("docker")
+        resolvers.forEach { resolver ->
+            add("--dns")
+            add(resolver)
+        }
+    }
+
+    private fun isUsableResolver(value: String): Boolean {
+        if ('%' in value) return false
+        val address = runCatching { InetAddress.getByName(value) }.getOrNull() ?: return false
+        return !address.isLoopbackAddress &&
+            !address.isAnyLocalAddress &&
+            !address.isLinkLocalAddress &&
+            !address.isMulticastAddress
     }
 }
 
