@@ -1191,3 +1191,36 @@ Next real acceptance:
 
 Current state:
 **M6.2 CLOUD PASS / INSTALLED-DMG REAL ACCEPTANCE PENDING**.
+
+
+## 36. M6.2 R8 Managed Container DNS Repair — CLOUD PASS
+
+Installed-path real acceptance established a clean reproduction from `/Applications/SiftAlpha X.app`, eliminating App Translocation as a cause of the current Compose failure.
+
+Real failure class:
+`docker compose pull` could fail because the managed VM attempted DNS through a loopback resolver such as `[::1]:53`, which is not reachable from the VM/container namespace.
+
+Universal repair:
+- discover macOS resolver candidates from `scutil --dns`;
+- prefer usable non-loopback system resolvers;
+- if macOS exposes only loopback/empty resolvers, use Colima's documented public-DNS recovery strategy as a last-resort fallback;
+- pass explicit `--dns` values to SiftAlpha-managed Colima;
+- detect only the specific loopback-DNS failure class;
+- when an already-running SiftAlpha-managed Docker hits that failure, stop/restart the managed Colima profile with repaired DNS and retry Compose Prepare once automatically;
+- external Docker/Podman providers are not modified;
+- no machine model, username, one-network, or one-project special case was introduced.
+
+Authority:
+- functional HEAD `6a6f663d1b5e9b38a1f1d85a85075f354a957f91`;
+- macOS Run #100 PASS;
+- Android W0 #809 PASS;
+- M6.1 / M6.2 / M4 / M5 regressions PASS;
+- DMG verification PASS;
+- `LSMinimumSystemVersion=13.0`;
+- artifact `siftalpha-macos-m6.2-installed-r8-dns-ventura-x64-100`;
+- artifact ID `10844090101`;
+- artifact digest `sha256:f9014d2c840c54d1a6b8b4856142cff41fbb2a6a6eeeb1c735a9399cb10d171a`;
+- DMG SHA-256 `51ef1c325f37899a156280a77a62829aa7511386bd9639d04b50ef056246050d`.
+
+Current state:
+**M6.2 CLOUD PASS / REAL INSTALLED-MAC DNS-REPAIR RETEST PENDING**.
