@@ -258,6 +258,11 @@ class MacContainerWorkflowTest {
             ),
         )
         assertTrue(
+            MacManagedContainerDns.isRecoverableManagedNetworkFailure(
+                "failed to resolve reference image: failed to do request: Head https://auth.docker.io/token: read: connection reset by peer",
+            ),
+        )
+        assertTrue(
             !MacManagedContainerDns.isRecoverableManagedNetworkFailure(
                 "docker compose pull failed exit=1: manifest unknown",
             ),
@@ -447,6 +452,115 @@ class MacContainerWorkflowTest {
             "unix:///Users/tester/.siftalpha/c/sa/docker.sock",
             environment["DOCKER_HOST"],
         )
+    }
+
+    @Test
+    fun managedComposeEnvironmentReappliesSystemProxyAfterProjectEnvironmentMerge() {
+        val home = java.nio.file.Files.createTempDirectory("siftalpha-managed-home").toFile()
+        try {
+            val toolchain = java.io.File(
+                home,
+                "Library/Application Support/SiftAlpha X/container-runtime/managed-test",
+            )
+            java.io.File(toolchain, "bin").mkdirs()
+            java.io.File(toolchain, "bin/docker").writeText("")
+            java.io.File(toolchain.parentFile, "current.txt").writeText("managed-test\n")
+
+            val environment = MacComposeProcessEnvironment.build(
+                executable = java.io.File(toolchain, "bin/docker").absolutePath,
+                projectEnvironment = mapOf(
+                    "HTTP_PROXY" to "http://stale.proxy:8080",
+                    "HTTPS_PROXY" to "http://stale.proxy:8080",
+                    "NO_PROXY" to "stale.internal",
+                    "http_proxy" to "http://stale.proxy:8080",
+                    "https_proxy" to "http://stale.proxy:8080",
+                    "no_proxy" to "stale.internal",
+                    "PROJECT_SETTING" to "preserved",
+                ),
+                userHome = home,
+                base = mapOf("PATH" to "/usr/bin"),
+                systemProxy = MacSystemProxySettings(
+                    httpProxy = "http://127.0.0.1:7897",
+                    httpsProxy = "http://127.0.0.1:7897",
+                    socksProxy = "socks5://127.0.0.1:7897",
+                    noProxy = "localhost,host.docker.internal",
+                ),
+            )
+
+            assertEquals("socks5h://127.0.0.1:7897", environment["HTTP_PROXY"])
+            assertEquals("socks5h://127.0.0.1:7897", environment["HTTPS_PROXY"])
+            assertEquals("localhost,host.docker.internal", environment["NO_PROXY"])
+            assertEquals("socks5h://127.0.0.1:7897", environment["http_proxy"])
+            assertEquals("socks5h://127.0.0.1:7897", environment["https_proxy"])
+            assertEquals("localhost,host.docker.internal", environment["no_proxy"])
+            assertEquals("preserved", environment["PROJECT_SETTING"])
+        } finally {
+            home.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun managedComposeEnvironmentClearsProjectProxyWhenSystemProxyIsOff() {
+        val home = java.nio.file.Files.createTempDirectory("siftalpha-managed-home").toFile()
+        try {
+            val toolchain = java.io.File(
+                home,
+                "Library/Application Support/SiftAlpha X/container-runtime/managed-test",
+            )
+            java.io.File(toolchain, "bin").mkdirs()
+            java.io.File(toolchain, "bin/docker").writeText("")
+            java.io.File(toolchain.parentFile, "current.txt").writeText("managed-test\n")
+
+            val environment = MacComposeProcessEnvironment.build(
+                executable = java.io.File(toolchain, "bin/docker").absolutePath,
+                projectEnvironment = mapOf(
+                    "HTTP_PROXY" to "http://stale.proxy:8080",
+                    "HTTPS_PROXY" to "http://stale.proxy:8080",
+                    "NO_PROXY" to "stale.internal",
+                    "http_proxy" to "http://stale.proxy:8080",
+                    "https_proxy" to "http://stale.proxy:8080",
+                    "no_proxy" to "stale.internal",
+                ),
+                userHome = home,
+                base = emptyMap(),
+                systemProxy = MacSystemProxySettings(null, null, null, null),
+            )
+
+            assertTrue(!environment.containsKey("HTTP_PROXY"))
+            assertTrue(!environment.containsKey("HTTPS_PROXY"))
+            assertTrue(!environment.containsKey("NO_PROXY"))
+            assertTrue(!environment.containsKey("http_proxy"))
+            assertTrue(!environment.containsKey("https_proxy"))
+            assertTrue(!environment.containsKey("no_proxy"))
+        } finally {
+            home.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun externalComposeEnvironmentKeepsProjectProxyPolicyUntouched() {
+        val environment = MacComposeProcessEnvironment.build(
+            executable = "/usr/local/bin/docker",
+            projectEnvironment = mapOf(
+                "HTTP_PROXY" to "http://project.proxy:8080",
+                "HTTPS_PROXY" to "http://project.proxy:8080",
+                "NO_PROXY" to "project.internal",
+            ),
+            userHome = java.nio.file.Files.createTempDirectory("siftalpha-external-home").toFile(),
+            base = mapOf("PATH" to "/usr/bin"),
+            systemProxy = MacSystemProxySettings(
+                httpProxy = "http://127.0.0.1:7897",
+                httpsProxy = "http://127.0.0.1:7897",
+                socksProxy = "socks5://127.0.0.1:7897",
+                noProxy = "localhost",
+            ),
+        )
+
+        assertEquals("http://project.proxy:8080", environment["HTTP_PROXY"])
+        assertEquals("http://project.proxy:8080", environment["HTTPS_PROXY"])
+        assertEquals("project.internal", environment["NO_PROXY"])
+        assertEquals("/usr/bin", environment["PATH"])
+        assertTrue(!environment.containsKey("DOCKER_HOST"))
     }
 
     @Test
