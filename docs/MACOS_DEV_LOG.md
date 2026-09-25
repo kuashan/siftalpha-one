@@ -2408,3 +2408,34 @@ State remains:
 ### Backlog Boundary（待办边界）
 
 Compose `composePrepared` 目前仍是进程内状态，App 重启/升级后会遗忘“已准备”事实。Android 已有 Environment Identity / READY proof（环境身份 / 就绪证明）的成熟原则。该问题记录为跨平台行为差距，但本次不与网络阻塞混修；不得用一个持久化 boolean 草率修复。后续必须先复用 Android 的“身份 + 指纹 + 实际资源再验证”原则再设计。
+
+
+## 2026-09-25 · M6.2 Host Egress Provisioning（宿主出口补齐）
+
+真实 Ventura + VPN 证据在 Host Resolver（宿主解析器）纠偏后变为：
+
+- DNS 已成功：`registry-1.docker.io` 可以解析到 IPv4；
+- Docker daemon 仍直接连接解析后的 `:443` 并 `i/o timeout`；
+- 用户 `scutil --proxy` 证明当前 macOS 同时启用 HTTP / HTTPS / SOCKS 本机代理，端口为动态系统事实，不得硬编码；
+- 因此剩余阻塞不是 DNS，而是 managed VM / Docker daemon 没有继承 macOS 当前 HTTP/HTTPS egress proxy（出口代理）。
+
+成熟方案依据：
+
+- Android Reference First（安卓成熟实现优先）继续成立：Runtime 应继承 Host Effective Network（宿主有效网络），不自行发明网络。
+- Colima 0.10.3 已原生支持 `env.HTTP_PROXY / HTTPS_PROXY / NO_PROXY`，并在 Docker provisioning（Docker 补齐）中把 loopback host proxy（宿主回环代理）转换为 VM 可访问的 host gateway。
+- 所以 SiftAlpha 只负责发现 macOS 系统代理并交给 Colima 官方机制，不直接写 Docker daemon 专用代理配置，不绑定 VPN 品牌/用户名/端口。
+
+本轮完成条件冻结：
+
+1. 读取 `/usr/sbin/scutil --proxy` 的 HTTP / HTTPS / SOCKS / ExceptionsList；
+2. 只把 Docker 支持的 HTTP / HTTPS / NO_PROXY 通过 Colima `--env` 官方入口传入并持久化到 SiftAlpha-managed profile；
+3. Finder 启动不依赖 shell 环境变量；
+4. 当系统代理关闭时显式传空值，清理 SiftAlpha-managed profile 的旧代理，避免 VPN 切换留下 stale proxy；
+5. loopback proxy 由 Colima 官方 `resolveHostProxy` 转换为 host gateway；
+6. Colima 重启后用 `docker info` 验证 daemon proxy 已实际生效，验证失败则本轮 repair 失败，不假装成功；
+7. 原有 DNS Host Resolver 机制保留；
+8. Compose 网络失败只自动 repair + retry 一次；
+9. 外部 Docker / Podman 不修改；
+10. Android W0 必须 PASS。
+
+本轮不新增 M6.x，不重开 M2～M5，不修改 Core / Android。

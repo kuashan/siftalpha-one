@@ -1287,3 +1287,16 @@ State remains:
 - 当前纠偏方案恢复 Host Network Inheritance（宿主网络继承）：SiftAlpha-managed Colima profile 使用 `dns: []`，不再注入公共 DNS，让 Lima Host Resolver 跟随 macOS 当前有效网络 / VPN 解析语义。
 - 本轮不重开 M2～M5，不修改 Core / Android，不扩展 M6 新切片。
 - M6.2 只有当前网络阻塞解除并完成既定 A/B Compose 真机验收后才能 COMPLETE；随后只允许一次 M6 Final Closure Audit。
+
+
+### M6.2 Host Egress Provisioning（宿主出口补齐）— 2026-09-25
+
+最新真实 Mac 证据表明 Host Resolver 已工作，但 Docker daemon 在 VPN 开启时仍直接连接解析后的 Docker Registry IP 并超时。用户系统代理事实为 macOS static HTTP + HTTPS + SOCKS loopback proxy，同时存在 utun 接口。
+
+当前实现已改为完整 Host Network Inheritance（宿主网络继承）：
+
+`macOS System Proxy → SiftAlpha managed Colima --env → Colima native loopback-to-host-gateway rewrite → Docker daemon proxy → Registry`
+
+并增加 post-start `docker info` 验证；只有 Docker daemon 确认真正继承当前 HTTP/HTTPS proxy 后 repair 才能成功。
+
+当前 M6.2 状态仍为 CURRENT，最终仍需真实 Ventura + VPN A/B Compose 固定验收链通过。

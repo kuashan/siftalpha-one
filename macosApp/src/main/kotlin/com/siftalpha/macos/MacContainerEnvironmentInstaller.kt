@@ -303,6 +303,149 @@ object MacManagedContainerToolchain {
     }
 }
 
+data class MacSystemProxySettings(
+    val httpProxy: String?,
+    val httpsProxy: String?,
+    val socksProxy: String?,
+    val noProxy: String?,
+) {
+    val hasDockerProxy: Boolean
+        get() = httpProxy != null || httpsProxy != null
+}
+
+internal object MacSystemProxyDiscovery {
+    private val scalarLine = Regex("""(?m)^\\s*([A-Za-z][A-Za-z0-9]+)\\s*:\\s*(.*?)\\s*$""")
+    private val arrayEntryLine = Regex("""^\\s*\\d+\\s*:\\s*(.*?)\\s*$""")
+
+    fun discover(): MacSystemProxySettings =
+        runCatching {
+            val process = ProcessBuilder("/usr/sbin/scutil", "--proxy")
+                .redirectErrorStream(true)
+                .start()
+            check(process.waitFor(10, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                "scutil --proxy timed out"
+            }
+            val output = process.inputStream.bufferedReader().use { it.readText().take(128 * 1024) }
+            check(process.exitValue() == 0) { "scutil --proxy failed exit=" + process.exitValue() }
+            parse(output)
+        }.getOrElse {
+            MacSystemProxySettings(null, null, null, null)
+        }
+
+    fun parse(output: String): MacSystemProxySettings {
+        val values = scalarLine.findAll(output).associate { match ->
+            match.groupValues[1] to match.groupValues[2]
+        }
+        val exceptions = parseExceptions(output)
+        return MacSystemProxySettings(
+            httpProxy = endpoint(values, "HTTPEnable", "HTTPProxy", "HTTPPort"),
+            httpsProxy = endpoint(values, "HTTPSEnable", "HTTPSProxy", "HTTPSPort"),
+            socksProxy = endpoint(values, "SOCKSEnable", "SOCKSProxy", "SOCKSPort", "socks5"),
+            noProxy = buildNoProxy(exceptions),
+        )
+    }
+
+    private fun endpoint(
+        values: Map<String, String>,
+        enabledKey: String,
+        hostKey: String,
+        portKey: String,
+        scheme: String = "http",
+    ): String? {
+        if (values[enabledKey] != "1") return null
+        val host = values[hostKey]?.trim()?.takeIf(String::isNotBlank) ?: return null
+        if (host.any(Char::isWhitespace) || '/' in host) return null
+        val port = values[portKey]?.trim()?.toIntOrNull()?.takeIf { it in 1..65535 } ?: return null
+        val encodedHost = if (':' in host && !host.startsWith("[")) "[$host]" else host
+        return "$scheme://$encodedHost:$port"
+    }
+
+    private fun parseExceptions(output: String): List<String> {
+        var inExceptions = false
+        val result = mutableListOf<String>()
+        output.lineSequence().forEach { line ->
+            if (!inExceptions && line.contains("ExceptionsList : <array> {")) {
+                inExceptions = true
+                return@forEach
+            }
+            if (!inExceptions) return@forEach
+            if (line.trim() == "}") {
+                inExceptions = false
+                return@forEach
+            }
+            val value = arrayEntryLine.matchEntire(line)?.groupValues?.getOrNull(1)?.trim()
+            if (!value.isNullOrBlank() && value != "<local>") result += value
+        }
+        return result
+    }
+
+    private fun buildNoProxy(exceptions: List<String>): String {
+        val required = listOf(
+            "localhost",
+            "127.0.0.1",
+            "::1",
+            "host.lima.internal",
+            "host.docker.internal",
+        )
+        return (exceptions + required)
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .joinToString(",")
+            .takeIf(String::isNotBlank)
+            .orEmpty()
+    }
+}
+
+internal object MacManagedContainerProxy {
+    fun colimaEnvironmentArguments(settings: MacSystemProxySettings): List<String> =
+        listOf(
+            "--env", "HTTP_PROXY=" + settings.httpProxy.orEmpty(),
+            "--env", "HTTPS_PROXY=" + settings.httpsProxy.orEmpty(),
+            "--env", "NO_PROXY=" + settings.noProxy.orEmpty(),
+        )
+
+    fun applyToProcessEnvironment(
+        base: Map<String, String>,
+        settings: MacSystemProxySettings,
+    ): Map<String, String> = buildMap {
+        putAll(base)
+        settings.httpProxy?.let {
+            put("HTTP_PROXY", it)
+            put("http_proxy", it)
+        }
+        settings.httpsProxy?.let {
+            put("HTTPS_PROXY", it)
+            put("https_proxy", it)
+        }
+        settings.noProxy?.takeIf(String::isNotBlank)?.let {
+            put("NO_PROXY", it)
+            put("no_proxy", it)
+        }
+    }
+
+    fun dockerInfoMatches(
+        settings: MacSystemProxySettings,
+        dockerInfo: String,
+    ): Boolean {
+        if (!settings.hasDockerProxy) return true
+        val values = dockerInfo.trim().split("|", limit = 3)
+        if (values.size < 2) return false
+        val actualHttp = values[0].trim()
+        val actualHttps = values[1].trim()
+
+        fun samePort(expected: String?, actual: String): Boolean {
+            if (expected == null) return true
+            val port = runCatching { URI(expected).port }.getOrDefault(-1)
+            return actual.isNotBlank() && port > 0 && actual.contains(":$port")
+        }
+
+        return samePort(settings.httpProxy, actualHttp) &&
+            samePort(settings.httpsProxy, actualHttps)
+    }
+}
+
 internal object MacManagedContainerDns {
     private val resolvConfNameserverLine = Regex("""(?m)^\s*nameserver\s+([^\s#]+)""")
     private val gatewayAddressLine = Regex("""^\s{2}gatewayAddress:\s*["']?([^"'#\s]+)""")
@@ -487,7 +630,8 @@ class MacManagedContainerInstaller(
         return try {
             registerComposePlugin(root, log)
             ensureManagedStateDirectories(log)
-            val environment = environmentFor(root)
+            val systemProxy = discoverManagedSystemProxy(log)
+            val environment = environmentFor(root, systemProxy)
             val hostResolverGateway = ensureManagedHostNetworkPolicy(log)
             progress(MacContainerInstallPhase.STARTING, "正在修复托管容器网络并重新启动…")
             runChecked(
@@ -497,7 +641,9 @@ class MacManagedContainerInstaller(
                 log,
             )
             runChecked(
-                listOf(colima.absolutePath) + MacManagedContainerDns.colimaStartArguments(),
+                listOf(colima.absolutePath) +
+                    MacManagedContainerDns.colimaStartArguments() +
+                    MacManagedContainerProxy.colimaEnvironmentArguments(systemProxy),
                 environment,
                 30 * 60,
                 log,
@@ -514,6 +660,12 @@ class MacManagedContainerInstaller(
                 environment,
                 60,
                 log,
+            )
+            verifyManagedDockerProxy(
+                docker = docker,
+                environment = environment,
+                settings = systemProxy,
+                log = log,
             )
             MacContainerInstallResult(true)
         } catch (error: Throwable) {
@@ -681,7 +833,8 @@ class MacManagedContainerInstaller(
         return try {
             registerComposePlugin(root, log)
             ensureManagedStateDirectories(log)
-            val managedEnvironment = environmentFor(root)
+            val systemProxy = discoverManagedSystemProxy(log)
+            val managedEnvironment = environmentFor(root, systemProxy)
             log("COLIMA_HOME=MANAGED|" + managedEnvironment["COLIMA_HOME"].orEmpty())
             log("LIMA_HOME=MANAGED|" + managedEnvironment["LIMA_HOME"].orEmpty())
             log(
@@ -691,7 +844,9 @@ class MacManagedContainerInstaller(
             val hostResolverGateway = ensureManagedHostNetworkPolicy(log)
             progress(MacContainerInstallPhase.STARTING, "正在启动本地容器环境…")
             runChecked(
-                listOf(colima.absolutePath) + MacManagedContainerDns.colimaStartArguments(),
+                listOf(colima.absolutePath) +
+                    MacManagedContainerDns.colimaStartArguments() +
+                    MacManagedContainerProxy.colimaEnvironmentArguments(systemProxy),
                 managedEnvironment,
                 30 * 60,
                 log,
@@ -715,6 +870,12 @@ class MacManagedContainerInstaller(
                 managedEnvironment,
                 60,
                 log,
+            )
+            verifyManagedDockerProxy(
+                docker = docker,
+                environment = managedEnvironment,
+                settings = systemProxy,
+                log = log,
             )
             runChecked(
                 listOf(docker.absolutePath, "compose", "version"),
@@ -906,8 +1067,53 @@ class MacManagedContainerInstaller(
         )
     }
 
-    private fun environmentFor(root: File): Map<String, String> =
-        MacManagedContainerToolchain.environment(root, userHome = userHome)
+    private fun environmentFor(
+        root: File,
+        systemProxy: MacSystemProxySettings? = null,
+    ): Map<String, String> {
+        val base = MacManagedContainerToolchain.environment(root, userHome = userHome)
+        return systemProxy?.let {
+            MacManagedContainerProxy.applyToProcessEnvironment(base, it)
+        } ?: base
+    }
+
+    private fun discoverManagedSystemProxy(log: (String) -> Unit): MacSystemProxySettings {
+        val settings = MacSystemProxyDiscovery.discover()
+        log("MANAGED_SYSTEM_PROXY_HTTP=" + if (settings.httpProxy != null) "ON" else "OFF")
+        log("MANAGED_SYSTEM_PROXY_HTTPS=" + if (settings.httpsProxy != null) "ON" else "OFF")
+        log("MANAGED_SYSTEM_PROXY_SOCKS=" + if (settings.socksProxy != null) "ON" else "OFF")
+        log(
+            "MANAGED_EGRESS_POLICY=" +
+                if (settings.hasDockerProxy) "HOST_SYSTEM_PROXY" else "DIRECT_OR_TUN",
+        )
+        return settings
+    }
+
+    private fun verifyManagedDockerProxy(
+        docker: File,
+        environment: Map<String, String>,
+        settings: MacSystemProxySettings,
+        log: (String) -> Unit,
+    ) {
+        if (!settings.hasDockerProxy) {
+            log("MANAGED_DOCKER_PROXY=NOT_REQUIRED")
+            return
+        }
+        val info = captureCommand(
+            command = listOf(
+                docker.absolutePath,
+                "info",
+                "--format",
+                "{{.HTTPProxy}}|{{.HTTPSProxy}}|{{.NoProxy}}",
+            ),
+            timeoutSeconds = 60,
+            environment = environment,
+        )
+        check(MacManagedContainerProxy.dockerInfoMatches(settings, info)) {
+            "managed Docker daemon did not inherit the current macOS HTTP/HTTPS proxy"
+        }
+        log("MANAGED_DOCKER_PROXY=HOST_SYSTEM_PROXY_ACTIVE")
+    }
 
     private fun ensureManagedHostNetworkPolicy(log: (String) -> Unit): String {
         val configFile = MacManagedContainerToolchain.colimaProfileConfig(userHome)

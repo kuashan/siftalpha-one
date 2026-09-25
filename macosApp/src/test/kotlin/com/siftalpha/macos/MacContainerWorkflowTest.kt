@@ -82,6 +82,90 @@ class MacContainerWorkflowTest {
     }
 
     @Test
+    fun systemProxyParserCapturesMacOsHttpHttpsSocksAndExceptions() {
+        val settings = MacSystemProxyDiscovery.parse(
+            """
+            <dictionary> {
+              ExceptionsList : <array> {
+                0 : 127.0.0.1
+                1 : 192.168.0.0/16
+                2 : localhost
+                3 : *.local
+                4 : <local>
+              }
+              HTTPEnable : 1
+              HTTPPort : 7897
+              HTTPProxy : 127.0.0.1
+              HTTPSEnable : 1
+              HTTPSPort : 7897
+              HTTPSProxy : 127.0.0.1
+              ProxyAutoConfigEnable : 0
+              SOCKSEnable : 1
+              SOCKSPort : 7897
+              SOCKSProxy : 127.0.0.1
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("http://127.0.0.1:7897", settings.httpProxy)
+        assertEquals("http://127.0.0.1:7897", settings.httpsProxy)
+        assertEquals("socks5://127.0.0.1:7897", settings.socksProxy)
+        assertTrue(settings.noProxy.orEmpty().contains("192.168.0.0/16"))
+        assertTrue(settings.noProxy.orEmpty().contains("host.lima.internal"))
+        assertTrue(!settings.noProxy.orEmpty().contains("<local>"))
+    }
+
+    @Test
+    fun managedProxyPassesStaticSystemProxyThroughOfficialColimaEnvFlags() {
+        val settings = MacSystemProxySettings(
+            httpProxy = "http://127.0.0.1:7897",
+            httpsProxy = "http://127.0.0.1:7897",
+            socksProxy = "socks5://127.0.0.1:7897",
+            noProxy = "localhost,127.0.0.1",
+        )
+        val args = MacManagedContainerProxy.colimaEnvironmentArguments(settings)
+
+        assertTrue(args.contains("HTTP_PROXY=http://127.0.0.1:7897"))
+        assertTrue(args.contains("HTTPS_PROXY=http://127.0.0.1:7897"))
+        assertTrue(args.contains("NO_PROXY=localhost,127.0.0.1"))
+        assertTrue(!args.any { it.startsWith("--dns") })
+    }
+
+    @Test
+    fun managedProxyExplicitlyClearsPersistedHttpProxyWhenSystemProxyIsOff() {
+        val args = MacManagedContainerProxy.colimaEnvironmentArguments(
+            MacSystemProxySettings(null, null, null, null),
+        )
+
+        assertTrue(args.contains("HTTP_PROXY="))
+        assertTrue(args.contains("HTTPS_PROXY="))
+        assertTrue(args.contains("NO_PROXY="))
+    }
+
+    @Test
+    fun managedProxyVerificationAcceptsColimaLoopbackToHostGatewayRewrite() {
+        val settings = MacSystemProxySettings(
+            httpProxy = "http://127.0.0.1:7897",
+            httpsProxy = "http://127.0.0.1:7897",
+            socksProxy = null,
+            noProxy = "localhost",
+        )
+
+        assertTrue(
+            MacManagedContainerProxy.dockerInfoMatches(
+                settings,
+                "http://192.168.5.2:7897|http://192.168.5.2:7897|localhost",
+            ),
+        )
+        assertTrue(
+            !MacManagedContainerProxy.dockerInfoMatches(
+                settings,
+                "||localhost",
+            ),
+        )
+    }
+
+    @Test
     fun managedDnsClearsPersistedExplicitResolversWithoutChangingOtherNetworkSettings() {
         val updated = MacManagedContainerDns.clearExplicitResolvers(
             """

@@ -976,3 +976,20 @@ macOS 后续每个实现/修复在进入代码前必须增加以下证据：
 - A/B Compose 原冻结验收链保持不变；
 - 外部 Docker / Podman 未被修改；
 - Android W0 回归 PASS。
+
+
+### M6.2 Host Egress Provisioning Verification（宿主出口补齐验证）
+
+| Check（检查） | Expected（期望） |
+|---|---|
+| macOS `scutil --proxy` parser | HTTP / HTTPS / SOCKS / exceptions 正确解析 |
+| Finder launch independence | 不依赖 shell 的 HTTP_PROXY / HTTPS_PROXY |
+| Colima env bridge | 当前 HTTP_PROXY / HTTPS_PROXY / NO_PROXY 通过官方 `--env` 入口进入 managed profile |
+| Loopback proxy | `127.0.0.1:<dynamic-port>` 不硬编码；由 Colima 转换到 VM host gateway |
+| Proxy disable migration | 系统代理关闭时旧 HTTP/HTTPS/NO_PROXY 被显式清空 |
+| Docker daemon proof | `docker info` 显示 daemon HTTP/HTTPS proxy，且端口与当前 macOS 系统代理一致 |
+| DNS inheritance | 继续保留 Lima Host Resolver；不重新引入公共 DNS fallback |
+| Repair bound | 网络失败最多自动 repair + retry 一次 |
+| External providers | Docker / Podman 外部安装不修改 |
+| Android regression | W0 PASS |
+| Real Ventura + VPN | Compose A Prepare PASS |
