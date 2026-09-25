@@ -100,6 +100,45 @@ class MacContainerWorkflowTest {
     }
 
     @Test
+    fun managedLimaStateUsesShortMacOsSafePath() {
+        val home = java.io.File("/Users/" + "x".repeat(31))
+        val limaHome = MacManagedContainerToolchain.limaHome(home)
+
+        assertEquals(".siftalpha", limaHome.parentFile.name)
+        assertTrue(MacManagedContainerToolchain.projectedLimaSocketPathLength(home) < 104)
+        assertTrue(!limaHome.absolutePath.contains("Library/Application Support"))
+    }
+
+    @Test
+    fun managedLimaStateFallsBackToCompactPathForLongHome() {
+        val home = java.io.File("/Users/" + "x".repeat(38))
+        val limaHome = MacManagedContainerToolchain.limaHome(home)
+
+        assertEquals(".sa", limaHome.parentFile.name)
+        assertEquals("l", limaHome.name)
+        assertTrue(MacManagedContainerToolchain.projectedLimaSocketPathLength(home) < 104)
+    }
+
+    @Test
+    fun managedEnvironmentSeparatesToolchainAndShortRuntimeState() {
+        val home = java.io.File("/Users/tester")
+        val toolchain = java.io.File(
+            home,
+            "Library/Application Support/SiftAlpha X/container-runtime/managed-test",
+        )
+        val env = MacManagedContainerToolchain.environment(
+            root = toolchain,
+            base = mapOf("PATH" to "/usr/bin"),
+            userHome = home,
+        )
+
+        assertTrue(env.getValue("PATH").startsWith(java.io.File(toolchain, "bin").absolutePath))
+        assertEquals(java.io.File(home, ".siftalpha/lima").absolutePath, env["LIMA_HOME"])
+        assertEquals(java.io.File(home, ".siftalpha/colima").absolutePath, env["COLIMA_HOME"])
+        assertEquals(java.io.File(toolchain, "cache/colima").absolutePath, env["COLIMA_CACHE_HOME"])
+    }
+
+    @Test
     fun advisorDistinguishesReadyInstalledButStoppedAndMissingProvider() {
         val ready = MacContainerProviderSnapshot(
             kind = MacContainerProviderKind.DOCKER,
