@@ -1332,3 +1332,16 @@ M7 may now begin. M7 remains **NOT STARTED** and requires the original OpenBot p
 这不是新 M6 切片，仍属于 M6.2 当前唯一网络阻塞的关闭修复。
 
 The historical pending statements above are superseded by section 37: the M6 Final Closure Audit is complete, and the next stage is M7 OpenBot Acceptance.
+
+
+## Pre-M7 Functional Parity Repair（M7 前功能对齐修复）
+
+M6 remains CLOSED. M7 stays blocked until this finite repair passes real-Mac acceptance:
+
+- durable project catalog + app-restart restore;
+- durable Compose prepared marker;
+- project removal without source deletion;
+- project-scoped environment cleanup with running-project guard;
+- Compose `image + build` prepare semantics using `pull --ignore-buildable` + `build`.
+
+This is not M6.3 and not M7.1.

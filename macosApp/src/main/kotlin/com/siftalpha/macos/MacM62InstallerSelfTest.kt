@@ -72,6 +72,18 @@ object MacM62InstallerSelfTest {
             plan: ComposeProjectPlan,
         ): MacContainerOperationResult = MacContainerOperationResult(true)
 
+        override fun clean(
+            project: MacImportedProject,
+            plan: ComposeProjectPlan,
+        ): MacContainerOperationResult {
+            runningClean(project)
+            return MacContainerOperationResult(true, output = "fake compose clean")
+        }
+
+        private fun runningClean(project: MacImportedProject) {
+            // no runtime state in installer self-test
+        }
+
         override fun publishedPorts(
             project: MacImportedProject,
             plan: ComposeProjectPlan,

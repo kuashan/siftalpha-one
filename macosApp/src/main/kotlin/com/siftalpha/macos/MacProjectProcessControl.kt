@@ -106,6 +106,14 @@ class MacProjectProcessControl : ProjectProcessControl {
         }
     }
 
+    internal fun forget(scope: ProjectProcessScope): Boolean {
+        synchronized(records) {
+            val record = records[scope.projectId] ?: return true
+            if (record.process.isAlive) return false
+            return records.remove(scope.projectId, record)
+        }
+    }
+
     override fun stopProject(scope: ProjectProcessScope): ProjectStopResult {
         val record = records[scope.projectId]
             ?: return ProjectStopResult(scope, ProjectStopOutcome.NOT_FOUND)

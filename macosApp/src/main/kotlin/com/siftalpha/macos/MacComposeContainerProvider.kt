@@ -59,6 +59,16 @@ internal object MacComposeFailureDiagnostics {
     }
 }
 
+internal object MacComposePreparePolicy {
+    fun operations(plan: ComposeProjectPlan): List<List<String>> = buildList {
+        val hasPullOnlyService = plan.services.any { service ->
+            !service.image.isNullOrBlank() && service.buildContext.isNullOrBlank()
+        }
+        if (hasPullOnlyService) add(listOf("pull", "--ignore-buildable"))
+        if (plan.services.any { !it.buildContext.isNullOrBlank() }) add(listOf("build"))
+    }
+}
+
 interface MacComposeContainerProvider {
     val snapshot: MacContainerProviderSnapshot
 
@@ -86,6 +96,11 @@ interface MacComposeContainerProvider {
     ): String
 
     fun stop(
+        project: MacImportedProject,
+        plan: ComposeProjectPlan,
+    ): MacContainerOperationResult
+
+    fun clean(
         project: MacImportedProject,
         plan: ComposeProjectPlan,
     ): MacContainerOperationResult
@@ -153,32 +168,19 @@ class MacCliComposeContainerProvider(
         log("COMPOSE_PROJECT_NAME=" + projectName)
         log("COMPOSE_MANIFEST=" + manifest)
 
-        if (plan.services.any { !it.image.isNullOrBlank() }) {
-            val pull = runCompose(
+        MacComposePreparePolicy.operations(plan).forEach { arguments ->
+            val operation = arguments.first()
+            val result = runCompose(
                 project = project,
                 manifest = manifest,
                 projectName = projectName,
-                arguments = listOf("pull"),
-                timeoutSeconds = 20 * 60,
+                arguments = arguments,
+                timeoutSeconds = if (operation == "build") 30 * 60 else 20 * 60,
                 cancelled = cancelled,
             )
-            appendOutput("pull", pull.output, log)
-            if (!pull.success) return pull
-            log("COMPOSE_PULL:PASS")
-        }
-
-        if (plan.services.any { !it.buildContext.isNullOrBlank() }) {
-            val build = runCompose(
-                project = project,
-                manifest = manifest,
-                projectName = projectName,
-                arguments = listOf("build"),
-                timeoutSeconds = 30 * 60,
-                cancelled = cancelled,
-            )
-            appendOutput("build", build.output, log)
-            if (!build.success) return build
-            log("COMPOSE_BUILD:PASS")
+            appendOutput(operation, result.output, log)
+            if (!result.success) return result
+            log("COMPOSE_" + operation.uppercase() + ":PASS")
         }
 
         return MacContainerOperationResult(
@@ -311,6 +313,22 @@ class MacCliComposeContainerProvider(
             manifest = manifest,
             projectName = projectName(project.projectId),
             arguments = listOf("down", "--remove-orphans"),
+            timeoutSeconds = 5 * 60,
+            cancelled = { false },
+        )
+    }
+
+    override fun clean(
+        project: MacImportedProject,
+        plan: ComposeProjectPlan,
+    ): MacContainerOperationResult {
+        val manifest = plan.manifestPath
+            ?: return MacContainerOperationResult(false, detail = "Compose manifest is missing")
+        return runCompose(
+            project = project,
+            manifest = manifest,
+            projectName = projectName(project.projectId),
+            arguments = listOf("down", "--remove-orphans", "--volumes"),
             timeoutSeconds = 5 * 60,
             cancelled = { false },
         )

@@ -149,6 +149,10 @@ class MacProjectFilesystem : ProjectFilesystem {
 
     fun rootFile(projectId: String): File = root(projectId)
 
+    fun forgetProject(projectId: String) {
+        roots.remove(projectId)
+    }
+
     private fun root(projectId: String): File =
         roots[projectId] ?: error("unknown imported project: " + projectId)
 

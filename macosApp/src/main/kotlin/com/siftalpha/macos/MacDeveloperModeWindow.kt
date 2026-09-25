@@ -52,6 +52,8 @@ class MacDeveloperModeWindow(
     private val stopButton = JButton("停止")
     private val restartButton = JButton("重新运行")
     private val refreshButton = JButton("刷新")
+    private val cleanButton = JButton("清理环境")
+    private val removeButton = JButton("移除项目")
     private val copyButton = JButton("复制日志")
     private val normalButton = JButton("普通模式")
     private val emptyProjectHint = JLabel("尚未导入项目，请点击“导入项目”开始。")
@@ -119,6 +121,8 @@ class MacDeveloperModeWindow(
             add(stopButton)
             add(restartButton)
             add(refreshButton)
+            add(cleanButton)
+            add(removeButton)
             add(copyButton)
             add(normalButton)
         }
@@ -133,6 +137,8 @@ class MacDeveloperModeWindow(
         stopButton.addActionListener { runOperation(controller::stop) }
         restartButton.addActionListener { runOperation(controller::restart) }
         refreshButton.addActionListener { refreshSelectedProject() }
+        cleanButton.addActionListener { clearSelectedEnvironment() }
+        removeButton.addActionListener { removeSelectedProject() }
         copyButton.addActionListener { copyCombinedLogs() }
         normalButton.addActionListener { returnToNormal() }
     }
@@ -458,6 +464,8 @@ class MacDeveloperModeWindow(
             stopButton.isEnabled = false
             restartButton.isEnabled = false
             refreshButton.isEnabled = false
+            cleanButton.isEnabled = false
+            removeButton.isEnabled = false
             copyButton.isEnabled = false
             return
         }
@@ -476,6 +484,8 @@ class MacDeveloperModeWindow(
         stopButton.isEnabled = running || busy
         restartButton.isEnabled = !busy && view.workflow.environmentReady
         refreshButton.isEnabled = true
+        cleanButton.isEnabled = !busy && !running && !environmentInstallActive
+        removeButton.isEnabled = !busy && !running && !environmentInstallActive
         copyButton.isEnabled = view.combinedLogs.isNotBlank()
     }
 
@@ -497,6 +507,53 @@ class MacDeveloperModeWindow(
         stopButton.isEnabled = false
         restartButton.isEnabled = false
         refreshButton.isEnabled = false
+        cleanButton.isEnabled = false
+        removeButton.isEnabled = false
+    }
+
+    private fun clearSelectedEnvironment() {
+        val id = selectedProjectId ?: return
+        val name = controller.project(id)?.name ?: "当前项目"
+        val answer = JOptionPane.showConfirmDialog(
+            frame,
+            "清理 $name 的 SiftAlpha 运行环境和项目级容器资源？\n不会删除项目源代码，也不会影响其他项目。",
+            "清理项目环境",
+            JOptionPane.OK_CANCEL_OPTION,
+            JOptionPane.WARNING_MESSAGE,
+        )
+        if (answer != JOptionPane.OK_OPTION) return
+        runOperation(controller::clearProjectEnvironment)
+    }
+
+    private fun removeSelectedProject() {
+        val id = selectedProjectId ?: return
+        val name = controller.project(id)?.name ?: "当前项目"
+        val answer = JOptionPane.showConfirmDialog(
+            frame,
+            "从 SiftAlpha X 中移除 $name？\n项目源代码不会被删除；已准备的环境也不会自动删除。",
+            "移除项目",
+            JOptionPane.OK_CANCEL_OPTION,
+            JOptionPane.WARNING_MESSAGE,
+        )
+        if (answer != JOptionPane.OK_OPTION) return
+        setButtonsBusy()
+        Thread {
+            val success = controller.removeProject(id)
+            SwingUtilities.invokeLater {
+                if (success) {
+                    selectedProjectId = null
+                    refreshProjects(null)
+                } else {
+                    JOptionPane.showMessageDialog(
+                        frame,
+                        controller.view(id)?.lastError ?: "无法移除项目，请先停止项目。",
+                        "移除失败",
+                        JOptionPane.ERROR_MESSAGE,
+                    )
+                    refreshProjects(id)
+                }
+            }
+        }.start()
     }
 
     private fun copyCombinedLogs() {

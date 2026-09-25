@@ -86,6 +86,18 @@ object MacM62SelfTest {
             return MacContainerOperationResult(true, output = "fake compose down")
         }
 
+        override fun clean(
+            project: MacImportedProject,
+            plan: ComposeProjectPlan,
+        ): MacContainerOperationResult {
+            runningClean(project)
+            return MacContainerOperationResult(true, output = "fake compose clean")
+        }
+
+        private fun runningClean(project: MacImportedProject) {
+            running[projectName(project.projectId)] = false
+        }
+
         override fun publishedPorts(
             project: MacImportedProject,
             plan: ComposeProjectPlan,

@@ -1,6 +1,7 @@
 package com.siftalpha.macos
 
 import com.siftalpha.core.lifecycle.ProjectLifecycleState
+import com.siftalpha.core.storage.PlatformStateStorage
 import com.siftalpha.studio.container.ComposeProjectPlan
 import com.siftalpha.studio.container.ComposeProjectPlanner
 import com.siftalpha.studio.runtime.RuntimeKind
@@ -75,6 +76,7 @@ class MacProductController(
         MacManagedContainerInstaller(systemFacts),
     processControl: MacProjectProcessControl = MacProjectProcessControl(),
     dataRoot: File = MacProjectEnvironmentManager.defaultDataRoot(),
+    stateStorage: PlatformStateStorage = MacFileStateStorage(File(dataRoot, "state/platform-state.properties")),
 ) {
     @Volatile
     private var latestContainerProviders: List<MacContainerProviderSnapshot> =
@@ -93,14 +95,65 @@ class MacProductController(
         },
     )
     private val projects = LinkedHashMap<String, MacProductProject>()
+    private val projectCatalog = MacProjectCatalog(stateStorage)
     private val lastErrors = ConcurrentHashMap<String, String?>()
     private val containerInstallProgress = ConcurrentHashMap<String, MacContainerInstallProgress>()
     private val containerInstallLogs = ConcurrentHashMap<String, StringBuilder>()
     private val managedPythonVersion: String? by lazy { managedPython?.version() }
 
+    init {
+        restoreProjects()
+    }
+
     @Synchronized
     fun importProject(directory: File): MacProductProject {
         refreshContainerProviders()
+        val product = attachProject(directory)
+        projectCatalog.add(product.imported.canonicalRootPath)
+        lastErrors.remove(product.projectId)
+        return product
+    }
+
+    @Synchronized
+    fun removeProject(projectId: String): Boolean {
+        val product = projects[projectId] ?: return false
+        if (!coordinator.detach(projectId)) {
+            lastErrors[projectId] = "项目正在运行或有操作进行中，请先停止后再移除。"
+            return false
+        }
+        projects.remove(projectId)
+        filesystem.forgetProject(projectId)
+        projectCatalog.remove(product.imported.canonicalRootPath)
+        lastErrors.remove(projectId)
+        containerInstallProgress.remove(projectId)
+        containerInstallLogs.remove(projectId)
+        return true
+    }
+
+    fun clearProjectEnvironment(projectId: String): Boolean {
+        val exists = synchronized(this) { projects.containsKey(projectId) }
+        if (!exists) return false
+        lastErrors.remove(projectId)
+        val success = coordinator.clearEnvironment(projectId)
+        if (!success) {
+            lastErrors[projectId] = "无法清理项目环境。请先停止当前项目并等待正在执行的操作结束。"
+        } else {
+            containerInstallProgress.remove(projectId)
+            containerInstallLogs.remove(projectId)
+        }
+        return success
+    }
+
+    @Synchronized
+    private fun restoreProjects() {
+        projectCatalog.paths().forEach { path ->
+            val directory = File(path)
+            if (!directory.isDirectory || !directory.canRead()) return@forEach
+            runCatching { attachProject(directory) }
+        }
+    }
+
+    private fun attachProject(directory: File): MacProductProject {
         val imported = filesystem.importDirectory(directory)
         val snapshot = MacProjectSnapshotBuilder(filesystem).build(imported)
         val plan = languagePlan(snapshot)
@@ -108,7 +161,6 @@ class MacProductController(
         val product = MacProductProject(imported, snapshot, plan, composePlan)
         projects[product.projectId] = product
         coordinator.attach(MacWorkflowContext(imported, snapshot, plan, composePlan))
-        lastErrors.remove(product.projectId)
         return product
     }
 

@@ -76,7 +76,59 @@ class MacProjectWorkflowCoordinator(
     private val webDiscovery = MacProjectWebDiscovery(processControl)
 
     fun attach(context: MacWorkflowContext) {
-        state(context.project.projectId).context = context
+        val state = state(context.project.projectId)
+        state.context = context
+        if (context.composePlan?.isComposeProject == true) {
+            state.composePrepared = environmentManager.isComposePrepared(context.project.projectId)
+        }
+    }
+
+    fun detach(projectId: String): Boolean {
+        val state = states[projectId] ?: return true
+        if (state.operation != null) return false
+        if (status(projectId).processState == ProjectProcessState.RUNNING) return false
+        if (!processControl.forget(ProjectProcessScope(projectId))) return false
+        return states.remove(projectId, state)
+    }
+
+    fun clearEnvironment(projectId: String): Boolean {
+        val state = states[projectId] ?: return false
+        val context = state.context ?: return false
+        if (state.operation != null) return false
+        if (status(projectId).processState == ProjectProcessState.RUNNING) return false
+        val generation = begin(projectId, ProjectOperationAction.CLEAN) ?: return false
+
+        val composePlan = context.composePlan?.takeIf { it.isComposeProject }
+        val success = if (composePlan != null) {
+            val provider = containerProviderSource()
+            if (provider == null) {
+                append(state, "CLEAN_FAILED=container provider unavailable")
+                false
+            } else {
+                val result = provider.clean(context.project, composePlan)
+                appendProviderOutput(state, "compose clean", result.output)
+                result.detail?.let { append(state, "CLEAN_DETAIL=" + it) }
+                result.success
+            }
+        } else {
+            runCatching { environmentManager.clearProjectEnvironment(projectId) }
+                .onFailure { append(state, "CLEAN_DETAIL=" + (it.message ?: it.javaClass.simpleName)) }
+                .getOrDefault(false)
+        }
+
+        if (success) {
+            state.composePrepared = false
+            environmentManager.clearComposePrepared(projectId)
+            invalidateComposeStatus(state)
+            processControl.forget(ProjectProcessScope(projectId))
+            synchronized(state.history) { state.history.setLength(0) }
+        }
+        finish(
+            projectId,
+            generation,
+            if (success) ProjectOperationPhase.SUCCESS else ProjectOperationPhase.FAILED,
+        )
+        return success
     }
 
     fun prepare(projectId: String): MacPrepareResult {
@@ -148,6 +200,7 @@ class MacProjectWorkflowCoordinator(
         )
         if (operation.success) {
             state.composePrepared = true
+            environmentManager.markComposePrepared(context.project.projectId)
             invalidateComposeStatus(state)
         }
         return MacPrepareResult(

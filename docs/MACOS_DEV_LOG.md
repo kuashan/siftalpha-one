@@ -2454,3 +2454,38 @@ Compose `composePrepared` 目前仍是进程内状态，App 重启/升级后会�
 - `EOF` / `proxyconnect tcp: EOF` 正式纳入 managed registry transport recoverable failure（托管仓库传输可恢复失败）；
 - 自动恢复仍严格保持一次 repair + 一次 retry，不增加循环；
 - Docker daemon proof 同时校验 proxy scheme（协议）与动态端口，避免“只看到同一个端口就误判成功”。
+
+
+## 2026-09-25 · Pre-M7 Functional Parity Repair（M7 前功能对齐修复）
+
+M6 保持 CLOSED。本轮不重开 M6，也不开始 M7；只关闭三个已确认的基础产品阻塞项。
+
+### Project Persistence（项目持久化）
+- macOS 原实现只把项目登记存在进程内存，App 退出即丢失；
+- 新增 macOS PlatformStateStorage 文件实现，原子提交到 SiftAlpha App Data；
+- 项目 catalog 持久保存 canonical project path，App 启动自动重新 Import → Detect → Plan → Coordinator attach；
+- Compose prepared marker 同步持久化，避免项目恢复后错误回到“未准备”；
+- 原项目源代码不复制、不移动、不改写。
+
+### Project Removal / Environment Cleanup（项目移除 / 环境清理）
+- “移除项目”只移除 SiftAlpha catalog 登记，不删除源代码，也不默认删除已准备环境；
+- “清理项目环境”仅允许项目未运行且无操作进行时执行；
+- Python / Node 清理只删除 SiftAlpha App Data 下当前 projectId 的 managed environment；
+- Compose 清理只执行当前项目的 `compose down --remove-orphans --volumes`；
+- 清理成功后 environment-ready / compose-ready 状态同时失效；
+- Normal Mode 与 Developer Mode 都提供入口。
+
+### Compose Pull / Build Semantics（Compose 拉取 / 构建语义）
+- 纯 `image:` 服务：`docker compose pull --ignore-buildable`；
+- 含 `build:` 服务：`docker compose build`；
+- `image + build` 是合法 buildable service，不再因为同名 Docker Hub image 不存在而 Prepare 失败；
+- mixed project 按 pull remote → build local 顺序执行；
+- 无 Easy-TDX / OpenBot 专属分支。
+
+Exit gate：
+- macOS cloud tests/build PASS；
+- Android W0 PASS；
+- real Mac: 导入 A/B → 完全退出 App → 重开仍存在；
+- 清理 A 不删除 A 源码、不影响 B；
+- 移除 A 后重启不再出现，B 仍存在；
+- `image + build` Compose Prepare 可进入 build 而不是 pull-access-denied。

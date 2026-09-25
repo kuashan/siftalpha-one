@@ -251,6 +251,15 @@ class MacNormalModeWindow(
             menu.add(JMenuItem("刷新项目").apply {
                 addActionListener { refreshProjects() }
             })
+            if (selectedProjectId != null) {
+                menu.add(JMenuItem("清理项目环境…").apply {
+                    addActionListener { clearSelectedEnvironment() }
+                })
+                menu.add(JMenuItem("移除项目…").apply {
+                    addActionListener { removeSelectedProject() }
+                })
+                menu.addSeparator()
+            }
             menu.add(JMenuItem("开发者模式").apply {
                 addActionListener { openDeveloperMode() }
             })
@@ -649,6 +658,52 @@ class MacNormalModeWindow(
             operation(id)
             SwingUtilities.invokeLater {
                 refreshProjects(selectProjectId = id)
+            }
+        }.start()
+    }
+
+    private fun clearSelectedEnvironment() {
+        val id = selectedProjectId ?: return
+        val name = controller.project(id)?.name ?: "当前项目"
+        val answer = JOptionPane.showConfirmDialog(
+            frame,
+            "清理 $name 的 SiftAlpha 运行环境和项目级容器资源？\n不会删除项目源代码，也不会影响其他项目。",
+            "清理项目环境",
+            JOptionPane.OK_CANCEL_OPTION,
+            JOptionPane.WARNING_MESSAGE,
+        )
+        if (answer != JOptionPane.OK_OPTION) return
+        runProjectOperation("正在清理项目环境…") { projectId ->
+            controller.clearProjectEnvironment(projectId)
+        }
+    }
+
+    private fun removeSelectedProject() {
+        val id = selectedProjectId ?: return
+        val name = controller.project(id)?.name ?: "当前项目"
+        val answer = JOptionPane.showConfirmDialog(
+            frame,
+            "从 SiftAlpha X 中移除 $name？\n项目源代码不会被删除；已准备的环境也不会自动删除。",
+            "移除项目",
+            JOptionPane.OK_CANCEL_OPTION,
+            JOptionPane.WARNING_MESSAGE,
+        )
+        if (answer != JOptionPane.OK_OPTION) return
+        Thread {
+            val success = controller.removeProject(id)
+            SwingUtilities.invokeLater {
+                if (success) {
+                    selectedProjectId = null
+                    refreshProjects()
+                } else {
+                    JOptionPane.showMessageDialog(
+                        frame,
+                        controller.view(id)?.lastError ?: "无法移除项目，请先停止项目。",
+                        "移除失败",
+                        JOptionPane.ERROR_MESSAGE,
+                    )
+                    refreshProjects(selectProjectId = id)
+                }
             }
         }.start()
     }

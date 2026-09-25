@@ -4,8 +4,12 @@ import com.siftalpha.core.process.ProjectProcessLaunchRequest
 import com.siftalpha.core.process.ProjectProcessScope
 import com.siftalpha.core.process.ProjectProcessState
 import java.io.File
+import java.nio.file.FileVisitResult
 import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
 import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.BasicFileAttributes
 import java.util.concurrent.atomic.AtomicLong
 import org.tomlj.Toml
 import org.tomlj.TomlTable
@@ -36,6 +40,42 @@ class MacProjectEnvironmentManager(
 
     fun managedPythonExecutable(): File? =
         managedPython?.pythonExecutable?.takeIf { managedPython.available }
+
+    fun isComposePrepared(projectId: String): Boolean =
+        File(projectRoot(projectId), "compose-prepared.ready").isFile
+
+    fun markComposePrepared(projectId: String) {
+        File(projectRoot(projectId), "compose-prepared.ready").writeText("ready\n")
+    }
+
+    fun clearComposePrepared(projectId: String) {
+        File(projectRoot(projectId), "compose-prepared.ready").delete()
+    }
+
+    fun clearProjectEnvironment(projectId: String): Boolean {
+        val projectsRoot = File(root, "projects").apply { mkdirs() }.canonicalFile
+        val target = projectRootFile(projectId).canonicalFile
+        require(target != projectsRoot && target.toPath().startsWith(projectsRoot.toPath())) {
+            "project environment escaped managed data root"
+        }
+        if (!target.exists()) return true
+        Files.walkFileTree(
+            target.toPath(),
+            object : SimpleFileVisitor<Path>() {
+                override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                    Files.deleteIfExists(file)
+                    return FileVisitResult.CONTINUE
+                }
+
+                override fun postVisitDirectory(dir: Path, exc: java.io.IOException?): FileVisitResult {
+                    if (exc != null) throw exc
+                    Files.deleteIfExists(dir)
+                    return FileVisitResult.CONTINUE
+                }
+            },
+        )
+        return !target.exists()
+    }
 
     fun currentEnvironment(projectId: String): MacPreparedEnvironment? {
         val projectRoot = projectRoot(projectId)
@@ -403,10 +443,13 @@ class MacProjectEnvironmentManager(
         }
     }
 
-    private fun projectRoot(projectId: String): File {
+    private fun projectRootFile(projectId: String): File {
         val safe = projectId.replace(Regex("[^A-Za-z0-9._-]"), "_").take(96)
-        return File(root, "projects/" + safe).apply { mkdirs() }
+        return File(root, "projects/" + safe)
     }
+
+    private fun projectRoot(projectId: String): File =
+        projectRootFile(projectId).apply { mkdirs() }
 
     private fun failure(detail: String): MacPrepareResult =
         MacPrepareResult(

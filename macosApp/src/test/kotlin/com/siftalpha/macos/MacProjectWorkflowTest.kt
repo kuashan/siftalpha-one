@@ -1,12 +1,133 @@
 package com.siftalpha.macos
 
 import com.siftalpha.studio.runtime.RuntimeKind
+import com.siftalpha.core.storage.StoredStateValue
 import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MacProjectWorkflowTest {
+    @Test
+    fun fileStateStorageAndProjectCatalogSurviveNewInstances() {
+        val root = Files.createTempDirectory("siftalpha-state-").toFile()
+        try {
+            val stateFile = root.resolve("state/platform-state.properties")
+            val first = MacFileStateStorage(stateFile)
+            first.mutate(
+                com.siftalpha.core.storage.StateStorageMutation(
+                    writes = mapOf("proof" to StoredStateValue.Text("persisted")),
+                ),
+            )
+            val catalog = MacProjectCatalog(first)
+            catalog.add("/tmp/Project A")
+            catalog.add("/tmp/项目 B")
+
+            val second = MacFileStateStorage(stateFile)
+            assertEquals(StoredStateValue.Text("persisted"), second.read("proof"))
+            assertEquals(listOf("/tmp/Project A", "/tmp/项目 B"), MacProjectCatalog(second).paths())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun productControllerRestoresImportedProjectsWithoutTouchingSource() {
+        val root = Files.createTempDirectory("siftalpha-persist-").toFile()
+        val project = root.resolve("demo").apply { mkdirs() }
+        val dataRoot = root.resolve("data")
+        try {
+            project.resolve("main.py").writeText("print('ok')\n")
+            val first = MacProductController(
+                discovery = emptyList(),
+                filesystem = MacProjectFilesystem(),
+                managedPython = null,
+                containerProviderSnapshotSource = { emptyList() },
+                dataRoot = dataRoot,
+                stateStorage = MacFileStateStorage(dataRoot.resolve("state/platform-state.properties")),
+            )
+            val imported = first.importProject(project)
+            assertEquals(1, first.projects().size)
+
+            val second = MacProductController(
+                discovery = emptyList(),
+                filesystem = MacProjectFilesystem(),
+                managedPython = null,
+                containerProviderSnapshotSource = { emptyList() },
+                dataRoot = dataRoot,
+                stateStorage = MacFileStateStorage(dataRoot.resolve("state/platform-state.properties")),
+            )
+            assertEquals(listOf(imported.projectId), second.projects().map { it.projectId })
+            assertTrue(project.resolve("main.py").isFile)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun composePreparePolicySkipsPullForBuildableImageAndHandlesMixedProjects() {
+        fun service(name: String, image: String?, build: String?) =
+            com.siftalpha.studio.container.ComposeServicePlan(
+                name = name,
+                image = image,
+                buildContext = build,
+                dependsOn = emptyList(),
+                ports = emptyList(),
+            )
+        fun plan(services: List<com.siftalpha.studio.container.ComposeServicePlan>) =
+            com.siftalpha.studio.container.ComposeProjectPlan(
+                status = com.siftalpha.studio.container.ComposeProjectPlanStatus.READY,
+                manifestPath = "compose.yaml",
+                services = services,
+                containerAvailability = com.siftalpha.studio.platform.CapabilityAvailability.AVAILABLE,
+                issues = emptyList(),
+            )
+
+        assertEquals(
+            listOf(listOf("build")),
+            MacComposePreparePolicy.operations(
+                plan(listOf(service("easy-tdx", "easy-tdx:latest", "."))),
+            ),
+        )
+        assertEquals(
+            listOf(listOf("pull", "--ignore-buildable"), listOf("build")),
+            MacComposePreparePolicy.operations(
+                plan(
+                    listOf(
+                        service("redis", "redis:alpine", null),
+                        service("easy-tdx", "easy-tdx:latest", "."),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun clearingProjectEnvironmentDeletesOnlyManagedProjectData() {
+        val root = Files.createTempDirectory("siftalpha-clean-").toFile()
+        val source = root.resolve("source").apply { mkdirs() }
+        val dataRoot = root.resolve("data")
+        try {
+            source.resolve("main.py").writeText("print('keep me')\n")
+            val manager = MacProjectEnvironmentManager(
+                processControl = MacProjectProcessControl(),
+                managedPython = null,
+                dataRoot = dataRoot,
+            )
+            val projectId = "macos:test-clean"
+            val managedProjectRoot = dataRoot.resolve("projects/macos_test-clean")
+            managedProjectRoot.resolve("environments/env-1").mkdirs()
+            managedProjectRoot.resolve("environments/env-1/marker").writeText("generated")
+            managedProjectRoot.resolve("compose-prepared.ready").writeText("ready")
+
+            assertTrue(manager.clearProjectEnvironment(projectId))
+            assertTrue(!managedProjectRoot.exists())
+            assertTrue(source.resolve("main.py").isFile)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun importsPythonProjectAndBuildsProviderNeutralPlan() {
         val root = Files.createTempDirectory("siftalpha-m4-python-").toFile()

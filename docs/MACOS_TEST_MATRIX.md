@@ -1012,3 +1012,20 @@ macOS 后续每个实现/修复在进入代码前必须增加以下证据：
 | No hard-code | 无固定 7897 / VPN 产品 / 用户路径 |
 | Android regression | W0 PASS |
 | Real Mac | VPN 开启下 Compose A Prepare PASS |
+
+
+## Pre-M7 Functional Parity Verification（M7 前功能对齐验证）
+
+| Check | Expected |
+|---|---|
+| Project catalog restart | 导入 A/B → 退出 App → 重开 → A/B 自动恢复 |
+| Source safety | restore / remove / clean 均不删除项目源代码 |
+| Compose readiness restart | 已准备 Compose 项目重启 App 后仍识别为 prepared |
+| Remove project | 仅移除 catalog；重启后不再出现；其他项目不受影响 |
+| Clean running guard | RUNNING / busy 项目拒绝清理 |
+| Python/Node clean scope | 只删除当前 projectId 的 SiftAlpha managed data |
+| Compose clean scope | 只执行当前 Compose project 的 down + volumes + orphans |
+| Compose image-only | pull --ignore-buildable |
+| Compose image+build | 不 pull 同名 buildable image，直接进入 build |
+| Mixed Compose | pull --ignore-buildable → build |
+| Android regression | W0 PASS |
