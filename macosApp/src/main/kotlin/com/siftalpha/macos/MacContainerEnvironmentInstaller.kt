@@ -516,7 +516,10 @@ internal object MacManagedContainerDns {
                         text.contains("proxyconnect tcp") ||
                         Regex("""(?:^|[:\s])eof(?:$|\s)""").containsMatchIn(text)
                     )
-        return loopbackDnsFailure || composeRegistryTransportFailure
+        val composeRegistryResetFailure =
+            text.contains("failed to resolve reference") &&
+                text.contains("connection reset by peer")
+        return loopbackDnsFailure || composeRegistryTransportFailure || composeRegistryResetFailure
     }
 
     fun colimaStartArguments(): List<String> =
