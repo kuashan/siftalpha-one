@@ -2151,3 +2151,21 @@ Authority:
 
 Distribution remains M8:
 ZIP is still a development-test artifact; DMG/signing/notarization/upgrade installation remain M8 scope.
+
+
+## M6.2 R6 diagnostic authority — 2026-09-25
+
+Universal-First boundary remains in force.
+
+R5 real evidence proves the managed-container path repair, VM startup, Docker daemon, Compose and Buildx work on the supported acceptance Mac. The next failure is in generic Compose project preparation.
+
+R6 does not guess at proxy/network/image causes. It repairs diagnostic propagation so a failed Compose pull/build exposes its real output through Developer Mode without requiring the user to understand or manually reproduce commands in Terminal.
+
+Authority:
+- functional HEAD `fba1ead63818af26898f3284606e363fe36865b5`;
+- macOS Run #90 PASS;
+- Android W0 #799 PASS;
+- real Compose Prepare root-cause retest pending.
+
+Roadmap unchanged:
+**M6 CURRENT / M6.1 COMPLETE / M6.2 CURRENT → M7 NOT STARTED → M8 NOT STARTED**.
