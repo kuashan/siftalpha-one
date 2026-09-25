@@ -425,8 +425,8 @@ class MacDeveloperModeWindow(
                             line.contains("SIFTALPHA_M62_PREPARE=") ||
                             line.contains("PREPARE_DETAIL=")
                     }
-                    .takeLast(120)
                     .toList()
+                    .takeLast(120)
                 if (composeDiagnostics.isNotEmpty()) {
                     appendLine("=== Compose Prepare Diagnostics ===")
                     composeDiagnostics.forEach(::appendLine)
