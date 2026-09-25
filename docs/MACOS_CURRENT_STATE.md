@@ -1116,3 +1116,35 @@ Verification authority:
 
 Current state:
 **M6.2 CLOUD PASS / REAL VENTURA R5 RETEST PENDING**.
+
+
+## 36. M6.2 R5 real path PASS + R6 Compose diagnostics — CLOUD PASS
+
+Real Ventura R5 evidence confirms the universal managed-container path repair works on a supported Intel Mac:
+- `CONTAINER_STATE_ROOT=MANAGED|~/.siftalpha`;
+- `LIMA_SOCKET_PATH_LENGTH=60`;
+- Lima VM reached RUNNING;
+- SSH / guest agent / socket forwarding completed;
+- Docker server, Docker Compose and Docker Buildx verification all PASS.
+
+Therefore:
+**M6.2 R5 Managed Container Path Safety = REAL MAC PASS.**
+
+The next failure moved to project-level Compose Prepare and surfaced only as `container command exit=1`. R6 fixes that generic diagnostic loss:
+- failed `docker compose <operation>` results now preserve operation name, exit code and bounded real stdout/stderr tail;
+- timeouts preserve operation and bounded output;
+- Developer Mode Environment Preparation shows `LAST_ERROR` and a dedicated `Compose Prepare Diagnostics` section from the shared project log;
+- no Compose execution behavior, provider selection, Core architecture or Android code was changed.
+
+R6 verification:
+- functional HEAD `fba1ead63818af26898f3284606e363fe36865b5`;
+- macOS Run #90 PASS;
+- Android W0 #799 PASS;
+- M4/M5/M6 probes PASS;
+- artifact `siftalpha-macos-m6.2-compose-diagnostics-r6-ventura-x64-90`;
+- artifact ID `10842248813`;
+- artifact digest `sha256:7b72753498e410b59bf7841ab05b15d52656c5accf04c0e9dff8ecc77ba9caa4`;
+- user ZIP SHA-256 `deee5b6eafc3f0e28166c1c0db91cd1e55a0c56c8a181573271d0964036b7320`.
+
+Current state:
+**M6.2 R5 REAL PATH PASS / R6 CLOUD PASS / REAL COMPOSE PREPARE ROOT-CAUSE RETEST PENDING**.
