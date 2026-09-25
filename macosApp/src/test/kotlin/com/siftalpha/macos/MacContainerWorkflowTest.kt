@@ -177,7 +177,7 @@ class MacContainerWorkflowTest {
         val settings = MacSystemProxySettings(
             httpProxy = "http://127.0.0.1:7897",
             httpsProxy = "http://127.0.0.1:7897",
-            socksProxy = null,
+            socksProxy = "socks5://127.0.0.1:7897",
             noProxy = "localhost",
         )
 

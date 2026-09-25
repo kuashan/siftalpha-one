@@ -508,7 +508,7 @@ internal object MacManagedContainerDns {
                                 )
                         ) ||
                         text.contains("proxyconnect tcp") ||
-                        Regex("""(?:^|[:\\s])eof(?:$|[\\s])""").containsMatchIn(text)
+                        Regex("""(?:^|[:\s])eof(?:$|\s)""").containsMatchIn(text)
                     )
         return loopbackDnsFailure || composeRegistryTransportFailure
     }
