@@ -2215,3 +2215,21 @@ Authority:
 
 Roadmap remains:
 **M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS / REAL INSTALLED-MAC PENDING → M7 NOT STARTED → M8 NOT STARTED**.
+
+
+## M6.2 R9 managed-VM DNS authority — 2026-09-25
+
+R8 real installed-app evidence proved that selecting host DNS and restarting managed Colima with explicit `--dns` values was not sufficient: Docker Hub resolution could still fall back to `[::1]:53`.
+
+R9 authority:
+- functional HEAD `98cd197c314549b68bf66924406ad02b402e29c1`;
+- macOS Run #102 PASS;
+- Android W0 #811 PASS;
+- SiftAlpha now validates the resolver that actually exists inside its own managed Colima VM;
+- missing/loopback-only VM resolver state is repaired using the already-selected validated DNS set and verified before continuing;
+- external Docker/Podman configuration remains immutable;
+- Core/Android boundaries remain unchanged;
+- real installed-DMG retest is still required.
+
+Roadmap remains:
+**M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS / REAL INSTALLED-MAC PENDING → M7 NOT STARTED → M8 NOT STARTED**.

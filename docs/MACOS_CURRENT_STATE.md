@@ -1224,3 +1224,35 @@ Authority:
 
 Current state:
 **M6.2 CLOUD PASS / REAL INSTALLED-MAC DNS-REPAIR RETEST PENDING**.
+
+
+## M6.2 R9 Managed VM DNS Resolver Recovery — CLOUD PASS / REAL RETEST PENDING
+
+R8 installed-app acceptance reproduced the same Docker Hub failure after the managed-network restart/retry path:
+
+`lookup registry-1.docker.io on [::1]:53 ... connection refused`
+
+The additional real evidence narrowed the problem from host DNS selection to resolver materialization inside the SiftAlpha-managed Colima VM. Colima 0.10.3 can skip its DNS setup when its dnsmasq installation check does not recognize an installed-but-upgradable package; in that failure class, passing `colima start --dns ...` alone does not guarantee a usable VM `/etc/resolv.conf`.
+
+R9 keeps the existing Universal-First boundary and adds a managed-provider health/repair step:
+- after SiftAlpha-managed Colima starts or is restarted for a proven loopback-DNS failure, inspect the VM `/etc/resolv.conf`;
+- if it already contains a usable non-loopback resolver, leave it unchanged;
+- if it is missing, unreadable, or contains only unusable/loopback resolvers, materialize a validated resolver list inside that SiftAlpha-managed VM and verify it;
+- resolver values still come from the existing macOS resolver discovery/fallback policy;
+- recovery is confined to the SiftAlpha-managed Colima VM;
+- external Docker Desktop / Podman / user-managed Docker are never modified;
+- no username, model, Wi-Fi, project-name, or acceptance-machine special case was added;
+- Core and Android logic are unchanged.
+
+Functional authority before documentation/package relabel:
+- functional HEAD `98cd197c314549b68bf66924406ad02b402e29c1`;
+- macOS Run #102 PASS;
+- Android W0 #811 PASS;
+- Core/macOS tests PASS;
+- M6.1 / M6.2 Compose workflow / managed-container / M4 / M5 regressions PASS;
+- project-scoped process-control regression PASS.
+
+Current state:
+**M6.2 R9 CLOUD PASS / REAL INSTALLED-MAC DNS RETEST PENDING**.
+
+Do not close M6.2 yet. The next evidence remains the installed-DMG real test of `siftalpha-compose-a`; only after full A/B Prepare → Run → Web → project-scoped Stop → Restart acceptance may M6.2 close and the single M6 Final Closure Audit run.

@@ -914,3 +914,21 @@ Current result:
 
 Current R8 result:
 **9 / 11 PASS — CLOUD PASS / REAL INSTALLED-MAC RETEST PENDING**.
+
+
+### M6.2 R9 Managed VM Resolver Recovery Verification（托管 VM DNS 解析器恢复验证）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| M6.2-R9-01 | VM resolver parser | usable non-loopback nameserver is accepted | PASS |
+| M6.2-R9-02 | Loopback-only resolver | `::1` / `127.x` is rejected as recovery-ready DNS | PASS |
+| M6.2-R9-03 | Missing resolver | empty/unreadable resolver state requires recovery | PASS |
+| M6.2-R9-04 | Recovery rendering | validated resolvers are deduplicated and loopback values excluded | PASS |
+| M6.2-R9-05 | Managed-provider boundary | resolver materialization occurs only in SiftAlpha-managed Colima | PASS |
+| M6.2-R9-06 | Existing Compose workflow/isolation | Prepare/Run/Stop/Restart probes unchanged | PASS — macOS #102 |
+| M6.2-R9-07 | Android regression | W0 remains PASS | PASS — #811 |
+| M6.2-R9-08 | Real installed Mac pull | Docker Hub pull no longer resolves through `[::1]:53` | PENDING |
+| M6.2-R9-09 | Full real Compose A/B acceptance | A/B Run, Stop A leaves B RUNNING, Restart A | PENDING |
+
+Current R9 result:
+**7 / 9 PASS — CLOUD PASS / REAL INSTALLED-MAC RETEST PENDING**.

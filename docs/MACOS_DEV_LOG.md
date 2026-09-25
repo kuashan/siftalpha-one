@@ -2320,3 +2320,27 @@ SHA-256:
 
 State:
 **CLOUD PASS / REAL INSTALLED-MAC RETEST PENDING**.
+
+
+## 2026-09-25 · M6.2 R9 managed VM resolver recovery
+
+Real R8 acceptance still produced `[::1]:53 connection refused` during `docker compose pull`. The one-retry path did not make the VM resolver usable.
+
+Root-cause refinement:
+- explicit Colima `--dns` arguments are not sufficient for the observed Colima 0.10.3 DNS setup failure class;
+- SiftAlpha must verify the resolver actually materialized inside its own managed VM before retrying project Prepare.
+
+Implementation:
+- added managed-VM `/etc/resolv.conf` health validation;
+- healthy non-loopback resolver configuration is preserved;
+- missing/loopback-only resolver state is repaired from SiftAlpha's already-selected validated resolver list;
+- repair is verified by re-reading the VM resolver file;
+- stdin piping is used for resolver content rather than interpolated shell commands;
+- external providers remain untouched.
+
+Functional verification:
+- HEAD `98cd197c314549b68bf66924406ad02b402e29c1`;
+- macOS Run #102 PASS;
+- Android W0 #811 PASS;
+- M6.2 workflow/isolation and managed-container probes PASS;
+- R9 installed-DMG real retest pending.
