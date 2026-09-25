@@ -82,6 +82,74 @@ class MacContainerWorkflowTest {
     }
 
     @Test
+    fun managedDnsPrefersNonLoopbackMacOsResolvers() {
+        val selection = MacManagedContainerDns.select(
+            """
+            resolver #1
+              nameserver[0] : ::1
+              nameserver[1] : 127.0.0.1
+            resolver #2
+              nameserver[0] : 192.168.1.1
+              nameserver[1] : 10.0.0.53
+            """.trimIndent(),
+        )
+
+        assertEquals("MACOS_SCUTIL", selection.source)
+        assertEquals(listOf("192.168.1.1", "10.0.0.53"), selection.resolvers)
+    }
+
+    @Test
+    fun managedDnsFallsBackWhenHostResolversAreOnlyLoopback() {
+        val selection = MacManagedContainerDns.select(
+            """
+            resolver #1
+              nameserver[0] : ::1
+              nameserver[1] : 127.0.0.1
+            """.trimIndent(),
+        )
+
+        assertEquals("PUBLIC_FALLBACK_AFTER_LOOPBACK_OR_EMPTY", selection.source)
+        assertEquals(listOf("1.1.1.1", "8.8.8.8"), selection.resolvers)
+    }
+
+    @Test
+    fun managedDnsDetectsOnlyLoopbackResolverFailures() {
+        assertTrue(
+            MacManagedContainerDns.isLoopbackFailure(
+                "failed to resolve: dial tcp: lookup registry-1.docker.io on [::1]:53: read: connection refused",
+            ),
+        )
+        assertTrue(
+            MacManagedContainerDns.isLoopbackFailure(
+                "lookup registry.example on 127.0.0.1:53: connection refused",
+            ),
+        )
+        assertTrue(
+            !MacManagedContainerDns.isLoopbackFailure(
+                "lookup registry.example on 10.0.0.53:53: no such host",
+            ),
+        )
+    }
+
+    @Test
+    fun managedDnsColimaArgumentsAreExplicitAndProviderGeneric() {
+        assertEquals(
+            listOf(
+                "start",
+                "--runtime",
+                "docker",
+                "--dns",
+                "192.168.1.1",
+                "--dns",
+                "10.0.0.53",
+            ),
+            MacManagedContainerDns.colimaStartArguments(
+                listOf("192.168.1.1", "10.0.0.53"),
+            ),
+        )
+    }
+
+    @Test
     fun checksumParserSelectsExactAssetFromMultiFileManifest() {
         val manifest = """
             bbdef91774885a0d05f7b048c4eb89ae2bcf3a0c252ae7ca7934e63df76d93c3 *lima-2.2.0-Darwin-arm64.tar.gz
