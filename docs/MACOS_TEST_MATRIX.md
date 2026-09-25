@@ -874,3 +874,23 @@ Current R5 result:
 | M6.2-D08 | Real Compose Prepare | Prepare succeeds after root-cause repair | PENDING |
 
 R5 path acceptance is already REAL PASS. M6.2 remains open for real Compose Prepare / Run / A-B isolation acceptance.
+
+
+### Installed-test DMG / App Translocation Verification（安装与转移保护）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| DIST-PRE-01 | macOS DMG build | DMG produced by CI | PASS — Run #95 |
+| DIST-PRE-02 | DMG integrity | `hdiutil verify` succeeds | PASS — Run #95 |
+| DIST-PRE-03 | DMG application payload | contains `SiftAlpha X.app` | PASS |
+| DIST-PRE-04 | Applications target | DMG contains symlink to `/Applications` | PASS |
+| DIST-PRE-05 | Installed path guard | packaged app under `/Applications` is allowed | PASS |
+| DIST-PRE-06 | App Translocation guard | translocated packaged path is blocked | PASS |
+| DIST-PRE-07 | Downloads/non-installed guard | packaged app outside `/Applications` is blocked | PASS |
+| DIST-PRE-08 | Development/CI path | non-packaged probe execution remains allowed | PASS |
+| DIST-PRE-09 | Android regression | W0 remains PASS | PASS — #804 |
+| DIST-PRE-10 | Real DMG install | drag to Applications / replace / launch from Applications | PENDING |
+| DIST-PRE-11 | Real no-translocation launch | no App Translocation warning on installed build | PENDING |
+
+Current result:
+**9 / 11 PASS — CLOUD PASS / REAL INSTALLED-DMG ACCEPTANCE PENDING**.
