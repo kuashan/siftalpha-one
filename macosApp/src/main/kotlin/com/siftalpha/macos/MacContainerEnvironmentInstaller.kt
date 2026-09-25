@@ -172,6 +172,12 @@ object MacManagedContainerToolchain {
     const val BUILDX_VERSION = "0.37.1"
     const val STACK_VERSION = "c0.10.3-l2.2.0-d29.8.1-p5.5.1-b0.37.1"
 
+    fun buildxReleaseSha256(arch: String): String = when (arch) {
+        "x86_64" -> "7003a7bae20e7741283db1e23dafdcb957776a8be85de3f459630b1dd4c19db0"
+        "arm64" -> "c3cbbc820d578b0aa8158dd62ef1af25a0c8a75ef53331dbe4e219471e1dbe8c"
+        else -> error("unsupported Buildx architecture: " + arch)
+    }
+
     fun normalizeArchitecture(value: String): String? = when (value.lowercase()) {
         "x86_64", "amd64" -> "x86_64"
         "arm64", "aarch64" -> "arm64"
@@ -531,11 +537,7 @@ class MacManagedContainerInstaller(
         val name = buildxAssetName(arch)
         val base = "https://github.com/docker/buildx/releases/download/v" +
             MacManagedContainerToolchain.BUILDX_VERSION + "/"
-        val expectedSha256 = when (arch) {
-            "x86_64" -> "7003a7bae20e7741283db1e23dafdcb957776a8be85de3f459630b1dd4c19db0"
-            "arm64" -> "c3cbbc820d578b0aa8158dd62ef1af25a0c8a75ef53331dbe4e219471e1dbe8c"
-            else -> error("unsupported Buildx architecture: " + arch)
-        }
+        val expectedSha256 = MacManagedContainerToolchain.buildxReleaseSha256(arch)
         // Buildx v0.37.1 intentionally omits Darwin binaries from checksums.txt.
         // GitHub Release metadata publishes a SHA-256 digest for each Darwin asset,
         // so pin those official digests in the managed toolchain catalog.
