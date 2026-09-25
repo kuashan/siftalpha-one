@@ -494,10 +494,17 @@ class MacManagedContainerInstaller(
 
         return try {
             registerComposePlugin(root, log)
+            val managedEnvironment = environmentFor(root)
+            log("COLIMA_HOME=MANAGED|" + managedEnvironment["COLIMA_HOME"].orEmpty())
+            log("LIMA_HOME=MANAGED|" + managedEnvironment["LIMA_HOME"].orEmpty())
+            log(
+                "LIMA_SOCKET_PATH_LENGTH=" +
+                    MacManagedContainerToolchain.projectedLimaSocketPathLength(userHome),
+            )
             progress(MacContainerInstallPhase.STARTING, "正在启动本地容器环境…")
             runChecked(
                 listOf(colima.absolutePath, "start", "--runtime", "docker"),
-                environmentFor(root),
+                managedEnvironment,
                 30 * 60,
                 log,
             )
@@ -505,25 +512,25 @@ class MacManagedContainerInstaller(
             progress(MacContainerInstallPhase.VERIFYING, "正在验证 Docker 与 Compose…")
             runChecked(
                 listOf(docker.absolutePath, "--version"),
-                environmentFor(root),
+                managedEnvironment,
                 30,
                 log,
             )
             runChecked(
                 listOf(docker.absolutePath, "info", "--format", "{{.ServerVersion}}"),
-                environmentFor(root),
+                managedEnvironment,
                 60,
                 log,
             )
             runChecked(
                 listOf(docker.absolutePath, "compose", "version"),
-                environmentFor(root),
+                managedEnvironment,
                 60,
                 log,
             )
             runChecked(
                 listOf(docker.absolutePath, "buildx", "version"),
-                environmentFor(root),
+                managedEnvironment,
                 60,
                 log,
             )
