@@ -2236,3 +2236,28 @@ SHA-256:
 
 State remains:
 **CLOUD PASS / REAL VENTURA RETEST PENDING**.
+
+
+## 2026-09-25 · M6.2 R6 Compose prepare diagnostics PASS
+
+R5 real-device result:
+- managed VM state path is socket-safe;
+- Lima / Colima starts;
+- Docker / Compose / Buildx verify successfully.
+
+The remaining failure occurs only when preparing the imported Compose project. Previous error propagation reduced any failed Compose command to `container command exit=N`, even though the provider had already captured the actual command output.
+
+R6 repair:
+- preserve `docker compose` operation + exit code + bounded output tail in `MacContainerOperationResult.detail`;
+- preserve bounded output for Compose timeout failures;
+- surface `LAST_ERROR` in Developer Mode Environment Preparation;
+- surface latest `compose pull:`, `compose build:`, `SIFTALPHA_M62_PREPARE=` and `PREPARE_DETAIL=` records in a dedicated diagnostics block;
+- add tests for actionable failure detail and bounded very-large output.
+
+Verification:
+- HEAD `fba1ead63818af26898f3284606e363fe36865b5`;
+- macOS Run #90 PASS;
+- Android W0 #799 PASS;
+- package SHA-256 `deee5b6eafc3f0e28166c1c0db91cd1e55a0c56c8a181573271d0964036b7320`.
+
+Next real acceptance is diagnostic, not architectural: rerun Prepare and capture the now-visible Compose root cause.
