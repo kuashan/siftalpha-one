@@ -229,7 +229,35 @@ class MacProjectWorkflowCoordinator(
                 plan.issues.firstOrNull() ?: "Compose plan is invalid",
             )
         }
-        val provider = containerProvider(context.project.projectId)
+        val discoveredProvider = containerProvider(context.project.projectId)
+        val managedRuntime = when {
+            discoveredProvider?.snapshot?.executablePath?.let {
+                MacManagedContainerToolchain.isManagedExecutable(it)
+            } == true -> true
+            discoveredProvider == null && MacManagedContainerToolchain.managedDockerExecutable() != null -> true
+            else -> false
+        }
+        if (managedRuntime) {
+            append(state, "RUNTIME_READY=MANAGED_CHECK")
+            val ready = MacManagedContainerInstaller().ensureManagedRuntimeReady { line ->
+                append(state, line)
+            }
+            if (!ready.success) {
+                return MacPrepareResult(
+                    false,
+                    false,
+                    null,
+                    listOf("SIFTALPHA_M62_PREPARE=FAILED", "SIFTALPHA_M62_RUNTIME_READY=FAILED"),
+                    ready.detail ?: "managed container runtime is not ready",
+                )
+            }
+            append(state, "SIFTALPHA_M62_RUNTIME_READY=PASS")
+        }
+        val provider = if (managedRuntime) {
+            containerProvider(context.project.projectId)
+        } else {
+            discoveredProvider
+        }
             ?: return MacPrepareResult(
                 false,
                 false,
