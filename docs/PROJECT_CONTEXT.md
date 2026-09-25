@@ -2116,3 +2116,17 @@ Current authority:
 
 Roadmap unchanged:
 **M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS / REAL VENTURA PENDING → M7 NOT STARTED → M8 NOT STARTED**.
+
+
+## M6.2 Buildx checksum authority — 2026-09-25
+
+Real Ventura diagnostics confirmed the managed environment reached Buildx after successfully verifying Colima, Lima and Compose. Buildx v0.37.1 omits Darwin from its generic checksum manifest, so macOS Buildx is now verified against pinned official GitHub Release asset digests.
+
+Authority:
+- functional HEAD `a44c83f00f820c68ab7a542ac2d8788f0098fe4f`;
+- macOS Run #77 PASS;
+- Android W0 #786 PASS;
+- R4 real-machine retry pending.
+
+Roadmap unchanged:
+**M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS / REAL VENTURA PENDING → M7 NOT STARTED → M8 NOT STARTED**.
