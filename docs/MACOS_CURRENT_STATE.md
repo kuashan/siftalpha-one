@@ -16,6 +16,16 @@
 - M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 PASS / COMPLETE；M4 PASS / CLOSED（M4 已通过并关闭）**
 - M5 implementation（实现）：**M5.1 PASS / COMPLETE；M5.2 PASS / COMPLETE；M5 PASS / CLOSED（M5 已通过并关闭）**
 
+本轮最新 macOS 适配层修复：**Managed Container Network Inheritance Regression Repair = CLOUD PASS（云端通过）**。
+
+- M6 继续 **CLOSED（关闭）**，没有创建 M6.3；
+- Managed VM / daemon lifecycle（托管虚拟机 / 守护进程生命周期）已确认正确，本轮未修改；
+- 根因是 Compose / Buildx 客户端子进程没有在项目环境合并后重新继承当前 macOS System Proxy（系统代理）；
+- `connection reset by peer` 已加入有界的 Registry 网络传输恢复分类；
+- External Docker / Podman（外部 Docker / Podman）未改变；Android 未改变；
+- macOS CI Run `36154688284` PASS；Android W0 Run `36154688417` PASS；
+- 真实 Mac / Easy-TDX Prepare 验收仍为 **PENDING（待验收）**。
+
 M3 最后一个已验收功能 HEAD：
 `259d94fe7d7501a1232f1d7114445f4673cfc0a1`
 
@@ -1371,4 +1381,3 @@ Verification:
 Stage status:
 **Pre-M7 Functional Parity / Core Realignment = CLOSED.**
 **Next stage = M7 OpenBot Acceptance.**
-

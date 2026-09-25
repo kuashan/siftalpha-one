@@ -161,6 +161,21 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 
 The final installed Ventura acceptance passed on the current Intel Mac. It covers the real A/B Compose lifecycle, Web endpoint access, project-scoped Stop, Restart, Docker/Compose availability, and the automatic temporary port override path. M6 is closed; M7 can start with the original OpenBot project.
 
+### Managed Container Network Inheritance Regression Repair — CLOUD PASS
+
+This bounded macOS Adapter repair keeps M6 CLOSED and does not create M6.3.
+
+| 验证项 | 结果 |
+|---|---|
+| Managed Compose proxy inheritance with System Proxy ON | PASS（大小写代理变量均由现有系统代理策略生成） |
+| Managed Compose stale proxy clearing with System Proxy OFF | PASS |
+| External Docker / Podman proxy isolation | PASS |
+| Registry `connection reset by peer` classification | PASS |
+| Existing timeout / refused / EOF / loopback DNS recovery regression | PASS |
+| macOS Host Runtime CI | PASS，Run `36154688284` |
+| Android W0 Shared Core boundary regression | PASS，Run `36154688417` |
+| Real Mac Easy-TDX Prepare acceptance | PENDING（待真实设备验收） |
+
 ## M8 — Distribution（分发）
 
 必须证明：
@@ -1055,4 +1070,3 @@ macOS 后续每个实现/修复在进入代码前必须增加以下证据：
 
 Closure:
 **PRE-M7 SHARED CORE REALIGNMENT = PASS / CLOSED.**
-

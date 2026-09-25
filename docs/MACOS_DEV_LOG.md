@@ -2563,3 +2563,32 @@ Result:
 
 M7 remains the next product stage. No additional M6.x or Pre-M7 substage is created.
 
+## 2026-09-25 · Managed Container Network Inheritance Regression Repair（托管容器网络继承回归修复）
+
+M6 remains CLOSED（M6 继续关闭）。本轮不是 M6.3，不创建新的产品阶段，也不重写 Compose、Docker Runtime 或 Colima/Lima 生命周期。
+
+### Root cause（根因）
+
+- Managed Colima / Lima / Docker daemon lifecycle was already correct and passed the existing Runtime Ready Gate（运行时就绪门禁）。
+- The regression was in the macOS Adapter Compose client process: `docker compose` / Buildx inherited the managed toolchain variables, but did not reapply the current macOS System Proxy to the actual Compose child process after project environment merging.
+- The project environment could therefore override or leave stale `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` values.
+- `connection reset by peer` was missing from the existing bounded managed registry transport failure classifier.
+
+### Repair（修复）
+
+- Managed Compose operations now merge project variables while reapplying the existing `MacSystemProxyDiscovery` + `MacManagedContainerProxy` policy last.
+- Both uppercase and lowercase proxy variables are inherited for Managed Runtime; SOCKS continues to use the existing `socks5h://` policy.
+- System Proxy OFF clears stale managed proxy variables.
+- External Docker and Podman keep their original project environment behavior.
+- Registry-scoped `connection reset by peer` now enters the existing single `repair → retry once` path.
+- No infinite retry, Runtime reinstall loop, Compose project change, Dockerfile change, Shared Core change, or Android change was introduced.
+
+### Verification authority（验证依据）
+
+- START_HEAD=`05fbba12c431a1e8748754b03f55a766377f9eaa`
+- Functional repair HEAD=`ed64c3972b9ecdb24afee5b3ec9f84fbdef3bd2c`
+- macOS Host Runtime Run `36154688284`: PASS
+- Android W0 Cloud Build Run `36154688417`: PASS
+- Managed proxy ON / OFF, External Docker isolation, and registry reset classification tests: PASS
+- M6 remains CLOSED; no M6.3 created
+- REAL_DEVICE_ACCEPTANCE=PENDING（真实 Mac 仍待验收）
