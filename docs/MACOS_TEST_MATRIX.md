@@ -858,3 +858,19 @@ Current Buildx repair result:
 
 Current R5 result:
 **8 / 10 PASS — CLOUD PASS / REAL VENTURA RETEST PENDING**.
+
+
+### M6.2 R6 Compose Prepare Diagnostics Verification（诊断验证）
+
+| ID | Check（检查） | Expected（期望） | Status（状态） |
+| --- | --- | --- | --- |
+| M6.2-D01 | Failed Compose operation | operation name + exit code retained | PASS |
+| M6.2-D02 | Failed Compose stdout/stderr | useful output tail retained in error detail | PASS |
+| M6.2-D03 | Large failure output | diagnostic detail bounded | PASS |
+| M6.2-D04 | Developer Environment tab | LAST_ERROR + Compose Prepare Diagnostics shown | PASS |
+| M6.2-D05 | macOS regressions | Core/macOS, M4/M5/M6 probes PASS | PASS — Run #90 |
+| M6.2-D06 | Android regression | W0 PASS | PASS — #799 |
+| M6.2-D07 | Real Compose failure diagnosis | root cause visible without Terminal/manual reproduction | PENDING |
+| M6.2-D08 | Real Compose Prepare | Prepare succeeds after root-cause repair | PENDING |
+
+R5 path acceptance is already REAL PASS. M6.2 remains open for real Compose Prepare / Run / A-B isolation acceptance.
