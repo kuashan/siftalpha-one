@@ -366,8 +366,7 @@ class MacManagedContainerInstaller(
             File(staging, "bin").mkdirs()
             File(staging, "docker-config/cli-plugins").mkdirs()
             File(staging, "cache/colima").mkdirs()
-            MacManagedContainerToolchain.colimaHome(userHome).mkdirs()
-            MacManagedContainerToolchain.limaHome(userHome).mkdirs()
+            ensureManagedStateDirectories(log)
 
             progress(MacContainerInstallPhase.DOWNLOADING, "正在下载并校验容器工具…")
             val assets = assets(arch)
@@ -503,6 +502,7 @@ class MacManagedContainerInstaller(
 
         return try {
             registerComposePlugin(root, log)
+            ensureManagedStateDirectories(log)
             val managedEnvironment = environmentFor(root)
             log("COLIMA_HOME=MANAGED|" + managedEnvironment["COLIMA_HOME"].orEmpty())
             log("LIMA_HOME=MANAGED|" + managedEnvironment["LIMA_HOME"].orEmpty())
@@ -723,6 +723,34 @@ class MacManagedContainerInstaller(
 
     private fun environmentFor(root: File): Map<String, String> =
         MacManagedContainerToolchain.environment(root, userHome = userHome)
+
+    private fun ensureManagedStateDirectories(log: (String) -> Unit) {
+        val stateRoot = MacManagedContainerToolchain.managedStateRoot(userHome)
+        listOf(
+            stateRoot,
+            MacManagedContainerToolchain.colimaHome(userHome),
+            MacManagedContainerToolchain.limaHome(userHome),
+        ).forEach { directory ->
+            check(directory.exists() || directory.mkdirs()) {
+                "failed to create managed container state directory: " + directory.absolutePath
+            }
+            directory.setReadable(false, false)
+            directory.setWritable(false, false)
+            directory.setExecutable(false, false)
+            check(
+                directory.setReadable(true, true) &&
+                    directory.setWritable(true, true) &&
+                    directory.setExecutable(true, true),
+            ) {
+                "failed to restrict managed container state directory: " + directory.absolutePath
+            }
+        }
+        log("CONTAINER_STATE_ROOT=MANAGED|" + stateRoot.absolutePath)
+        log(
+            "CONTAINER_STATE_ROOT_FALLBACK=" +
+                MacManagedContainerToolchain.usesFallbackStateRoot(userHome),
+        )
+    }
 
     private fun runChecked(
         command: List<String>,
