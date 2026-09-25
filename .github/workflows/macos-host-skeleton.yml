@@ -340,7 +340,7 @@ jobs:
           find "$APP" -maxdepth 4 -type f | sort | tee macos-evidence/app-files.txt
 
           DMG_ROOT="macos-dist/dmg-root"
-          DMG="macos-dist/SiftAlpha-X-m6.2-installed-r9-vm-dns-ventura-x64.dmg"
+          DMG="macos-dist/SiftAlpha-X-m6.2-host-network-ventura-x64.dmg"
           rm -rf "$DMG_ROOT" "$DMG"
           mkdir -p "$DMG_ROOT"
           ditto "$APP" "$DMG_ROOT/SiftAlpha X.app"
@@ -380,9 +380,9 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: siftalpha-macos-m6.2-installed-r9-vm-dns-ventura-x64-${{ github.run_number }}
+          name: siftalpha-macos-m6.2-host-network-ventura-x64-${{ github.run_number }}
           path: |
-            macos-dist/SiftAlpha-X-m6.2-installed-r9-vm-dns-ventura-x64.dmg
+            macos-dist/SiftAlpha-X-m6.2-host-network-ventura-x64.dmg
             macos-evidence
           if-no-files-found: warn
           retention-days: 14

@@ -304,8 +304,8 @@ object MacManagedContainerToolchain {
 }
 
 internal object MacManagedContainerDns {
-    private val resolvConfNameserverLine = Regex("""(?m)^\\s*nameserver\\s+([^\\s#]+)""")
-    private val gatewayAddressLine = Regex("""^\\s{2}gatewayAddress:\\s*["']?([^"'#\\s]+)""")
+    private val resolvConfNameserverLine = Regex("""(?m)^\s*nameserver\s+([^\s#]+)""")
+    private val gatewayAddressLine = Regex("""^\s{2}gatewayAddress:\s*["']?([^"'#\s]+)""")
     private const val DEFAULT_HOST_RESOLVER_GATEWAY = "192.168.5.2"
     private const val LEGACY_R9_RESOLV_MARKER = "# Managed by SiftAlpha container DNS recovery"
 
@@ -317,7 +317,7 @@ internal object MacManagedContainerDns {
                 (
                     text.contains("on [::1]:53") ||
                         text.contains("on ::1:53") ||
-                        Regex("""on\\s+127(?:\\.\\d{1,3}){3}:53""").containsMatchIn(text)
+                        Regex("""on\s+127(?:\.\d{1,3}){3}:53""").containsMatchIn(text)
                     )
         val composeRegistryTransportFailure =
             text.contains("failed to resolve reference") &&
@@ -387,7 +387,7 @@ internal object MacManagedContainerDns {
         configText.lineSequence()
             .mapNotNull { gatewayAddressLine.find(it)?.groupValues?.getOrNull(1) }
             .firstOrNull()
-            ?.takeIf { it.matches(Regex("""\\d{1,3}(?:\\.\\d{1,3}){3}""")) }
+            ?.takeIf { it.matches(Regex("""\d{1,3}(?:\.\d{1,3}){3}""")) }
             ?: DEFAULT_HOST_RESOLVER_GATEWAY
 
     fun requiresVmResolverRecovery(resolvConf: String): Boolean {
