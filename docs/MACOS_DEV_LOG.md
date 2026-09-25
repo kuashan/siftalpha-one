@@ -2177,3 +2177,32 @@ Verification:
 
 State:
 **CLOUD PASS / REAL VENTURA RETEST PENDING**.
+
+
+## 2026-09-25 · M6.2 R4 Buildx Darwin checksum repair PASS
+
+Real installer diagnostics proved:
+- Colima checksum PASS;
+- Lima checksum PASS;
+- Docker CLI downloaded;
+- Docker Compose checksum PASS;
+- Buildx failed because the generic upstream `checksums.txt` contains no Darwin entry.
+
+The Buildx release workflow intentionally strips Darwin lines from that manifest. GitHub Release metadata still publishes per-asset SHA-256 digests.
+
+Fix:
+- pin the official v0.37.1 Darwin Buildx release digests in the macOS managed-toolchain catalog;
+- verify the downloaded Buildx binary against that pinned release digest;
+- retain fail-closed verification;
+- support `*filename` checksum-manifest syntax.
+
+Verification:
+- HEAD `a44c83f00f820c68ab7a542ac2d8788f0098fe4f`;
+- macOS Run #77 PASS;
+- Android W0 #786 PASS;
+- Core/macOS tests PASS;
+- M6.2 managed environment probe PASS;
+- user-facing ZIP SHA-256 `3f60ec593e0f5c454407572da3e986750c9439806d856d2eff25c0a1940fbd3c`.
+
+State:
+**CLOUD PASS / REAL VENTURA R4 RETEST PENDING**.
