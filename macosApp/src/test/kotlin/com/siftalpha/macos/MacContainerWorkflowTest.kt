@@ -58,8 +58,8 @@ class MacContainerWorkflowTest {
     @Test
     fun checksumParserSelectsExactAssetFromMultiFileManifest() {
         val manifest = """
-            bbdef91774885a0d05f7b048c4eb89ae2bcf3a0c252ae7ca7934e63df76d93c3  lima-2.2.0-Darwin-arm64.tar.gz
-            0d6f99c19f6e4bc3c92730c4c29d929e6927f0cb0a0ba1a84383367135a8ff31  lima-2.2.0-Darwin-x86_64.tar.gz
+            bbdef91774885a0d05f7b048c4eb89ae2bcf3a0c252ae7ca7934e63df76d93c3 *lima-2.2.0-Darwin-arm64.tar.gz
+            0d6f99c19f6e4bc3c92730c4c29d929e6927f0cb0a0ba1a84383367135a8ff31 *lima-2.2.0-Darwin-x86_64.tar.gz
         """.trimIndent()
 
         assertEquals(
@@ -74,6 +74,18 @@ class MacContainerWorkflowTest {
                 manifest,
                 "lima-2.2.0-Darwin-riscv64.tar.gz",
             ),
+        )
+    }
+
+    @Test
+    fun buildxDarwinReleaseDigestsArePinnedForBothArchitectures() {
+        assertEquals(
+            "7003a7bae20e7741283db1e23dafdcb957776a8be85de3f459630b1dd4c19db0",
+            MacManagedContainerToolchain.buildxReleaseSha256("x86_64"),
+        )
+        assertEquals(
+            "c3cbbc820d578b0aa8158dd62ef1af25a0c8a75ef53331dbe4e219471e1dbe8c",
+            MacManagedContainerToolchain.buildxReleaseSha256("arm64"),
         )
     }
 
