@@ -242,6 +242,7 @@ internal object MacManagedContainerChecksum {
                 val digest = match.groupValues[1].lowercase()
                 val listedName = match.groupValues.getOrNull(2)
                     ?.trim()
+                    ?.removePrefix("*")
                     ?.removePrefix("./")
                     ?.takeIf(String::isNotBlank)
                 digest to listedName
@@ -271,6 +272,7 @@ class MacManagedContainerInstaller(
         val url: String,
         val checksumUrl: String? = null,
         val checksumMatchName: String = name,
+        val expectedSha256: String? = null,
     )
 
     override fun install(
@@ -529,7 +531,19 @@ class MacManagedContainerInstaller(
         val name = buildxAssetName(arch)
         val base = "https://github.com/docker/buildx/releases/download/v" +
             MacManagedContainerToolchain.BUILDX_VERSION + "/"
-        return Asset(name, base + name, base + "checksums.txt", name)
+        val expectedSha256 = when (arch) {
+            "x86_64" -> "7003a7bae20e7741283db1e23dafdcb957776a8be85de3f459630b1dd4c19db0"
+            "arm64" -> "c3cbbc820d578b0aa8158dd62ef1af25a0c8a75ef53331dbe4e219471e1dbe8c"
+            else -> error("unsupported Buildx architecture: " + arch)
+        }
+        // Buildx v0.37.1 intentionally omits Darwin binaries from checksums.txt.
+        // GitHub Release metadata publishes a SHA-256 digest for each Darwin asset,
+        // so pin those official digests in the managed toolchain catalog.
+        return Asset(
+            name = name,
+            url = base + name,
+            expectedSha256 = expectedSha256,
+        )
     }
 
     private fun colimaAssetName(arch: String): String =
@@ -557,19 +571,30 @@ class MacManagedContainerInstaller(
         destination.parentFile.mkdirs()
         download(asset.url, destination)
         val actual = sha256(destination)
+        val pinned = asset.expectedSha256
         val checksumUrl = asset.checksumUrl
-        if (checksumUrl != null) {
-            val checksumText = downloadText(checksumUrl)
-            val expected = MacManagedContainerChecksum.expectedFor(
-                checksumText = checksumText,
-                fileName = asset.checksumMatchName,
-            ) ?: error("checksum not found for " + asset.name)
-            check(actual == expected) {
-                "checksum mismatch for " + asset.name + ": expected=" + expected + " actual=" + actual
+        when {
+            pinned != null -> {
+                check(actual == pinned.lowercase()) {
+                    "checksum mismatch for " + asset.name +
+                        ": expected=" + pinned.lowercase() + " actual=" + actual
+                }
+                log("VERIFY_SHA256=PASS_PINNED_RELEASE_DIGEST|" + asset.name + "|" + actual)
             }
-            log("VERIFY_SHA256=PASS|" + asset.name + "|" + actual)
-        } else {
-            log("VERIFY_SHA256=UPSTREAM_NOT_PUBLISHED|" + asset.name + "|" + actual)
+            checksumUrl != null -> {
+                val checksumText = downloadText(checksumUrl)
+                val expected = MacManagedContainerChecksum.expectedFor(
+                    checksumText = checksumText,
+                    fileName = asset.checksumMatchName,
+                ) ?: error("checksum not found for " + asset.name)
+                check(actual == expected) {
+                    "checksum mismatch for " + asset.name + ": expected=" + expected + " actual=" + actual
+                }
+                log("VERIFY_SHA256=PASS|" + asset.name + "|" + actual)
+            }
+            else -> {
+                log("VERIFY_SHA256=UPSTREAM_NOT_PUBLISHED|" + asset.name + "|" + actual)
+            }
         }
     }
 
