@@ -1274,6 +1274,23 @@ Verification:
 State remains:
 **M6.2 R9 CLOUD PASS / REAL INSTALLED-MAC RETEST PENDING**.
 
+## 37. M6 Final Closure Audit + Port Conflict Resolution — COMPLETE
+
+The installed Ventura Intel acceptance was completed after the port-conflict repair:
+
+- source commit `f9f859b` passed the W0 Cloud Build and macOS Host Runtime workflows;
+- the artifact SHA-256 matched the GitHub artifact digest before installation;
+- the application was installed at `/Applications/SiftAlpha X.app` and launched from that path, without App Translocation;
+- the installed application reported Docker `AVAILABLE`, Compose `5.5.1`, and managed Python `3.14.7`;
+- the installed M6 Compose workflow probe passed Prepare → Run → Web → project-scoped Stop → Restart;
+- real Desktop Compose A/B projects both ran and returned HTTP 200; stopping A left B running, and restarting A restored its endpoint;
+- a real occupied `18080` binding produced the expected Compose conflict, while the temporary `!override` binding remapped the second project to `18082` without changing either source manifest;
+- the new Core policy keeps current-project ownership, remaps supported conflicts, and blocks unsupported cases safely.
+
+M6 final result: **COMPLETE**.
+
+M7 may now begin. M7 remains **NOT STARTED** and requires the original OpenBot project acceptance; no OpenBot-specific source adaptation has been added.
+
 
 ## Cross-platform Route Correction（跨平台路线纠偏）— 2026-09-25
 
@@ -1313,3 +1330,5 @@ State remains:
 5. `EOF` 纳入唯一一次自动网络 repair + retry。
 
 这不是新 M6 切片，仍属于 M6.2 当前唯一网络阻塞的关闭修复。
+
+The historical pending statements above are superseded by section 37: the M6 Final Closure Audit is complete, and the next stage is M7 OpenBot Acceptance.

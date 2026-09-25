@@ -139,7 +139,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - 端口映射可发现。
 - project-scoped STOP（项目级停止）不影响其他项目。
 
-当前状态：**M6.1 PASS / COMPLETE；M6.2 CURRENT（进行中，真实 Ventura 网络阻塞待验收）**
+当前状态：**M6.1 PASS / COMPLETE；M6.2 PASS / COMPLETE（真实 Ventura 验收已通过）**
 
 ## M7 — OpenBot Acceptance（OpenBot 验收）
 
@@ -156,6 +156,10 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - 重启后可以重新运行。
 
 当前状态：**NOT STARTED（未开始）**
+
+### M6 Final Closure Audit — PASS
+
+The final installed Ventura acceptance passed on the current Intel Mac. It covers the real A/B Compose lifecycle, Web endpoint access, project-scoped Stop, Restart, Docker/Compose availability, and the automatic temporary port override path. M6 is closed; M7 can start with the original OpenBot project.
 
 ## M8 — Distribution（分发）
 
