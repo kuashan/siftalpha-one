@@ -2261,3 +2261,27 @@ Verification:
 - package SHA-256 `deee5b6eafc3f0e28166c1c0db91cd1e55a0c56c8a181573271d0964036b7320`.
 
 Next real acceptance is diagnostic, not architectural: rerun Prepare and capture the now-visible Compose root cause.
+
+
+## 2026-09-25 · Installed-test DMG + App Translocation guard PASS
+
+Acceptance sequencing was explicitly changed before further M6.2 real-machine evidence:
+the macOS app must first be installed into `/Applications` using a DMG, and packaged launches from Downloads, the DMG volume, or App Translocation must not continue into project/runtime operations.
+
+Implementation:
+- `MacInstallationGuard` classifies DEVELOPMENT / INSTALLED_IN_APPLICATIONS / APP_TRANSLOCATION / OUTSIDE_APPLICATIONS;
+- packaged GUI launch is blocked for App Translocation and non-`/Applications` paths with a clear installation message;
+- CI packaging switched from ZIP-only user delivery to a DMG containing `SiftAlpha X.app` + `Applications -> /Applications`;
+- DMG integrity and mounted contents are verified in CI.
+
+Verification:
+- HEAD `9910bb5ad200d94f7ae837374b1037df9cf8f432`;
+- macOS Run #95 PASS;
+- Android W0 #804 PASS;
+- DMG verify PASS;
+- DMG mounted-content check PASS;
+- installation-guard unit tests PASS;
+- DMG SHA-256 `c7ed357fa19173cc91d8528ff60eb934c15a2590cffbd60cfab832e9d6b52c11`.
+
+This is intentionally not full M8 closure:
+Developer ID / notarization / Hardened Runtime / public release update flow remain pending.
