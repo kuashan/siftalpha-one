@@ -2194,3 +2194,24 @@ Distribution boundary:
 - still M8: Developer ID signing, Hardened Runtime, Apple notarization, clean public install/upgrade policy, production update/distribution completion.
 
 M6.2 Compose testing must resume only after the R7 DMG is installed and launched from `/Applications`.
+
+
+## M6.2 R8 installed-app DNS authority — 2026-09-25
+
+The acceptance workflow now uses a DMG-installed app under `/Applications`; App Translocation is no longer accepted as a clean M6.2 evidence source.
+
+The current generic managed-container DNS rule is:
+- prefer host capabilities;
+- for the SiftAlpha-managed Colima provider, discover usable non-loopback macOS resolvers;
+- repair only a proven loopback resolver failure;
+- retry the user's original Prepare once after successful repair;
+- never mutate external Docker/Podman DNS configuration.
+
+Authority:
+- functional HEAD `6a6f663d1b5e9b38a1f1d85a85075f354a957f91`;
+- macOS Run #100 PASS;
+- Android W0 #809 PASS;
+- R8 installed-DMG real test pending.
+
+Roadmap remains:
+**M6 CURRENT / M6.1 COMPLETE / M6.2 CLOUD PASS / REAL INSTALLED-MAC PENDING → M7 NOT STARTED → M8 NOT STARTED**.
