@@ -2169,3 +2169,28 @@ Authority:
 
 Roadmap unchanged:
 **M6 CURRENT / M6.1 COMPLETE / M6.2 CURRENT → M7 NOT STARTED → M8 NOT STARTED**.
+
+
+## macOS installed-test prerequisite authority — 2026-09-25
+
+User-approved sequencing rule:
+
+**Before continuing M6.2 real-machine acceptance, macOS SiftAlpha must be installed from a DMG into global `/Applications`, and App Translocation must be blocked.**
+
+Reason:
+ZIP/Downloads/translocated launches make path, permission, update and runtime evidence less clean. Further M6.2 evidence must therefore come from the installed application.
+
+This does not change the platform architecture and is not a machine-specific workaround.
+
+Current authority:
+- functional HEAD `9910bb5ad200d94f7ae837374b1037df9cf8f432`;
+- macOS Run #95 PASS;
+- Android W0 #804 PASS;
+- installed-test DMG artifact PASS;
+- real `/Applications` launch acceptance pending.
+
+Distribution boundary:
+- pulled forward now: DMG + Applications install target + runtime App Translocation/non-installed guard;
+- still M8: Developer ID signing, Hardened Runtime, Apple notarization, clean public install/upgrade policy, production update/distribution completion.
+
+M6.2 Compose testing must resume only after the R7 DMG is installed and launched from `/Applications`.
