@@ -314,8 +314,8 @@ data class MacSystemProxySettings(
 }
 
 internal object MacSystemProxyDiscovery {
-    private val scalarLine = Regex("""(?m)^\\s*([A-Za-z][A-Za-z0-9]+)\\s*:\\s*(.*?)\\s*$""")
-    private val arrayEntryLine = Regex("""^\\s*\\d+\\s*:\\s*(.*?)\\s*$""")
+    private val scalarLine = Regex("""(?m)^\s*([A-Za-z][A-Za-z0-9]+)\s*:\s*(.*?)\s*$""")
+    private val arrayEntryLine = Regex("""^\s*\d+\s*:\s*(.*?)\s*$""")
 
     fun discover(): MacSystemProxySettings =
         runCatching {
