@@ -32,6 +32,33 @@ data class MacContainerOperationResult(
     val output: String = "",
 )
 
+internal object MacComposeFailureDiagnostics {
+    private const val MAX_DETAIL_CHARS = 8 * 1024
+
+    fun detail(
+        operation: String,
+        exitCode: Int,
+        output: String,
+    ): String {
+        val cleaned = output
+            .lineSequence()
+            .map(String::trimEnd)
+            .filter(String::isNotBlank)
+            .joinToString("\n")
+            .takeLast(MAX_DETAIL_CHARS)
+        return buildString {
+            append("docker compose ")
+            append(operation)
+            append(" failed exit=")
+            append(exitCode)
+            if (cleaned.isNotBlank()) {
+                append("\n")
+                append(cleaned)
+            }
+        }
+    }
+}
+
 interface MacComposeContainerProvider {
     val snapshot: MacContainerProviderSnapshot
 
@@ -352,7 +379,15 @@ class MacCliComposeContainerProvider(
                     val code = process.exitValue()
                     return MacContainerOperationResult(
                         success = code == 0,
-                        detail = if (code == 0) null else "container command exit=" + code,
+                        detail = if (code == 0) {
+                            null
+                        } else {
+                            MacComposeFailureDiagnostics.detail(
+                                operation = arguments.joinToString(" "),
+                                exitCode = code,
+                                output = output,
+                            )
+                        },
                         output = output,
                     )
                 }
@@ -361,10 +396,19 @@ class MacCliComposeContainerProvider(
                     if (!process.waitFor(2, TimeUnit.SECONDS)) {
                         process.destroyForcibly()
                     }
+                    val output = readOutput(outputFile, maxOutputBytes)
                     return MacContainerOperationResult(
                         success = false,
-                        detail = "container command timed out",
-                        output = readOutput(outputFile, maxOutputBytes),
+                        detail = buildString {
+                            append("docker compose ")
+                            append(arguments.joinToString(" "))
+                            append(" timed out")
+                            if (output.isNotBlank()) {
+                                append("\n")
+                                append(output.takeLast(8 * 1024))
+                            }
+                        },
+                        output = output,
                     )
                 }
             }
