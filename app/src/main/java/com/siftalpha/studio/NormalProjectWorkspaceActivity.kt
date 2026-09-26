@@ -1570,6 +1570,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         detectedPort = profile.port,
         framework = profile.framework,
         learnedPort = webLearnedEndpointStore.read(project.summary.documentId)?.port,
+        detectedSource = profile.source,
     )
 
     private fun openProjectPresentation() {
