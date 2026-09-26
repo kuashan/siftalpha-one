@@ -70,7 +70,7 @@ internal object MacProjectConfigurationDiscovery {
             if (
                 value.length >= 2 &&
                 ((value.startsWith('"') && value.endsWith('"')) ||
-                    (value.startsWith(''') && value.endsWith(''')))
+                    (value.startsWith("'") && value.endsWith("'")))
             ) {
                 value = value.substring(1, value.length - 1)
             } else {
