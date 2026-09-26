@@ -31,6 +31,29 @@ class ProjectEnvironmentNeedsTest {
     }
 
     @Test
+    fun pythonWithSupplementalNodeButNoViteDoesNotInventNodePreparation() {
+        val needs = ProjectEnvironmentNeeds(
+            primaryRuntime = RuntimeKind.PYTHON,
+            supplementalRuntimes = listOf(RuntimeKind.NODE_JS),
+            viteComponentCount = 0,
+        )
+
+        assertTrue(needs.requiresNode)
+        assertFalse(needs.requiresNodeBuild)
+        assertEquals(
+            listOf(
+                EnvironmentPreparationStep.VALIDATE_PLAN,
+                EnvironmentPreparationStep.ACQUIRE_RUNTIME,
+                EnvironmentPreparationStep.CREATE_ENVIRONMENT,
+                EnvironmentPreparationStep.PYTHON_INSTALL,
+                EnvironmentPreparationStep.VERIFY_ENVIRONMENT,
+                EnvironmentPreparationStep.COMMIT_ENVIRONMENT,
+            ),
+            ProjectEnvironmentNeedPolicy.preparationSteps(needs),
+        )
+    }
+
+    @Test
     fun pythonWithViteRequiresNodeWorkBeforePythonInstall() {
         val needs = ProjectEnvironmentNeeds(
             primaryRuntime = RuntimeKind.PYTHON,
