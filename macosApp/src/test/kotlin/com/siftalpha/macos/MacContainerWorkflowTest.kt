@@ -270,11 +270,96 @@ class MacContainerWorkflowTest {
     @Test
     fun managedResourceParserReadsColimaCpuAndMemoryFacts() {
         val facts = MacManagedVmResourceParser.parse(
-            """{"status":"Running","cpu":4,"memory":6}""",
+            """{"status":"Running","cpus":2,"memory":2147483648}""",
+        )
+
+        assertEquals(2, facts?.cpuCount)
+        assertEquals(2147483648L, facts?.memoryBytes)
+        assertEquals(2.0, facts!!.memoryBytes!!.toDouble() / gib, 0.0)
+    }
+
+    @Test
+    fun managedResourceParserKeepsLegacyCpuKeyCompatibility() {
+        val facts = MacManagedVmResourceParser.parse(
+            """{"status":"Running","cpu":4,"memory":4294967296}""",
         )
 
         assertEquals(4, facts?.cpuCount)
-        assertEquals(6L * gib, facts?.memoryBytes)
+        assertEquals(4294967296L, facts?.memoryBytes)
+    }
+
+    @Test
+    fun managedResourcePolicyUsesByteFactsForSixteenGiBHostAndTwoGiBVm() {
+        val recommendation = MacManagedResourcePolicy.recommend(
+            healthyFacts.copy(
+                processorCount = 4,
+                physicalMemoryBytes = 16L * gib,
+            ),
+            MacManagedVmResourceFacts(cpuCount = 2, memoryBytes = 2147483648L),
+        )
+
+        assertEquals(MacManagedResourceDecision.REPAIR_REQUIRED, recommendation.decision)
+        assertTrue(recommendation.recommendedMemoryBytes!! > 2147483648L)
+        assertTrue(recommendation.recommendedMemoryBytes!! <= recommendation.maximumSafeMemoryBytes!!)
+    }
+
+    @Test
+    fun physicalMemoryDiscoveryPrefersValidJvmValueWithoutFallback() {
+        var fallbackCalled = false
+
+        val memory = MacSystemFactsDiscovery.physicalMemory(
+            jvmMemory = { 16L * gib },
+            sysctlMemory = {
+                fallbackCalled = true
+                MacSysctlMemoryRead("17179869184", exitCode = 0, timedOut = false)
+            },
+        )
+
+        assertEquals(16L * gib, memory)
+        assertFalse(fallbackCalled)
+    }
+
+    @Test
+    fun physicalMemoryDiscoveryFallsBackToSysctlBytesWhenJvmValueIsMissing() {
+        val memory = MacSystemFactsDiscovery.physicalMemory(
+            jvmMemory = { null },
+            sysctlMemory = {
+                MacSysctlMemoryRead("17179869184\n", exitCode = 0, timedOut = false)
+            },
+        )
+
+        assertEquals(16L * gib, memory)
+    }
+
+    @Test
+    fun physicalMemoryDiscoveryFailsClosedForInvalidSysctlOutput() {
+        val memory = MacSystemFactsDiscovery.physicalMemory(
+            jvmMemory = { 0L },
+            sysctlMemory = {
+                MacSysctlMemoryRead("not-a-byte-count", exitCode = 0, timedOut = false)
+            },
+        )
+
+        assertNull(memory)
+    }
+
+    @Test
+    fun physicalMemoryDiscoveryFailsClosedForSysctlFailureAndTimeout() {
+        val exitFailure = MacSystemFactsDiscovery.physicalMemory(
+            jvmMemory = { null },
+            sysctlMemory = {
+                MacSysctlMemoryRead("17179869184", exitCode = 1, timedOut = false)
+            },
+        )
+        val timeout = MacSystemFactsDiscovery.physicalMemory(
+            jvmMemory = { null },
+            sysctlMemory = {
+                MacSysctlMemoryRead("", exitCode = -1, timedOut = true)
+            },
+        )
+
+        assertNull(exitFailure)
+        assertNull(timeout)
     }
 
     @Test
