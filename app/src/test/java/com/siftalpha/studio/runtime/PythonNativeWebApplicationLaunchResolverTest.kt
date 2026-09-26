@@ -66,6 +66,32 @@ class PythonNativeWebApplicationLaunchResolverTest {
     }
 
     @Test
+    fun `strict project owned Web launch outranks generic FastAPI evidence`() {
+        val result = PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = null,
+            pyprojectToml = pyproject,
+            relativePaths = paths + "src/easy_tdx/web/api.py",
+            pythonSources = sources + (
+                "src/easy_tdx/web/api.py" to """
+                    from fastapi import FastAPI
+                    app = FastAPI()
+                """.trimIndent()
+            ),
+            webProjectEnabled = true,
+        )
+
+        assertEquals(
+            PythonNativeWebLaunchCandidate(
+                executableName = "easy-tdx",
+                arguments = listOf("serve", "--host", "127.0.0.1", "--no-open-browser"),
+                evidencePath = "src/easy_tdx/cli/cmd_web.py",
+            ),
+            result,
+        )
+    }
+
+
+    @Test
     fun `explicit project run remains authoritative`() {
         val result = PythonNativeWebApplicationLaunchResolver.resolve(
             declaredRun = "python run_all_strategies.py SH 600519",
