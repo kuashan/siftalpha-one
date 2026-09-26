@@ -328,16 +328,17 @@ class NodeJsRuntimeAdapter(
     private fun detectedComponentManifestShell(project: RuntimeProjectSpec): String {
         val manifests = project.viteComponentDirectories
             .asSequence()
-            .map { it.replace('\\\\', '/').trim().trim('/') }
-            .map { if (it.isBlank() || it == ".") "package.json" else "${'$'}it/package.json" }
+            .map { it.replace('\\', '/').trim().trim('/') }
+            .map { if (it.isBlank() || it == ".") "package.json" else "$it/package.json" }
             .distinct()
             .sorted()
             .toList()
         if (manifests.isEmpty()) return ":"
-        return manifests.joinToString("\\n") { relative ->
-            "printf '%s\\\\n' \"${'$'}project\"/" + sh(relative) + " >>\"${'$'}component_file\""
+        return manifests.joinToString("\n") { relative ->
+            "printf '%s\\n' \"${'$'}project\"/" + sh(relative) + " >>\"${'$'}component_file\""
         }
     }
+
     private fun componentHelpersShell(): String = """
         find_vite_config() {
           package_dir="${'$'}1"
