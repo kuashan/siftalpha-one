@@ -99,7 +99,7 @@ class MacContainerWorkflowTest {
             writeText(
                 """
                 #!/bin/sh
-                printf 'build-before=%s\n' "\$SIFTALPHA_SECRET"
+                printf 'build-before=%s\n' "${'$'}SIFTALPHA_SECRET"
                 sleep 1
                 printf 'build-after\n'
                 """.trimIndent() + "\n",
@@ -171,7 +171,7 @@ class MacContainerWorkflowTest {
     fun composeBuildCancellationStillStopsTheManagedProcess() {
         val root = Files.createTempDirectory("siftalpha-compose-cancel-").toFile()
         val script = root.resolve("fake-docker").apply {
-            writeText("#!/bin/sh\nsleep 30\n")
+            writeText("#!/bin/sh\nexec sleep 30\n")
             setExecutable(true)
         }
         val imported = MacProjectFilesystem().importDirectory(root)
