@@ -3876,3 +3876,61 @@ For `easy_tdx_1-main`, after one PREPARE if the new plan invalidates the old env
 
 Cloud verification: pending.
 
+## 2026-09-26 · Android v237 Launch + Endpoint Authority Closure
+
+### Scope
+
+Android（安卓）only. No project-name special case, no easy_tdx source modification, no Worker change, and no macOS Runtime change.
+
+### Root cause chain
+
+The v234/v235 real-device failure had two independent authority defects:
+
+1. Launch Authority（启动权）: generic framework synthesis could create `uvicorn module:app` before the stronger project-owned Web/CLI contract won.
+2. Endpoint Authority（端点权）: after a correct multi-service launch, Runtime Web Discovery could still accept the first owned HTTP listener. Learned/detected API ports could also outrank the browser UI port, recreating the historical "wrong port looks like configuration is required" failure mode.
+
+### Repair
+
+v236 closed Launch Authority:
+- project-owned Web/CLI contracts outrank generic framework synthesis;
+- generic FastAPI -> uvicorn is fallback-only;
+- learned launch reuse is bound to current source fingerprint;
+- environment / launch / configuration inspection use the runtime source-facts scan;
+- Python + supplemental Node does not trigger Node work without Vite.
+
+v237 closes Endpoint Authority:
+- explicit project Web configuration remains strongest;
+- current project Web facts outrank learned endpoint history;
+- `python-vite-web` / Vite / Next browser UI hints outrank inferred backend/API ports;
+- learned endpoints use authority-bound v2 storage; v1 entries are invalidated;
+- External Termux/PRoot PID/socket discovery classifies owned HTTP candidates and prefers HTML UI;
+- non-HTML HTTP remains a bounded fallback only when no owned HTML UI is found;
+- Internal Alpine applies the same HTML UI > other HTTP > unreachable ordering on the already ownership-scoped listener set;
+- same-class candidates preserve the prior authority order;
+- no global port scan and no unrelated-process listener fallback was added.
+
+### Diagnostics
+
+External discovery now emits one of:
+- `SIFTALPHA_WEB_ENDPOINT_CLASS=HTML_UI`
+- `SIFTALPHA_WEB_ENDPOINT_CLASS=HTTP_FALLBACK`
+
+Ownership diagnostics and project PID/socket scoping remain unchanged.
+
+### Version
+
+- versionCode = `237`
+- versionName = `0.8.0-alpha43-r48d13-android-endpoint-authority-r1`
+
+### Acceptance target
+
+For a Python+Vite project that also exposes FastAPI/API:
+- START must use the project-owned launch contract, not synthetic `uvicorn`;
+- if both frontend and API listeners exist, Browser must choose the HTML UI;
+- a previously learned API port must not outrank current UI facts;
+- a custom HTML UI port must outrank an earlier reachable JSON/API port after classification;
+- if no HTML UI exists, the first owned reachable HTTP endpoint may be used as `HTTP_FALLBACK`;
+- Internal Alpine and External Termux/PRoot must preserve project ownership isolation.
+
+Cloud verification: pending for final v237 HEAD.
+Real-device acceptance: pending.
