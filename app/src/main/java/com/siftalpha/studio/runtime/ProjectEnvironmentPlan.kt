@@ -140,7 +140,7 @@ data class ProjectEnvironmentPlan(
     }
 
     companion object {
-        const val CURRENT_SCHEMA_VERSION = 2
+        const val CURRENT_SCHEMA_VERSION = 3
         private const val MAX_DIAGNOSTIC_ISSUES = 12
         private const val MAX_DIAGNOSTIC_WEB_COMPONENTS = 8
     }
@@ -531,7 +531,7 @@ object ProjectEnvironmentDetector {
         packageJsonTexts: Map<String, String>,
     ): String {
         val canonical = buildString {
-            append("schema=2\n")
+            append("schema=3\n")
             append("requirements\n").append(normalizeText(requirementsText)).append('\n')
             append("pyproject\n").append(normalizeText(pyprojectText)).append('\n')
             packageJsonTexts
