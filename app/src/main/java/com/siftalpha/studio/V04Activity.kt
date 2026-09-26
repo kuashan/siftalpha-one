@@ -86,6 +86,8 @@ import com.siftalpha.studio.runtime.RuntimeWebAvailabilityTracker
 import com.siftalpha.studio.runtime.RuntimeWebCandidateSource
 import com.siftalpha.studio.runtime.RuntimeWebDetectionCadence
 import com.siftalpha.studio.runtime.RuntimeWebDiscoveryScopePolicy
+import com.siftalpha.studio.runtime.RuntimeWebEndpointAuthorityPolicy
+import com.siftalpha.studio.runtime.RuntimeWebEndpointClassifier
 import com.siftalpha.studio.runtime.RuntimeWebHintPolicy
 import com.siftalpha.studio.runtime.RuntimeWebLearnedEndpointPolicy
 import com.siftalpha.studio.runtime.RuntimeWebLearnedEndpointStore
@@ -3228,7 +3230,13 @@ open class V04Activity : StudioActivity() {
             )
             val observation = runCatching {
                 runtime.internalAlpineWebObservationFor(snapshot, hintPorts)
-            }.getOrNull()
+            }.getOrNull()?.let { raw ->
+                raw.copy(
+                    ports = RuntimeWebEndpointAuthorityPolicy.rank(raw.ports) { port ->
+                        RuntimeWebEndpointClassifier.classifyLoopback(port)
+                    },
+                )
+            }
             refreshHandler.post {
                 internalWebObservationInFlight.remove(stateKey)
                 resolvedProfile?.let { webProfileCache[stateKey] = it }
