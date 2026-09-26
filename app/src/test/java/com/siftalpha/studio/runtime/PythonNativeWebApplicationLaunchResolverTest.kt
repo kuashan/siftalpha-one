@@ -92,6 +92,34 @@ class PythonNativeWebApplicationLaunchResolverTest {
 
 
     @Test
+    fun `installed guard console script still owns mixed Python Vite FastAPI Web launch`() {
+        val result = PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = null,
+            pyprojectToml = pyproject.replace(
+                "easy_tdx.cli:main",
+                "easy_tdx._editable_guard:main",
+            ),
+            relativePaths = paths + "src/easy_tdx/web/api.py",
+            pythonSources = sources + (
+                "src/easy_tdx/web/api.py" to """
+                    from fastapi import FastAPI
+                    app = FastAPI()
+                """.trimIndent()
+            ),
+            webProjectEnabled = true,
+        )
+
+        assertEquals(
+            PythonNativeWebLaunchCandidate(
+                executableName = "easy-tdx",
+                arguments = listOf("serve", "--host", "127.0.0.1", "--no-open-browser"),
+                evidencePath = "src/easy_tdx/cli/cmd_web.py",
+            ),
+            result,
+        )
+    }
+
+    @Test
     fun `explicit project run remains authoritative`() {
         val result = PythonNativeWebApplicationLaunchResolver.resolve(
             declaredRun = "python run_all_strategies.py SH 600519",
