@@ -9,6 +9,7 @@ package com.siftalpha.studio.runtime
 object RuntimeWebHintPolicy {
     private val frameworkDefaults = mapOf(
         "vite" to 5173,
+        "python-vite-web" to 5173,
         "next" to 3000,
         "fastapi" to 8000,
         "flask" to 5000,
@@ -33,16 +34,41 @@ object RuntimeWebHintPolicy {
         detectedPort: Int?,
         framework: String?,
         learnedPort: Int? = null,
+        detectedSource: String? = null,
     ): List<Int> = buildList {
-        learnedPort?.takeIf { it in 1..65535 }?.let(::add)
-        detectedPort?.takeIf { it in 1..65535 }?.let(::add)
-        framework
+        val normalizedFramework = framework?.trim()?.lowercase()
+        val frameworkPort = normalizedFramework?.let(frameworkDefaults::get)
+        val explicitConfiguredPort = detectedSource
             ?.trim()
-            ?.lowercase()
-            ?.let(frameworkDefaults::get)
-            ?.let(::add)
+            ?.lowercase() == "config"
+
+        // Current project facts own endpoint ordering. Explicit configuration remains strongest.
+        // For browser-first hybrid projects (for example Python + Vite), the UI framework port must
+        // be tried before a backend/API port inferred from source. A learned endpoint is only a weak
+        // cross-run hint and can never outrank current source/configuration evidence.
+        if (explicitConfiguredPort) {
+            detectedPort?.takeIf { it in 1..65535 }?.let(::add)
+        }
+        if (normalizedFramework in browserUiFrameworks) {
+            frameworkPort?.let(::add)
+            if (!explicitConfiguredPort) {
+                detectedPort?.takeIf { it in 1..65535 }?.let(::add)
+            }
+        } else {
+            if (!explicitConfiguredPort) {
+                detectedPort?.takeIf { it in 1..65535 }?.let(::add)
+            }
+            frameworkPort?.let(::add)
+        }
+        learnedPort?.takeIf { it in 1..65535 }?.let(::add)
         addAll(commonPorts)
     }.distinct().take(MAX_HINT_PORTS)
+
+    private val browserUiFrameworks = setOf(
+        "vite",
+        "python-vite-web",
+        "next",
+    )
 
     internal const val MAX_HINT_PORTS = 10
 }
