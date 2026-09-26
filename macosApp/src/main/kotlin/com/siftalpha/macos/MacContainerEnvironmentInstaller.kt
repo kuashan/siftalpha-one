@@ -912,13 +912,43 @@ class MacManagedContainerInstaller(
         }
     }
 
-    fun ensureManagedRuntimeReady(log: (String) -> Unit): MacContainerInstallResult =
-        startExisting(
+    fun ensureManagedRuntimeReady(log: (String) -> Unit): MacContainerInstallResult {
+        val ready = startExisting(
             progress = { phase, message ->
                 log("RUNTIME_READY_" + phase.name + "=" + message)
             },
             log = log,
         )
+        if (!ready.success) return ready
+
+        log("MANAGED_VM_BUILD_BOOST=CHECK")
+        val resources = repairManagedResources(
+            progress = { phase, message ->
+                log("RUNTIME_RESOURCE_" + phase.name + "=" + message)
+            },
+            log = log,
+        )
+        return when {
+            resources.success -> {
+                log("MANAGED_VM_BUILD_BOOST=PASS")
+                resources
+            }
+            resources.detail == "RESOURCE_REPAIR_NOT_REQUIRED" -> {
+                log("MANAGED_VM_BUILD_BOOST=NOT_REQUIRED")
+                ready
+            }
+            resources.detail == "RESOURCE_MEMORY_INSUFFICIENT" -> {
+                // Preserve the existing ability to try the project on smaller hosts.
+                // The later OOM classifier still returns a clear memory-insufficient result.
+                log("MANAGED_VM_BUILD_BOOST=HOST_LIMITED")
+                ready
+            }
+            else -> {
+                log("MANAGED_VM_BUILD_BOOST=FAILED")
+                resources
+            }
+        }
+    }
 
     private fun installFullStack(
         progress: (MacContainerInstallPhase, String) -> Unit,

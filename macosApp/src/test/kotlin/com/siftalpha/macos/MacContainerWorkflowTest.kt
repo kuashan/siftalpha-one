@@ -268,6 +268,31 @@ class MacContainerWorkflowTest {
     }
 
     @Test
+    fun managedResourcePolicyBuildBoostsEightGiBFourCpuHostBeforeComposeBuild() {
+        val boost = MacManagedResourcePolicy.recommend(
+            healthyFacts.copy(
+                processorCount = 4,
+                physicalMemoryBytes = 8L * gib,
+            ),
+            MacManagedVmResourceFacts(cpuCount = 2, memoryBytes = 4L * gib),
+        )
+
+        assertEquals(MacManagedResourceDecision.REPAIR_REQUIRED, boost.decision)
+        assertEquals(5L * gib, boost.maximumSafeMemoryBytes)
+        assertEquals(5L * gib, boost.recommendedMemoryBytes)
+        assertEquals(3, boost.recommendedCpuCount)
+
+        val alreadyBoosted = MacManagedResourcePolicy.recommend(
+            healthyFacts.copy(
+                processorCount = 4,
+                physicalMemoryBytes = 8L * gib,
+            ),
+            MacManagedVmResourceFacts(cpuCount = 3, memoryBytes = 5L * gib),
+        )
+        assertEquals(MacManagedResourceDecision.CURRENT_OK, alreadyBoosted.decision)
+    }
+
+    @Test
     fun managedResourceParserReadsColimaCpuAndMemoryFacts() {
         val facts = MacManagedVmResourceParser.parse(
             """{"status":"Running","cpus":2,"memory":2147483648}""",

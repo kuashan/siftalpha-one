@@ -55,9 +55,11 @@ object MacManagedResourcePolicy {
             )
         }
 
-        val reservedForHost = maxOf(4L * GIB, hostMemory / 4L)
+        // Build Boost keeps a bounded host reserve while giving managed Compose builds
+        // enough headroom to avoid repeated OOM/retry cycles on 8 GiB-class Macs.
+        val reservedForHost = maxOf(3L * GIB, hostMemory / 4L)
         val maximumSafeMemory = (hostMemory - reservedForHost).coerceAtLeast(0L)
-        val hostInsufficient = hostMemory < 8L * GIB || maximumSafeMemory < 4L * GIB
+        val hostInsufficient = hostMemory < 8L * GIB || maximumSafeMemory < 5L * GIB
         if (hostInsufficient) {
             return MacManagedVmResourceRecommendation(
                 currentCpuCount = currentCpu,
@@ -69,14 +71,14 @@ object MacManagedResourcePolicy {
             )
         }
 
-        val maximumSafeCpu = maxOf(1, host.processorCount - 2)
+        val maximumSafeCpu = maxOf(1, host.processorCount - 1)
         val recommendedCpu = minOf(
             maximumSafeCpu,
-            maxOf(1, (host.processorCount + 1) / 2),
+            maxOf(1, (host.processorCount * 3 + 3) / 4),
         )
         val recommendedMemory = minOf(
             maximumSafeMemory,
-            maxOf(4L * GIB, hostMemory / 2L),
+            maxOf(5L * GIB, hostMemory / 2L),
         )
         val decision = if (currentMemory >= recommendedMemory && currentCpu >= recommendedCpu) {
             MacManagedResourceDecision.CURRENT_OK
