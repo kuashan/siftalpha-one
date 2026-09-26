@@ -293,19 +293,24 @@ object RuntimeWebPortDiscovery {
               siftalpha_web_ports_for_inodes "${D}web_inodes"
             }
 
-            siftalpha_web_http_probe() {
+            siftalpha_web_http_classify() {
               web_port="${D}1"
               if command -v timeout >/dev/null 2>&1; then
-                web_first_line="${D}(timeout 1 bash -c 'exec 3<>"/dev/tcp/127.0.0.1/${D}1" || exit 1; printf "GET / HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n" >&3; IFS= read -r line <&3 || true; printf "%s" "${D}line"' _ "${D}web_port" 2>/dev/null | tr -d '\r' | head -n 1 || true)"
+                web_response="${D}(timeout 1 bash -c 'exec 3<>"/dev/tcp/127.0.0.1/${D}1" || exit 1; printf "GET / HTTP/1.0\r\nHost: 127.0.0.1\r\nAccept: text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.5\r\nConnection: close\r\n\r\n" >&3; head -c 4096 <&3' _ "${D}web_port" 2>/dev/null | tr -d '\r' || true)"
               elif command -v busybox >/dev/null 2>&1; then
-                web_first_line="${D}(busybox timeout 1 bash -c 'exec 3<>"/dev/tcp/127.0.0.1/${D}1" || exit 1; printf "GET / HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n" >&3; IFS= read -r line <&3 || true; printf "%s" "${D}line"' _ "${D}web_port" 2>/dev/null | tr -d '\r' | head -n 1 || true)"
+                web_response="${D}(busybox timeout 1 bash -c 'exec 3<>"/dev/tcp/127.0.0.1/${D}1" || exit 1; printf "GET / HTTP/1.0\r\nHost: 127.0.0.1\r\nAccept: text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.5\r\nConnection: close\r\n\r\n" >&3; head -c 4096 <&3' _ "${D}web_port" 2>/dev/null | tr -d '\r' || true)"
               else
                 return 1
               fi
+              web_first_line="${D}(printf '%s\n' "${D}web_response" | head -n 1)"
               case "${D}web_first_line" in
-                HTTP/*) return 0 ;;
+                HTTP/*) ;;
                 *) return 1 ;;
               esac
+              if printf '%s\n' "${D}web_response" | grep -Eiq '(^Content-Type:[[:space:]]*(text/html|application/xhtml\+xml)|<!doctype[[:space:]]+html|<html([[:space:]>]))'; then
+                return 0
+              fi
+              return 2
             }
 
             siftalpha_web_order_ports() {
@@ -332,6 +337,7 @@ object RuntimeWebPortDiscovery {
               [ -n "${D}{web_ports// }" ] || return 2
               web_ordered="${D}(siftalpha_web_order_ports "${D}web_ports")"
               web_checked=0
+              web_http_fallback=''
               for web_port in ${D}web_ordered; do
                 if [ "${D}web_checked" -ge $MAX_RUNTIME_CANDIDATES ]; then
                   echo 'SIFTALPHA_WEB_RUNTIME_CANDIDATE_LIMIT=REACHED'
@@ -339,13 +345,26 @@ object RuntimeWebPortDiscovery {
                 fi
                 web_checked="${D}((web_checked + 1))"
                 printf 'SIFTALPHA_WEB_PORT_CANDIDATE=%s source=%s\n' "${D}web_port" "${D}web_source"
-                if siftalpha_web_http_probe "${D}web_port"; then
+                if siftalpha_web_http_classify "${D}web_port"; then
+                  printf 'SIFTALPHA_WEB_ENDPOINT_CLASS=HTML_UI source=%s port=%s\n' "${D}web_source" "${D}web_port"
                   printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=PASS source=%s port=%s\n' "${D}web_source" "${D}web_port"
                   printf 'SIFTALPHA_WEB_AUTODISCOVERY=PASS source=%s port=%s\n' "${D}web_source" "${D}web_port"
                   printf 'SIFTALPHA_WEB_URL=http://127.0.0.1:%s\n' "${D}web_port"
                   return 0
+                else
+                  web_probe_status="${D}?"
+                  if [ "${D}web_probe_status" -eq 2 ] && [ -z "${D}web_http_fallback" ]; then
+                    web_http_fallback="${D}web_port"
+                  fi
                 fi
               done
+              if [ -n "${D}web_http_fallback" ]; then
+                printf 'SIFTALPHA_WEB_ENDPOINT_CLASS=HTTP_FALLBACK source=%s port=%s\n' "${D}web_source" "${D}web_http_fallback"
+                printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=PASS source=%s port=%s\n' "${D}web_source" "${D}web_http_fallback"
+                printf 'SIFTALPHA_WEB_AUTODISCOVERY=PASS source=%s port=%s\n' "${D}web_source" "${D}web_http_fallback"
+                printf 'SIFTALPHA_WEB_URL=http://127.0.0.1:%s\n' "${D}web_http_fallback"
+                return 0
+              fi
               return 1
             }
 
@@ -734,7 +753,22 @@ object RuntimeWebPortDiscovery {
           esac
         done
 
+        guest_http_classify() {
+          guest_probe_port="${D}1"
+          guest_response="${D}(timeout 1 bash -c 'exec 3<>"/dev/tcp/127.0.0.1/${D}1" || exit 1; printf "GET / HTTP/1.0\r\nHost: 127.0.0.1\r\nAccept: text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.5\r\nConnection: close\r\n\r\n" >&3; head -c 4096 <&3' _ "${D}guest_probe_port" 2>/dev/null | tr -d '\r' || true)"
+          guest_first_line="${D}(printf '%s\n' "${D}guest_response" | head -n 1)"
+          case "${D}guest_first_line" in
+            HTTP/*) ;;
+            *) return 1 ;;
+          esac
+          if printf '%s\n' "${D}guest_response" | grep -Eiq '(^Content-Type:[[:space:]]*(text/html|application/xhtml\+xml)|<!doctype[[:space:]]+html|<html([[:space:]>]))'; then
+            return 0
+          fi
+          return 2
+        }
+
         guest_checked=0
+        guest_http_fallback=''
         for guest_port in ${D}guest_ordered; do
           if [ "${D}guest_checked" -ge $MAX_RUNTIME_CANDIDATES ]; then
             echo 'SIFTALPHA_WEB_RUNTIME_CANDIDATE_LIMIT=REACHED source=PROOT_PROJECT_PID_SCOPE'
@@ -742,16 +776,26 @@ object RuntimeWebPortDiscovery {
           fi
           guest_checked="${D}((guest_checked + 1))"
           printf 'SIFTALPHA_WEB_PORT_CANDIDATE=%s source=PROOT_PROJECT_PID_SCOPE\n' "${D}guest_port"
-          guest_first_line="${D}(timeout 1 bash -c 'exec 3<>"/dev/tcp/127.0.0.1/${D}1" || exit 1; printf "GET / HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n" >&3; IFS= read -r line <&3 || true; printf "%s" "${D}line"' _ "${D}guest_port" 2>/dev/null | tr -d '\r' | head -n 1 || true)"
-          case "${D}guest_first_line" in
-            HTTP/*)
-              printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=PASS source=PROOT_PROJECT_PID_SCOPE port=%s\n' "${D}guest_port"
-              printf 'SIFTALPHA_WEB_AUTODISCOVERY=PASS source=PROOT_PROJECT_PID_SCOPE port=%s\n' "${D}guest_port"
-              printf 'SIFTALPHA_WEB_URL=http://127.0.0.1:%s\n' "${D}guest_port"
-              exit 0
-              ;;
-          esac
+          if guest_http_classify "${D}guest_port"; then
+            printf 'SIFTALPHA_WEB_ENDPOINT_CLASS=HTML_UI source=PROOT_PROJECT_PID_SCOPE port=%s\n' "${D}guest_port"
+            printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=PASS source=PROOT_PROJECT_PID_SCOPE port=%s\n' "${D}guest_port"
+            printf 'SIFTALPHA_WEB_AUTODISCOVERY=PASS source=PROOT_PROJECT_PID_SCOPE port=%s\n' "${D}guest_port"
+            printf 'SIFTALPHA_WEB_URL=http://127.0.0.1:%s\n' "${D}guest_port"
+            exit 0
+          else
+            guest_probe_status="${D}?"
+            if [ "${D}guest_probe_status" -eq 2 ] && [ -z "${D}guest_http_fallback" ]; then
+              guest_http_fallback="${D}guest_port"
+            fi
+          fi
         done
+        if [ -n "${D}guest_http_fallback" ]; then
+          printf 'SIFTALPHA_WEB_ENDPOINT_CLASS=HTTP_FALLBACK source=PROOT_PROJECT_PID_SCOPE port=%s\n' "${D}guest_http_fallback"
+          printf 'SIFTALPHA_WEB_DISCOVERY_STATUS=PASS source=PROOT_PROJECT_PID_SCOPE port=%s\n' "${D}guest_http_fallback"
+          printf 'SIFTALPHA_WEB_AUTODISCOVERY=PASS source=PROOT_PROJECT_PID_SCOPE port=%s\n' "${D}guest_http_fallback"
+          printf 'SIFTALPHA_WEB_URL=http://127.0.0.1:%s\n' "${D}guest_http_fallback"
+          exit 0
+        fi
         echo 'SIFTALPHA_WEB_DISCOVERY_STATUS=NO_HTTP_ENDPOINT source=PROOT_PROJECT_PID_SCOPE'
         echo 'SIFTALPHA_WEB_GUEST_SCOPE=NO_HTTP_ENDPOINT'
     """.trimIndent()
