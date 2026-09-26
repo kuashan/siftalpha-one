@@ -1566,12 +1566,24 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 
     private fun webHintPorts(
         profile: WebProjectInspector.Profile = webInspector.inspect(project.summary.documentId),
-    ): List<Int> = RuntimeWebHintPolicy.ports(
-        detectedPort = profile.port,
-        framework = profile.framework,
-        learnedPort = webLearnedEndpointStore.read(project.summary.documentId)?.port,
-        detectedSource = profile.source,
-    )
+    ): List<Int> {
+        val authorityFingerprint = RuntimeWebLearnedEndpointPolicy.authorityFingerprint(
+            enabled = profile.enabled,
+            framework = profile.framework,
+            source = profile.source,
+            host = profile.host,
+            detectedPort = profile.port,
+        )
+        return RuntimeWebHintPolicy.ports(
+            detectedPort = profile.port,
+            framework = profile.framework,
+            learnedPort = webLearnedEndpointStore.read(
+                projectKey = project.summary.documentId,
+                authorityFingerprint = authorityFingerprint,
+            )?.port,
+            detectedSource = profile.source,
+        )
+    }
 
     private fun openProjectPresentation() {
         val projectId = project.summary.documentId
