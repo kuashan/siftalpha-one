@@ -2250,3 +2250,34 @@ Verification:
 
 State remains:
 **M6.2 R9 CLOUD PASS / REAL INSTALLED-MAC RETEST PENDING**.
+
+## Android Launch / Endpoint Authority — 2026-09-26
+
+Current Android authority target:
+- branch: `feature/cross-platform-core`
+- version: `0.8.0-alpha43-r48d13-android-endpoint-authority-r1`
+- versionCode: `237`
+
+Architecture rule:
+**Web Detection（Web 检测） != Launch Authority（启动权） != Endpoint Authority（端点权）.**
+
+Launch Authority:
+- explicit/project-owned contracts first;
+- generic framework synthesis fallback-only;
+- learned launch is source-fingerprint-bound.
+
+Endpoint Authority:
+- explicit project configuration first;
+- current browser/UI facts before inferred backend/API facts;
+- learned endpoint history is weak and authority-bound;
+- among owned listeners, HTML UI outranks non-HTML HTTP;
+- non-HTML HTTP is fallback only;
+- PID/socket ownership remains mandatory before Browser publication.
+
+This is a generic Android capability repair. It does not modify easy_tdx source, add project-specific rules, unfreeze Worker, or change macOS Runtime behavior.
+
+Closure requires:
+1. final v237 W0 Cloud Build PASS;
+2. final v237 Internal Alpine Probe PASS;
+3. real-device evidence showing the project-owned launch command and the correct full Web UI endpoint;
+4. no MARKET/CODE prompt caused by selecting an unrelated CLI/API entry.
