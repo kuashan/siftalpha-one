@@ -16,7 +16,7 @@
 - M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 PASS / COMPLETE；M4 PASS / CLOSED（M4 已通过并关闭）**
 - M5 implementation（实现）：**M5.1 PASS / COMPLETE；M5.2 PASS / COMPLETE；M5 PASS / CLOSED（M5 已通过并关闭）**
 
-本轮最新 macOS 适配层修复：**M7 Managed Compose Build Boost（托管 Compose 构建增强）= CLOUD PASS（云端通过）**。
+本轮最新 macOS 适配层修复：**M7 Managed Bun Provisioning（托管 Bun 环境补齐）= CLOUD PASS（云端通过）**。
 
 - M6 继续 **CLOSED（关闭）**，没有创建 M6.3；
 - Managed VM / daemon lifecycle（托管虚拟机 / 守护进程生命周期）架构保持不变，本轮补齐了 SSH readiness 与 resolver inspection gate；
@@ -30,7 +30,7 @@
 
 - M6 = **CLOSED**。
 - M7 = **IN PROGRESS**，尚未关闭。
-- 当前 M7 blocker：原始 OpenBot **Prepare 已在真实 Ventura Intel Mac PASS**；剩余阻塞为 Hybrid Compose + Host Launcher（混合 Compose + 主机启动器）Full Run / Web UI / STOP / Restart 真机复测。
+- 当前 M7 blocker：原始 OpenBot **Prepare 已在真实 Ventura Intel Mac PASS**；Hybrid Launcher 已正确识别 Host Bun 缺失，Managed Bun Provisioning 已 CLOUD PASS；剩余阻塞为 Run → Web UI → STOP → Restart 真实 Mac 复测。
 - Managed VM SSH readiness gate、DNS inspection/recovery separation、跨 generation recovery 收尾：**CLOUD PASS**。
 - Developer Mode toolbar：响应式 2-row / 3-row layout 已实现，按钮顺序和 ActionListener 未改变：**CLOUD PASS**。
 - macOS Host Runtime Run `36210492001`: **PASS**。
@@ -1534,3 +1534,81 @@ Install Run #137 DMG and validate the original OpenBot:
 7. Restart returns the project to the same working state.
 
 M7 remains **IN PROGRESS** until these real-Mac items pass.
+
+
+## 2026-09-26 · M7 Managed Bun Provisioning — CLOUD PASS
+
+### Real-Mac trigger
+
+The original, unmodified OpenBot project already has:
+
+- Managed VM 5 GiB / 3 CPU: PASS;
+- Compose build: PASS;
+- Prepare: PASS;
+- Hybrid lifecycle detection: PASS.
+
+The next real-Mac Run failed only because the host did not provide Bun:
+
+- `HYBRID_START_FAILED=missing host tool: bun`
+- `START:FAILED`
+
+OpenBot root metadata declares `packageManager: bun@1.3.14`, so the project provides an exact Bun version requirement.
+
+### Managed Bun implementation
+
+Functional source commit: `0189af3874bf43c6e6fe250189dcd5f7639982c6`
+Verified functional / CI HEAD: `4d853d488324f4f0cf86d16219eec7db85210c95`
+
+- Exact Bun version is derived from project `packageManager`; runtime behavior does not hard-code OpenBot or 1.3.14.
+- `bun.lock` / `bun.lockb` still identify Bun as required; automatic provisioning requires an exact project-declared version.
+- A matching user-installed Host Bun is reused without modification.
+- Otherwise SiftAlpha downloads the official Bun GitHub release asset for the project version:
+  - Intel: `bun-darwin-x64.zip`
+  - Apple Silicon: `bun-darwin-aarch64.zip`
+- SiftAlpha also downloads the release `SHASUMS256.txt`, extracts the exact asset checksum, computes SHA-256 locally and refuses installation on mismatch.
+- Downloads inherit the existing macOS System Proxy policy.
+- Managed Bun is stored privately under SiftAlpha data:
+  `managed-runtimes/bun/<version>/bin/bun`.
+- User `~/.bun`, Homebrew and global PATH are not modified.
+- Installed Bun is verified with `bun --version` before activation.
+- Repeated calls reuse the version cache.
+- Hybrid Prepare and Run perform the same idempotent host-tool gate. A project that is already Prepare PASS may therefore provision Bun directly on the next Run without rebuilding Compose images.
+- After provisioning, project context is refreshed so the managed Bun directory is injected into the existing launcher PATH.
+- Environment Plan diagnostics now expose the Bun host-tool requirement and exact version.
+
+### Cloud evidence
+
+- macOS Host Runtime Run `36226180412` / #140: **PASS**
+- Android W0 Run `36226180411` / #860: **PASS**
+- M7 Managed Bun live provisioning probe: **PASS**
+  - official Bun 1.3.14 x64 release downloaded on macOS runner;
+  - official SHA-256 matched;
+  - `bun --version` returned 1.3.14;
+  - second ensure hit managed cache.
+- Existing M4 / M5 / M6 regressions: **PASS**
+- project-scoped process-control regression: **PASS**
+- Core changed: **NO**
+- Android production code changed: **NO**
+- OpenBot source changed: **NO**
+- DMG artifact: `siftalpha-macos-m6.2-host-network-ventura-x64-140`
+- Artifact ID: `10900592950`
+- Artifact digest: `sha256:9789a67ece563afe2e3012199056d73b9110b5f4d07eeabd87b71a89e965c8fc`
+
+### Remaining M7 acceptance
+
+On the real Ventura Intel acceptance Mac, install Run #140 and use the existing already-prepared OpenBot project.
+
+Expected first Run:
+
+1. `HOST_BUN_REQUIRED=1.3.14`
+2. `MANAGED_BUN_PROVISION=STARTED version=1.3.14`
+3. `MANAGED_BUN_SHA256=PASS`
+4. `MANAGED_BUN_VERSION=1.3.14`
+5. `MANAGED_BUN_PROVISION=PASS`
+6. `HOST_BUN_SOURCE=MANAGED|1.3.14|...`
+7. `HYBRID_START=PASS`
+8. project launcher reaches the real Web UI.
+
+Subsequent Run/Restart should use `MANAGED_BUN_CACHE=HIT version=1.3.14`.
+
+M7 remains **IN PROGRESS** until Run / Web UI / STOP / Restart pass on the real Mac.

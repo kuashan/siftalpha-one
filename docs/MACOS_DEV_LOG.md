@@ -2812,3 +2812,57 @@ No OpenBot name, port, service or command is hard-coded.
 - Shared Core / Android production / OpenBot source: unchanged.
 
 Next evidence is real-Mac Full Run / Web / STOP / Restart. This remains inside M7 and does not create M7.1/M7.2.
+
+
+## 2026-09-26 · M7 — Managed Bun Provisioning
+
+### Trigger evidence
+
+Real OpenBot acceptance after Hybrid Launch repair produced:
+
+- Prepare remained PASS;
+- Run repeatedly emitted `HYBRID_START_FAILED=missing host tool: bun`;
+- no new Docker, memory, DNS, proxy or Compose failure was present.
+
+The project itself declares `packageManager: bun@1.3.14`; therefore the missing capability is a project-declared Host Runtime tool, not an OpenBot-specific exception.
+
+### Implementation
+
+Added `MacManagedBunRuntimeProvider` and related pure artifact/version policy inside the macOS Adapter.
+
+Provisioning contract:
+
+1. inspect project Bun requirement and exact `packageManager` version;
+2. reuse a matching discovered Host Bun if present;
+3. otherwise resolve the official per-architecture Bun GitHub release asset;
+4. use existing macOS System Proxy inheritance for `curl`;
+5. fetch `SHASUMS256.txt` plus the Bun zip;
+6. parse the checksum for the exact asset;
+7. compute local SHA-256 and fail closed on mismatch;
+8. extract into temporary SiftAlpha-owned staging;
+9. verify `bun --version` equals the requested project version;
+10. atomically activate under `managed-runtimes/bun/<version>`;
+11. refresh project context and prepend the exact executable directory to the existing hybrid launcher PATH;
+12. cache by version for future Run/Restart.
+
+No shell installer script is piped to a shell. No Homebrew installation occurs. No user Bun installation is mutated.
+
+The project plan now publishes `SIFTALPHA_M4_HOST_TOOL_REQUIREMENT=bun|<version>`.
+
+### Verification and repair note
+
+The first CI workflow edit was malformed because a JavaScript string replacement interpreted the literal `$'` in grep patterns as a replacement token and duplicated the workflow suffix. No production source was partially reverted. CI generation was repaired with function-based replacement.
+
+Final evidence:
+
+- SOURCE_START_HEAD: `0f5e8df070c2282d646e677ffe159b2e98b833e5`
+- FEATURE_COMMIT: `0189af3874bf43c6e6fe250189dcd5f7639982c6`
+- CI repair commits: `e4eeda05ab432af3aa67a2c93ce4dfb171aa716b`, `4d853d488324f4f0cf86d16219eec7db85210c95`
+- FINAL_FUNCTIONAL_HEAD: `4d853d488324f4f0cf86d16219eec7db85210c95`
+- macOS #140 / `36226180412`: PASS
+- Android W0 #860 / `36226180411`: PASS
+- Managed Bun live network/checksum/cache probe: PASS
+- Artifact ID: `10900592950`
+- Core / Android production / OpenBot: unchanged.
+
+The next action is real-Mac OpenBot Run. Do not redo the expensive Compose Prepare unless new evidence requires it.

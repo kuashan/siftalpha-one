@@ -155,7 +155,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - STOP（停止）只停止该项目。
 - 重启后可以重新运行。
 
-当前状态：**IN PROGRESS（进行中）— Original OpenBot Prepare REAL MAC PASS；Hybrid Full Run / Web / STOP / Restart real-Mac retest pending**
+当前状态：**IN PROGRESS（进行中）— Original OpenBot Prepare REAL MAC PASS；Managed Bun CLOUD PASS；Full Run / Web / STOP / Restart real-Mac retest pending**
 
 ### M6 Final Closure Audit — PASS
 
@@ -1179,5 +1179,36 @@ M6 remains **CLOSED**. M7 remains **IN PROGRESS**. The next action is the real V
 | Real Web UI | user-facing Open reaches actual OpenBot UI | PENDING |
 | Real STOP | only current OpenBot project stops | PENDING |
 | Real Restart | re-run returns to working OpenBot | PENDING |
+
+M6 remains **CLOSED**. M7 remains **IN PROGRESS**.
+
+
+## M7 Managed Bun Provisioning — 2026-09-26
+
+| Check | Expected | Status |
+|---|---|---|
+| Real blocker classification | Run fails specifically on missing Host Bun | PASS — REAL MAC |
+| Project version source | exact version read from `packageManager: bun@...` | PASS |
+| No OpenBot hard-code | generic project metadata drives provisioning | PASS |
+| Matching system Bun | reuse without mutation | PASS — unit policy |
+| Managed version cache | `managed-runtimes/bun/<version>` | PASS |
+| Intel artifact selection | official `bun-darwin-x64.zip` | PASS |
+| ARM artifact selection | official `bun-darwin-aarch64.zip` | PASS — policy |
+| System Proxy inheritance | managed download uses existing macOS proxy policy | PASS — code / cloud |
+| Official checksum retrieval | exact release `SHASUMS256.txt` | PASS — live cloud |
+| Local SHA-256 verification | mismatch fails closed | PASS — unit + live cloud |
+| Runtime version verification | `bun --version` equals requested version | PASS — live cloud |
+| Cache reuse | second provisioning avoids re-download | PASS — live cloud |
+| Plan diagnostics | Bun requirement + exact version exposed | PASS |
+| Prepare gate | managed host tools checked before Prepare | PASS — cloud |
+| Run gate | already-prepared project can provision Bun at Run | PASS — cloud |
+| Existing M4/M5/M6 regressions | unchanged behavior remains green | PASS — macOS #140 |
+| Android regression | W0 | PASS — #860 |
+| Core boundary | unchanged | PASS |
+| OpenBot source | unchanged | PASS |
+| Real OpenBot Full Run | launcher continues past Bun gate | PENDING |
+| Real Web UI | actual UI becomes Open result | PENDING |
+| Real STOP | selected OpenBot project only | PENDING |
+| Real Restart | cached Bun + project lifecycle recover | PENDING |
 
 M6 remains **CLOSED**. M7 remains **IN PROGRESS**.
