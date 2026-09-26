@@ -4,6 +4,8 @@ import com.siftalpha.studio.project.ConfigurationEvidence
 import com.siftalpha.studio.project.PythonCliArgumentKind
 import com.siftalpha.studio.project.PythonCliRequirement
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PythonLaunchCompatibilityPolicyTest {
@@ -129,4 +131,36 @@ class PythonLaunchCompatibilityPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun `native Web launch synthesis is allowed only when project launch is missing`() {
+        assertTrue(
+            PythonLaunchCompatibilityPolicy.allowsNativeWebFallback(
+                PythonCliLaunchResolver.Resolution.Missing,
+            ),
+        )
+        assertFalse(
+            PythonLaunchCompatibilityPolicy.allowsNativeWebFallback(
+                PythonCliLaunchResolver.Resolution.PythonFile("run_all_strategies.py"),
+            ),
+        )
+        assertFalse(
+            PythonLaunchCompatibilityPolicy.allowsNativeWebFallback(
+                PythonCliLaunchResolver.Resolution.ConsoleScripts(listOf("easy-tdx")),
+            ),
+        )
+        assertFalse(
+            PythonLaunchCompatibilityPolicy.allowsNativeWebFallback(
+                PythonCliLaunchResolver.Resolution.DeclaredRun("python run_all_strategies.py"),
+            ),
+        )
+        assertFalse(
+            PythonLaunchCompatibilityPolicy.allowsNativeWebFallback(
+                PythonCliLaunchResolver.Resolution.Invalid(
+                    PythonCliLaunchResolver.InvalidReason.TOML_PARSE_FAILED,
+                ),
+            ),
+        )
+    }
+
 }

@@ -3649,3 +3649,55 @@ Current status: **CODE / CLOUD PASS（代码 / 云端通过）; REAL DEVICE ACCE
 最终结论：
 
 **Android Developer Mode External Provider Return Recovery r1 = PASS / CLOSED（通过 / 关闭）。**
+
+## 2026-09-26 · Android v233 Python Launch Authority Repair
+
+### Scope
+
+Android（安卓）only. This repair does not modify macOS source, managed macOS Runtime, Compose/Docker provisioning, or cross-platform Core contracts.
+
+### Trigger
+
+Real-device Android regression on `easy_tdx_1-main`:
+- the project card still identified the normal entry as `python run_all_strategies.py`;
+- START was nevertheless rewritten to a synthetic `uvicorn` console-script launch;
+- the prepared environment did not contain that synthesized executable;
+- Runtime exited with `SIFTALPHA_ERROR=PYTHON_CONSOLE_SCRIPT_MISSING` / exit code `76`.
+
+The same launch-authority defect could affect any Python project where Web recognition found FastAPI/Streamlit/Django/etc. even though the project already had a normal Python launch contract.
+
+### Root cause
+
+Both Android Normal Mode and Developer Mode attempted learned/static Native Web launch resolution before resolving the normal Python launch contract. As a result, Web recognition could replace an existing Python file, console script, or declared run command instead of remaining an observational capability.
+
+A previously verified `RuntimeWebLearnedLaunchStore` entry could also keep resurrecting that synthetic launcher on later runs after an environment rebuild.
+
+### Repair
+
+- Added one Android launch-authority rule: Native Web launch synthesis is allowed only when normal Python launch resolution is genuinely `Missing`.
+- Normal Mode now resolves Python launch first.
+- Developer Mode now follows the same order.
+- Existing Python file / console script / declared run contracts outrank Web synthesis.
+- Conflicting learned Web launch entries are cleared when a normal project launch contract exists.
+- `webLogDiscoveryAllowed` remains enabled, so Web Discovery / Endpoint Probe can still discover and open a Web endpoint after the project starts normally.
+- No project-specific `easy_tdx` or OpenBB hardcoding was added.
+- STOP, Environment Plan, External Provider, Internal Alpine, Embedded CPython, Worker freeze, and macOS source are unchanged.
+
+### Regression coverage
+
+Added unit coverage proving:
+- `Missing` may fall back to Native Web launch synthesis;
+- `PythonFile`, `ConsoleScripts`, `DeclaredRun`, and invalid authoritative metadata may not be replaced by a synthetic Web launch.
+
+Real-device acceptance target:
+- `easy_tdx_1-main` must no longer start as `SIFTALPHA_LAUNCH_EXECUTABLE=uvicorn`;
+- its existing Python launch contract must be used;
+- Web detection may observe the running process but must not rewrite its launch command.
+
+### Version
+
+- versionCode = `233`
+- versionName = `0.8.0-alpha43-r48d11-android-launch-r1`
+
+Cloud verification: pending.
+

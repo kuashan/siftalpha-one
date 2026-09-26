@@ -107,6 +107,96 @@ class ProjectRunWorkflowCoordinator(
             )
         }
 
+        val requiredCli = configuration.cliRequirements.filter { it.required }
+        val resolution = runCatching {
+            runtime.resolvePythonLaunch(
+                project = project,
+                cliRequirements = requiredCli,
+            )
+        }.getOrElse {
+            return Preparation.Rejected(RejectReason.PYTHON_LAUNCH_INVALID)
+        }
+
+        if (!PythonLaunchCompatibilityPolicy.allowsNativeWebFallback(resolution)) {
+            // A previously learned synthetic Web launcher must never outrank the current project
+            // launch contract. Clear it so later runs cannot resurrect stale uvicorn/serve choices.
+            learnedWebLaunchStore.clear(projectId)
+            return when (resolution) {
+                is PythonCliLaunchResolver.Resolution.DeclaredRun ->
+                    Preparation.Ready(
+                        ProjectControlHub.RunRequest(
+                            webLogDiscoveryAllowed = webEnabled,
+                            webHintPorts = webHintPorts,
+                        ),
+                    )
+
+                is PythonCliLaunchResolver.Resolution.ConsoleScripts -> {
+                    val targets = resolution.names.map { name ->
+                        LaunchTarget(
+                            id = name,
+                            label = name,
+                            kind = TargetKind.CONSOLE_SCRIPT,
+                        )
+                    }
+                    if (targets.size == 1 && requiredCli.isEmpty()) {
+                        Preparation.Ready(
+                            ProjectControlHub.RunRequest(
+                                launchInvocation = PythonLaunchInvocation.consoleScript(targets.single().id),
+                                webLogDiscoveryAllowed = webEnabled,
+                                webHintPorts = webHintPorts,
+                            ),
+                        )
+                    } else {
+                        recoveryStore.mark(projectId, ProjectRunRecoveryStore.Reason.CLI_ARGUMENTS)
+                        Preparation.NeedsLaunchInput(
+                            LaunchInputPlan(
+                                targets = targets,
+                                requiredArguments = requiredCli,
+                                webLogDiscoveryAllowed = webEnabled,
+                                webHintPorts = webHintPorts,
+                            ),
+                        )
+                    }
+                }
+
+                is PythonCliLaunchResolver.Resolution.PythonFile -> {
+                    val target = LaunchTarget(
+                        id = resolution.entrypoint,
+                        label = resolution.entrypoint,
+                        kind = TargetKind.PYTHON_FILE,
+                        entrypoint = resolution.entrypoint,
+                    )
+                    if (requiredCli.isEmpty()) {
+                        Preparation.Ready(
+                            ProjectControlHub.RunRequest(
+                                launchInvocation = PythonLaunchInvocation.pythonFile(resolution.entrypoint),
+                                webLogDiscoveryAllowed = webEnabled,
+                                webHintPorts = webHintPorts,
+                            ),
+                        )
+                    } else {
+                        recoveryStore.mark(projectId, ProjectRunRecoveryStore.Reason.CLI_ARGUMENTS)
+                        Preparation.NeedsLaunchInput(
+                            LaunchInputPlan(
+                                targets = listOf(target),
+                                requiredArguments = requiredCli,
+                                webLogDiscoveryAllowed = webEnabled,
+                                webHintPorts = webHintPorts,
+                            ),
+                        )
+                    }
+                }
+
+                is PythonCliLaunchResolver.Resolution.Invalid ->
+                    Preparation.Rejected(RejectReason.PYTHON_LAUNCH_INVALID)
+
+                PythonCliLaunchResolver.Resolution.Missing ->
+                    error("Missing launch cannot enter authoritative branch")
+            }
+        }
+
+        // Native Web launch synthesis is intentionally a last-resort fallback. Web Discovery and
+        // endpoint probing still run for normal launches through webLogDiscoveryAllowed.
         val learnedNativeWebLaunch = if (webEnabled) {
             learnedWebLaunchStore.readVerified(projectId)
         } else {
@@ -135,98 +225,7 @@ class ProjectRunWorkflowCoordinator(
             )
         }
 
-        val requiredCli = configuration.cliRequirements.filter { it.required }
-        val shouldResolveCli = !webEnabled || requiredCli.isNotEmpty()
-        if (!shouldResolveCli) {
-            return Preparation.Ready(
-                ProjectControlHub.RunRequest(
-                    webLogDiscoveryAllowed = webEnabled,
-                    webHintPorts = webHintPorts,
-                ),
-            )
-        }
-
-        return when (
-            val resolution = runCatching {
-                runtime.resolvePythonLaunch(
-                    project = project,
-                    cliRequirements = requiredCli,
-                )
-            }.getOrElse {
-                return Preparation.Rejected(RejectReason.PYTHON_LAUNCH_INVALID)
-            }
-        ) {
-            is PythonCliLaunchResolver.Resolution.DeclaredRun ->
-                Preparation.Ready(
-                    ProjectControlHub.RunRequest(
-                        webLogDiscoveryAllowed = webEnabled,
-                        webHintPorts = webHintPorts,
-                    ),
-                )
-
-            is PythonCliLaunchResolver.Resolution.ConsoleScripts -> {
-                val targets = resolution.names.map { name ->
-                    LaunchTarget(
-                        id = name,
-                        label = name,
-                        kind = TargetKind.CONSOLE_SCRIPT,
-                    )
-                }
-                if (targets.size == 1 && requiredCli.isEmpty()) {
-                    Preparation.Ready(
-                        ProjectControlHub.RunRequest(
-                            launchInvocation = PythonLaunchInvocation.consoleScript(targets.single().id),
-                            webLogDiscoveryAllowed = webEnabled,
-                            webHintPorts = webHintPorts,
-                        ),
-                    )
-                } else {
-                    recoveryStore.mark(projectId, ProjectRunRecoveryStore.Reason.CLI_ARGUMENTS)
-                    Preparation.NeedsLaunchInput(
-                        LaunchInputPlan(
-                            targets = targets,
-                            requiredArguments = requiredCli,
-                            webLogDiscoveryAllowed = webEnabled,
-                            webHintPorts = webHintPorts,
-                        ),
-                    )
-                }
-            }
-
-            is PythonCliLaunchResolver.Resolution.PythonFile -> {
-                val target = LaunchTarget(
-                    id = resolution.entrypoint,
-                    label = resolution.entrypoint,
-                    kind = TargetKind.PYTHON_FILE,
-                    entrypoint = resolution.entrypoint,
-                )
-                if (requiredCli.isEmpty()) {
-                    Preparation.Ready(
-                        ProjectControlHub.RunRequest(
-                            launchInvocation = PythonLaunchInvocation.pythonFile(resolution.entrypoint),
-                            webLogDiscoveryAllowed = webEnabled,
-                            webHintPorts = webHintPorts,
-                        ),
-                    )
-                } else {
-                    recoveryStore.mark(projectId, ProjectRunRecoveryStore.Reason.CLI_ARGUMENTS)
-                    Preparation.NeedsLaunchInput(
-                        LaunchInputPlan(
-                            targets = listOf(target),
-                            requiredArguments = requiredCli,
-                            webLogDiscoveryAllowed = webEnabled,
-                            webHintPorts = webHintPorts,
-                        ),
-                    )
-                }
-            }
-
-            PythonCliLaunchResolver.Resolution.Missing ->
-                Preparation.Rejected(RejectReason.PYTHON_LAUNCH_MISSING)
-
-            is PythonCliLaunchResolver.Resolution.Invalid ->
-                Preparation.Rejected(RejectReason.PYTHON_LAUNCH_INVALID)
-        }
+        return Preparation.Rejected(RejectReason.PYTHON_LAUNCH_MISSING)
     }
 
     fun resolveInput(

@@ -175,8 +175,10 @@ android {
         // r48d11-m1.6-r1 repairs Developer Mode External Provider return-to-app recovery:
         // recoverable Termux bridge/configuration states retain the original user intent and
         // onResume retries provider probing before resuming the deferred action exactly once.
-        versionCode = 232
-        versionName = "0.8.0-alpha43-r48d11-m1.6-r1"
+        // v233 is Android-only: normal Python launch authority now outranks synthetic/learned
+        // Web launchers; Web Discovery remains observational and macOS source is unchanged.
+        versionCode = 233
+        versionName = "0.8.0-alpha43-r48d11-android-launch-r1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
