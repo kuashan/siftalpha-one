@@ -1956,3 +1956,22 @@ Real-device result（真机结果）：
 
 Cloud result: pending final v237 W0 + Internal Alpine Probe.
 Real-device result: pending.
+
+## Android v238 Internal Python Staging Authority Closure
+
+| ID | Check | Expected |
+|---|---|---|
+| SA-01 | Python+Vite source build | FULL_PROJECT staging; generated build/dependency pruning preserved |
+| SA-02 | Explicit Python CONSOLE_SCRIPT invocation | FULL_PROJECT staging |
+| SA-03 | Valid pyproject project.scripts contract, invocation not yet supplied | FULL_PROJECT staging; UI propagation cannot downgrade capacity |
+| SA-04 | Simple Python-file project without console-script contract | ENTRYPOINT staging remains |
+| SA-05 | Unsupported/structured script metadata | Does not widen staging |
+| SA-06 | File larger than ENTRYPOINT limit but within FULL_PROJECT limit | Project-owned console-script path is not rejected by the 8 MiB profile |
+| SA-07 | Mixed Python + Vite + internal FastAPI + project-owned serve | Project-owned serve remains Launch Authority; generic uvicorn is fallback-only |
+| SA-08 | Staging bounds | 8 MiB entrypoint / 16 MiB full-project / existing total and node bounds unchanged |
+| SA-09 | Project-specific behavior | No project-name/path/downloads exception |
+| SA-10 | Platform boundary | Android staging repair only; macOS Runtime and Worker unchanged |
+
+Cloud result: pending final v238 W0 + Internal Alpine Probe.
+Real-device result: pending.
+
