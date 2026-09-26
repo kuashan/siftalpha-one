@@ -94,27 +94,25 @@ class ProjectRunWorkflowCoordinator(
 
         val webProfile = runCatching { webInspector.inspect(projectId) }
             .getOrElse { WebProjectInspector.Profile(false, null, "none", null, null) }
-        val webEnabled = webProfile.enabled
         val resolvedSelection =
             project.runtimeSelection as? ProjectRuntimeExecutionPlanner.Selection.Resolved
 
         if (resolvedSelection?.primary != RuntimeKind.PYTHON) {
             return Preparation.Ready(
                 ProjectControlHub.RunRequest(
-                    webLogDiscoveryAllowed = webEnabled,
+                    webLogDiscoveryAllowed = webProfile.enabled,
                     webHintPorts = webHintPorts,
                 ),
             )
         }
 
-        val learnedNativeWebLaunch = if (webEnabled) {
-            learnedWebLaunchStore.readVerified(projectId)
-        } else {
-            null
-        }
-        val nativeWebLaunch = if (webEnabled) {
-            learnedNativeWebLaunch ?: runCatching {
-                runtime.resolvePythonNativeWebLaunch(
+        // A bounded presentation-oriented Web profile must not be the sole gate for launch
+        // resolution. Unless Web was explicitly disabled by project config, let the authoritative
+        // runtime source snapshot prove (or reject) the Python Web launch contract.
+        val webLaunchAllowed = webProfile.enabled || webProfile.source != "config"
+        val nativeWebResolution = if (webLaunchAllowed) {
+            runCatching {
+                runtime.resolvePythonNativeWebLaunchResolution(
                     project = project,
                     webProjectEnabled = true,
                 )
@@ -122,9 +120,20 @@ class ProjectRunWorkflowCoordinator(
         } else {
             null
         }
-        if (nativeWebLaunch != null) {
+        val learnedNativeWebLaunch = nativeWebResolution?.let { resolution ->
+            learnedWebLaunchStore.readVerified(
+                projectKey = projectId,
+                sourceFingerprint = resolution.sourceFingerprint,
+            )
+        }
+        val nativeWebLaunch = learnedNativeWebLaunch ?: nativeWebResolution?.candidate
+        if (nativeWebLaunch != null && nativeWebResolution != null) {
             if (learnedNativeWebLaunch == null) {
-                learnedWebLaunchStore.rememberDiscovered(projectId, nativeWebLaunch)
+                learnedWebLaunchStore.rememberDiscovered(
+                    projectKey = projectId,
+                    candidate = nativeWebLaunch,
+                    sourceFingerprint = nativeWebResolution.sourceFingerprint,
+                )
             }
             return Preparation.Ready(
                 ProjectControlHub.RunRequest(
@@ -135,12 +144,13 @@ class ProjectRunWorkflowCoordinator(
             )
         }
 
+        val effectiveWebEnabled = webProfile.enabled || nativeWebResolution != null
         val requiredCli = configuration.cliRequirements.filter { it.required }
-        val shouldResolveCli = !webEnabled || requiredCli.isNotEmpty()
+        val shouldResolveCli = !effectiveWebEnabled || requiredCli.isNotEmpty()
         if (!shouldResolveCli) {
             return Preparation.Ready(
                 ProjectControlHub.RunRequest(
-                    webLogDiscoveryAllowed = webEnabled,
+                    webLogDiscoveryAllowed = effectiveWebEnabled,
                     webHintPorts = webHintPorts,
                 ),
             )
