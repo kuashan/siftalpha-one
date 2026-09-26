@@ -52,15 +52,6 @@ internal object PythonLaunchCompatibilityPolicy {
         return PythonCliLaunchResolver.Resolution.PythonFile(entrypoint)
     }
 
-    /**
-     * Project launch resolution is authoritative. Native Web launch synthesis is a fallback only
-     * when the normal Python launch contract is genuinely missing; Web detection must not replace
-     * an existing Python file, console script, or declared run command.
-     */
-    fun allowsNativeWebFallback(
-        resolution: PythonCliLaunchResolver.Resolution,
-    ): Boolean = resolution is PythonCliLaunchResolver.Resolution.Missing
-
     fun preserveLegacyRun(
         resolution: PythonCliLaunchResolver.Resolution,
         legacyRun: String,
