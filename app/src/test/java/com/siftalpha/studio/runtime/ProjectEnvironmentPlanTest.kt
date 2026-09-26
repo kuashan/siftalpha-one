@@ -454,6 +454,44 @@ class ProjectEnvironmentPlanTest {
     }
 
     @Test
+    fun packageManifestChangeInvalidatesWebEnvironmentPlanIdentity() {
+        val paths = listOf("pyproject.toml", "main.py", "frontend/package.json")
+        val pyproject = "[project]\nname = \"demo\"\n"
+        val first = ProjectEnvironmentPlanner.plan(
+            detect(
+                paths = paths,
+                pyproject = pyproject,
+                packageJsonTexts = mapOf(
+                    "frontend/package.json" to """
+                        {
+                          "scripts": { "build": "vite build" },
+                          "devDependencies": { "vite": "^8.1.1" }
+                        }
+                    """.trimIndent(),
+                ),
+            ),
+            allCapabilities,
+        )
+        val changed = ProjectEnvironmentPlanner.plan(
+            detect(
+                paths = paths,
+                pyproject = pyproject,
+                packageJsonTexts = mapOf(
+                    "frontend/package.json" to """
+                        {
+                          "scripts": { "build": "vite build" },
+                          "devDependencies": { "vite": "^8.2.0" }
+                        }
+                    """.trimIndent(),
+                ),
+            ),
+            allCapabilities,
+        )
+
+        assertNotEquals(first.planId, changed.planId)
+    }
+
+    @Test
     fun diagnosticsExposeMachineReadableContract() {
         val plan = ProjectEnvironmentPlanner.plan(
             detect(
