@@ -77,7 +77,8 @@ class PythonRuntimeAdapterTest {
         assertEquals("Sample · 准备环境", command.label)
         assertTrue(script.contains("HOST_WRAP_BEGIN"))
         assertFalse(script.contains("HOST_CANCELABLE_BEGIN:runtime-id:prepare"))
-        assertTrue(script.contains("python3 -m venv"))
+        assertTrue(script.contains("guest_python='/usr/bin/python3'"))
+        assertTrue(script.contains("\"${'$'}guest_python\" -m venv"))
         assertFalse(script.contains("venv.prepare-"))
         assertTrue(script.contains("venv.backup-"))
         assertTrue(script.contains("ready.backup-"))
@@ -85,8 +86,8 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("ENVIRONMENT_ACTIVATION_FAILED"))
         assertTrue(script.contains("ENVIRONMENT_ROLLBACK_FAILED"))
         assertTrue(script.contains("PYTHON_ENVIRONMENT_PREFIX_MISMATCH"))
-        assertTrue(script.contains("python3 -m pip --version"))
-        assertTrue(script.contains("apt-get install -y python3-venv python3-pip"))
+        assertTrue(script.contains("\"${'$'}guest_python\" -m pip --version"))
+        assertTrue(script.contains("apt-get install -y ca-certificates python3 python3-venv python3-pip"))
         assertTrue(script.contains("DEPENDENCY_SOURCE=requirements.txt"))
         assertTrue(script.contains("DEPENDENCY_SOURCE=pyproject.toml"))
         assertTrue(script.contains("SIFTALPHA_PYPROJECT_EXTRAS=none"))
@@ -106,7 +107,7 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("SIFTALPHA_PREPARE_COMMITTED=1"))
         assertTrue(script.contains("SIFTALPHA_ENV=READY"))
 
-        val finalVenvCreation = script.indexOf("python3 -m venv \"${'$'}venv\"")
+        val finalVenvCreation = script.indexOf("\"${'$'}guest_python\" -m venv \"${'$'}venv\"")
         val pythonValidation = script.indexOf(
             "\"${'$'}venv/bin/python\" -m pip install",
             finalVenvCreation,
@@ -128,6 +129,18 @@ class PythonRuntimeAdapterTest {
         assertTrue("old-backup cleanup must have a hard bound", script.contains("timeout 4s rm -rf"))
     }
 
+
+    @Test
+    fun `external prepare pins Python provenance to Ubuntu guest`() {
+        val script = adapter.prepare(project).shellScript
+
+        assertTrue(script.contains("guest_python='/usr/bin/python3'"))
+        assertTrue(script.contains("[ -x \"${'$'}guest_python\" ]"))
+        assertTrue(script.contains("apt-get install -y ca-certificates python3 python3-venv python3-pip"))
+        assertTrue(script.contains("\"${'$'}guest_python\" -m venv \"${'$'}venv\""))
+        assertFalse(script.contains("command -v python3"))
+        assertFalse(script.contains("\n            python3 -m venv \"${'$'}venv\""))
+    }
 
     @Test
     fun `planned web extra is executed without install-time project rediscovery`() {
