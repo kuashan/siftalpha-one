@@ -70,6 +70,7 @@ import com.siftalpha.studio.runtime.RuntimeProgramOutputExtractor
 import com.siftalpha.studio.runtime.RuntimeWebAvailabilityTracker
 import com.siftalpha.studio.runtime.RuntimeWebDiscoveryScopePolicy
 import com.siftalpha.studio.runtime.RuntimeWebHintPolicy
+import com.siftalpha.studio.runtime.RuntimeWebLearnedEndpointPolicy
 import com.siftalpha.studio.runtime.RuntimeWebLearnedEndpointStore
 import com.siftalpha.studio.runtime.RuntimeWebLearnedLaunchStore
 import com.siftalpha.studio.runtime.RuntimeWebStateStore
