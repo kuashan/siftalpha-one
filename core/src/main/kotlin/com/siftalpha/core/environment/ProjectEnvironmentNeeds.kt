@@ -66,7 +66,13 @@ object ProjectEnvironmentNeedPolicy {
             add(EnvironmentPreparationStep.ACQUIRE_RUNTIME)
             add(EnvironmentPreparationStep.CREATE_ENVIRONMENT)
 
-            if (needs.requiresNode) {
+            val nodePreparationRequired =
+                needs.primaryRuntime == RuntimeKind.NODE_JS ||
+                    (
+                        RuntimeKind.NODE_JS in needs.supplementalRuntimes &&
+                            needs.viteComponentCount > 0
+                    )
+            if (nodePreparationRequired) {
                 add(EnvironmentPreparationStep.NODE_INSTALL)
                 if (
                     needs.primaryRuntime != RuntimeKind.NODE_JS ||
