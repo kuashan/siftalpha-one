@@ -651,8 +651,7 @@ class MacNormalModeWindow(
         when (MacNormalProjectPresentationPolicy.resolve(view).primaryAction) {
             MacNormalPrimaryAction.PREPARE ->
                 runProjectOperation("正在准备运行环境…") { projectId -> controller.prepare(projectId).success }
-            MacNormalPrimaryAction.RUN ->
-                runProjectOperation("正在启动项目…") { projectId -> controller.start(projectId) }
+            MacNormalPrimaryAction.RUN -> runSelectedProjectWithConfiguration()
             MacNormalPrimaryAction.STOP ->
                 runProjectOperation("正在停止项目…") { projectId -> controller.stop(projectId) }
             MacNormalPrimaryAction.OPEN_RESULT -> openResult()
@@ -660,14 +659,35 @@ class MacNormalModeWindow(
         }
     }
 
-    private fun runProjectOperation(message: String, operation: (String) -> Boolean) {
+    private fun runSelectedProjectWithConfiguration(retriesRemaining: Int = 3) {
+        runProjectOperation(
+            message = "正在启动项目…",
+            operation = { projectId -> controller.start(projectId) },
+        ) { id, success ->
+            if (
+                !success &&
+                retriesRemaining > 0 &&
+                controller.pendingEnvironmentConfiguration(id).isNotEmpty() &&
+                MacProjectConfigurationDialog.showRequired(frame, controller, id)
+            ) {
+                runSelectedProjectWithConfiguration(retriesRemaining - 1)
+            }
+        }
+    }
+
+    private fun runProjectOperation(
+        message: String,
+        operation: (String) -> Boolean,
+        onComplete: ((String, Boolean) -> Unit)? = null,
+    ) {
         val id = selectedProjectId ?: return
         statusTitle.text = message
         primaryButton.isEnabled = false
         Thread {
-            operation(id)
+            val success = runCatching { operation(id) }.getOrDefault(false)
             SwingUtilities.invokeLater {
                 refreshProjects(selectProjectId = id)
+                onComplete?.invoke(id, success)
             }
         }.start()
     }

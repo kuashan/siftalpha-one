@@ -116,6 +116,8 @@ class MacProductController(
     private val lastErrors = ConcurrentHashMap<String, String?>()
     private val containerInstallProgress = ConcurrentHashMap<String, MacContainerInstallProgress>()
     private val containerInstallLogs = ConcurrentHashMap<String, StringBuilder>()
+    private val pendingConfiguration =
+        ConcurrentHashMap<String, List<MacProjectConfigurationRequirement>>()
     private val managedPythonVersion: String? by lazy { managedPython?.version() }
     private val managedBun = MacManagedBunRuntimeProvider(
         File(dataRoot, "managed-runtimes/bun"),
@@ -146,6 +148,7 @@ class MacProductController(
         filesystem.forgetProject(projectId)
         projectCatalog.remove(product.imported.canonicalRootPath)
         lastErrors.remove(projectId)
+        pendingConfiguration.remove(projectId)
         containerInstallProgress.remove(projectId)
         containerInstallLogs.remove(projectId)
         return true
@@ -176,10 +179,37 @@ class MacProductController(
     fun configuredEnvironmentKeys(projectId: String): Set<String> =
         if (project(projectId) == null) emptySet() else projectSecretStore.configuredKeys(projectId)
 
+    fun pendingEnvironmentConfiguration(
+        projectId: String,
+    ): List<MacProjectConfigurationRequirement> =
+        pendingConfiguration[projectId].orEmpty()
+
+    private fun discoverEnvironmentConfiguration(
+        projectId: String,
+    ): List<MacProjectConfigurationRequirement> {
+        val product = synchronized(this) { projects[projectId] } ?: return emptyList()
+        val requirements = MacProjectConfigurationDiscovery.discover(
+            projectRootPath = product.imported.canonicalRootPath,
+            configuredKeys = projectSecretStore.configuredKeys(projectId),
+            runtimeLog = coordinator.logs(projectId, 256 * 1024),
+        )
+        if (requirements.isEmpty()) {
+            pendingConfiguration.remove(projectId)
+        } else {
+            pendingConfiguration[projectId] = requirements
+        }
+        return requirements
+    }
+
     fun saveEnvironmentValue(projectId: String, name: String, value: String): Boolean {
         if (project(projectId) == null) return false
         return runCatching {
             projectSecretStore.write(projectId, name, value)
+            pendingConfiguration.computeIfPresent(projectId) { _, requirements ->
+                requirements.filterNot { it.name == name.trim().uppercase() }
+            }
+            lastErrors.remove(projectId)
+            coordinator.appendDiagnostic(projectId, "PROJECT_CONFIGURATION_SAVED=" + name.trim().uppercase())
             true
         }.getOrElse { error ->
             lastErrors[projectId] = error.message ?: error.javaClass.simpleName
@@ -620,13 +650,33 @@ class MacProductController(
 
     fun start(projectId: String): Boolean {
         lastErrors.remove(projectId)
+
+        val missingBeforeStart = discoverEnvironmentConfiguration(projectId)
+        if (missingBeforeStart.isNotEmpty()) {
+            val names = missingBeforeStart.joinToString("、") { it.name }
+            coordinator.appendDiagnostic(
+                projectId,
+                "PROJECT_CONFIGURATION_REQUIRED=" +
+                    missingBeforeStart.joinToString(",") { it.name },
+            )
+            lastErrors[projectId] = "项目缺少运行配置：" + names
+            return false
+        }
+
         if (!ensureManagedHostTools(projectId)) return false
 
         val started = coordinator.start(projectId)
-        if (!started && lastErrors[projectId] == null) {
-            lastErrors[projectId] =
+        if (!started) {
+            val discovered = discoverEnvironmentConfiguration(projectId)
+            lastErrors[projectId] = if (discovered.isNotEmpty()) {
+                "项目缺少运行配置：" + discovered.joinToString("、") { it.name }
+            } else {
                 coordinator.latestStartFailure(projectId)
+                    ?: lastErrors[projectId]
                     ?: "项目启动失败"
+            }
+        } else {
+            pendingConfiguration.remove(projectId)
         }
         return started
     }

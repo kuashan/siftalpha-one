@@ -245,7 +245,7 @@ class MacDeveloperModeWindow(
         installEnvironmentButton.addActionListener {
             runOperation(controller::installRecommendedContainerAndPrepare)
         }
-        runButton.addActionListener { runOperation(controller::start) }
+        runButton.addActionListener { runStartWithConfiguration() }
         stopButton.addActionListener { runOperation(controller::stop) }
         restartButton.addActionListener { runOperation(controller::restart) }
         refreshButton.addActionListener { refreshSelectedProject() }
@@ -611,13 +611,30 @@ class MacDeveloperModeWindow(
         copyButton.isEnabled = view.combinedLogs.isNotBlank()
     }
 
-    private fun runOperation(operation: (String) -> Boolean) {
+    private fun runStartWithConfiguration(retriesRemaining: Int = 3) {
+        runOperation(controller::start) { id, success ->
+            if (
+                !success &&
+                retriesRemaining > 0 &&
+                controller.pendingEnvironmentConfiguration(id).isNotEmpty() &&
+                MacProjectConfigurationDialog.showRequired(frame, controller, id)
+            ) {
+                runStartWithConfiguration(retriesRemaining - 1)
+            }
+        }
+    }
+
+    private fun runOperation(
+        operation: (String) -> Boolean,
+        onComplete: ((String, Boolean) -> Unit)? = null,
+    ) {
         val id = selectedProjectId ?: return
         setButtonsBusy()
         Thread {
-            runCatching { operation(id) }
+            val success = runCatching { operation(id) }.getOrDefault(false)
             SwingUtilities.invokeLater {
                 refreshProjects(id)
+                onComplete?.invoke(id, success)
             }
         }.start()
     }
