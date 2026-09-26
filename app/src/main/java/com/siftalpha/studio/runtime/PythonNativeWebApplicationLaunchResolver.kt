@@ -69,6 +69,12 @@ object PythonNativeWebApplicationLaunchResolver {
                 relativePaths = relativePaths,
                 pythonSources = pythonSources,
             )?.let { return it }
+
+            // A project-owned console-script contract is stronger launch authority than a generic
+            // framework signature. If the strict Web contract cannot be proven, fail closed here
+            // and let the normal CLI workflow resolve the declared project command instead of
+            // synthesizing (for example) an internal FastAPI module into the main launch.
+            if (hasProjectOwnedCliContract(pyprojectToml)) return null
         }
 
         return resolveCommonWebLaunch(
@@ -167,11 +173,16 @@ object PythonNativeWebApplicationLaunchResolver {
         val appAssignment = Regex(
             """(?m)^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?:[A-Za-z_][A-Za-z0-9_]*\.)?FastAPI\s*\(""",
         )
-        val entry = pythonSources.entries.firstOrNull { (_, source) ->
-            appAssignment.containsMatchIn(source)
-        } ?: return null
-        val path = normalizedSafePythonPath(entry.key) ?: return null
-        val appName = appAssignment.find(entry.value)?.groupValues?.getOrNull(1) ?: return null
+        val matches = pythonSources.entries.mapNotNull { (rawPath, source) ->
+            val assignment = appAssignment.find(source) ?: return@mapNotNull null
+            val path = normalizedSafePythonPath(rawPath) ?: return@mapNotNull null
+            val appName = assignment.groupValues.getOrNull(1) ?: return@mapNotNull null
+            Triple(path, appName, source)
+        }
+        // Generic FastAPI launch synthesis is fallback-only. Ambiguous app ownership must never be
+        // converted into an arbitrary "first file wins" launch contract.
+        if (matches.size != 1) return null
+        val (path, appName, _) = matches.single()
         val module = pythonModuleName(path) ?: return null
         return PythonNativeWebLaunchCandidate(
             executableName = "uvicorn",
@@ -251,13 +262,13 @@ object PythonNativeWebApplicationLaunchResolver {
             .asSequence()
             .sorted()
             .mapNotNull { name ->
-                val target = scripts.get(name)
+                val target = scripts.get(name) as? String ?: return@mapNotNull null
                 if (
-                    target is String &&
                     target.isNotBlank() &&
-                    PythonCliLaunchResolver.isSafeCommandName(name)
+                    PythonCliLaunchResolver.isSafeCommandName(name) &&
+                    consoleScriptTarget.matches(target.trim())
                 ) {
-                    name
+                    ProjectScript(name = name, target = target.trim())
                 } else {
                     null
                 }
@@ -266,11 +277,11 @@ object PythonNativeWebApplicationLaunchResolver {
         if (scriptEntries.isEmpty()) return null
 
         val projectName = (project.get("name") as? String).orEmpty()
-        val executable = when {
+        val selectedScript = when {
             scriptEntries.size == 1 -> scriptEntries.single()
             projectName.isNotBlank() -> {
                 val wanted = canonicalCommandName(projectName)
-                scriptEntries.singleOrNull { canonicalCommandName(it) == wanted } ?: return null
+                scriptEntries.singleOrNull { canonicalCommandName(it.name) == wanted } ?: return null
             }
             else -> return null
         }
@@ -278,6 +289,7 @@ object PythonNativeWebApplicationLaunchResolver {
         if (!hasViteComponent(relativePaths)) return null
 
         val sourceEvidence = pythonSources.entries.firstNotNullOfOrNull { (path, source) ->
+            if (!sourceOwnedByScript(path, selectedScript.target)) return@firstNotNullOfOrNull null
             inspectServeSource(path, source)
         } ?: return null
 
@@ -290,17 +302,46 @@ object PythonNativeWebApplicationLaunchResolver {
             add(sourceEvidence.browserDisableFlag)
         }
         return PythonNativeWebLaunchCandidate(
-            executableName = executable,
+            executableName = selectedScript.name,
             arguments = arguments,
             evidencePath = sourceEvidence.path,
         )
     }
+
+    private data class ProjectScript(
+        val name: String,
+        val target: String,
+    )
 
     private data class ServeSourceEvidence(
         val path: String,
         val supportsHost: Boolean,
         val browserDisableFlag: String,
     )
+
+    private fun hasProjectOwnedCliContract(pyprojectToml: String): Boolean {
+        val root = runCatching { Toml.parse(pyprojectToml) }.getOrNull() ?: return false
+        if (root.hasErrors()) return false
+        val project = root.get("project") as? TomlTable ?: return false
+        val scripts = project.get("scripts") as? TomlTable ?: return false
+        return scripts.keySet().any { name ->
+            val target = scripts.get(name) as? String
+            target != null &&
+                PythonCliLaunchResolver.isSafeCommandName(name) &&
+                consoleScriptTarget.matches(target.trim())
+        }
+    }
+
+    private fun sourceOwnedByScript(path: String, scriptTarget: String): Boolean {
+        val match = consoleScriptTarget.matchEntire(scriptTarget.trim()) ?: return false
+        val module = match.groupValues[1]
+        val topLevelPackage = module.substringBefore('.')
+        if (!PYTHON_MODULE_SEGMENT.matches(topLevelPackage)) return false
+        val normalized = normalizedSafePythonPath(path) ?: return false
+        val sourcePath = normalized.removePrefix("src/")
+        return sourcePath == "$topLevelPackage.py" ||
+            sourcePath.startsWith("$topLevelPackage/")
+    }
 
     private fun inspectServeSource(path: String, source: String): ServeSourceEvidence? {
         if (serveCommandDecorators.none { it.containsMatchIn(source) }) return null
@@ -332,4 +373,7 @@ object PythonNativeWebApplicationLaunchResolver {
         value.trim().lowercase().replace('_', '-')
 
     private val PYTHON_MODULE_SEGMENT = Regex("^[A-Za-z_][A-Za-z0-9_]*$")
+    private val consoleScriptTarget = Regex(
+        "^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_]*$",
+    )
 }
