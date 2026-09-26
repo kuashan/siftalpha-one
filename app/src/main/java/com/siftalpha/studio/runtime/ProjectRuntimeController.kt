@@ -16,6 +16,7 @@ import com.siftalpha.studio.siftalphax.InternalAlpineSession
 import com.siftalpha.studio.siftalphax.InternalAlpineWebObservation
 import com.siftalpha.studio.siftalphax.InternalPythonBackend
 import java.io.File
+import java.security.MessageDigest
 
 internal object ExternalProjectActivityContract {
     fun operationFor(action: ProjectRuntimeController.Action): String? = when (action) {
@@ -110,6 +111,11 @@ class ProjectRuntimeController(
         val sourceUrl: String,
         val branch: String,
         val projectName: String,
+    )
+
+    data class PythonNativeWebLaunchResolution(
+        val candidate: PythonNativeWebLaunchCandidate,
+        val sourceFingerprint: String,
     )
 
     private data class ExecutionContext(
@@ -248,17 +254,16 @@ class ProjectRuntimeController(
         project: V04ProjectGateway.RuntimeProject,
     ): EnvironmentPlanningContext {
         val projectId = project.summary.documentId
-        val facts = gateway.runtimeFacts(projectId)
-        val requirements = gateway.readProjectRootText(projectId, "requirements.txt")
-        val pyproject = gateway.readProjectRootText(projectId, "pyproject.toml")
+        val snapshot = gateway.runtimeSourceFacts(projectId)
+        val facts = snapshot.facts
         val detection = ProjectEnvironmentDetector.detect(
             ProjectEnvironmentDetectionInput(
                 relativePaths = facts.relativePaths,
                 declaredType = facts.declaredType,
                 declaredEntry = facts.declaredEntry,
                 declaredRun = facts.declaredRun,
-                requirementsText = requirements,
-                pyprojectText = pyproject,
+                requirementsText = snapshot.requirementsText,
+                pyprojectText = snapshot.pyprojectText,
             ),
         )
         val plan = ProjectEnvironmentPlanner.plan(
@@ -836,12 +841,13 @@ class ProjectRuntimeController(
         cliRequirements: List<PythonCliRequirement> = emptyList(),
     ): PythonCliLaunchResolver.Resolution {
         val projectId = project.summary.documentId
-        val facts = gateway.runtimeFacts(projectId)
+        val snapshot = gateway.runtimeSourceFacts(projectId)
+        val facts = snapshot.facts
         val pyprojectToml = if (
             facts.declaredRun.isNullOrBlank() &&
             facts.relativePaths.any { it == "pyproject.toml" }
         ) {
-            gateway.readProjectRootText(projectId, "pyproject.toml")
+            snapshot.pyprojectText
         } else {
             null
         }
@@ -880,18 +886,30 @@ class ProjectRuntimeController(
     fun resolvePythonNativeWebLaunch(
         project: V04ProjectGateway.RuntimeProject,
         webProjectEnabled: Boolean,
-    ): PythonNativeWebLaunchCandidate? {
+    ): PythonNativeWebLaunchCandidate? =
+        resolvePythonNativeWebLaunchResolution(
+            project = project,
+            webProjectEnabled = webProjectEnabled,
+        )?.candidate
+
+    fun resolvePythonNativeWebLaunchResolution(
+        project: V04ProjectGateway.RuntimeProject,
+        webProjectEnabled: Boolean,
+    ): PythonNativeWebLaunchResolution? {
         if (!webProjectEnabled) return null
         val projectId = project.summary.documentId
-        val facts = gateway.runtimeFacts(projectId)
+        val snapshot = gateway.runtimeSourceFacts(projectId)
+        val facts = snapshot.facts
         if (!facts.declaredRun.isNullOrBlank()) return null
         val pyprojectToml = if (facts.relativePaths.any { it == "pyproject.toml" }) {
-            gateway.readProjectRootText(projectId, "pyproject.toml")
+            snapshot.pyprojectText
         } else {
             null
         }
-        val requirementsText = if (facts.relativePaths.any { it.equals("requirements.txt", ignoreCase = true) }) {
-            gateway.readProjectRootText(projectId, "requirements.txt")
+        val requirementsText = if (
+            facts.relativePaths.any { it.equals("requirements.txt", ignoreCase = true) }
+        ) {
+            snapshot.requirementsText
         } else {
             null
         }
@@ -923,14 +941,39 @@ class ProjectRuntimeController(
             .toList()
         val sources = gateway.readProjectTextFiles(projectId, sourcePaths)
 
-        return PythonNativeWebApplicationLaunchResolver.resolve(
+        val candidate = PythonNativeWebApplicationLaunchResolver.resolve(
             declaredRun = facts.declaredRun,
             pyprojectToml = pyprojectToml,
             relativePaths = facts.relativePaths,
             pythonSources = sources,
             webProjectEnabled = webProjectEnabled,
             requirementsText = requirementsText,
+        ) ?: return null
+
+        return PythonNativeWebLaunchResolution(
+            candidate = candidate,
+            sourceFingerprint = nativeWebLaunchFingerprint(
+                rootFingerprint = snapshot.fingerprint,
+                pythonSources = sources,
+            ),
         )
+    }
+
+    private fun nativeWebLaunchFingerprint(
+        rootFingerprint: String,
+        pythonSources: Map<String, String>,
+    ): String {
+        val canonical = buildString {
+            append(rootFingerprint).append('\n')
+            pythonSources.toSortedMap().forEach { (path, source) ->
+                append("source=").append(path).append('\n')
+                append(source).append("\n<<end-source>>\n")
+            }
+        }
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(canonical.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        return "sha256:$digest"
     }
 
     private fun nativeWebSourcePriority(path: String): Int {
