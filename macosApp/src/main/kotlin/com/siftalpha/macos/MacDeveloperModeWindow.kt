@@ -3,10 +3,11 @@ package com.siftalpha.macos
 import com.siftalpha.core.process.ProjectProcessState
 import java.awt.BorderLayout
 import java.awt.Component
+import java.awt.Container
 import java.awt.Dimension
-import java.awt.FlowLayout
 import java.awt.Font
 import java.awt.GridLayout
+import java.awt.LayoutManager
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.awt.event.WindowAdapter
@@ -30,6 +31,113 @@ import javax.swing.SwingConstants
 import javax.swing.SwingUtilities
 import javax.swing.Timer
 import javax.swing.WindowConstants
+
+internal object MacDeveloperToolbarLayoutPolicy {
+    fun rowRanges(
+        availableWidth: Int,
+        preferredWidths: List<Int>,
+        horizontalGap: Int = 8,
+    ): List<IntRange> {
+        if (preferredWidths.isEmpty()) return emptyList()
+
+        val width = availableWidth.coerceAtLeast(1)
+        val gap = horizontalGap.coerceAtLeast(0)
+        val rows = mutableListOf<IntRange>()
+        var rowStart = 0
+        var rowWidth = 0
+
+        preferredWidths.forEachIndexed { index, rawPreferredWidth ->
+            val preferredWidth = rawPreferredWidth.coerceAtLeast(1)
+            val nextWidth = if (index == rowStart) {
+                preferredWidth
+            } else {
+                rowWidth + gap + preferredWidth
+            }
+            if (index > rowStart && nextWidth > width) {
+                rows += rowStart until index
+                rowStart = index
+                rowWidth = preferredWidth
+            } else {
+                rowWidth = nextWidth
+            }
+        }
+        rows += rowStart until preferredWidths.size
+        return rows
+    }
+
+    fun rowsForWidth(
+        availableWidth: Int,
+        preferredWidths: List<Int>,
+        horizontalGap: Int = 8,
+    ): Int = rowRanges(availableWidth, preferredWidths, horizontalGap).size
+}
+
+internal class MacDeveloperToolbarWrapLayout(
+    private val horizontalGap: Int = 8,
+    private val verticalGap: Int = 8,
+) : LayoutManager {
+    override fun addLayoutComponent(name: String?, component: Component?) = Unit
+
+    override fun removeLayoutComponent(component: Component?) = Unit
+
+    override fun preferredLayoutSize(parent: Container): Dimension {
+        val preferredWidths = preferredWidths(parent)
+        if (preferredWidths.isEmpty()) return Dimension()
+        val targetWidth = preferredWidths
+            .take(7)
+            .sum() + horizontalGap * (minOf(7, preferredWidths.size) - 1).coerceAtLeast(0)
+        val rows = MacDeveloperToolbarLayoutPolicy.rowRanges(targetWidth, preferredWidths, horizontalGap)
+        val rowHeight = parent.components.maxOf { it.preferredSize.height }
+        val insets = parent.insets
+        return Dimension(
+            targetWidth + insets.left + insets.right,
+            rows.size * rowHeight + (rows.size - 1).coerceAtLeast(0) * verticalGap +
+                insets.top + insets.bottom,
+        )
+    }
+
+    override fun minimumLayoutSize(parent: Container): Dimension {
+        val insets = parent.insets
+        val component = parent.components.firstOrNull() ?: return Dimension()
+        return Dimension(
+            component.minimumSize.width + insets.left + insets.right,
+            component.minimumSize.height + insets.top + insets.bottom,
+        )
+    }
+
+    override fun layoutContainer(parent: Container) {
+        val components = parent.components
+        if (components.isEmpty()) return
+
+        val insets = parent.insets
+        val availableWidth = (parent.width - insets.left - insets.right).coerceAtLeast(1)
+        val preferredWidths = preferredWidths(parent)
+        val rows = MacDeveloperToolbarLayoutPolicy.rowRanges(
+            availableWidth = availableWidth,
+            preferredWidths = preferredWidths,
+            horizontalGap = horizontalGap,
+        )
+        var y = insets.top
+        rows.forEach { range ->
+            val rowHeight = range.maxOf { components[it].preferredSize.height }
+            val naturalRowWidth = range.sumOf { preferredWidths[it] } +
+                horizontalGap * (range.count() - 1).coerceAtLeast(0)
+            var x = insets.left + (availableWidth - naturalRowWidth).coerceAtLeast(0)
+            range.forEach { index ->
+                val component = components[index]
+                val componentWidth = preferredWidths[index]
+                    .coerceAtMost(availableWidth)
+                    .coerceAtLeast(1)
+                component.setBounds(x, y, componentWidth, rowHeight)
+                x += componentWidth + horizontalGap
+            }
+            y += rowHeight + verticalGap
+        }
+    }
+
+    private fun preferredWidths(parent: Container): List<Int> =
+        parent.components.map { it.preferredSize.width.coerceAtLeast(1) }
+}
 
 class MacDeveloperModeWindow(
     private val controller: MacProductController,
@@ -114,7 +222,7 @@ class MacDeveloperModeWindow(
             foreground = MacDesignTokens.foreground
         }, BorderLayout.WEST)
 
-        val actions = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0)).apply {
+        val actions = JPanel(MacDeveloperToolbarWrapLayout()).apply {
             isOpaque = false
             add(importButton)
             add(prepareButton)
@@ -130,7 +238,7 @@ class MacDeveloperModeWindow(
             add(copyButton)
             add(normalButton)
         }
-        add(actions, BorderLayout.EAST)
+        add(actions, BorderLayout.CENTER)
 
         importButton.addActionListener { importProject() }
         prepareButton.addActionListener { runOperation { id -> controller.prepare(id).success } }
