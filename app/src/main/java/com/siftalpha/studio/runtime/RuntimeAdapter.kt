@@ -39,6 +39,8 @@ data class RuntimeProjectSpec(
     val environmentPlanId: String? = null,
     /** Detection/Plan-owned Python extras. Executors must not rediscover these at install time. */
     val pythonInstallExtras: List<String> = emptyList(),
+    /** Detection-owned Vite component directories consumed by Node preparation/status. */
+    val viteComponentDirectories: List<String> = emptyList(),
     /** Optional one-shot argv-based Python launch selected at action time. */
     val pythonLaunchInvocation: PythonLaunchInvocation? = null,
     /** M-owned Web capability gate for weak Runtime log URL discovery. */
