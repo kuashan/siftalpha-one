@@ -2038,22 +2038,16 @@ open class V04Activity : StudioActivity() {
             project.folderName,
         )
         val requiredCli = configurationSnapshot.cliRequirements.filter { it.required }
-        val nativeWebProfile = webProfile?.takeIf { it.enabled }
-        val learnedNativeWebLaunch = if (
-            nativeWebProfile != null &&
-            resolvedSelection?.primary == RuntimeKind.PYTHON &&
-            ::webLearnedLaunchStore.isInitialized
-        ) {
-            webLearnedLaunchStore.readVerified(project.summary.documentId)
-        } else {
-            null
-        }
-        val nativeWebLaunch = if (
-            nativeWebProfile != null &&
+        val webLaunchAllowed =
+            webProfile == null ||
+                webProfile.enabled ||
+                webProfile.source != "config"
+        val nativeWebResolution = if (
+            webLaunchAllowed &&
             resolvedSelection?.primary == RuntimeKind.PYTHON
         ) {
-            learnedNativeWebLaunch ?: runCatching {
-                runtime.resolvePythonNativeWebLaunch(
+            runCatching {
+                runtime.resolvePythonNativeWebLaunchResolution(
                     project = project,
                     webProjectEnabled = true,
                 )
@@ -2061,20 +2055,50 @@ open class V04Activity : StudioActivity() {
         } else {
             null
         }
-        if (nativeWebLaunch != null && nativeWebProfile != null) {
+        val nativeWebProfile = when {
+            nativeWebResolution != null ->
+                webProfile?.takeIf { it.enabled }
+                    ?: WebProjectInspector.Profile(
+                        enabled = true,
+                        framework = null,
+                        source = "runtime-source",
+                        host = null,
+                        port = null,
+                    )
+            else -> webProfile?.takeIf { it.enabled }
+        }
+        val learnedNativeWebLaunch = if (
+            nativeWebResolution != null &&
+            ::webLearnedLaunchStore.isInitialized
+        ) {
+            webLearnedLaunchStore.readVerified(
+                projectKey = project.summary.documentId,
+                sourceFingerprint = nativeWebResolution.sourceFingerprint,
+            )
+        } else {
+            null
+        }
+        val nativeWebLaunch = learnedNativeWebLaunch ?: nativeWebResolution?.candidate
+        if (
+            nativeWebLaunch != null &&
+            nativeWebProfile != null &&
+            nativeWebResolution != null
+        ) {
             showPythonNativeWebRunConfirmation(
                 project = project,
                 webProfile = nativeWebProfile,
                 controlRequest = controlRequest,
                 candidate = nativeWebLaunch,
+                sourceFingerprint = nativeWebResolution.sourceFingerprint,
             )
             return
         }
 
+        val effectiveWebEnabled = nativeWebProfile != null
         val isPythonCliCandidate =
             webProfile != null &&
                 resolvedSelection?.primary == RuntimeKind.PYTHON &&
-                (!webProfile.enabled || requiredCli.isNotEmpty())
+                (!effectiveWebEnabled || requiredCli.isNotEmpty())
 
         if (isPythonCliCandidate) {
             val cliWebProfile = checkNotNull(webProfile)
@@ -2154,6 +2178,7 @@ open class V04Activity : StudioActivity() {
         webProfile: WebProjectInspector.Profile,
         controlRequest: RuntimeControlRequest,
         candidate: PythonNativeWebLaunchCandidate,
+        sourceFingerprint: String,
     ) {
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.runtime_native_web_run_title, project.summary.name))
@@ -2167,8 +2192,9 @@ open class V04Activity : StudioActivity() {
             .setPositiveButton(getString(R.string.runtime_button_run)) { _, _ ->
                 if (::webLearnedLaunchStore.isInitialized) {
                     webLearnedLaunchStore.rememberDiscovered(
-                        project.summary.documentId,
-                        candidate,
+                        projectKey = project.summary.documentId,
+                        candidate = candidate,
+                        sourceFingerprint = sourceFingerprint,
                     )
                 }
                 startProject(
