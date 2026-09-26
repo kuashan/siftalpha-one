@@ -169,7 +169,7 @@ class ProjectRunWorkflowCoordinator(
             is PythonCliLaunchResolver.Resolution.DeclaredRun ->
                 Preparation.Ready(
                     ProjectControlHub.RunRequest(
-                        webLogDiscoveryAllowed = webEnabled,
+                        webLogDiscoveryAllowed = effectiveWebEnabled,
                         webHintPorts = webHintPorts,
                     ),
                 )
@@ -186,7 +186,7 @@ class ProjectRunWorkflowCoordinator(
                     Preparation.Ready(
                         ProjectControlHub.RunRequest(
                             launchInvocation = PythonLaunchInvocation.consoleScript(targets.single().id),
-                            webLogDiscoveryAllowed = webEnabled,
+                            webLogDiscoveryAllowed = effectiveWebEnabled,
                             webHintPorts = webHintPorts,
                         ),
                     )
@@ -196,7 +196,7 @@ class ProjectRunWorkflowCoordinator(
                         LaunchInputPlan(
                             targets = targets,
                             requiredArguments = requiredCli,
-                            webLogDiscoveryAllowed = webEnabled,
+                            webLogDiscoveryAllowed = effectiveWebEnabled,
                             webHintPorts = webHintPorts,
                         ),
                     )
@@ -214,7 +214,7 @@ class ProjectRunWorkflowCoordinator(
                     Preparation.Ready(
                         ProjectControlHub.RunRequest(
                             launchInvocation = PythonLaunchInvocation.pythonFile(resolution.entrypoint),
-                            webLogDiscoveryAllowed = webEnabled,
+                            webLogDiscoveryAllowed = effectiveWebEnabled,
                             webHintPorts = webHintPorts,
                         ),
                     )
@@ -224,7 +224,7 @@ class ProjectRunWorkflowCoordinator(
                         LaunchInputPlan(
                             targets = listOf(target),
                             requiredArguments = requiredCli,
-                            webLogDiscoveryAllowed = webEnabled,
+                            webLogDiscoveryAllowed = effectiveWebEnabled,
                             webHintPorts = webHintPorts,
                         ),
                     )
