@@ -12,6 +12,100 @@ data class MacSystemFacts(
     val usableDiskBytes: Long?,
 )
 
+data class MacManagedVmResourceFacts(
+    val cpuCount: Int?,
+    val memoryBytes: Long?,
+)
+
+enum class MacManagedResourceDecision {
+    CURRENT_OK,
+    REPAIR_REQUIRED,
+    HOST_INSUFFICIENT,
+    UNKNOWN,
+}
+
+data class MacManagedVmResourceRecommendation(
+    val currentCpuCount: Int?,
+    val currentMemoryBytes: Long?,
+    val recommendedCpuCount: Int?,
+    val recommendedMemoryBytes: Long?,
+    val maximumSafeMemoryBytes: Long?,
+    val decision: MacManagedResourceDecision,
+)
+
+object MacManagedResourcePolicy {
+    const val GIB = 1024L * 1024L * 1024L
+
+    fun recommend(
+        host: MacSystemFacts,
+        current: MacManagedVmResourceFacts,
+    ): MacManagedVmResourceRecommendation {
+        val hostMemory = host.physicalMemoryBytes?.takeIf { it > 0L }
+        val currentMemory = current.memoryBytes?.takeIf { it > 0L }
+        val currentCpu = current.cpuCount?.takeIf { it > 0 }
+        if (hostMemory == null || currentMemory == null || currentCpu == null) {
+            return MacManagedVmResourceRecommendation(
+                currentCpuCount = current.cpuCount,
+                currentMemoryBytes = current.memoryBytes,
+                recommendedCpuCount = null,
+                recommendedMemoryBytes = null,
+                maximumSafeMemoryBytes = null,
+                decision = MacManagedResourceDecision.UNKNOWN,
+            )
+        }
+
+        val reservedForHost = maxOf(4L * GIB, hostMemory / 4L)
+        val maximumSafeMemory = (hostMemory - reservedForHost).coerceAtLeast(0L)
+        val hostInsufficient = hostMemory < 8L * GIB || maximumSafeMemory < 4L * GIB
+        if (hostInsufficient) {
+            return MacManagedVmResourceRecommendation(
+                currentCpuCount = currentCpu,
+                currentMemoryBytes = currentMemory,
+                recommendedCpuCount = null,
+                recommendedMemoryBytes = null,
+                maximumSafeMemoryBytes = maximumSafeMemory,
+                decision = MacManagedResourceDecision.HOST_INSUFFICIENT,
+            )
+        }
+
+        val maximumSafeCpu = maxOf(1, host.processorCount - 2)
+        val recommendedCpu = minOf(
+            maximumSafeCpu,
+            maxOf(1, (host.processorCount + 1) / 2),
+        )
+        val recommendedMemory = minOf(
+            maximumSafeMemory,
+            maxOf(4L * GIB, hostMemory / 2L),
+        )
+        val decision = if (currentMemory >= recommendedMemory && currentCpu >= recommendedCpu) {
+            MacManagedResourceDecision.CURRENT_OK
+        } else {
+            MacManagedResourceDecision.REPAIR_REQUIRED
+        }
+        return MacManagedVmResourceRecommendation(
+            currentCpuCount = currentCpu,
+            currentMemoryBytes = currentMemory,
+            recommendedCpuCount = recommendedCpu,
+            recommendedMemoryBytes = recommendedMemory,
+            maximumSafeMemoryBytes = maximumSafeMemory,
+            decision = decision,
+        )
+    }
+}
+
+object MacManagedVmResourceParser {
+    private val cpuPattern = Regex("\\\"(?:cpu|cpus)\\\"\\s*:\\s*(\\d+)")
+    private val memoryPattern = Regex("\\\"memory\\\"\\s*:\\s*(\\d+(?:\\.\\d+)?)")
+
+    fun parse(text: String): MacManagedVmResourceFacts? {
+        val cpu = cpuPattern.find(text)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        val memoryGiB = memoryPattern.find(text)?.groupValues?.getOrNull(1)?.toDoubleOrNull()
+        val memoryBytes = memoryGiB?.let { (it * MacManagedResourcePolicy.GIB).toLong() }
+        if (cpu == null && memoryBytes == null) return null
+        return MacManagedVmResourceFacts(cpuCount = cpu, memoryBytes = memoryBytes)
+    }
+}
+
 enum class MacContainerAdviceState {
     READY,
     START_EXISTING_PROVIDER,
@@ -135,7 +229,7 @@ object MacContainerEnvironmentAdvisor {
         return MacContainerEnvironmentAdvice(
             state = state,
             title = "需要安装或启用容器环境",
-            detail = "当前没有可用的 Docker/Podman + Compose。SiftAlpha 可以根据系统能力生成推荐环境方案；只会在用户主动点击“准备环境”或开发者环境修复时执行，也不会自动修改 CPU、内存或磁盘资源配置。",
+            detail = "当前没有可用的 Docker/Podman + Compose。SiftAlpha 可以根据系统能力生成推荐环境方案；初次安装不会自动修改 CPU、内存或磁盘资源配置，只有托管容器构建明确遇到内存不足时，才会进行一次有上限的资源恢复。",
             suggestedOptions = options,
             warnings = warnings,
         )

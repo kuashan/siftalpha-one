@@ -4,7 +4,6 @@ import com.siftalpha.studio.container.ComposeProjectPlan
 import com.siftalpha.studio.container.ComposeProjectPlanStatus
 import com.siftalpha.studio.container.ComposeServicePlan
 import com.siftalpha.studio.platform.CapabilityAvailability
-import java.io.File
 import java.nio.file.Files
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
@@ -100,7 +99,7 @@ class MacContainerWorkflowTest {
             writeText(
                 """
                 #!/bin/sh
-                printf 'build-before=%s\n' "$SIFTALPHA_SECRET"
+                printf 'build-before=%s\n' "\$SIFTALPHA_SECRET"
                 sleep 1
                 printf 'build-after\n'
                 """.trimIndent() + "\n",

@@ -245,6 +245,10 @@ class MacProjectWorkflowCoordinator(
         return result
     }
 
+    internal fun appendDiagnostic(projectId: String, line: String) {
+        append(state(projectId), line)
+    }
+
     private fun prepareCompose(
         state: MutableProjectState,
         context: MacWorkflowContext,

@@ -70,6 +70,29 @@ internal object MacComposePreparePolicy {
     }
 }
 
+enum class MacComposeResourceFailure {
+    MEMORY_EXHAUSTED,
+    OTHER,
+}
+
+object MacComposeResourceFailureClassifier {
+    fun classify(text: String?): MacComposeResourceFailure {
+        val normalized = text.orEmpty().lowercase()
+        val explicitMemoryEvidence = normalized.contains("cannot allocate memory") ||
+            normalized.contains("resourceexhausted") ||
+            normalized.contains("out of memory") ||
+            normalized.contains("oom")
+        val killedWithBuildContext =
+            (normalized.contains("sigkill") || normalized.contains("killed")) &&
+                (normalized.contains("build") || normalized.contains("memory") || normalized.contains("oom"))
+        return if (explicitMemoryEvidence || killedWithBuildContext) {
+            MacComposeResourceFailure.MEMORY_EXHAUSTED
+        } else {
+            MacComposeResourceFailure.OTHER
+        }
+    }
+}
+
 interface MacComposeContainerProvider {
     val snapshot: MacContainerProviderSnapshot
 
@@ -222,8 +245,8 @@ class MacCliComposeContainerProvider(
                 arguments = arguments,
                 timeoutSeconds = if (operation == "build") 30 * 60 else 20 * 60,
                 cancelled = cancelled,
+                onLine = { line -> log("compose " + operation + ": " + line.take(1000)) },
             )
-            appendOutput(operation, result.output, log)
             if (!result.success) return result
             log("COMPOSE_" + operation.uppercase() + ":PASS")
         }
@@ -436,50 +459,80 @@ class MacCliComposeContainerProvider(
         cancelled: () -> Boolean,
         maxOutputBytes: Int = 512 * 1024,
         additionalManifest: File? = null,
+        onLine: (String) -> Unit = {},
     ): MacContainerOperationResult {
-        val outputFile = File.createTempFile("siftalpha-compose-", ".log")
-        try {
-            val command = buildList {
-                add(executable)
-                add("compose")
-                add("-p")
-                add(projectName)
+        val command = buildList {
+            add(executable)
+            add("compose")
+            add("-p")
+            add(projectName)
+            add("-f")
+            add(manifest)
+            additionalManifest?.let { file ->
                 add("-f")
-                add(manifest)
-                additionalManifest?.let { file ->
-                    add("-f")
-                    add(file.absolutePath)
-                }
-                addAll(arguments)
+                add(file.absolutePath)
             }
-            val processBuilder = ProcessBuilder(command)
+            addAll(arguments)
+        }
+        val output = StringBuilder()
+        val outputLock = Any()
+        var reader: Thread? = null
+        fun snapshot(): String = synchronized(outputLock) { output.toString() }
+        fun stopProcess(process: Process) {
+            process.destroy()
+            if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
+        }
+        fun awaitReader() {
+            reader?.join(2_000)
+        }
+        try {
+            val process = ProcessBuilder(command)
                 .directory(File(project.canonicalRootPath))
                 .redirectErrorStream(true)
-                .redirectOutput(outputFile)
-            processBuilder.environment().putAll(
-                MacComposeProcessEnvironment.build(
-                    executable = executable,
-                    projectEnvironment = projectEnvironment[project.projectId].orEmpty(),
-                ),
-            )
-            val process = processBuilder.start()
+                .apply {
+                    environment().putAll(
+                        MacComposeProcessEnvironment.build(
+                            executable = executable,
+                            projectEnvironment = projectEnvironment[project.projectId].orEmpty(),
+                        ),
+                    )
+                }
+                .start()
+
+            reader = Thread {
+                runCatching {
+                    process.inputStream.bufferedReader().useLines { lines ->
+                        lines.forEach { rawLine ->
+                            val safeLine = redact(project.projectId, rawLine)
+                            synchronized(outputLock) {
+                                output.append(safeLine).append('\n')
+                                trimOutput(output, maxOutputBytes)
+                            }
+                            runCatching { onLine(safeLine) }
+                        }
+                    }
+                }
+            }.apply {
+                isDaemon = true
+                name = "siftalpha-compose-output"
+                start()
+            }
 
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
             while (true) {
                 if (cancelled()) {
-                    process.destroy()
-                    if (!process.waitFor(2, TimeUnit.SECONDS)) {
-                        process.destroyForcibly()
-                    }
+                    stopProcess(process)
+                    awaitReader()
                     return MacContainerOperationResult(
                         success = false,
                         cancelled = true,
                         detail = "container operation cancelled",
-                        output = redact(project.projectId, readOutput(outputFile, maxOutputBytes)),
+                        output = redact(project.projectId, snapshot()),
                     )
                 }
                 if (process.waitFor(200, TimeUnit.MILLISECONDS)) {
-                    val output = redact(project.projectId, readOutput(outputFile, maxOutputBytes))
+                    awaitReader()
+                    val safeOutput = redact(project.projectId, snapshot())
                     val code = process.exitValue()
                     return MacContainerOperationResult(
                         success = code == 0,
@@ -489,41 +542,38 @@ class MacCliComposeContainerProvider(
                             MacComposeFailureDiagnostics.detail(
                                 operation = arguments.joinToString(" "),
                                 exitCode = code,
-                                output = output,
+                                output = safeOutput,
                             )
                         },
-                        output = output,
+                        output = safeOutput,
                     )
                 }
                 if (System.nanoTime() >= deadline) {
-                    process.destroy()
-                    if (!process.waitFor(2, TimeUnit.SECONDS)) {
-                        process.destroyForcibly()
-                    }
-                    val output = redact(project.projectId, readOutput(outputFile, maxOutputBytes))
+                    stopProcess(process)
+                    awaitReader()
+                    val safeOutput = redact(project.projectId, snapshot())
                     return MacContainerOperationResult(
                         success = false,
                         detail = buildString {
                             append("docker compose ")
                             append(arguments.joinToString(" "))
                             append(" timed out")
-                            if (output.isNotBlank()) {
+                            if (safeOutput.isNotBlank()) {
                                 append("\n")
-                                append(output.takeLast(8 * 1024))
+                                append(safeOutput.takeLast(8 * 1024))
                             }
                         },
-                        output = output,
+                        output = safeOutput,
                     )
                 }
             }
         } catch (error: Throwable) {
+            awaitReader()
             return MacContainerOperationResult(
                 success = false,
                 detail = error.message ?: error.javaClass.simpleName,
-                output = redact(project.projectId, readOutput(outputFile, maxOutputBytes)),
+                output = redact(project.projectId, snapshot()),
             )
-        } finally {
-            outputFile.delete()
         }
     }
 
@@ -538,20 +588,14 @@ class MacCliComposeContainerProvider(
         java.net.ServerSocket(port).use { true }
     }.getOrDefault(false)
 
-    private fun readOutput(file: File, maxBytes: Int): String {
-        if (!file.isFile) return ""
-        val bytes = file.readBytes()
-        val slice = if (bytes.size <= maxBytes) bytes else bytes.copyOfRange(bytes.size - maxBytes, bytes.size)
-        return slice.toString(Charsets.UTF_8)
-    }
-
-    private fun appendOutput(
-        operation: String,
-        output: String,
-        log: (String) -> Unit,
-    ) {
-        output.lineSequence()
-            .filter(String::isNotBlank)
-            .forEach { line -> log("compose " + operation + ": " + line.take(1000)) }
+    private fun trimOutput(output: StringBuilder, maxBytes: Int) {
+        while (output.toString().toByteArray(Charsets.UTF_8).size > maxBytes) {
+            val newline = output.indexOf("\n")
+            if (newline < 0) {
+                output.delete(0, output.length)
+                return
+            }
+            output.delete(0, newline + 1)
+        }
     }
 }

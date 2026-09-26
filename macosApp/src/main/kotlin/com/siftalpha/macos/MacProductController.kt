@@ -356,7 +356,32 @@ class MacProductController(
         }
 
         updateProgress(MacContainerInstallPhase.PREPARING_PROJECT, "容器环境已就绪，正在继续准备项目…")
-        val prepareResult = coordinator.prepare(projectId)
+        var prepareResult = coordinator.prepare(projectId)
+        var resourceRepairAttempted = false
+        if (
+            !prepareResult.success &&
+            !prepareResult.cancelled &&
+            MacComposeResourceFailureClassifier.classify(prepareResult.detail) ==
+                MacComposeResourceFailure.MEMORY_EXHAUSTED &&
+            managedDockerProviderAvailable() &&
+            !resourceRepairAttempted
+        ) {
+            resourceRepairAttempted = true
+            val resourceRepair = repairManagedContainerResources(projectId)
+            if (resourceRepair.success) {
+                refreshContainerProviders()
+                prepareResult = coordinator.prepare(projectId)
+                if (prepareResult.success) {
+                    updateProgress(MacContainerInstallPhase.COMPLETE, "运行环境资源已调整，项目准备已完成。")
+                    lastErrors.remove(projectId)
+                    return true
+                }
+            }
+            val detail = userFacingResourceFailure(resourceRepair.detail ?: prepareResult.detail)
+            lastErrors[projectId] = detail
+            updateProgress(MacContainerInstallPhase.FAILED, detail)
+            return false
+        }
         if (!prepareResult.success) {
             val detail = prepareResult.detail ?: "容器环境已安装，但项目准备失败。"
             lastErrors[projectId] = detail
@@ -402,7 +427,9 @@ class MacProductController(
             }
         }
 
-        val result = coordinator.prepare(projectId)
+        var result = coordinator.prepare(projectId)
+        var networkRepairRetried = false
+        var resourceRepairAttempted = false
         if (
             product?.isCompose == true &&
             !result.success &&
@@ -412,33 +439,68 @@ class MacProductController(
         ) {
             val repaired = repairManagedContainerNetwork(projectId)
             if (repaired) {
+                networkRepairRetried = true
                 refreshContainerProviders()
-                val retry = coordinator.prepare(projectId)
-                if (retry.success) {
+                result = coordinator.prepare(projectId)
+                if (result.success) {
                     containerInstallProgress[projectId] = MacContainerInstallProgress(
                         phase = MacContainerInstallPhase.COMPLETE,
                         message = "托管容器网络已自动修复，项目准备已完成。",
                         logLines = installLogTail(projectId),
                     )
                     lastErrors.remove(projectId)
-                    return retry
+                    return result
                 }
-                val retryDetail = retry.detail ?: "网络修复后项目准备仍然失败。"
-                lastErrors[projectId] = retryDetail
-                containerInstallProgress[projectId] = MacContainerInstallProgress(
-                    phase = MacContainerInstallPhase.FAILED,
-                    message = retryDetail,
-                    logLines = installLogTail(projectId),
-                )
-                return retry
             }
         }
 
+        if (
+            product?.isCompose == true &&
+            !result.success &&
+            !result.cancelled &&
+            MacComposeResourceFailureClassifier.classify(result.detail) ==
+            MacComposeResourceFailure.MEMORY_EXHAUSTED &&
+            managedDockerProviderAvailable() &&
+            !resourceRepairAttempted
+        ) {
+            resourceRepairAttempted = true
+            val resourceRepair = repairManagedContainerResources(projectId)
+            if (resourceRepair.success) {
+                refreshContainerProviders()
+                result = coordinator.prepare(projectId)
+                if (result.success) {
+                    containerInstallProgress[projectId] = MacContainerInstallProgress(
+                        phase = MacContainerInstallPhase.COMPLETE,
+                        message = "托管容器资源已调整，项目准备已完成。",
+                        logLines = installLogTail(projectId),
+                    )
+                    lastErrors.remove(projectId)
+                    return result
+                }
+            }
+            val detail = userFacingResourceFailure(resourceRepair.detail ?: result.detail)
+            lastErrors[projectId] = detail
+            containerInstallProgress[projectId] = MacContainerInstallProgress(
+                phase = MacContainerInstallPhase.FAILED,
+                message = detail,
+                logLines = installLogTail(projectId),
+            )
+            return result.copy(detail = detail)
+        }
+
         if (!result.success) {
-            lastErrors[projectId] = result.detail ?: if (result.cancelled) {
+            val detail = result.detail ?: if (result.cancelled) {
                 "准备已停止"
             } else {
                 "项目准备失败"
+            }
+            lastErrors[projectId] = detail
+            if (networkRepairRetried) {
+                containerInstallProgress[projectId] = MacContainerInstallProgress(
+                    phase = MacContainerInstallPhase.FAILED,
+                    message = detail,
+                    logLines = installLogTail(projectId),
+                )
             }
         }
         return result
@@ -471,6 +533,39 @@ class MacProductController(
         }
         return result.success
     }
+
+    private fun repairManagedContainerResources(projectId: String): MacContainerInstallResult {
+        coordinator.appendDiagnostic(projectId, "RESOURCE_REPAIR_ATTEMPT=1")
+        containerInstallLogs[projectId] = StringBuilder()
+        fun updateProgress(phase: MacContainerInstallPhase, message: String) {
+            containerInstallProgress[projectId] = MacContainerInstallProgress(
+                phase = phase,
+                message = message,
+                logLines = installLogTail(projectId),
+            )
+        }
+        val result = containerInstaller.repairManagedResources(
+            progress = ::updateProgress,
+            log = { appendInstallLog(projectId, it) },
+        )
+        if (!result.success) {
+            val detail = userFacingResourceFailure(result.detail)
+            lastErrors[projectId] = detail
+            updateProgress(MacContainerInstallPhase.FAILED, detail)
+        }
+        return result
+    }
+
+    private fun userFacingResourceFailure(detail: String?): String =
+        if (
+            detail?.contains("RESOURCE_MEMORY_INSUFFICIENT", ignoreCase = true) == true ||
+            MacComposeResourceFailureClassifier.classify(detail) ==
+                MacComposeResourceFailure.MEMORY_EXHAUSTED
+        ) {
+            "当前设备可用内存不足，无法完成这个项目的环境构建。"
+        } else {
+            "托管容器资源调整失败，无法完成这个项目的环境构建。"
+        }
 
     private fun appendInstallLog(projectId: String, line: String) {
         val buffer = containerInstallLogs.computeIfAbsent(projectId) { StringBuilder() }

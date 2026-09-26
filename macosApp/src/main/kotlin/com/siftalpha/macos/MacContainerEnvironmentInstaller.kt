@@ -126,6 +126,12 @@ interface MacContainerEnvironmentInstaller {
         log: (String) -> Unit,
     ): MacContainerInstallResult =
         MacContainerInstallResult(false, "managed container network repair is unavailable")
+
+    fun repairManagedResources(
+        progress: (MacContainerInstallPhase, String) -> Unit,
+        log: (String) -> Unit,
+    ): MacContainerInstallResult =
+        MacContainerInstallResult(false, "managed container resource repair is unavailable")
 }
 
 object MacContainerInstallPlanner {
@@ -778,6 +784,134 @@ class MacManagedContainerInstaller(
         }
     }
 
+    override fun repairManagedResources(
+        progress: (MacContainerInstallPhase, String) -> Unit,
+        log: (String) -> Unit,
+    ): MacContainerInstallResult {
+        val root = MacManagedContainerToolchain.currentRoot(userHome)
+            ?: return MacContainerInstallResult(false, "managed container toolchain is missing")
+        val colima = File(root, "bin/colima")
+        val docker = File(root, "bin/docker")
+        if (
+            !colima.isFile ||
+            !docker.isFile ||
+            !MacManagedContainerToolchain.isManagedExecutable(docker.absolutePath, userHome)
+        ) {
+            return MacContainerInstallResult(false, "managed container executables are incomplete")
+        }
+
+        return try {
+            registerComposePlugin(root, log)
+            ensureManagedStateDirectories(log)
+            val systemProxy = discoverManagedSystemProxy(log)
+            val environment = environmentFor(root, systemProxy)
+            val hostResolverGateway = ensureManagedHostNetworkPolicy(log)
+            val currentOutput = captureCommand(
+                command = listOf(colima.absolutePath, "status", "--profile", "sa", "--json"),
+                timeoutSeconds = 30,
+                environment = environment,
+            )
+            val current = MacManagedVmResourceParser.parse(currentOutput)
+                ?: run {
+                    log("MANAGED_VM_RESOURCE_CHECK=FAILED")
+                    return MacContainerInstallResult(false, "RESOURCE_CHECK_FAILED")
+                }
+            val recommendation = MacManagedResourcePolicy.recommend(facts, current)
+            log("HOST_PHYSICAL_MEMORY_GIB=" + formatGib(facts.physicalMemoryBytes))
+            log("HOST_CPU_COUNT=" + facts.processorCount)
+            log("MANAGED_VM_RESOURCE_CHECK=PASS")
+            log("MANAGED_VM_MEMORY_CURRENT_GIB=" + formatGib(recommendation.currentMemoryBytes))
+            log("MANAGED_VM_MEMORY_RECOMMENDED_GIB=" + formatGib(recommendation.recommendedMemoryBytes))
+            log("MANAGED_VM_MEMORY_MAX_SAFE_GIB=" + formatGib(recommendation.maximumSafeMemoryBytes))
+            log("MANAGED_VM_CPU_CURRENT=" + (recommendation.currentCpuCount ?: "UNKNOWN"))
+            log("MANAGED_VM_CPU_RECOMMENDED=" + (recommendation.recommendedCpuCount ?: "UNKNOWN"))
+
+            when (recommendation.decision) {
+                MacManagedResourceDecision.HOST_INSUFFICIENT -> {
+                    log("MANAGED_VM_RESOURCE_REPAIR=HOST_INSUFFICIENT")
+                    MacContainerInstallResult(false, "RESOURCE_MEMORY_INSUFFICIENT")
+                }
+                MacManagedResourceDecision.UNKNOWN -> {
+                    log("MANAGED_VM_RESOURCE_REPAIR=FAILED")
+                    MacContainerInstallResult(false, "RESOURCE_CHECK_FAILED")
+                }
+                MacManagedResourceDecision.CURRENT_OK -> {
+                    log("MANAGED_VM_RESOURCE_REPAIR=NOT_REQUIRED")
+                    MacContainerInstallResult(false, "RESOURCE_REPAIR_NOT_REQUIRED")
+                }
+                MacManagedResourceDecision.REPAIR_REQUIRED -> {
+                    val cpu = checkNotNull(recommendation.recommendedCpuCount)
+                    val memoryGiB = checkNotNull(recommendation.recommendedMemoryBytes) /
+                        MacManagedResourcePolicy.GIB
+                    log("MANAGED_VM_RESOURCE_REPAIR=REQUIRED")
+                    log("MANAGED_VM_RESOURCE_REPAIR=STARTED")
+                    progress(MacContainerInstallPhase.STARTING, "正在调整运行环境资源…")
+                    runChecked(
+                        listOf(colima.absolutePath, "stop", "--profile", "sa"),
+                        environment,
+                        5 * 60,
+                        log,
+                    )
+                    runChecked(
+                        listOf(colima.absolutePath) +
+                            MacManagedContainerDns.colimaStartArguments() +
+                            listOf("--profile", "sa", "--cpu", cpu.toString(), "--memory", memoryGiB.toString()) +
+                            MacManagedContainerProxy.colimaEnvironmentArguments(systemProxy),
+                        environment,
+                        30 * 60,
+                        log,
+                    )
+                    ensureManagedVmResolver(
+                        colima = colima,
+                        environment = environment,
+                        hostResolverGateway = hostResolverGateway,
+                        log = log,
+                    )
+                    progress(MacContainerInstallPhase.VERIFYING, "正在验证调整后的 Docker 与 Compose…")
+                    runChecked(
+                        listOf(docker.absolutePath, "--version"),
+                        environment,
+                        30,
+                        log,
+                    )
+                    runChecked(
+                        listOf(docker.absolutePath, "info", "--format", "{{.ServerVersion}}"),
+                        environment,
+                        60,
+                        log,
+                    )
+                    verifyManagedDockerProxy(
+                        docker = docker,
+                        environment = environment,
+                        settings = systemProxy,
+                        log = log,
+                    )
+                    runChecked(
+                        listOf(docker.absolutePath, "compose", "version"),
+                        environment,
+                        60,
+                        log,
+                    )
+                    runChecked(
+                        listOf(docker.absolutePath, "buildx", "version"),
+                        environment,
+                        60,
+                        log,
+                    )
+                    log("MANAGED_VM_RESOURCE_REPAIR=PASS")
+                    MacContainerInstallResult(true)
+                }
+            }
+        } catch (error: Throwable) {
+            log("MANAGED_VM_RESOURCE_REPAIR=FAILED")
+            progress(MacContainerInstallPhase.FAILED, "托管容器资源调整失败")
+            MacContainerInstallResult(
+                false,
+                "RESOURCE_REPAIR_FAILED: " + (error.message ?: error.javaClass.simpleName),
+            )
+        }
+    }
+
     fun ensureManagedRuntimeReady(log: (String) -> Unit): MacContainerInstallResult =
         startExisting(
             progress = { phase, message ->
@@ -1188,6 +1322,10 @@ class MacManagedContainerInstaller(
             MacManagedContainerProxy.applyToProcessEnvironment(base, it)
         } ?: base
     }
+
+    private fun formatGib(bytes: Long?): String = bytes?.let {
+        "%.1f".format(java.util.Locale.ROOT, it.toDouble() / MacManagedResourcePolicy.GIB)
+    } ?: "UNKNOWN"
 
     private fun discoverManagedSystemProxy(log: (String) -> Unit): MacSystemProxySettings {
         val settings = MacSystemProxyDiscovery.discover()
