@@ -250,6 +250,26 @@ class MacProjectWorkflowCoordinator(
         append(state(projectId), line)
     }
 
+    internal fun latestStartFailure(projectId: String): String? {
+        val history = synchronized(state(projectId).history) {
+            state(projectId).history.toString()
+        }
+        return history.lineSequence()
+            .toList()
+            .asReversed()
+            .firstNotNullOfOrNull { line ->
+                when {
+                    line.startsWith("HYBRID_START_DETAIL=") ->
+                        line.substringAfter('=').trim().takeIf(String::isNotBlank)
+                    line.startsWith("HYBRID_START=FAILED") ->
+                        line.trim().takeIf(String::isNotBlank)
+                    line.startsWith("PROJECT_ENV_FILE=FAILED") ->
+                        line.substringAfter("FAILED").trim().takeIf(String::isNotBlank)
+                    else -> null
+                }
+            }
+    }
+
     private fun prepareCompose(
         state: MutableProjectState,
         context: MacWorkflowContext,
@@ -450,18 +470,54 @@ class MacProjectWorkflowCoordinator(
                 workingDirectory = context.project.canonicalRootPath,
                 environment = hostLifecycleEnvironment(projectId, context, provider, generation),
             )
-            return runCatching {
-                processControl.start(request)
-                append(state, "HYBRID_LAUNCHER=" + lifecycle.startScript)
-                append(state, "HYBRID_START=PASS")
-                invalidateComposeStatus(state)
-                finish(projectId, generation, ProjectOperationPhase.SUCCESS)
-                true
-            }.getOrElse { error ->
-                append(state, "HYBRID_START_FAILED=" + (error.message ?: error.javaClass.simpleName))
+            val envProvision = MacProjectEnvironmentTemplatePolicy.ensure(
+                context.project.canonicalRootPath,
+            )
+            if (!envProvision.success) {
+                append(
+                    state,
+                    "PROJECT_ENV_FILE=FAILED " + envProvision.detail.orEmpty(),
+                )
                 finish(projectId, generation, ProjectOperationPhase.FAILED)
-                false
+                return false
             }
+            append(
+                state,
+                "PROJECT_ENV_FILE=" + when (envProvision.status) {
+                    MacProjectEnvProvisionStatus.EXISTING -> "EXISTING"
+                    MacProjectEnvProvisionStatus.CREATED_FROM_TEMPLATE -> "CREATED_FROM_TEMPLATE"
+                    MacProjectEnvProvisionStatus.NO_TEMPLATE -> "NO_TEMPLATE"
+                    null -> "UNKNOWN"
+                },
+            )
+
+            append(state, "HYBRID_LAUNCHER=" + lifecycle.startScript)
+            val launch = MacHybridLauncherRunner(processControl).run(
+                request = request,
+                cancelled = { state.cancelRequested },
+            )
+            invalidateComposeStatus(state)
+
+            if (launch.success) {
+                append(state, "HYBRID_START=PASS")
+                finish(projectId, generation, ProjectOperationPhase.SUCCESS)
+                return true
+            }
+
+            if (launch.cancelled) {
+                append(state, "HYBRID_START=CANCELLED")
+                launch.detail?.let { append(state, "HYBRID_START_DETAIL=" + it) }
+                finish(projectId, generation, ProjectOperationPhase.CANCELLED)
+                return false
+            }
+
+            append(
+                state,
+                "HYBRID_START=FAILED exit=" + (launch.exitCode?.toString() ?: "unknown"),
+            )
+            launch.detail?.let { append(state, "HYBRID_START_DETAIL=" + it) }
+            finish(projectId, generation, ProjectOperationPhase.FAILED)
+            return false
         }
 
         val result = provider.start(context.project, plan)

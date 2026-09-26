@@ -624,7 +624,9 @@ class MacProductController(
 
         val started = coordinator.start(projectId)
         if (!started && lastErrors[projectId] == null) {
-            lastErrors[projectId] = "项目启动失败"
+            lastErrors[projectId] =
+                coordinator.latestStartFailure(projectId)
+                    ?: "项目启动失败"
         }
         return started
     }
