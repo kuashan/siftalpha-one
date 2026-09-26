@@ -82,23 +82,38 @@ class PythonRuntimeAdapter(
             planned_extras=${sh(plannedExtrasValue)}
             mkdir -p /root/venvs /root/siftalpha/logs
             : >"${'$'}log"
-            if ! command -v python3 >/dev/null 2>&1; then
-              echo 'SIFTALPHA_ERROR=PYTHON_MISSING'
-              exit 72
-            fi
+            # A normal proot-distro session keeps Termux host tools reachable at the end of PATH.
+            # Never let a fresh Ubuntu rootfs fall through to Termux's host Python: a venv created
+            # from that executable embeds /data/data/com.termux paths and breaks inside the guest.
+            guest_python='/usr/bin/python3'
             need_tools=0
-            python3 -m venv --help >/dev/null 2>&1 || need_tools=1
-            python3 -m pip --version >/dev/null 2>&1 || need_tools=1
+            [ -x "${'$'}guest_python" ] || need_tools=1
+            if [ "${'$'}need_tools" -eq 0 ]; then
+              "${'$'}guest_python" -m venv --help >/dev/null 2>&1 || need_tools=1
+              "${'$'}guest_python" -m pip --version >/dev/null 2>&1 || need_tools=1
+            fi
             if [ "${'$'}need_tools" -ne 0 ]; then
               export DEBIAN_FRONTEND=noninteractive
               apt-get update >>"${'$'}log" 2>&1
-              apt-get install -y python3-venv python3-pip >>"${'$'}log" 2>&1
+              apt-get install -y ca-certificates python3 python3-venv python3-pip >>"${'$'}log" 2>&1
             fi
+            if [ ! -x "${'$'}guest_python" ]; then
+              echo 'SIFTALPHA_ERROR=PYTHON_MISSING'
+              exit 72
+            fi
+            "${'$'}guest_python" -m venv --help >/dev/null 2>&1 || {
+              echo 'SIFTALPHA_ERROR=PYTHON_VENV_MISSING'
+              exit 72
+            }
+            "${'$'}guest_python" -m pip --version >/dev/null 2>&1 || {
+              echo 'SIFTALPHA_ERROR=PYTHON_PIP_MISSING'
+              exit 72
+            }
 
-            python_version="${'$'}(python3 -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))')"
+            python_version="${'$'}("${'$'}guest_python" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))')"
             if [ -n "${'$'}required_python" ]; then
               set +e
-              python3 - "${'$'}required_python" <<'SIFTALPHA_PYTHON_REQUIRES_CHECK'
+              "${'$'}guest_python" - "${'$'}required_python" <<'SIFTALPHA_PYTHON_REQUIRES_CHECK'
 import sys
 from pip._vendor.packaging.specifiers import SpecifierSet
 from pip._vendor.packaging.version import Version
@@ -230,7 +245,7 @@ SIFTALPHA_PYTHON_REQUIRES_CHECK
             trap rollback_prepare EXIT
 
             rm -rf -- "${'$'}venv"
-            python3 -m venv "${'$'}venv" >>"${'$'}log" 2>&1
+            "${'$'}guest_python" -m venv "${'$'}venv" >>"${'$'}log" 2>&1
 
             if [ "${'$'}dependency_source" = 'requirements.txt' ]; then
               echo 'DEPENDENCY_SOURCE=requirements.txt'
