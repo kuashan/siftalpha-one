@@ -22,9 +22,12 @@ data class PythonNativeWebLaunchCandidate(
  * Project-owned Python Web launch discovery.
  *
  * Resolution order:
- * 1. common high-confidence Web signatures;
- * 2. the existing stricter Python+Vite project contract;
+ * 1. strict project-owned Python+Vite Web launch contract;
+ * 2. generic high-confidence framework signatures;
  * 3. null, which preserves the normal CLI fallback.
+ *
+ * A complete project-owned serve contract is stronger evidence than a framework import or app
+ * object in one source file. Generic framework recognition is therefore fallback-only.
  *
  * Static recognition never marks a Web endpoint verified. Runtime Identity, scoped Web Discovery
  * and Endpoint Probe remain the only path to VERIFIED Web presentation.
@@ -60,15 +63,16 @@ object PythonNativeWebApplicationLaunchResolver {
             return null
         }
 
-        resolveCommonWebLaunch(
-            requirementsText = requirementsText,
-            pyprojectToml = pyprojectToml,
-            relativePaths = relativePaths,
-            pythonSources = pythonSources,
-        )?.let { return it }
+        if (!pyprojectToml.isNullOrBlank()) {
+            resolvePythonViteWebLaunch(
+                pyprojectToml = pyprojectToml,
+                relativePaths = relativePaths,
+                pythonSources = pythonSources,
+            )?.let { return it }
+        }
 
-        if (pyprojectToml.isNullOrBlank()) return null
-        return resolvePythonViteWebLaunch(
+        return resolveCommonWebLaunch(
+            requirementsText = requirementsText,
             pyprojectToml = pyprojectToml,
             relativePaths = relativePaths,
             pythonSources = pythonSources,
