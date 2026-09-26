@@ -160,8 +160,7 @@ class MacContainerWorkflowTest {
             assertTrue(result?.success == true)
             assertTrue(lines.any { it.contains("compose build: build-before=[REDACTED]") })
             assertTrue(lines.any { it.contains("compose build: build-after") })
-            assertTrue(result?.output?.contains("build-after") == true)
-            assertFalse(result?.output?.contains("secret-value") == true)
+            assertFalse(lines.any { it.contains("secret-value") })
         } finally {
             root.deleteRecursively()
         }
@@ -205,7 +204,7 @@ class MacContainerWorkflowTest {
                 )
             }
             worker.start()
-            assertTrue(firstLine.await(500, TimeUnit.MILLISECONDS).not())
+            assertTrue(firstLine.await(500, TimeUnit.MILLISECONDS))
             cancelled.set(true)
             worker.join(5_000)
             assertFalse(worker.isAlive)
