@@ -73,6 +73,7 @@ data class ProjectEnvironmentDetection(
     val embeddedCpythonEligible: Boolean,
     val internalAlpineEligible: Boolean,
     val issues: List<EnvironmentDetectionIssue>,
+    val viteComponents: List<ViteWebComponentEvidence> = emptyList(),
 ) {
     val blockingIssues: List<EnvironmentDetectionIssue>
         get() = issues.filter { it.blocking }
@@ -111,6 +112,16 @@ data class ProjectEnvironmentPlan(
         )
         add("SIFTALPHA_ENV_PYTHON_INSTALL_EXTRAS=" + pythonInstallExtras.joinToString(","))
         add("SIFTALPHA_ENV_VITE_COMPONENTS=" + detection.viteComponentCount)
+        add("SIFTALPHA_ENV_WEB_COMPONENT_COUNT=" + detection.viteComponents.size)
+        detection.viteComponents.take(MAX_DIAGNOSTIC_WEB_COMPONENTS).forEachIndexed { index, component ->
+            val ordinal = index + 1
+            add("SIFTALPHA_ENV_WEB_COMPONENT_" + ordinal + "_DIR=" + component.directory)
+            add("SIFTALPHA_ENV_WEB_COMPONENT_" + ordinal + "_KIND=vite")
+            add(
+                "SIFTALPHA_ENV_WEB_COMPONENT_" + ordinal + "_EVIDENCE=" +
+                    component.evidenceLabels.joinToString(","),
+            )
+        }
         add(
             "SIFTALPHA_ENV_BACKEND_CANDIDATES=" +
                 backendCandidates.joinToString(",") { it.wireValue },
@@ -131,6 +142,7 @@ data class ProjectEnvironmentPlan(
     companion object {
         const val CURRENT_SCHEMA_VERSION = 2
         private const val MAX_DIAGNOSTIC_ISSUES = 12
+        private const val MAX_DIAGNOSTIC_WEB_COMPONENTS = 8
     }
 }
 
@@ -219,6 +231,7 @@ data class ProjectEnvironmentDetectionInput(
     val declaredRun: String? = null,
     val requirementsText: String? = null,
     val pyprojectText: String? = null,
+    val packageJsonTexts: Map<String, String> = emptyMap(),
 )
 
 data class ProjectEnvironmentCapabilities(
@@ -329,7 +342,10 @@ object ProjectEnvironmentDetector {
             -> 0
         }
 
-        val viteComponents = findViteComponents(normalizedPaths)
+        val viteComponents = ViteWebComponentDetector.detect(
+            relativePaths = normalizedPaths,
+            packageJsonTexts = input.packageJsonTexts,
+        )
         val nodeRelevant = resolved?.primary == RuntimeKind.NODE_JS ||
             resolved?.supplemental?.contains(RuntimeKind.NODE_JS) == true
         if (nodeRelevant) {
@@ -401,6 +417,7 @@ object ProjectEnvironmentDetector {
             embeddedCpythonEligible = embeddedCpythonEligible,
             internalAlpineEligible = internalAlpineEligible,
             issues = issues.toList(),
+            viteComponents = viteComponents,
         )
     }
 
@@ -480,18 +497,6 @@ object ProjectEnvironmentDetector {
         return segments.joinToString("/")
     }
 
-    private fun findViteComponents(paths: Set<String>): Set<String> {
-        val packageDirectories = paths
-            .filter { it.substringAfterLast('/').equals("package.json", ignoreCase = true) }
-            .map { it.substringBeforeLast('/', "") }
-        return packageDirectories.filterTo(linkedSetOf()) { directory ->
-            VITE_CONFIG_NAMES.any { config ->
-                val candidate = if (directory.isBlank()) config else "$directory/$config"
-                candidate in paths
-            }
-        }
-    }
-
     private fun unsupportedNodeManager(
         paths: Set<String>,
         viteComponents: Set<String>,
@@ -547,13 +552,6 @@ object ProjectEnvironmentDetector {
             .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     private val URI_SCHEME = Regex("^[A-Za-z][A-Za-z0-9+.-]*:.*")
-    private val VITE_CONFIG_NAMES = setOf(
-        "vite.config.ts",
-        "vite.config.js",
-        "vite.config.mts",
-        "vite.config.mjs",
-        "vite.config.cjs",
-    )
     private val UNSUPPORTED_PYTHON_MANIFESTS = setOf(
         "setup.py",
         "setup.cfg",
@@ -661,6 +659,12 @@ object ProjectEnvironmentPlanner {
                 .append('\n')
             append("dependency=").append(detection.dependencySource.wireValue).append('\n')
             append("vite_components=").append(detection.viteComponentCount).append('\n')
+            detection.viteComponents.forEach { component ->
+                append("vite_component=")
+                    .append(component.directory).append(':')
+                    .append(component.evidenceLabels.joinToString(","))
+                    .append('\n')
+            }
             append("python=").append(detection.pythonRequiresVersion.orEmpty()).append('\n')
             append("python_optional_groups=")
                 .append(detection.pythonOptionalDependencyGroups.joinToString(","))
