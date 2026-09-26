@@ -65,7 +65,8 @@ class NodeJsRuntimeAdapter(
             ${nodeToolchainHelpersShell()}
 
             component_file="${'$'}work_root/.components"
-            discover_vite_components >"${'$'}component_file"
+            : >"${'$'}component_file"
+            ${detectedComponentManifestShell(project)}
             component_count="${'$'}(grep -c . "${'$'}component_file" 2>/dev/null || true)"
             if [ "${'$'}component_count" -eq 0 ]; then
               echo 'SIFTALPHA_NODE_ENV=NOT_REQUIRED'
@@ -237,7 +238,8 @@ class NodeJsRuntimeAdapter(
             ${nodeToolchainHelpersShell()}
 
             component_file="${'$'}work_root/.components-status"
-            discover_vite_components >"${'$'}component_file"
+            : >"${'$'}component_file"
+            ${detectedComponentManifestShell(project)}
             component_count="${'$'}(grep -c . "${'$'}component_file" 2>/dev/null || true)"
             if [ "${'$'}component_count" -eq 0 ]; then
               echo 'SIFTALPHA_NODE_ENV=NOT_REQUIRED'
@@ -323,23 +325,20 @@ class NodeJsRuntimeAdapter(
         """.trimIndent()
     }
 
-    private fun componentHelpersShell(): String = """
-        discover_vite_components() {
-          find "${'$'}project" -maxdepth 7 -type f -name package.json \
-            ! -path '*/node_modules/*' ! -path '*/.git/*' \
-            ! -path '*/dist/*' ! -path '*/build/*' 2>/dev/null | \
-          while IFS= read -r package_json; do
-            package_dir="${'$'}{package_json%/package.json}"
-            if [ -f "${'$'}package_dir/vite.config.ts" ] || \
-               [ -f "${'$'}package_dir/vite.config.js" ] || \
-               [ -f "${'$'}package_dir/vite.config.mts" ] || \
-               [ -f "${'$'}package_dir/vite.config.mjs" ] || \
-               [ -f "${'$'}package_dir/vite.config.cjs" ]; then
-              printf '%s\n' "${'$'}package_json"
-            fi
-          done | LC_ALL=C sort
+    private fun detectedComponentManifestShell(project: RuntimeProjectSpec): String {
+        val manifests = project.viteComponentDirectories
+            .asSequence()
+            .map { it.replace('\\\\', '/').trim().trim('/') }
+            .map { if (it.isBlank() || it == ".") "package.json" else "${'$'}it/package.json" }
+            .distinct()
+            .sorted()
+            .toList()
+        if (manifests.isEmpty()) return ":"
+        return manifests.joinToString("\\n") { relative ->
+            "printf '%s\\\\n' \"${'$'}project\"/" + sh(relative) + " >>\"${'$'}component_file\""
         }
-
+    }
+    private fun componentHelpersShell(): String = """
         find_vite_config() {
           package_dir="${'$'}1"
           for config_name in vite.config.ts vite.config.js vite.config.mts vite.config.mjs vite.config.cjs; do
@@ -353,12 +352,15 @@ class NodeJsRuntimeAdapter(
 
         resolve_vite_output_dir() {
           package_dir="${'$'}1"
-          config="${'$'}(find_vite_config "${'$'}package_dir")" || return 1
-          out_rel="${'$'}(sed -nE "s#.*outDir:[[:space:]]*path\\.resolve\\(__dirname,[[:space:]]*['\"]([^'\"]+)['\"]\\).*#\\1#p" "${'$'}config" | head -n 1)"
-          if [ -z "${'$'}out_rel" ]; then
-            out_rel="${'$'}(sed -nE "s#.*outDir:[[:space:]]*['\"]([^'\"]+)['\"].*#\\1#p" "${'$'}config" | head -n 1)"
+          out_rel='dist'
+          config="${'$'}(find_vite_config "${'$'}package_dir" 2>/dev/null || true)"
+          if [ -n "${'$'}config" ]; then
+            configured="${'$'}(sed -nE "s#.*outDir:[[:space:]]*path\\.resolve\\(__dirname,[[:space:]]*['\"]([^'\"]+)['\"]\\).*#\\1#p" "${'$'}config" | head -n 1)"
+            if [ -z "${'$'}configured" ]; then
+              configured="${'$'}(sed -nE "s#.*outDir:[[:space:]]*['\"]([^'\"]+)['\"].*#\\1#p" "${'$'}config" | head -n 1)"
+            fi
+            [ -n "${'$'}configured" ] && out_rel="${'$'}configured"
           fi
-          [ -n "${'$'}out_rel" ] || out_rel='dist'
           case "${'$'}out_rel" in
             /*) return 1 ;;
           esac
