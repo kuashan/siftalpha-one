@@ -2010,6 +2010,7 @@ open class V04Activity : StudioActivity() {
             detectedPort = profile?.port,
             framework = profile?.framework,
             learnedPort = learnedPort,
+            detectedSource = profile?.source,
         )
         backgroundReliabilityGuidance.maybeProceed {
             dispatch(
@@ -3203,6 +3204,7 @@ open class V04Activity : StudioActivity() {
                 detectedPort = resolvedProfile?.port,
                 framework = resolvedProfile?.framework,
                 learnedPort = learnedPort,
+                detectedSource = resolvedProfile?.source,
             )
             val observation = runCatching {
                 runtime.internalAlpineWebObservationFor(snapshot, hintPorts)
@@ -4059,6 +4061,7 @@ open class V04Activity : StudioActivity() {
                 detectedPort = profile?.port,
                 framework = profile?.framework,
                 learnedPort = webLearnedEndpointStore.read(stateKey)?.port,
+                detectedSource = profile?.source,
             )
         }
         externalObservationRunnables[stateKey]?.let(refreshHandler::removeCallbacks)
