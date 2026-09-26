@@ -112,7 +112,26 @@ object MacM62SelfTest {
         val acceptThread = Thread {
             while (accepting.get()) {
                 runCatching {
-                    server.accept().use { }
+                    server.accept().use { socket ->
+                        socket.soTimeout = 500
+                        runCatching {
+                            val reader = socket.getInputStream().bufferedReader()
+                            while (true) {
+                                val line = reader.readLine() ?: break
+                                if (line.isBlank()) break
+                            }
+                            val body = "<!doctype html><html><head><title>SiftAlpha Test</title></head><body>ok</body></html>"
+                            val response = buildString {
+                                append("HTTP/1.1 200 OK\r\n")
+                                append("Content-Type: text/html; charset=utf-8\r\n")
+                                append("Content-Length: ").append(body.toByteArray().size).append("\r\n")
+                                append("Connection: close\r\n\r\n")
+                                append(body)
+                            }
+                            socket.getOutputStream().write(response.toByteArray())
+                            socket.getOutputStream().flush()
+                        }
+                    }
                 }
             }
         }.apply {

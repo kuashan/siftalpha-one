@@ -13,6 +13,39 @@ import org.junit.Test
 
 class MacProjectWorkflowTest {
     @Test
+    fun pairedHostLifecycleLauncherIsGenericAndFailClosed() {
+        assertEquals(
+            MacProjectHostLifecycleContract("scripts/start.sh", "scripts/stop.sh"),
+            MacProjectHostLifecyclePolicy.resolve(
+                listOf("compose.yaml", "scripts/start.sh", "scripts/stop.sh", "package.json"),
+            ),
+        )
+        assertEquals(
+            MacProjectHostLifecycleContract("start.sh", "stop.sh"),
+            MacProjectHostLifecyclePolicy.resolve(listOf("docker-compose.yml", "start.sh", "stop.sh")),
+        )
+        assertEquals(
+            null,
+            MacProjectHostLifecyclePolicy.resolve(listOf("compose.yaml", "scripts/start.sh")),
+        )
+    }
+
+    @Test
+    fun blindContainerPortDiscoveryRejectsNonHtmlServices() {
+        val discovery = MacProjectWebDiscovery(
+            processControl = MacProjectProcessControl(),
+            listeningProbe = { true },
+            webSurfaceProbe = { candidate -> candidate.endsWith(":3010") },
+        )
+        val endpoint = discovery.discoverFromPorts(
+            ports = listOf(4100, 4300, 3010),
+            combinedOutput = "",
+        )
+        assertEquals("http://127.0.0.1:3010", endpoint?.url)
+        assertEquals(MacProjectWebEndpoint.Source.CONTAINER_PORT, endpoint?.source)
+    }
+
+    @Test
     fun recoveryPolicyOnlyRecoversStaleGenerationAndPreservesLiveOwnership() {
         val stale = DurableProjectOperationRecord(
             projectId = "macos:recovery",

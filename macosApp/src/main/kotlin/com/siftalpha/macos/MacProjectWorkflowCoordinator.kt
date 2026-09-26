@@ -32,6 +32,7 @@ data class MacWorkflowContext(
     val snapshot: MacProjectSnapshot,
     val plan: MacProjectEnvironmentPlan,
     val composePlan: ComposeProjectPlan? = null,
+    val hostToolExecutables: Map<MacHostToolKind, String> = emptyMap(),
 )
 
 data class MacWorkflowStatus(
@@ -422,6 +423,36 @@ class MacProjectWorkflowCoordinator(
         if (!state.composePrepared) return false
         val provider = containerProvider(projectId) ?: return false
         val generation = begin(projectId, ProjectOperationAction.START) ?: return false
+        val lifecycle = MacProjectHostLifecyclePolicy.resolve(context.snapshot.relativePaths)
+
+        if (lifecycle != null) {
+            val bash = File("/bin/bash")
+            if (!bash.isFile || !bash.canExecute()) {
+                append(state, "HYBRID_START_FAILED=/bin/bash unavailable")
+                finish(projectId, generation, ProjectOperationPhase.FAILED)
+                return false
+            }
+            val request = ProjectProcessLaunchRequest(
+                scope = ProjectProcessScope(projectId),
+                executable = bash.absolutePath,
+                arguments = listOf(lifecycle.startScript),
+                workingDirectory = context.project.canonicalRootPath,
+                environment = hostLifecycleEnvironment(projectId, context, provider, generation),
+            )
+            return runCatching {
+                processControl.start(request)
+                append(state, "HYBRID_LAUNCHER=" + lifecycle.startScript)
+                append(state, "HYBRID_START=PASS")
+                invalidateComposeStatus(state)
+                finish(projectId, generation, ProjectOperationPhase.SUCCESS)
+                true
+            }.getOrElse { error ->
+                append(state, "HYBRID_START_FAILED=" + (error.message ?: error.javaClass.simpleName))
+                finish(projectId, generation, ProjectOperationPhase.FAILED)
+                false
+            }
+        }
+
         val result = provider.start(context.project, plan)
         appendProviderOutput(state, "compose up", result.output)
         invalidateComposeStatus(state)
@@ -466,23 +497,52 @@ class MacProjectWorkflowCoordinator(
     ): Boolean {
         val generation = begin(projectId, ProjectOperationAction.STOP) ?: return false
         state.cancelRequested = true
-        val provider = containerProvider(projectId)
-        if (provider == null) {
-            append(state, "COMPOSE_STOP=FAILED provider unavailable")
-            finish(projectId, generation, ProjectOperationPhase.FAILED)
-            return false
+        val lifecycle = MacProjectHostLifecyclePolicy.resolve(context.snapshot.relativePaths)
+        val launcherStop = processControl.stopProject(ProjectProcessScope(projectId))
+        val launcherStopped = launcherStop.outcome == ProjectStopOutcome.STOPPED ||
+            launcherStop.outcome == ProjectStopOutcome.ALREADY_STOPPED ||
+            launcherStop.outcome == ProjectStopOutcome.NOT_FOUND
+        if (lifecycle != null) {
+            append(state, "HYBRID_PROCESS_STOP=" + launcherStop.outcome)
         }
-        val result = provider.stop(context.project, plan)
-        appendProviderOutput(state, "compose down", result.output)
+
+        val provider = containerProvider(projectId)
+        var lifecycleStopped = lifecycle == null
+        if (lifecycle != null) {
+            val scriptResult = runHostLifecycleScript(
+                projectId = projectId,
+                context = context,
+                provider = provider,
+                generation = generation,
+                script = lifecycle.stopScript,
+            )
+            appendProviderOutput(state, "hybrid stop", scriptResult.output)
+            append(state, "HYBRID_STOP=" + if (scriptResult.success) "PASS" else "FAILED")
+            scriptResult.detail?.let { append(state, "HYBRID_STOP_DETAIL=" + it) }
+            lifecycleStopped = scriptResult.success
+        }
+
+        val composeResult = provider?.stop(context.project, plan)
+        if (composeResult != null) {
+            appendProviderOutput(state, "compose down", composeResult.output)
+            append(state, "COMPOSE_STOP=" + if (composeResult.success) "PASS" else "FAILED")
+            composeResult.detail?.let { append(state, "COMPOSE_STOP_DETAIL=" + it) }
+        } else if (lifecycle == null) {
+            append(state, "COMPOSE_STOP=FAILED provider unavailable")
+        } else {
+            append(state, "COMPOSE_STOP=SKIPPED provider unavailable after project stop script")
+        }
         invalidateComposeStatus(state)
-        append(state, "COMPOSE_STOP=" + if (result.success) "PASS" else "FAILED")
-        result.detail?.let { append(state, "COMPOSE_STOP_DETAIL=" + it) }
+
+        val okay = launcherStopped &&
+            lifecycleStopped &&
+            (composeResult?.success ?: (lifecycle != null))
         finish(
             projectId,
             generation,
-            if (result.success) ProjectOperationPhase.SUCCESS else ProjectOperationPhase.FAILED,
+            if (okay) ProjectOperationPhase.SUCCESS else ProjectOperationPhase.FAILED,
         )
-        return result.success
+        return okay
     }
 
     fun restart(projectId: String): Boolean {
@@ -497,16 +557,28 @@ class MacProjectWorkflowCoordinator(
         val history = synchronized(state.history) { state.history.toString() }
         val composePlan = context?.composePlan?.takeIf { it.isComposeProject }
         if (context != null && composePlan != null) {
+            val launcherLogs = processControl.logs(ProjectProcessScope(projectId), maxBytes)
             val containerLogs = containerProvider(projectId)
                 ?.logs(context.project, composePlan, maxBytes)
                 .orEmpty()
-            return buildString {
-                append(history)
-                if (containerLogs.isNotBlank()) {
-                    append("\n--- compose logs ---\n")
-                    append(containerLogs)
-                }
-            }.takeLast(maxBytes)
+            return redactProjectText(
+                projectId,
+                buildString {
+                    append(history)
+                    if (launcherLogs.stdout.isNotBlank()) {
+                        append("\n--- launcher stdout ---\n")
+                        append(launcherLogs.stdout)
+                    }
+                    if (launcherLogs.stderr.isNotBlank()) {
+                        append("\n--- launcher stderr ---\n")
+                        append(launcherLogs.stderr)
+                    }
+                    if (containerLogs.isNotBlank()) {
+                        append("\n--- compose logs ---\n")
+                        append(containerLogs)
+                    }
+                }.takeLast(maxBytes),
+            )
         }
 
         val processLogs = processControl.logs(ProjectProcessScope(projectId), maxBytes)
@@ -530,6 +602,17 @@ class MacProjectWorkflowCoordinator(
         val composePlan = context.composePlan?.takeIf { it.isComposeProject }
         if (composePlan != null) {
             val provider = containerProvider(projectId) ?: return null
+            if (MacProjectHostLifecyclePolicy.resolve(context.snapshot.relativePaths) != null) {
+                val launcherLogs = processControl.logs(ProjectProcessScope(projectId), 512 * 1024)
+                val launcherOutput = buildString {
+                    append(launcherLogs.stdout)
+                    if (launcherLogs.stderr.isNotBlank()) {
+                        append('\n')
+                        append(launcherLogs.stderr)
+                    }
+                }
+                webDiscovery.discover(ProjectProcessScope(projectId), launcherOutput)?.let { return it }
+            }
             return webDiscovery.discoverFromPorts(
                 ports = provider.publishedPorts(context.project, composePlan),
                 combinedOutput = logs(projectId),
@@ -550,7 +633,7 @@ class MacProjectWorkflowCoordinator(
                 status = status(projectId),
                 environment = null,
                 entrypoint = entrypoint(projectId),
-                ownedPids = emptySet(),
+                ownedPids = processControl.ownedPids(ProjectProcessScope(projectId)),
                 stdout = combined,
                 stderr = "",
                 combinedLogs = combined,
@@ -591,6 +674,9 @@ class MacProjectWorkflowCoordinator(
     fun entrypoint(projectId: String): String? {
         val context = state(projectId).context ?: return null
         context.composePlan?.takeIf { it.isComposeProject }?.let { plan ->
+            MacProjectHostLifecyclePolicy.resolve(context.snapshot.relativePaths)?.let { lifecycle ->
+                return "launcher:" + lifecycle.startScript
+            }
             return plan.manifestPath?.let { "compose:" + it }
         }
         return when (context.plan.needs?.primaryRuntime) {
@@ -626,9 +712,19 @@ class MacProjectWorkflowCoordinator(
         if (context != null && composePlan != null) {
             val provider = containerProvider(projectId)
             val composeStatus = provider?.let { composeStatus(state, context, composePlan, it) }
+            val hostLauncherState = if (
+                MacProjectHostLifecyclePolicy.resolve(context.snapshot.relativePaths) != null
+            ) {
+                processControl.status(ProjectProcessScope(projectId)).state
+            } else {
+                ProjectProcessState.UNKNOWN
+            }
             val processState = when {
+                composeStatus?.anyRunning == true -> ProjectProcessState.RUNNING
+                hostLauncherState == ProjectProcessState.RUNNING ||
+                    hostLauncherState == ProjectProcessState.STARTING -> hostLauncherState
+                hostLauncherState == ProjectProcessState.EXITED_ERROR -> ProjectProcessState.EXITED_ERROR
                 composeStatus == null -> ProjectProcessState.UNKNOWN
-                composeStatus.anyRunning -> ProjectProcessState.RUNNING
                 composeStatus.services.any { it.state == MacComposeServiceState.UNKNOWN } ->
                     ProjectProcessState.UNKNOWN
                 else -> ProjectProcessState.STOPPED
@@ -734,6 +830,97 @@ class MacProjectWorkflowCoordinator(
     private fun invalidateComposeStatus(state: MutableProjectState) {
         state.cachedComposeStatus = null
         state.cachedComposeStatusAtMs = 0L
+    }
+
+    private fun hostLifecycleEnvironment(
+        projectId: String,
+        context: MacWorkflowContext,
+        provider: MacComposeContainerProvider?,
+        generation: Long,
+    ): Map<String, String> {
+        val dockerExecutable = provider?.snapshot?.executablePath
+        val base = if (!dockerExecutable.isNullOrBlank()) {
+            MacManagedContainerToolchain.environmentForExecutable(
+                executable = dockerExecutable,
+                base = System.getenv(),
+            )
+        } else {
+            System.getenv()
+        }
+        val pathDirectories = linkedSetOf<String>()
+        dockerExecutable?.let { File(it).parentFile?.absolutePath }?.let(pathDirectories::add)
+        context.hostToolExecutables.values.forEach { executable ->
+            File(executable).parentFile?.absolutePath?.let(pathDirectories::add)
+        }
+        base["PATH"]
+            ?.split(File.pathSeparatorChar)
+            ?.filter(String::isNotBlank)
+            ?.forEach(pathDirectories::add)
+
+        return buildMap {
+            putAll(base)
+            put("PATH", pathDirectories.joinToString(File.pathSeparator))
+            put("SIFTALPHA_PROJECT_ID", projectId)
+            put("SIFTALPHA_OPERATION_GENERATION", generation.toString())
+            putAll(projectEnvironment(projectId))
+        }
+    }
+
+    private fun runHostLifecycleScript(
+        projectId: String,
+        context: MacWorkflowContext,
+        provider: MacComposeContainerProvider?,
+        generation: Long,
+        script: String,
+    ): MacContainerOperationResult {
+        val root = File(context.project.canonicalRootPath).canonicalFile
+        val canonical = runCatching { File(root, script).canonicalFile }.getOrNull()
+            ?: return MacContainerOperationResult(false, detail = "invalid lifecycle script path")
+        if (!canonical.isFile || !canonical.toPath().startsWith(root.toPath())) {
+            return MacContainerOperationResult(false, detail = "lifecycle script is missing or escapes project root")
+        }
+        val outputFile = File.createTempFile("siftalpha-lifecycle-", ".log")
+        return try {
+            val process = ProcessBuilder("/bin/bash", script)
+                .directory(root)
+                .redirectErrorStream(true)
+                .redirectOutput(outputFile)
+                .apply {
+                    environment().putAll(
+                        hostLifecycleEnvironment(projectId, context, provider, generation),
+                    )
+                }
+                .start()
+            val finished = process.waitFor(5, java.util.concurrent.TimeUnit.MINUTES)
+            if (!finished) {
+                process.destroy()
+                if (!process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                    process.destroyForcibly()
+                }
+            }
+            val output = runCatching { outputFile.readText().takeLast(256 * 1024) }.getOrDefault("")
+            if (!finished) {
+                MacContainerOperationResult(
+                    false,
+                    detail = "project lifecycle script timed out: " + script,
+                    output = redactProjectText(projectId, output),
+                )
+            } else {
+                val code = process.exitValue()
+                MacContainerOperationResult(
+                    success = code == 0,
+                    detail = if (code == 0) null else "project lifecycle script failed exit=" + code + ": " + script,
+                    output = redactProjectText(projectId, output),
+                )
+            }
+        } catch (error: Throwable) {
+            MacContainerOperationResult(
+                false,
+                detail = error.message ?: error.javaClass.simpleName,
+            )
+        } finally {
+            outputFile.delete()
+        }
     }
 
     private fun appendProviderOutput(

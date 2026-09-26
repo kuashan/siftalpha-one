@@ -225,7 +225,15 @@ class MacProductController(
         val composePlan = composePlan(snapshot)
         val product = MacProductProject(imported, snapshot, plan, composePlan)
         projects[product.projectId] = product
-        coordinator.attach(MacWorkflowContext(imported, snapshot, plan, composePlan))
+        coordinator.attach(
+            MacWorkflowContext(
+                imported,
+                snapshot,
+                plan,
+                composePlan,
+                hostToolExecutables = hostToolExecutables(),
+            ),
+        )
         return product
     }
 
@@ -238,7 +246,15 @@ class MacProductController(
         val composePlan = composePlan(snapshot)
         val refreshed = existing.copy(snapshot = snapshot, plan = plan, composePlan = composePlan)
         projects[projectId] = refreshed
-        coordinator.attach(MacWorkflowContext(refreshed.imported, snapshot, plan, composePlan))
+        coordinator.attach(
+            MacWorkflowContext(
+                refreshed.imported,
+                snapshot,
+                plan,
+                composePlan,
+                hostToolExecutables = hostToolExecutables(),
+            ),
+        )
         return refreshed
     }
 
@@ -646,6 +662,19 @@ class MacProductController(
                 latestContainerProviders,
             ),
         )
+
+    private fun hostToolExecutables(): Map<MacHostToolKind, String> = buildMap {
+        discovery.forEach { tool ->
+            if (tool.availability == MacHostToolAvailability.AVAILABLE) {
+                tool.executablePath?.let { put(tool.kind, it) }
+            }
+        }
+        managedPython
+            ?.takeIf { it.available }
+            ?.pythonExecutable
+            ?.absolutePath
+            ?.let { put(MacHostToolKind.PYTHON, it) }
+    }
 
     private fun adviceFor(project: MacProductProject): MacContainerEnvironmentAdvice? =
         if (project.isCompose) {

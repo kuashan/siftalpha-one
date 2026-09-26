@@ -122,6 +122,33 @@ class MacProjectSnapshotBuilder(
     }
 }
 
+data class MacProjectHostLifecycleContract(
+    val startScript: String,
+    val stopScript: String,
+)
+
+object MacProjectHostLifecyclePolicy {
+    private val pairs = listOf(
+        "scripts/start.sh" to "scripts/stop.sh",
+        "start.sh" to "stop.sh",
+    )
+
+    fun resolve(relativePaths: Collection<String>): MacProjectHostLifecycleContract? {
+        val paths = relativePaths
+            .asSequence()
+            .map { it.replace('\\', '/').trim().trim('/') }
+            .filter(String::isNotBlank)
+            .toSet()
+        return pairs.firstNotNullOfOrNull { (start, stop) ->
+            if (start in paths && stop in paths) {
+                MacProjectHostLifecycleContract(startScript = start, stopScript = stop)
+            } else {
+                null
+            }
+        }
+    }
+}
+
 object MacProjectWorkflowPlanner {
     fun plan(
         snapshot: MacProjectSnapshot,
