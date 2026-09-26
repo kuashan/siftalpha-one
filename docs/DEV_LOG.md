@@ -3773,4 +3773,18 @@ For `easy_tdx_1-main`:
 For a simple FastAPI project without a strict project-owned Web contract:
 - generic FastAPI -> `uvicorn` fallback remains available.
 
-Cloud verification: pending.
+Cloud verification:
+
+- Functional/source HEAD: `8fe471e6952d2e41df293bb3fd9c420189ba049f`.
+- W0 Cloud Build #877 / run ID `36240501496`: **PASS（通过）**.
+- Internal Alpine Probe #124 / run ID `36240498900`: **PASS（通过）** on the same v234 functional code line.
+- Repository validators: PASS.
+- Android unit tests: PASS.
+- `:core:test`: PASS.
+- `assembleDebug`: PASS.
+- APK evidence / stable signing: PASS.
+- Artifact: `siftalpha-w0-877`.
+- Artifact ID: `10905484062`.
+- Artifact digest: `sha256:04a92730ddf8954a455ed6c2605b456a00a443caa99bebda1ec6f4fe7378b5b5`.
+- APK SHA-256: `f961499814d9a79ec3423e77af043af6a3eab8251088476ed9cb333ededdad44`.
+- Status: **CODE / CLOUD PASS（代码 / 云端通过）; REAL DEVICE ACCEPTANCE PENDING（真机验收待确认）**.
