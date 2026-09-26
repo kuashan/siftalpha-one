@@ -6,6 +6,7 @@ import java.net.URI
 data class RuntimeWebLearnedEndpoint(
     val url: String,
     val port: Int,
+    val authorityFingerprint: String,
     val verifiedAtEpochMs: Long,
 )
 
@@ -17,30 +18,47 @@ data class RuntimeWebLearnedEndpoint(
 class RuntimeWebLearnedEndpointStore(context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun read(projectKey: String): RuntimeWebLearnedEndpoint? {
+    fun read(
+        projectKey: String,
+        authorityFingerprint: String,
+    ): RuntimeWebLearnedEndpoint? {
+        if (authorityFingerprint.isBlank()) return null
         val url = prefs.getString(key(projectKey, "url"), null) ?: return null
         val port = prefs.getInt(key(projectKey, "port"), -1)
+        val storedFingerprint = prefs.getString(key(projectKey, "authority_fingerprint"), null)
+            ?.trim()
+            .orEmpty()
         val verifiedAt = prefs.getLong(key(projectKey, "verified_at"), 0L)
         if (RuntimeWebLearnedEndpointPolicy.port(url) != port || port !in 1..65535) return null
-        return RuntimeWebLearnedEndpoint(url, port, verifiedAt)
+        if (!RuntimeWebLearnedEndpointPolicy.reusable(storedFingerprint, authorityFingerprint)) return null
+        return RuntimeWebLearnedEndpoint(url, port, storedFingerprint, verifiedAt)
     }
 
-    fun rememberOwnedVerified(projectKey: String, url: String): RuntimeWebLearnedEndpoint? {
+    fun rememberOwnedVerified(
+        projectKey: String,
+        url: String,
+        authorityFingerprint: String,
+    ): RuntimeWebLearnedEndpoint? {
+        if (authorityFingerprint.isBlank()) return null
         val port = RuntimeWebLearnedEndpointPolicy.port(url) ?: return null
-        read(projectKey)?.takeIf { it.url == url && it.port == port }?.let { return it }
+        read(projectKey, authorityFingerprint)
+            ?.takeIf { it.url == url && it.port == port }
+            ?.let { return it }
         val now = System.currentTimeMillis()
         prefs.edit()
             .putString(key(projectKey, "url"), url)
             .putInt(key(projectKey, "port"), port)
+            .putString(key(projectKey, "authority_fingerprint"), authorityFingerprint)
             .putLong(key(projectKey, "verified_at"), now)
             .apply()
-        return RuntimeWebLearnedEndpoint(url, port, now)
+        return RuntimeWebLearnedEndpoint(url, port, authorityFingerprint, now)
     }
 
     fun clear(projectKey: String) {
         prefs.edit()
             .remove(key(projectKey, "url"))
             .remove(key(projectKey, "port"))
+            .remove(key(projectKey, "authority_fingerprint"))
             .remove(key(projectKey, "verified_at"))
             .apply()
     }
@@ -49,11 +67,30 @@ class RuntimeWebLearnedEndpointStore(context: Context) {
         "${projectKey.length}:$projectKey:$suffix"
 
     companion object {
-        private const val PREFS_NAME = "siftalpha_runtime_web_learned_endpoint_v1"
+        private const val PREFS_NAME = "siftalpha_runtime_web_learned_endpoint_v2"
     }
 }
 
 object RuntimeWebLearnedEndpointPolicy {
+    fun authorityFingerprint(
+        enabled: Boolean,
+        framework: String?,
+        source: String?,
+        host: String?,
+        detectedPort: Int?,
+    ): String = listOf(
+        "enabled=" + enabled,
+        "framework=" + framework.orEmpty().trim().lowercase(),
+        "source=" + source.orEmpty().trim().lowercase(),
+        "host=" + host.orEmpty().trim().lowercase(),
+        "port=" + (detectedPort?.takeIf { it in 1..65535 }?.toString() ?: ""),
+    ).joinToString("|")
+
+    fun reusable(storedFingerprint: String, currentFingerprint: String): Boolean =
+        storedFingerprint.isNotBlank() &&
+            currentFingerprint.isNotBlank() &&
+            storedFingerprint == currentFingerprint
+
     fun port(url: String): Int? {
         val uri = runCatching { URI(url) }.getOrNull() ?: return null
         val scheme = uri.scheme?.lowercase() ?: return null
