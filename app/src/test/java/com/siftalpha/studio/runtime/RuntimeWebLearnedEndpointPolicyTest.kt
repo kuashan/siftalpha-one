@@ -23,6 +23,35 @@ class RuntimeWebLearnedEndpointPolicyTest {
     }
 
     @Test
+    fun learnedEndpointRequiresMatchingCurrentWebAuthority() {
+        val current = RuntimeWebLearnedEndpointPolicy.authorityFingerprint(
+            enabled = true,
+            framework = "python-vite-web",
+            source = "signature-project-script+web-extra+vite+web-subcommand",
+            host = null,
+            detectedPort = 8000,
+        )
+        val same = RuntimeWebLearnedEndpointPolicy.authorityFingerprint(
+            enabled = true,
+            framework = "python-vite-web",
+            source = "signature-project-script+web-extra+vite+web-subcommand",
+            host = null,
+            detectedPort = 8000,
+        )
+        val changed = RuntimeWebLearnedEndpointPolicy.authorityFingerprint(
+            enabled = true,
+            framework = "python-vite-web",
+            source = "signature-project-script+web-extra+vite+web-subcommand",
+            host = null,
+            detectedPort = 5173,
+        )
+
+        assertTrue(RuntimeWebLearnedEndpointPolicy.reusable(current, same))
+        assertFalse(RuntimeWebLearnedEndpointPolicy.reusable(current, changed))
+        assertFalse(RuntimeWebLearnedEndpointPolicy.reusable("", same))
+    }
+
+    @Test
     fun onlyPidSocketOwnedCandidateCanBecomeLongTermMemory() {
         assertTrue(
             RuntimeWebLearnedEndpointPolicy.canLearn(
