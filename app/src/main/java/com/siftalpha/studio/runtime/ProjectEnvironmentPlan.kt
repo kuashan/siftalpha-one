@@ -400,6 +400,7 @@ object ProjectEnvironmentDetector {
         val fingerprint = environmentInputFingerprint(
             requirementsText = input.requirementsText,
             pyprojectText = input.pyprojectText,
+            packageJsonTexts = input.packageJsonTexts,
         )
 
         return ProjectEnvironmentDetection(
@@ -499,10 +500,12 @@ object ProjectEnvironmentDetector {
 
     private fun unsupportedNodeManager(
         paths: Set<String>,
-        viteComponents: Set<String>,
+        viteComponents: List<ViteWebComponentEvidence>,
     ): String? {
         val relevantDirectories = if (viteComponents.isNotEmpty()) {
-            viteComponents
+            viteComponents.mapTo(linkedSetOf()) { component ->
+                component.directory.takeUnless { it == "." }.orEmpty()
+            }
         } else {
             setOf("")
         }
@@ -525,11 +528,19 @@ object ProjectEnvironmentDetector {
     private fun environmentInputFingerprint(
         requirementsText: String?,
         pyprojectText: String?,
+        packageJsonTexts: Map<String, String>,
     ): String {
         val canonical = buildString {
             append("schema=2\n")
             append("requirements\n").append(normalizeText(requirementsText)).append('\n')
             append("pyproject\n").append(normalizeText(pyprojectText)).append('\n')
+            packageJsonTexts
+                .mapKeys { (path, _) -> normalizePath(path) }
+                .toSortedMap()
+                .forEach { (path, text) ->
+                    append("package_json=").append(path).append('\n')
+                    append(normalizeText(text)).append("\n<<end-package-json>>\n")
+                }
         }
         return "sha256:" + sha256Hex(canonical.toByteArray(Charsets.UTF_8))
     }
