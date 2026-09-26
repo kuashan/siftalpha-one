@@ -12,7 +12,7 @@
 - M1 Core Boundary（核心边界）：PASS / CLOSED（通过 / 关闭）
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
-- 当前阶段：**M7 — OpenBot Acceptance（OpenBot 验收）— IN PROGRESS；原始 OpenBot Prepare 性能 / 资源充足性为当前阻塞项**
+- 当前阶段：**M7 — OpenBot Acceptance（OpenBot 验收）— IN PROGRESS；原始 OpenBot Full Run / Web UI 真机验收为当前阻塞项**
 - M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 PASS / COMPLETE；M4 PASS / CLOSED（M4 已通过并关闭）**
 - M5 implementation（实现）：**M5.1 PASS / COMPLETE；M5.2 PASS / COMPLETE；M5 PASS / CLOSED（M5 已通过并关闭）**
 
@@ -30,7 +30,7 @@
 
 - M6 = **CLOSED**。
 - M7 = **IN PROGRESS**，尚未关闭。
-- 当前 M7 blocker：**原始 OpenBot 在 8 GiB / 4 CPU Intel Mac 上的 Prepare 仍未完成**；新的通用 Build Boost 已将托管 VM 构建目标提升到 5 GiB / 3 CPU，并等待真实 Mac 复测。
+- 当前 M7 blocker：原始 OpenBot **Prepare 已在真实 Ventura Intel Mac PASS**；剩余阻塞为 Hybrid Compose + Host Launcher（混合 Compose + 主机启动器）Full Run / Web UI / STOP / Restart 真机复测。
 - Managed VM SSH readiness gate、DNS inspection/recovery separation、跨 generation recovery 收尾：**CLOUD PASS**。
 - Developer Mode toolbar：响应式 2-row / 3-row layout 已实现，按钮顺序和 ActionListener 未改变：**CLOUD PASS**。
 - macOS Host Runtime Run `36210492001`: **PASS**。
@@ -1471,3 +1471,66 @@ M6 remains **CLOSED**. M7 remains **IN PROGRESS**.
 - Artifact ID: `10899343182`
 - Artifact digest: `sha256:648e907427d39d88a53a8518a425af13e84c957c1472f7d16791c28d84937467`
 - Real Mac + original OpenBot retest: **PENDING**
+
+
+## 2026-09-26 · M7 OpenBot Prepare Real-Mac PASS + Hybrid Run Repair — CLOUD PASS
+
+### Real-Mac acceptance evidence
+
+On the original, unmodified OpenBot project:
+
+- Managed Build Boost detected the 8 GiB / 4 CPU host and proactively raised the SiftAlpha-managed Colima profile from 4 GiB / 2 CPU to **5 GiB / 3 CPU**.
+- `MANAGED_VM_RESOURCE_REPAIR=PASS` and `MANAGED_VM_BUILD_BOOST=PASS`.
+- Vite completed `16878 modules transformed`, rendered chunks and produced the application distribution.
+- All OpenBot images completed and the run ended with:
+  - `COMPOSE_BUILD:PASS`
+  - `PREPARE:SUCCESS`
+  - `SIFTALPHA_M62_PREPARE=PASS`
+
+Therefore original OpenBot **Prepare = REAL MAC PASS**.
+
+The first Run after that exposed the next generic gap: SiftAlpha's Compose-only start path launched container infrastructure and surfaced background service ports, but OpenBot's actual project lifecycle is hybrid. Its repository-owned startup contract starts Compose infrastructure plus host Bun server / worker / app processes. The Web UI is not a blind Compose port.
+
+### Hybrid lifecycle repair
+
+Functional HEAD: `83370eaade2bb551ad28776283deaec3e1ee48af`
+
+- A Compose project with a paired conventional lifecycle contract:
+  - `scripts/start.sh` + `scripts/stop.sh`, or
+  - `start.sh` + `stop.sh`
+  is treated as a generic Hybrid Compose + Host Launcher project.
+- Run starts the project-owned launcher through the existing macOS project process lifecycle instead of assuming `docker compose up -d` is the full application lifecycle.
+- The launcher environment exposes the selected container executable, SiftAlpha managed Docker environment, discovered host tools, managed Python when present, project secrets and the deterministic SiftAlpha `COMPOSE_PROJECT_NAME`.
+- `PATH`, `SIFTALPHA_PROJECT_ID`, generation and `COMPOSE_PROJECT_NAME` are ownership-fenced after project environment merge.
+- Bun requirement is detected from project evidence (`packageManager: bun@...`, `bun.lock`, `bun.lockb`) and missing Host Bun fails explicitly rather than as an opaque startup failure.
+- STOP first stops the tracked launcher process, then runs the paired project stop contract and finally performs Compose down when the provider is available.
+- Launcher stdout/stderr is merged into the existing project diagnostics; no second lifecycle or executor was introduced.
+- Hybrid Web Discovery prefers URLs emitted by the project launcher.
+- Blind port discovery now requires a real HTTP HTML/XHTML surface; raw TCP listeners, JSON APIs and background service ports are no longer automatically promoted to the user-facing Open action.
+
+### Cloud verification
+
+- macOS Host Runtime Run `36224792408` / #137: **PASS**
+- Android W0 Run `36224792421` / #856: **PASS**
+- M4.1 / M4.2 / M5.1 / M5.2 / M6.1 / M6.2 regressions: **PASS**
+- project-scoped macOS process-control regression: **PASS**
+- Core changed: **NO**
+- Android production code changed: **NO**
+- OpenBot source changed: **NO**
+- DMG: `siftalpha-macos-m6.2-host-network-ventura-x64-137`
+- Artifact ID: `10900113795`
+- Artifact digest: `sha256:e1dcf9943c118d1df7c216061aeb85788574677adc6e96d60fab52aca42d4793`
+
+### Remaining real-Mac M7 acceptance
+
+Install Run #137 DMG and validate the original OpenBot:
+
+1. Run uses the paired host launcher.
+2. Required Host Bun is either available or reported explicitly.
+3. server / worker / app startup completes.
+4. user-facing Open resolves the actual OpenBot Web UI rather than 4100/4300 background ports.
+5. Logs / Status remain observable.
+6. STOP stops this project only.
+7. Restart returns the project to the same working state.
+
+M7 remains **IN PROGRESS** until these real-Mac items pass.

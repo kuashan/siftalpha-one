@@ -2749,3 +2749,66 @@ Real Mac must now retest the original OpenBot and confirm:
 5. Run -> Web UI -> Logs/Status -> project-scoped STOP -> Restart all pass.
 
 The previously observed STOP finalization misreport (`provider unavailable`) remains a separate real-Mac M7 defect to close after Prepare usability is established.
+
+
+## 2026-09-26 · M7 — Original OpenBot Prepare PASS / Hybrid Compose + Host Launcher Repair
+
+### Real-Mac finding
+
+The Build Boost repair was successful on the real Ventura Intel acceptance host. The original OpenBot project completed the full Compose build and ended with `COMPOSE_BUILD:PASS`, `PREPARE:SUCCESS`, and `SIFTALPHA_M62_PREPARE=PASS`.
+
+The following Run exposed a separate lifecycle modeling problem:
+
+- SiftAlpha treated any Compose project as fully started after `docker compose up -d`.
+- OpenBot's repository-owned lifecycle is hybrid: its startup script starts the Compose services and also host Bun server / worker / app processes.
+- SiftAlpha therefore started only infrastructure and then blind port discovery surfaced backend listeners as "Open" results.
+- The background service ports were not proof of a Web UI.
+
+### Generic repair
+
+No OpenBot name, port, service or command is hard-coded.
+
+1. `MacProjectHostLifecyclePolicy`
+   - recognizes only paired conventional project lifecycle contracts:
+     `scripts/start.sh + scripts/stop.sh` or root `start.sh + stop.sh`;
+   - a start script without its stop partner fails closed to the existing Compose lifecycle.
+
+2. Hybrid Run
+   - uses the existing `MacProjectProcessControl`;
+   - runs `/bin/bash <project-start-script>` inside the imported project root;
+   - passes managed/external Docker, discovered host runtime paths, managed Python, secrets and generation identity;
+   - forces SiftAlpha's deterministic `COMPOSE_PROJECT_NAME` so repository scripts and SiftAlpha Status/STOP address the same Compose project.
+
+3. Host tool requirement gate
+   - Bun is required when root project evidence explicitly says Bun via `packageManager`, `bun.lock` or `bun.lockb`;
+   - missing Bun is named explicitly at Run instead of degrading into a generic launch failure.
+
+4. Hybrid STOP
+   - terminate the tracked launcher process;
+   - run the paired project stop script with the same ownership-fenced environment;
+   - run provider Compose down as a final idempotent cleanup when available.
+
+5. Web UI identity
+   - project-emitted local URLs retain priority;
+   - blind lsof / container published-port candidates must answer HTTP as HTML/XHTML (or contain an HTML signature);
+   - TCP-only / JSON / health service listeners are no longer sufficient for the user-facing Open action.
+
+6. Diagnostics
+   - launcher stdout/stderr is merged with the existing coordinator history and Compose logs;
+   - secret redaction remains in the existing path;
+   - Developer and Normal Mode continue using the same coordinator/runtime state.
+
+### Verification
+
+- START_HEAD: `a76a718f5cf0ca26425864991667e3f8e95535fa`
+- Initial hybrid commit: `c5dae0c0402b9f9e5e7f117bd6553d5efbafbd12`
+- Host-tool gate: `005df4cddd5a7ab47ae39204cf55bb6090a4fade`
+- Compose ownership alignment: `9d0c35856ac1c57e340aeaf95b05adb57148fae6`
+- FINAL_FUNCTIONAL_HEAD: `83370eaade2bb551ad28776283deaec3e1ee48af`
+- macOS Run #137 / `36224792408`: PASS
+- Android W0 #856 / `36224792421`: PASS
+- DMG artifact: `siftalpha-macos-m6.2-host-network-ventura-x64-137`
+- Artifact ID: `10900113795`
+- Shared Core / Android production / OpenBot source: unchanged.
+
+Next evidence is real-Mac Full Run / Web / STOP / Restart. This remains inside M7 and does not create M7.1/M7.2.

@@ -155,7 +155,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - STOP（停止）只停止该项目。
 - 重启后可以重新运行。
 
-当前状态：**IN PROGRESS（进行中）— Original OpenBot Prepare / Build Boost real-Mac retest pending**
+当前状态：**IN PROGRESS（进行中）— Original OpenBot Prepare REAL MAC PASS；Hybrid Full Run / Web / STOP / Restart real-Mac retest pending**
 
 ### M6 Final Closure Audit — PASS
 
@@ -1152,3 +1152,32 @@ M6 remains **CLOSED** and M7 remains **IN PROGRESS**. No M7.1/M7.2 or other new 
 | Real M7 STOP finalization | PREPARE/Run STOP must finish without `provider unavailable` misreport | OPEN |
 
 M6 remains **CLOSED**. M7 remains **IN PROGRESS**. The next action is the real Ventura Intel OpenBot retest with Run #133 DMG.
+
+
+## M7 Original OpenBot Prepare + Hybrid Runtime — 2026-09-26
+
+| Check | Expected | Status |
+|---|---|---|
+| Original OpenBot source | unmodified upstream project | PASS |
+| Build Boost real Mac | 8 GiB / 4 CPU -> managed 5 GiB / 3 CPU | PASS |
+| Compose Build | original project completes all images | PASS — REAL MAC |
+| Prepare | `COMPOSE_BUILD:PASS`, `PREPARE:SUCCESS`, `SIFTALPHA_M62_PREPARE=PASS` | PASS — REAL MAC |
+| Paired lifecycle detection | conventional start + stop pair only | PASS — cloud |
+| Hybrid launcher | Compose project may delegate full lifecycle to repository-owned launcher | PASS — cloud |
+| Bun requirement | Bun metadata/lock evidence becomes explicit Host Bun requirement | PASS — cloud |
+| Compose ownership fence | project launcher inherits SiftAlpha deterministic `COMPOSE_PROJECT_NAME` | PASS — cloud |
+| Managed/external Docker PATH | launcher receives selected Docker environment without global mutation | PASS — cloud |
+| Launcher diagnostics | stdout/stderr merged into shared coordinator diagnostics | PASS — cloud |
+| Blind port identity | raw TCP listener is insufficient; HTML Web surface required | PASS — cloud |
+| Existing explicit Web URL | project-emitted local URL remains authoritative after listener probe | PASS |
+| Hybrid STOP contract | launcher process -> paired stop script -> Compose cleanup | PASS — cloud |
+| Project-scoped process regression | existing A/B process isolation | PASS — macOS #137 |
+| Closed M4/M5/M6 regressions | all existing probes remain green | PASS — macOS #137 |
+| Android regression | production app unchanged | PASS — W0 #856 |
+| Core boundary | Shared Core unchanged | PASS |
+| Real Hybrid Run | server / worker / app all start | PENDING |
+| Real Web UI | user-facing Open reaches actual OpenBot UI | PENDING |
+| Real STOP | only current OpenBot project stops | PENDING |
+| Real Restart | re-run returns to working OpenBot | PENDING |
+
+M6 remains **CLOSED**. M7 remains **IN PROGRESS**.
