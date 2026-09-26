@@ -2689,3 +2689,63 @@ The same acceptance log reported `MANAGED_VM_MEMORY_CURRENT_GIB=2147483648.0`. T
 - DMG: `siftalpha-macos-m6.2-host-network-ventura-x64-132`, artifact ID `10898375639`.
 
 The next action is real Mac + original OpenBot retest. M6 is not reopened and no new M7 substage is created.
+
+
+## 2026-09-26 · M7 Regression Repair — Proactive Managed Compose Build Boost
+
+### Trigger
+
+Real Ventura / Intel OpenBot acceptance proved the previous resource-fact repair and managed VM resize path work, but the original OpenBot still did not complete Prepare under the 4 GiB / 2 CPU managed VM allocation. The second Vite build remained extremely slow and was manually cancelled after the resource-repair path had already passed.
+
+The product goal therefore remains unchanged: make the unmodified original OpenBot actually reach Prepare PASS on the supported 8 GiB acceptance Mac.
+
+### Implementation
+
+- `MacManagedResourcePolicy` changes only the managed-build recommendation:
+  - 8 GiB host reserve: 3 GiB minimum;
+  - 8 GiB / 4 CPU host target: 5 GiB / 3 CPU;
+  - higher-memory hosts remain bounded by host-memory fraction and reserve;
+  - at least one host CPU remains outside the VM.
+- `MacManagedContainerInstaller.ensureManagedRuntimeReady()` now runs the existing managed resource inspection/repair before the Compose build:
+  - `MANAGED_VM_BUILD_BOOST=CHECK`;
+  - repair if below recommendation;
+  - `PASS` after a successful managed resize;
+  - `NOT_REQUIRED` when already at target;
+  - `HOST_LIMITED` keeps the prior smaller-host behavior.
+- No OpenBot-specific name, Dockerfile, manifest, service, or command was introduced.
+- Existing OOM classification and bounded recovery remain available if the boosted build still exhausts memory.
+
+### Tests
+
+Added an 8 GiB / 4 CPU provider-shaped resource-policy case:
+
+- current 4 GiB / 2 CPU -> `REPAIR_REQUIRED`;
+- maximum safe memory -> 5 GiB;
+- recommendation -> 5 GiB / 3 CPU;
+- current 5 GiB / 3 CPU -> `CURRENT_OK`.
+
+### Verification
+
+- START_HEAD: `e63e8f32bcf654385b32235fb3b087bb99a5321a`
+- FUNCTIONAL_HEAD: `27e89e4120e56671ea793b3810c31d65c9b70cb1`
+- macOS Host Runtime Run `36220937862` / #133: **PASS**
+- Android W0 Run `36220937942` / #851: **PASS**
+- macOS M4/M5/M6 regression probes: **PASS**
+- Project-scoped process-control regression: **PASS**
+- DMG packaging: **PASS**
+- Artifact: `siftalpha-macos-m6.2-host-network-ventura-x64-133`, ID `10899343182`
+- Core changed: **NO**
+- Android production code changed: **NO**
+- OpenBot changed: **NO**
+
+### Remaining M7 evidence
+
+Real Mac must now retest the original OpenBot and confirm:
+
+1. pre-build resource facts show 5 GiB / 3 CPU target;
+2. managed boost completes before Compose build;
+3. OpenBot reaches `COMPOSE_BUILD:PASS`;
+4. Prepare completes;
+5. Run -> Web UI -> Logs/Status -> project-scoped STOP -> Restart all pass.
+
+The previously observed STOP finalization misreport (`provider unavailable`) remains a separate real-Mac M7 defect to close after Prepare usability is established.

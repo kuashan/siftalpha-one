@@ -12,11 +12,11 @@
 - M1 Core Boundary（核心边界）：PASS / CLOSED（通过 / 关闭）
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
-- 当前阶段：**M7 — OpenBot Acceptance（OpenBot 验收）— IN PROGRESS；Managed VM Readiness / DNS Recovery 为当前阻塞项**
+- 当前阶段：**M7 — OpenBot Acceptance（OpenBot 验收）— IN PROGRESS；原始 OpenBot Prepare 性能 / 资源充足性为当前阻塞项**
 - M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 PASS / COMPLETE；M4 PASS / CLOSED（M4 已通过并关闭）**
 - M5 implementation（实现）：**M5.1 PASS / COMPLETE；M5.2 PASS / COMPLETE；M5 PASS / CLOSED（M5 已通过并关闭）**
 
-本轮最新 macOS 适配层修复：**M7 Managed VM Readiness / DNS Recovery + Developer Mode Toolbar = CLOUD PASS（云端通过）**。
+本轮最新 macOS 适配层修复：**M7 Managed Compose Build Boost（托管 Compose 构建增强）= CLOUD PASS（云端通过）**。
 
 - M6 继续 **CLOSED（关闭）**，没有创建 M6.3；
 - Managed VM / daemon lifecycle（托管虚拟机 / 守护进程生命周期）架构保持不变，本轮补齐了 SSH readiness 与 resolver inspection gate；
@@ -30,7 +30,7 @@
 
 - M6 = **CLOSED**。
 - M7 = **IN PROGRESS**，尚未关闭。
-- 当前 M7 blocker：**Managed VM Readiness / DNS Recovery**；真实 Mac 仍需使用原始 OpenBot 完成验收。
+- 当前 M7 blocker：**原始 OpenBot 在 8 GiB / 4 CPU Intel Mac 上的 Prepare 仍未完成**；新的通用 Build Boost 已将托管 VM 构建目标提升到 5 GiB / 3 CPU，并等待真实 Mac 复测。
 - Managed VM SSH readiness gate、DNS inspection/recovery separation、跨 generation recovery 收尾：**CLOUD PASS**。
 - Developer Mode toolbar：响应式 2-row / 3-row layout 已实现，按钮顺序和 ActionListener 未改变：**CLOUD PASS**。
 - macOS Host Runtime Run `36210492001`: **PASS**。
@@ -1441,3 +1441,33 @@ M6 remains **CLOSED**. M7 remains **IN PROGRESS**; original OpenBot real-Mac acc
 - Android W0 Cloud Build Run `36218128249`: **PASS**
 - DMG artifact: `siftalpha-macos-m6.2-host-network-ventura-x64-132` (macOS Run `36218128238`, artifact ID `10898375639`)
 - Real Mac / original OpenBot acceptance: **PENDING**
+
+
+## 2026-09-26 · M7 Managed Compose Build Boost — CLOUD PASS
+
+M6 remains **CLOSED**. M7 remains **IN PROGRESS**.
+
+### Real-Mac evidence before this repair
+
+- Host facts are now correct on the acceptance Mac: 8 GiB physical memory / 4 CPU.
+- Managed Colima resource repair previously expanded the VM from 2 GiB to 4 GiB and completed SSH / resolver / Docker / Compose / Buildx verification.
+- The original OpenBot Prepare still did not reach `COMPOSE_BUILD:PASS`; the 4 GiB / 2 CPU retry spent a long time in Vite `transforming...` and was manually cancelled for diagnosis.
+- PREPARE cancellation succeeded, but the subsequent STOP result was misreported as `provider unavailable`; that STOP finalization defect remains open for later M7 acceptance and is not hidden by this repair.
+
+### Build Boost repair
+
+- `MacManagedResourcePolicy` now keeps a bounded 3 GiB minimum host-memory reserve on 8 GiB-class Macs, allowing a maximum managed VM target of 5 GiB.
+- Managed CPU recommendation now keeps at least one host CPU free and uses a bounded ~75% VM target, so the 4 CPU acceptance Mac recommends 3 VM CPUs.
+- Managed Compose readiness now performs resource preflight before the actual Compose build. A 4 GiB / 2 CPU managed VM on the 8 GiB / 4 CPU host is proactively raised to 5 GiB / 3 CPU instead of waiting for another OOM before repairing.
+- Already-boosted resources remain a no-op. Hosts below the existing minimum remain host-limited rather than receiving unbounded allocation.
+- Scope stays inside the macOS Adapter and the SiftAlpha-managed Colima `sa` profile. OpenBot, Shared Core, Android production code, external Docker, user Colima, Podman, DNS, proxy and Compose streaming are unchanged.
+
+### Cloud evidence
+
+- Functional HEAD: `27e89e4120e56671ea793b3810c31d65c9b70cb1`
+- macOS Host Runtime Run `36220937862` / #133: **PASS**
+- Android W0 Run `36220937942` / #851: **PASS**
+- DMG: `siftalpha-macos-m6.2-host-network-ventura-x64-133`
+- Artifact ID: `10899343182`
+- Artifact digest: `sha256:648e907427d39d88a53a8518a425af13e84c957c1472f7d16791c28d84937467`
+- Real Mac + original OpenBot retest: **PENDING**

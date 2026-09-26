@@ -155,7 +155,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - STOP（停止）只停止该项目。
 - 重启后可以重新运行。
 
-当前状态：**IN PROGRESS（进行中）— Managed VM Readiness / DNS Recovery blocker**
+当前状态：**IN PROGRESS（进行中）— Original OpenBot Prepare / Build Boost real-Mac retest pending**
 
 ### M6 Final Closure Audit — PASS
 
@@ -1130,3 +1130,25 @@ M6 remains CLOSED and M7 remains IN PROGRESS. No new M6.x or M7.x slice is creat
 | Real acceptance | Ventura + original OpenBot | PENDING |
 
 M6 remains **CLOSED** and M7 remains **IN PROGRESS**. No M7.1/M7.2 or other new stage is created.
+
+
+## M7 Managed Compose Build Boost — 2026-09-26
+
+| Check | Expected | Status |
+|---|---|---|
+| 8 GiB host policy | 8 GiB / 4 CPU host + current 4 GiB / 2 CPU -> bounded boost | PASS |
+| Memory target | maximum-safe and recommended managed VM memory = 5 GiB | PASS |
+| CPU target | recommended managed VM CPU = 3, leaving one host CPU | PASS |
+| Already boosted | 5 GiB / 3 CPU -> CURRENT_OK | PASS |
+| Pre-build resource gate | Managed Compose readiness checks/repairs resources before build | PASS — cloud |
+| Managed-only boundary | Only SiftAlpha managed Colima `sa` may be resized | PASS |
+| OpenBot-specific code | None | PASS |
+| Shared Core | unchanged | PASS |
+| Android production code | unchanged | PASS |
+| macOS regression | M4/M5/M6 + project-scoped process-control probes | PASS — Run #133 |
+| Android regression | W0 | PASS — Run #851 |
+| DMG | `siftalpha-macos-m6.2-host-network-ventura-x64-133` / `10899343182` | PASS |
+| Real OpenBot Prepare | original project reaches `COMPOSE_BUILD:PASS` | PENDING |
+| Real M7 STOP finalization | PREPARE/Run STOP must finish without `provider unavailable` misreport | OPEN |
+
+M6 remains **CLOSED**. M7 remains **IN PROGRESS**. The next action is the real Ventura Intel OpenBot retest with Run #133 DMG.
