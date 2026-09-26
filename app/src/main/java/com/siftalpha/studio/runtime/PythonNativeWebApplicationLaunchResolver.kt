@@ -333,8 +333,9 @@ object PythonNativeWebApplicationLaunchResolver {
     }
 
     private fun sourceOwnedByScript(path: String, scriptTarget: String): Boolean {
-        val match = consoleScriptTarget.matchEntire(scriptTarget.trim()) ?: return false
-        val module = match.groupValues[1]
+        val normalizedTarget = scriptTarget.trim()
+        if (!consoleScriptTarget.matches(normalizedTarget)) return false
+        val module = normalizedTarget.substringBefore(':')
         val topLevelPackage = module.substringBefore('.')
         if (!PYTHON_MODULE_SEGMENT.matches(topLevelPackage)) return false
         val normalized = normalizedSafePythonPath(path) ?: return false
