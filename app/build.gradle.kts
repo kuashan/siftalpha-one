@@ -188,9 +188,11 @@ android {
         // v237 closes Android endpoint authority: current Web facts outrank learned ports, Python+Vite
         // browser UI hints outrank inferred backend/API ports, learned endpoints are authority-bound,
         // and owned multi-port discovery prefers an HTML UI before falling back to non-HTML HTTP.
-        // Closure verification intentionally runs W0 + Internal Alpine Probe on this exact final HEAD.
-        versionCode = 237
-        versionName = "0.8.0-alpha43-r48d13-android-endpoint-authority-r1"
+        // v238 closes Internal Python staging authority: Vite builds, explicit console-script launches,
+        // and projects that own a pyproject console-script contract use bounded full-project staging.
+        // Simple Python-file projects retain the stricter entrypoint staging profile.
+        versionCode = 238
+        versionName = "0.8.0-alpha43-r48d14-android-staging-authority-r1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
