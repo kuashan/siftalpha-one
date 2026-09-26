@@ -1,5 +1,9 @@
 package com.siftalpha.macos
 
+import com.siftalpha.core.operation.ProjectOperationAction
+import com.siftalpha.core.operation.ProjectOperationOwnership
+import com.siftalpha.core.operation.ProjectOperationPhase
+import com.siftalpha.core.storage.DurableProjectOperationRecord
 import com.siftalpha.studio.runtime.RuntimeKind
 import com.siftalpha.core.storage.StoredStateValue
 import java.nio.file.Files
@@ -8,6 +12,38 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MacProjectWorkflowTest {
+    @Test
+    fun recoveryPolicyOnlyRecoversStaleGenerationAndPreservesLiveOwnership() {
+        val stale = DurableProjectOperationRecord(
+            projectId = "macos:recovery",
+            providerId = "container",
+            action = ProjectOperationAction.PREPARE,
+            phase = ProjectOperationPhase.ACTIVE,
+            generation = 2L,
+            startedAtEpochMs = 1000L,
+        )
+        val live = ProjectOperationOwnership(
+            projectId = "macos:recovery",
+            action = ProjectOperationAction.PREPARE,
+            phase = ProjectOperationPhase.ACTIVE,
+            generation = 3L,
+        )
+        val sameLive = stale.copy(generation = 3L)
+
+        assertEquals(
+            MacProjectRecoveryDecision.RECOVER_STALE,
+            MacProjectRecoveryPolicy.decide(stale, null),
+        )
+        assertEquals(
+            MacProjectRecoveryDecision.LIVE_OPERATION,
+            MacProjectRecoveryPolicy.decide(sameLive, live),
+        )
+        assertEquals(
+            MacProjectRecoveryDecision.NONE,
+            MacProjectRecoveryPolicy.decide(stale.copy(phase = ProjectOperationPhase.SUCCESS), live),
+        )
+    }
+
     @Test
     fun fileStateStorageAndProjectCatalogSurviveNewInstances() {
         val root = Files.createTempDirectory("siftalpha-state-").toFile()

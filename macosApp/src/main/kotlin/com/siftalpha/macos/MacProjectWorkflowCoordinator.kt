@@ -57,6 +57,33 @@ data class MacWorkflowDiagnostics(
     val containerServices: List<MacComposeServiceStatus> = emptyList(),
 )
 
+internal enum class MacProjectRecoveryDecision {
+    NONE,
+    RECOVER_STALE,
+    LIVE_OPERATION,
+}
+
+internal object MacProjectRecoveryPolicy {
+    fun decide(
+        persisted: DurableProjectOperationRecord?,
+        live: ProjectOperationOwnership?,
+    ): MacProjectRecoveryDecision {
+        if (persisted == null || persisted.phase.terminal) {
+            return MacProjectRecoveryDecision.NONE
+        }
+        if (
+            live != null &&
+            live.phase == ProjectOperationPhase.ACTIVE &&
+            persisted.projectId == live.projectId &&
+            persisted.action == live.action &&
+            persisted.generation == live.generation
+        ) {
+            return MacProjectRecoveryDecision.LIVE_OPERATION
+        }
+        return MacProjectRecoveryDecision.RECOVER_STALE
+    }
+}
+
 class MacProjectWorkflowCoordinator(
     private val processControl: MacProjectProcessControl = MacProjectProcessControl(),
     private val environmentManager: MacProjectEnvironmentManager = MacProjectEnvironmentManager(
@@ -100,16 +127,21 @@ class MacProjectWorkflowCoordinator(
                 state.generation.set(persistedGeneration)
             }
             val persisted = store.read(projectId)
-            if (persisted != null && !persisted.phase.terminal) {
-                state.recoveryInProgress = true
-                append(
-                    state,
-                    "RECOVERY_PENDING=" +
-                        persisted.action.name +
-                        " generation=" +
-                        persisted.generation,
-                )
-                store.clearCurrent(projectId)
+            when (MacProjectRecoveryPolicy.decide(persisted, state.operation)) {
+                MacProjectRecoveryDecision.RECOVER_STALE -> {
+                    checkNotNull(persisted)
+                    state.recoveryInProgress = true
+                    append(
+                        state,
+                        "RECOVERY_PENDING=" +
+                            persisted.action.name +
+                            " generation=" +
+                            persisted.generation,
+                    )
+                    store.clearCurrent(projectId)
+                }
+                MacProjectRecoveryDecision.LIVE_OPERATION,
+                MacProjectRecoveryDecision.NONE -> Unit
             }
         }
 
@@ -725,6 +757,7 @@ class MacProjectWorkflowCoordinator(
             val durableGeneration = operationStore?.lastGeneration(projectId) ?: 0L
             val generation = maxOf(state.generation.get(), durableGeneration) + 1L
             state.generation.set(generation)
+            state.recoveryInProgress = false
             state.operation = ProjectOperationOwnership(
                 projectId = projectId,
                 action = action,

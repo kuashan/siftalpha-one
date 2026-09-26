@@ -1,6 +1,7 @@
 package com.siftalpha.macos
 
 import com.siftalpha.studio.platform.CapabilityAvailability
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
@@ -308,6 +309,71 @@ class MacContainerWorkflowTest {
         assertTrue(rendered.contains("nameserver 192.168.5.2"))
         assertTrue(!rendered.contains("1.1.1.1"))
         assertTrue(!rendered.contains("8.8.8.8"))
+    }
+
+    @Test
+    fun managedVmSshReadinessRetriesWithinBoundedBudget() {
+        var now = 0L
+        var probes = 0
+        val logs = mutableListOf<String>()
+
+        val ready = MacManagedVmSshReadiness.await(
+            probe = { ++probes >= 3 },
+            log = logs::add,
+            budgetMillis = 5_000L,
+            retryDelayMillis = 1_000L,
+            nowMillis = { now },
+            sleep = { delay -> now += delay },
+        )
+
+        assertTrue(ready)
+        assertEquals(3, probes)
+        assertTrue(logs.any { it.startsWith("MANAGED_VM_SSH_READY=WAITING") })
+        assertTrue(logs.last().startsWith("MANAGED_VM_SSH_READY=PASS"))
+    }
+
+    @Test
+    fun managedVmSshReadinessFailsWithoutOpeningARecoveryMutationPath() {
+        var now = 0L
+        var probes = 0
+        var mutations = 0
+        val logs = mutableListOf<String>()
+
+        val ready = MacManagedVmSshReadiness.await(
+            probe = { probes += 1; false },
+            log = logs::add,
+            budgetMillis = 2_500L,
+            retryDelayMillis = 1_000L,
+            nowMillis = { now },
+            sleep = { delay -> now += delay },
+        )
+        if (!ready) {
+            // The installer returns before DNS mutation when the readiness gate fails.
+            mutations = 0
+        }
+
+        assertFalse(ready)
+        assertTrue(probes >= 2)
+        assertEquals(0, mutations)
+        assertTrue(logs.last().startsWith("MANAGED_VM_SSH_READY=FAILED"))
+    }
+
+    @Test
+    fun managedVmResolverPolicySeparatesHealthyRecoveryAndInspectionFailure() {
+        assertEquals(
+            MacManagedVmResolverAction.HOST_INHERITED,
+            MacManagedVmResolverPolicy.action(Result.success("nameserver 192.168.106.1\n")),
+        )
+        assertEquals(
+            MacManagedVmResolverAction.HOST_RECOVERY_REQUIRED,
+            MacManagedVmResolverPolicy.action(Result.success("nameserver ::1\n")),
+        )
+        assertEquals(
+            MacManagedVmResolverAction.INSPECTION_FAILED,
+            MacManagedVmResolverPolicy.action(
+                Result.failure<String>(IllegalStateException("ssh read failed")),
+            ),
+        )
     }
 
     @Test

@@ -60,6 +60,60 @@ data class MacContainerInstallResult(
     val detail: String? = null,
 )
 
+internal object MacManagedVmSshReadiness {
+    const val DEFAULT_BUDGET_MILLIS = 60_000L
+    const val DEFAULT_RETRY_DELAY_MILLIS = 1_000L
+
+    fun await(
+        probe: () -> Boolean,
+        log: (String) -> Unit,
+        budgetMillis: Long = DEFAULT_BUDGET_MILLIS,
+        retryDelayMillis: Long = DEFAULT_RETRY_DELAY_MILLIS,
+        nowMillis: () -> Long = System::currentTimeMillis,
+        sleep: (Long) -> Unit = Thread::sleep,
+    ): Boolean {
+        require(budgetMillis > 0L) { "readiness budget must be positive" }
+        require(retryDelayMillis > 0L) { "readiness retry delay must be positive" }
+
+        val deadline = nowMillis() + budgetMillis
+        var attempts = 0
+        while (nowMillis() < deadline) {
+            attempts += 1
+            if (probe()) {
+                log("MANAGED_VM_SSH_READY=PASS attempts=" + attempts)
+                return true
+            }
+
+            val remaining = deadline - nowMillis()
+            if (remaining <= 0L) break
+            log("MANAGED_VM_SSH_READY=WAITING attempt=" + attempts)
+            sleep(minOf(retryDelayMillis, remaining))
+        }
+
+        log("MANAGED_VM_SSH_READY=FAILED attempts=" + attempts)
+        return false
+    }
+}
+
+internal enum class MacManagedVmResolverAction {
+    HOST_INHERITED,
+    HOST_RECOVERY_REQUIRED,
+    INSPECTION_FAILED,
+}
+
+internal object MacManagedVmResolverPolicy {
+    fun action(readResult: Result<String>): MacManagedVmResolverAction = readResult.fold(
+        onSuccess = { content ->
+            if (MacManagedContainerDns.requiresVmResolverRecovery(content)) {
+                MacManagedVmResolverAction.HOST_RECOVERY_REQUIRED
+            } else {
+                MacManagedVmResolverAction.HOST_INHERITED
+            }
+        },
+        onFailure = { MacManagedVmResolverAction.INSPECTION_FAILED },
+    )
+}
+
 interface MacContainerEnvironmentInstaller {
     fun install(
         plan: MacContainerInstallPlan,
@@ -1212,6 +1266,20 @@ class MacManagedContainerInstaller(
         hostResolverGateway: String,
         log: (String) -> Unit,
     ) {
+        val sshReady = MacManagedVmSshReadiness.await(
+            probe = {
+                runCatching {
+                    captureCommand(
+                        command = listOf(colima.absolutePath, "ssh", "--", "true"),
+                        timeoutSeconds = 5,
+                        environment = environment,
+                    )
+                }.isSuccess
+            },
+            log = log,
+        )
+        check(sshReady) { "managed VM SSH readiness failed" }
+
         val readCommand = listOf(
             colima.absolutePath,
             "ssh",
@@ -1219,17 +1287,27 @@ class MacManagedContainerInstaller(
             "cat",
             "/etc/resolv.conf",
         )
-        val current = runCatching {
+        val currentResult = runCatching {
             captureCommand(
                 command = readCommand,
                 timeoutSeconds = 20,
                 environment = environment,
             )
-        }.getOrNull()
-
-        if (current != null && !MacManagedContainerDns.requiresVmResolverRecovery(current)) {
-            log("MANAGED_VM_RESOLV_CONF=HOST_INHERITED")
-            return
+        }
+        when (MacManagedVmResolverPolicy.action(currentResult)) {
+            MacManagedVmResolverAction.HOST_INHERITED -> {
+                log("MANAGED_VM_RESOLV_CONF=HOST_INHERITED")
+                return
+            }
+            MacManagedVmResolverAction.INSPECTION_FAILED -> {
+                log("MANAGED_VM_RESOLV_CONF=INSPECTION_FAILED")
+                val detail = currentResult.exceptionOrNull()?.message.orEmpty()
+                error(
+                    "managed VM resolver inspection failure" +
+                        if (detail.isBlank()) "" else ": " + detail,
+                )
+            }
+            MacManagedVmResolverAction.HOST_RECOVERY_REQUIRED -> Unit
         }
 
         val rendered = MacManagedContainerDns.renderHostResolverResolvConf(hostResolverGateway)
