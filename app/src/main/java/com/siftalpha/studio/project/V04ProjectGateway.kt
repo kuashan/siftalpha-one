@@ -9,6 +9,7 @@ import com.siftalpha.studio.runtime.RuntimeKind
 import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.ByteBuffer
+import java.security.MessageDigest
 import java.nio.charset.CodingErrorAction
 import java.time.Instant
 import java.util.zip.ZipInputStream
@@ -31,6 +32,18 @@ class V04ProjectGateway(private val context: Context) {
         val declaredRun: String?,
         val declaredEntry: String?,
         val hasExternalDependencyRequirement: Boolean = false,
+    )
+
+    /**
+     * One action-time authoritative source snapshot shared by environment planning and launch
+     * resolution. The fingerprint intentionally covers the bounded source tree plus root dependency
+     * metadata so learned launch contracts cannot outlive the source identity that proved them.
+     */
+    data class RuntimeSourceFactsSnapshot(
+        val facts: RuntimeFacts,
+        val requirementsText: String?,
+        val pyprojectText: String?,
+        val fingerprint: String,
     )
 
     private data class Child(
@@ -265,16 +278,66 @@ class V04ProjectGateway(private val context: Context) {
      * Full runtime facts are loaded only when a Runtime action needs them. Runtime Center refresh uses
      * root-only normalization so large repositories are not recursively scanned merely to render cards.
      */
-    fun runtimeFacts(projectDocumentId: String): RuntimeFacts {
+    fun runtimeFacts(projectDocumentId: String): RuntimeFacts =
+        runtimeSourceFacts(projectDocumentId).facts
+
+    fun runtimeSourceFacts(projectDocumentId: String): RuntimeSourceFactsSnapshot {
         val objectValue = metadata(projectDocumentId)
         val nodes = projectStore.listProjectTreeForRuntimeFacts(projectDocumentId)
-        return RuntimeFacts(
-            relativePaths = nodes.map { it.relativePath },
+        val relativePaths = nodes.map { it.relativePath }
+        val facts = RuntimeFacts(
+            relativePaths = relativePaths,
             declaredType = objectValue?.optString("type")?.takeIf { it.isNotBlank() },
             declaredRun = objectValue?.optString("run")?.takeIf { it.isNotBlank() },
             declaredEntry = objectValue?.optString("entry")?.takeIf { it.isNotBlank() },
             hasExternalDependencyRequirement = requiresExternalPythonEnvironment(nodes),
         )
+        val requirementsText = readRootTextFromNodes(nodes, "requirements.txt")
+        val pyprojectText = readRootTextFromNodes(nodes, "pyproject.toml")
+        val canonical = buildString {
+            append("type=").append(facts.declaredType.orEmpty()).append('\n')
+            append("run=").append(facts.declaredRun.orEmpty()).append('\n')
+            append("entry=").append(facts.declaredEntry.orEmpty()).append('\n')
+            relativePaths
+                .asSequence()
+                .map { it.replace('\\', '/').trim().trim('/') }
+                .filter { it.isNotBlank() }
+                .sorted()
+                .forEach { append("path=").append(it).append('\n') }
+            append("requirements<<\n").append(requirementsText.orEmpty()).append("\n>>\n")
+            append("pyproject<<\n").append(pyprojectText.orEmpty()).append("\n>>\n")
+        }
+        val fingerprint = MessageDigest.getInstance("SHA-256")
+            .digest(canonical.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        return RuntimeSourceFactsSnapshot(
+            facts = facts,
+            requirementsText = requirementsText,
+            pyprojectText = pyprojectText,
+            fingerprint = "sha256:$fingerprint",
+        )
+    }
+
+    private fun readRootTextFromNodes(
+        nodes: List<ProjectStore.FileNode>,
+        fileName: String,
+    ): String? {
+        val file = nodes.firstOrNull {
+            !it.isDirectory && it.relativePath.equals(fileName, ignoreCase = true)
+        } ?: return null
+        val bytes = projectStore.readProjectFileBytes(file, MAX_ROOT_TEXT_BYTES + 1)
+        require(bytes.size <= MAX_ROOT_TEXT_BYTES) {
+            "$fileName 超过 ${MAX_ROOT_TEXT_BYTES / 1024} KB，当前运行时事实不会读取"
+        }
+        return runCatching {
+            Charsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString()
+        }.getOrElse {
+            error("$fileName 不是有效的 UTF-8 文本")
+        }
     }
 
     /** Read one bounded root metadata file at action time without exposing SAF to policy code. */
