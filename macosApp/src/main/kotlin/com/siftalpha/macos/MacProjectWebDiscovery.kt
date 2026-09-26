@@ -24,7 +24,7 @@ internal object MacHttpWebSurfaceProbe {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = timeoutMs
             readTimeout = timeoutMs
-            instanceFollowRedirects = true
+            instanceFollowRedirects = false
             requestMethod = "GET"
             setRequestProperty("Accept", "text/html,application/xhtml+xml")
         }

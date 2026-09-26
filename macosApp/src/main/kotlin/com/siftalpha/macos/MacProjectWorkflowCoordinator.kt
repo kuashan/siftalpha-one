@@ -873,6 +873,7 @@ class MacProjectWorkflowCoordinator(
             put("PATH", pathDirectories.joinToString(File.pathSeparator))
             put("SIFTALPHA_PROJECT_ID", projectId)
             put("SIFTALPHA_OPERATION_GENERATION", generation.toString())
+            provider?.let { put("COMPOSE_PROJECT_NAME", it.projectName(projectId)) }
             putAll(projectEnvironment(projectId))
         }
     }
