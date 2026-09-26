@@ -256,6 +256,7 @@ class ProjectRuntimeController(
         val projectId = project.summary.documentId
         val snapshot = gateway.runtimeSourceFacts(projectId)
         val facts = snapshot.facts
+        val packageJsonTexts = readPackageJsonTexts(projectId, facts.relativePaths)
         val detection = ProjectEnvironmentDetector.detect(
             ProjectEnvironmentDetectionInput(
                 relativePaths = facts.relativePaths,
@@ -264,6 +265,7 @@ class ProjectRuntimeController(
                 declaredRun = facts.declaredRun,
                 requirementsText = snapshot.requirementsText,
                 pyprojectText = snapshot.pyprojectText,
+                packageJsonTexts = packageJsonTexts,
             ),
         )
         val plan = ProjectEnvironmentPlanner.plan(
@@ -281,6 +283,27 @@ class ProjectRuntimeController(
             ),
         )
         return EnvironmentPlanningContext(facts = facts, plan = plan)
+    }
+
+    private fun readPackageJsonTexts(
+        projectDocumentId: String,
+        relativePaths: Collection<String>,
+    ): Map<String, String> {
+        val packageJsonPaths = relativePaths
+            .asSequence()
+            .map { it.replace('\\', '/').trim().trim('/') }
+            .filter { it.substringAfterLast('/').equals("package.json", ignoreCase = true) }
+            .distinct()
+            .sorted()
+            .take(MAX_PACKAGE_JSON_FILES)
+            .toList()
+        if (packageJsonPaths.isEmpty()) return emptyMap()
+        return gateway.readProjectTextFiles(
+            projectDocumentId = projectDocumentId,
+            relativePaths = packageJsonPaths,
+            maxFiles = MAX_PACKAGE_JSON_FILES,
+            maxBytesPerFile = MAX_PACKAGE_JSON_BYTES,
+        )
     }
 
     private fun requiresSupplementalNodePrepare(plan: ProjectEnvironmentPlan): Boolean =
@@ -954,6 +977,7 @@ class ProjectRuntimeController(
             pythonSources = sources,
             webProjectEnabled = webProjectEnabled,
             requirementsText = requirementsText,
+            packageJsonTexts = readPackageJsonTexts(projectId, facts.relativePaths),
         ) ?: return null
 
         return PythonNativeWebLaunchResolution(
@@ -1242,6 +1266,7 @@ class ProjectRuntimeController(
                 pythonRequiresVersion = plan.detection.pythonRequiresVersion,
                 environmentPlanId = plan.planId,
                 pythonInstallExtras = plan.pythonInstallExtras,
+                viteComponentDirectories = plan.detection.viteComponents.map { it.directory },
                 webLogDiscoveryAllowed = webLogDiscoveryAllowed,
                 webHintPorts = webHintPorts.filter { it in 1..65535 }.distinct(),
             ),
@@ -1364,6 +1389,11 @@ class ProjectRuntimeController(
             echo 'SIFTALPHA_RUNTIME_RECOVERY_CLEAN=1'
         """.trimIndent()
         return ManagedProcessRuntime.clean(host, spec, id, guestClean)
+    }
+
+    private companion object {
+        const val MAX_PACKAGE_JSON_FILES = 32
+        const val MAX_PACKAGE_JSON_BYTES = 256 * 1024
     }
 
     private fun simpleError(
