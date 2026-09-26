@@ -426,6 +426,17 @@ class MacProjectWorkflowCoordinator(
         val lifecycle = MacProjectHostLifecyclePolicy.resolve(context.snapshot.relativePaths)
 
         if (lifecycle != null) {
+            val missingHostTools = MacProjectHostToolRequirementPolicy.requiredTools(context.snapshot)
+                .filter { it !in context.hostToolExecutables }
+            if (missingHostTools.isNotEmpty()) {
+                append(
+                    state,
+                    "HYBRID_START_FAILED=missing host tool: " +
+                        missingHostTools.joinToString(",") { it.id },
+                )
+                finish(projectId, generation, ProjectOperationPhase.FAILED)
+                return false
+            }
             val bash = File("/bin/bash")
             if (!bash.isFile || !bash.canExecute()) {
                 append(state, "HYBRID_START_FAILED=/bin/bash unavailable")

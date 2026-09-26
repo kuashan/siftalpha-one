@@ -31,17 +31,33 @@ class MacProjectWorkflowTest {
     }
 
     @Test
+    fun hybridLauncherRecognizesBunRequirementFromProjectEvidence() {
+        val snapshot = MacProjectSnapshot(
+            projectId = "macos:test",
+            rootPath = "/tmp/test",
+            relativePaths = listOf("package.json", "bun.lock", "scripts/start.sh", "scripts/stop.sh"),
+            requirementsText = null,
+            pyprojectText = null,
+            packageJsonText = """{"name":"demo","packageManager":"bun@1.3.14"}""",
+        )
+        assertEquals(
+            setOf(MacHostToolKind.BUN),
+            MacProjectHostToolRequirementPolicy.requiredTools(snapshot),
+        )
+    }
+
+    @Test
     fun blindContainerPortDiscoveryRejectsNonHtmlServices() {
         val discovery = MacProjectWebDiscovery(
             processControl = MacProjectProcessControl(),
             listeningProbe = { true },
-            webSurfaceProbe = { candidate -> candidate.endsWith(":3010") },
+            webSurfaceProbe = { candidate -> candidate.endsWith(":5000") },
         )
         val endpoint = discovery.discoverFromPorts(
-            ports = listOf(4100, 4300, 3010),
+            ports = listOf(4100, 4300, 5000),
             combinedOutput = "",
         )
-        assertEquals("http://127.0.0.1:3010", endpoint?.url)
+        assertEquals("http://127.0.0.1:5000", endpoint?.url)
         assertEquals(MacProjectWebEndpoint.Source.CONTAINER_PORT, endpoint?.source)
     }
 

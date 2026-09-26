@@ -149,6 +149,24 @@ object MacProjectHostLifecyclePolicy {
     }
 }
 
+object MacProjectHostToolRequirementPolicy {
+    fun requiredTools(snapshot: MacProjectSnapshot): Set<MacHostToolKind> = buildSet {
+        val rootNames = snapshot.relativePaths
+            .asSequence()
+            .map { it.replace('\\', '/').trim().trim('/') }
+            .filter { it.isNotBlank() && '/' !in it }
+            .map(String::lowercase)
+            .toSet()
+        val packageManagerRequiresBun = Regex(
+            """["']packageManager["']\s*:\s*["']bun(?:@|["'])""",
+            RegexOption.IGNORE_CASE,
+        ).containsMatchIn(snapshot.packageJsonText.orEmpty())
+        if (packageManagerRequiresBun || "bun.lock" in rootNames || "bun.lockb" in rootNames) {
+            add(MacHostToolKind.BUN)
+        }
+    }
+}
+
 object MacProjectWorkflowPlanner {
     fun plan(
         snapshot: MacProjectSnapshot,
