@@ -689,13 +689,19 @@ class ProjectRuntimeController(
         val consoleScript = pythonLaunchInvocation
             ?.takeIf { it.kind == PythonLaunchKind.CONSOLE_SCRIPT }
             ?.executableName
-        val stagedRoot = if (requiresNodeVite || consoleScript != null) {
-            stager.stageAll(
-                projectDocumentId = projectId,
-                sourceBuild = requiresNodeVite,
-            )
-        } else {
-            stager.stage(projectId, entrypoint)
+        val stagingProfile = InternalPythonStagingProfilePolicy.select(
+            requiresNodeVite = requiresNodeVite,
+            launchInvocation = pythonLaunchInvocation,
+            pyprojectToml = files.pyprojectText,
+        )
+        val stagedRoot = when (stagingProfile) {
+            InternalPythonStagingProfile.FULL_PROJECT ->
+                stager.stageAll(
+                    projectDocumentId = projectId,
+                    sourceBuild = requiresNodeVite,
+                )
+            InternalPythonStagingProfile.ENTRYPOINT ->
+                stager.stage(projectId, entrypoint)
         }
 
         return try {
