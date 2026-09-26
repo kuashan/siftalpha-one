@@ -701,7 +701,7 @@ class ProjectConfigurationInspector(context: Context) {
     }
 
     private fun inspectPythonFiles(projectDocumentId: String): PythonConfiguration {
-        val files = projectStore.listProjectTree(projectDocumentId)
+        val files = projectStore.listProjectTreeForRuntimeFacts(projectDocumentId)
             .asSequence()
             .filter { file -> !file.isDirectory && file.name.endsWith(".py", ignoreCase = true) }
             .filterNot { file ->
