@@ -1,6 +1,15 @@
 package com.siftalpha.macos
 
+import com.siftalpha.studio.container.ComposeProjectPlan
+import com.siftalpha.studio.container.ComposeProjectPlanStatus
+import com.siftalpha.studio.container.ComposeServicePlan
 import com.siftalpha.studio.platform.CapabilityAvailability
+import java.io.File
+import java.nio.file.Files
+import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -10,6 +19,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MacContainerWorkflowTest {
+    private val gib = 1024L * 1024L * 1024L
+
     private val healthyFacts = MacSystemFacts(
         osVersion = "15.0",
         osMajor = 15,
@@ -80,6 +91,192 @@ class MacContainerWorkflowTest {
         assertTrue(detail.startsWith("docker compose build failed exit=17"))
         assertTrue(detail.endsWith("useful-tail"))
         assertTrue(detail.length < 9_000)
+    }
+
+    @Test
+    fun composeBuildStreamsRedactedOutputBeforeProcessExitAndKeepsFinalTail() {
+        val root = Files.createTempDirectory("siftalpha-compose-stream-").toFile()
+        val script = root.resolve("fake-docker").apply {
+            writeText(
+                """
+                #!/bin/sh
+                printf 'build-before=%s\n' "$SIFTALPHA_SECRET"
+                sleep 1
+                printf 'build-after\n'
+                """.trimIndent() + "\n",
+            )
+            setExecutable(true)
+        }
+        val imported = MacProjectFilesystem().importDirectory(root)
+        val provider = MacCliComposeContainerProvider(
+            MacContainerProviderSnapshot(
+                kind = MacContainerProviderKind.DOCKER,
+                availability = CapabilityAvailability.AVAILABLE,
+                executablePath = script.absolutePath,
+                composeAvailable = true,
+            ),
+        )
+        provider.configureProjectEnvironment(
+            imported.projectId,
+            mapOf("SIFTALPHA_SECRET" to "secret-value"),
+        )
+        val plan = ComposeProjectPlan(
+            status = ComposeProjectPlanStatus.READY,
+            manifestPath = "compose.yaml",
+            services = listOf(
+                ComposeServicePlan(
+                    name = "web",
+                    image = "web:latest",
+                    buildContext = ".",
+                    dependsOn = emptyList(),
+                    ports = emptyList(),
+                ),
+            ),
+            containerAvailability = CapabilityAvailability.AVAILABLE,
+            issues = emptyList(),
+        )
+        val firstLine = CountDownLatch(1)
+        val lines = Collections.synchronizedList(mutableListOf<String>())
+        try {
+            val resultHolder = arrayOfNulls<MacContainerOperationResult>(1)
+            val worker = Thread {
+                resultHolder[0] = provider.prepare(
+                    project = imported,
+                    plan = plan,
+                    cancelled = { false },
+                    log = { line ->
+                        lines += line
+                        firstLine.countDown()
+                    },
+                )
+            }
+            worker.start()
+
+            assertTrue(firstLine.await(500, TimeUnit.MILLISECONDS))
+            assertTrue(worker.isAlive)
+            worker.join(5_000)
+            assertFalse(worker.isAlive)
+
+            val result = resultHolder[0]
+            assertTrue(result?.success == true)
+            assertTrue(lines.any { it.contains("compose build: build-before=[REDACTED]") })
+            assertTrue(lines.any { it.contains("compose build: build-after") })
+            assertTrue(result?.output?.contains("build-after") == true)
+            assertFalse(result?.output?.contains("secret-value") == true)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun composeBuildCancellationStillStopsTheManagedProcess() {
+        val root = Files.createTempDirectory("siftalpha-compose-cancel-").toFile()
+        val script = root.resolve("fake-docker").apply {
+            writeText("#!/bin/sh\nsleep 30\n")
+            setExecutable(true)
+        }
+        val imported = MacProjectFilesystem().importDirectory(root)
+        val provider = MacCliComposeContainerProvider(
+            MacContainerProviderSnapshot(
+                kind = MacContainerProviderKind.DOCKER,
+                availability = CapabilityAvailability.AVAILABLE,
+                executablePath = script.absolutePath,
+                composeAvailable = true,
+            ),
+        )
+        val cancelled = AtomicBoolean(false)
+        val plan = ComposeProjectPlan(
+            status = ComposeProjectPlanStatus.READY,
+            manifestPath = "compose.yaml",
+            services = listOf(
+                ComposeServicePlan("web", "web:latest", ".", emptyList(), emptyList()),
+            ),
+            containerAvailability = CapabilityAvailability.AVAILABLE,
+            issues = emptyList(),
+        )
+        val firstLine = CountDownLatch(1)
+        try {
+            val resultHolder = arrayOfNulls<MacContainerOperationResult>(1)
+            val worker = Thread {
+                resultHolder[0] = provider.prepare(
+                    imported,
+                    plan,
+                    cancelled = { cancelled.get() },
+                    log = { firstLine.countDown() },
+                )
+            }
+            worker.start()
+            assertTrue(firstLine.await(500, TimeUnit.MILLISECONDS).not())
+            cancelled.set(true)
+            worker.join(5_000)
+            assertFalse(worker.isAlive)
+            assertTrue(resultHolder[0]?.cancelled == true)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun composeResourceFailureClassifierRequiresMemoryEvidence() {
+        assertEquals(
+            MacComposeResourceFailure.MEMORY_EXHAUSTED,
+            MacComposeResourceFailureClassifier.classify("cannot allocate memory"),
+        )
+        assertEquals(
+            MacComposeResourceFailure.MEMORY_EXHAUSTED,
+            MacComposeResourceFailureClassifier.classify("ResourceExhausted: build process killed"),
+        )
+        assertEquals(
+            MacComposeResourceFailure.OTHER,
+            MacComposeResourceFailureClassifier.classify("docker compose build failed exit=1\nmanifest unknown"),
+        )
+        assertEquals(
+            MacComposeResourceFailure.OTHER,
+            MacComposeResourceFailureClassifier.classify("Killed"),
+        )
+    }
+
+    @Test
+    fun managedResourcePolicyKeepsHostReserveAndAvoidsUnboundedGrowth() {
+        val low = MacManagedResourcePolicy.recommend(
+            healthyFacts.copy(
+                processorCount = 4,
+                physicalMemoryBytes = 6L * gib,
+            ),
+            MacManagedVmResourceFacts(cpuCount = 1, memoryBytes = 2L * gib),
+        )
+        assertEquals(MacManagedResourceDecision.HOST_INSUFFICIENT, low.decision)
+        assertTrue((low.maximumSafeMemoryBytes ?: 0L) >= 0L)
+
+        val medium = MacManagedResourcePolicy.recommend(
+            healthyFacts.copy(
+                processorCount = 8,
+                physicalMemoryBytes = 16L * gib,
+            ),
+            MacManagedVmResourceFacts(cpuCount = 2, memoryBytes = 4L * gib),
+        )
+        assertEquals(MacManagedResourceDecision.REPAIR_REQUIRED, medium.decision)
+        assertEquals(8L * gib, medium.recommendedMemoryBytes)
+        assertTrue(medium.recommendedMemoryBytes!! <= medium.maximumSafeMemoryBytes!!)
+        assertTrue(medium.recommendedMemoryBytes!! > 0L)
+
+        val high = MacManagedResourcePolicy.recommend(
+            healthyFacts.copy(physicalMemoryBytes = 32L * gib),
+            MacManagedVmResourceFacts(cpuCount = 12, memoryBytes = 24L * gib),
+        )
+        assertEquals(MacManagedResourceDecision.CURRENT_OK, high.decision)
+        assertEquals(24L * gib, high.maximumSafeMemoryBytes)
+        assertTrue(high.recommendedMemoryBytes!! <= high.maximumSafeMemoryBytes!!)
+    }
+
+    @Test
+    fun managedResourceParserReadsColimaCpuAndMemoryFacts() {
+        val facts = MacManagedVmResourceParser.parse(
+            """{"status":"Running","cpu":4,"memory":6}""",
+        )
+
+        assertEquals(4, facts?.cpuCount)
+        assertEquals(6L * gib, facts?.memoryBytes)
     }
 
     @Test
