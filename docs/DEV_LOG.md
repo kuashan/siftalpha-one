@@ -3714,3 +3714,63 @@ Cloud verification:
 - Artifact digest: `sha256:e013723aa99c8c66b7e910a40d60e5515b0feb77d9622757c0b46afa0e3a7425`.
 - Status: **CODE / CLOUD PASS（代码 / 云端通过）; REAL DEVICE ACCEPTANCE PENDING（真机验收待确认）**.
 
+## 2026-09-26 · Android v234 Native Web Launch Evidence Priority Repair
+
+### Scope
+
+Android（安卓）only. macOS source/runtime is intentionally untouched.
+
+### Baselines
+
+- Overall Android real-device baseline: `baseline/r48d10` / `a60d7fb5d81a6611ea6695c023c1c70e8181388c` / v222.
+- Native-Web behavior reference: alpha43-r44 / `0285db2c26565e1aa2a47624d2cad8fa9c19e89f`, where `easy_tdx_1-main` was real-device accepted opening its complete project-owned Web UI without requiring MARKET / CODE.
+- v233 is not accepted as final behavior: it blocked the erroneous synthetic `uvicorn` path but regressed the project to the one-shot CLI argument flow.
+
+### Root cause
+
+Generic Python Web framework recognition was evaluated before the stricter project-owned Python+Vite Web contract. A project containing an internal FastAPI application could therefore be rewritten to `uvicorn module:app` before the resolver reached the project's own validated console-script + `serve` + Vite launch contract.
+
+This is an evidence-priority defect, not an `easy_tdx`-specific defect.
+
+### Repair
+
+- Restored the pre-v233 Android Normal Mode and Developer Mode Native-Web workflow.
+- Native-Web resolution order is now:
+  1. explicit project run remains authoritative;
+  2. strict project-owned Python+Vite Web contract;
+  3. generic framework fallback (FastAPI / Streamlit / Django / Flask / Gradio / NiceGUI / Dash / aiohttp / Tornado);
+  4. normal CLI fallback when no Native-Web launch is proven.
+- The strict project-owned contract retains its fail-closed evidence requirements: Web classification, pyproject Web extra, Vite component, safe console script, literal serve command and browser-suppression option.
+- Generic framework recognition remains available when no stricter project-owned Web contract exists.
+- Learned Web launch storage namespace advanced from v1 to v2 so launches verified under the previous priority policy are not reused.
+- No project-name, `easy_tdx`, OpenBB, or port-specific exception was added.
+- Environment Plan, PREPARE, STOP, External Provider, Internal Alpine, Embedded CPython, project-scoped ownership, Worker freeze, Endpoint Probe and macOS are unchanged.
+
+### Regression coverage
+
+Added a resolver regression where one project contains both:
+- the complete strict Python+Vite `serve` contract; and
+- an internal FastAPI `app = FastAPI()`.
+
+Expected: the project-owned `easy-tdx serve --host 127.0.0.1 --no-open-browser` candidate wins.
+
+Existing generic FastAPI coverage remains and must still resolve to `uvicorn` when no stricter project-owned Web contract exists.
+
+### Version
+
+- versionCode = `234`
+- versionName = `0.8.0-alpha43-r48d11-android-web-priority-r1`
+
+### Real-device acceptance target
+
+For `easy_tdx_1-main`:
+- Run must not ask for MARKET / CODE;
+- Run must not select generic `uvicorn`;
+- the project-owned Web service must start;
+- Web Discovery / Endpoint Probe must verify it;
+- Open must reach the complete project Web UI.
+
+For a simple FastAPI project without a strict project-owned Web contract:
+- generic FastAPI -> `uvicorn` fallback remains available.
+
+Cloud verification: pending.
