@@ -3699,5 +3699,18 @@ Real-device acceptance target:
 - versionCode = `233`
 - versionName = `0.8.0-alpha43-r48d11-android-launch-r1`
 
-Cloud verification: pending.
+Cloud verification:
+
+- Functional source HEAD: `8ad7448c3f38c5456097920aaf661e4c5706c21f`.
+- W0 Cloud Build #867 / run ID `36237502378`: **PASS（通过）**.
+- Internal Alpine Probe #123 / run ID `36237502395`: **PASS（通过）**.
+- Repository validators: PASS.
+- Android unit tests: PASS.
+- `:core:test`: PASS.
+- `assembleDebug`: PASS.
+- APK evidence and stable signing: PASS.
+- Artifact: `siftalpha-w0-867`.
+- Artifact ID: `10904428943`.
+- Artifact digest: `sha256:e013723aa99c8c66b7e910a40d60e5515b0feb77d9622757c0b46afa0e3a7425`.
+- Status: **CODE / CLOUD PASS（代码 / 云端通过）; REAL DEVICE ACCEPTANCE PENDING（真机验收待确认）**.
 
