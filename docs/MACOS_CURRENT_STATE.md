@@ -12,19 +12,30 @@
 - M1 Core Boundary（核心边界）：PASS / CLOSED（通过 / 关闭）
 - M2 macOS Host Skeleton（macOS 主机骨架）：PASS / CLOSED（通过 / 关闭）
 - M3 Host Runtime Provider（主机运行提供者）：**PASS / CLOSED（通过 / 关闭）**
-- 当前阶段：**M6 — Container / Multi-service（容器 / 多服务）— M6.1 COMPLETE；M6.2 CLOUD PASS / REAL VENTURA PENDING**
+- 当前阶段：**M7 — OpenBot Acceptance（OpenBot 验收）— IN PROGRESS；Managed VM Readiness / DNS Recovery 为当前阻塞项**
 - M4 implementation（实现）：**M4.1 PASS / COMPLETE；M4.2 PASS / COMPLETE；M4 PASS / CLOSED（M4 已通过并关闭）**
 - M5 implementation（实现）：**M5.1 PASS / COMPLETE；M5.2 PASS / COMPLETE；M5 PASS / CLOSED（M5 已通过并关闭）**
 
-本轮最新 macOS 适配层修复：**Managed Container Network Inheritance Regression Repair = CLOUD PASS（云端通过）**。
+本轮最新 macOS 适配层修复：**M7 Managed VM Readiness / DNS Recovery + Developer Mode Toolbar = CLOUD PASS（云端通过）**。
 
 - M6 继续 **CLOSED（关闭）**，没有创建 M6.3；
-- Managed VM / daemon lifecycle（托管虚拟机 / 守护进程生命周期）已确认正确，本轮未修改；
+- Managed VM / daemon lifecycle（托管虚拟机 / 守护进程生命周期）架构保持不变，本轮补齐了 SSH readiness 与 resolver inspection gate；
 - 根因是 Compose / Buildx 客户端子进程没有在项目环境合并后重新继承当前 macOS System Proxy（系统代理）；
 - `connection reset by peer` 已加入有界的 Registry 网络传输恢复分类；
 - External Docker / Podman（外部 Docker / Podman）未改变；Android 未改变；
 - macOS CI Run `36154688284` PASS；Android W0 Run `36154688417` PASS；
 - 真实 Mac / Easy-TDX Prepare 验收仍为 **PENDING（待验收）**。
+
+### M7 当前状态 — 2026-09-26
+
+- M6 = **CLOSED**。
+- M7 = **IN PROGRESS**，尚未关闭。
+- 当前 M7 blocker：**Managed VM Readiness / DNS Recovery**；真实 Mac 仍需使用原始 OpenBot 完成验收。
+- Managed VM SSH readiness gate、DNS inspection/recovery separation、跨 generation recovery 收尾：**CLOUD PASS**。
+- Developer Mode toolbar：响应式 2-row / 3-row layout 已实现，按钮顺序和 ActionListener 未改变：**CLOUD PASS**。
+- macOS Host Runtime Run `36210492001`: **PASS**。
+- Android W0 Run `36210491934`: **PASS**。
+- REAL_DEVICE_ACCEPTANCE / REAL_MAC_ACCEPTANCE: **PENDING**。
 
 M3 最后一个已验收功能 HEAD：
 `259d94fe7d7501a1232f1d7114445f4673cfc0a1`

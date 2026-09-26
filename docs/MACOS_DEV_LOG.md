@@ -2592,3 +2592,41 @@ M6 remains CLOSED（M6 继续关闭）。本轮不是 M6.3，不创建新的产�
 - Managed proxy ON / OFF, External Docker isolation, and registry reset classification tests: PASS
 - M6 remains CLOSED; no M6.3 created
 - REAL_DEVICE_ACCEPTANCE=PENDING（真实 Mac 仍待验收）
+
+## 2026-09-26 · M7 Managed VM Readiness / DNS Recovery + Developer Toolbar Repair
+
+M6 remains **CLOSED**. M7 is now **IN PROGRESS**; the original OpenBot real-Mac acceptance remains pending.
+
+### Task A — Managed VM readiness and recovery
+
+Root causes confirmed in the macOS Adapter:
+
+- `ensureManagedVmResolver()` previously treated a failed `colima ssh -- cat /etc/resolv.conf` as DNS corruption and immediately attempted `rm` / `tee` through the same not-ready SSH channel.
+- `attach()` treated a durable operation as recovery even when the in-memory coordinator already owned the same project/action/generation, allowing `RECOVERY_PENDING` to contaminate a live generation.
+
+Repair:
+
+- added a bounded 60-second `colima ssh -- true` readiness gate with retry facts `MANAGED_VM_SSH_READY=WAITING`, `PASS`, and `FAILED`;
+- DNS recovery is now evaluated only after SSH readiness and a successful resolver read;
+- resolver inspection failure is reported distinctly and never triggers blind `/etc/resolv.conf` mutation;
+- stale recovery is idempotent, preserves audit history, and does not clear a matching live durable operation;
+- a new operation generation clears only the recovery-in-progress flag, preserving history.
+
+### Task B — Developer Mode toolbar
+
+- replaced the single-line action strip with a UI-only wrap layout driven by available width and button preferred width;
+- normal width produces two rows and narrower width produces three rows;
+- all 13 buttons, their order, and existing ActionListeners remain unchanged;
+- no Controller, Coordinator, Core, Normal Mode, Runtime, or Android changes were made for the UI task.
+
+### Verification authority
+
+- START_HEAD=`26412748afa5f5ab58d7ec6d03672465a7be63f4`
+- Runtime repair commit=`010767465c15af95b1beeb03bca145bc955c64c3`
+- Toolbar commit=`7d04d0ffb0ef815ef11efa1ef3ccd0e4f21caf89`
+- Toolbar test correction=`65400deb9ec92c9031d8945ea80d1e8615ce82d0`
+- macOS Host Runtime Run `36210492001`: **PASS**
+- Android W0 Run `36210491934`: **PASS**
+- M6: **CLOSED**
+- M7: **IN PROGRESS**
+- Real Mac / original OpenBot acceptance: **PENDING**

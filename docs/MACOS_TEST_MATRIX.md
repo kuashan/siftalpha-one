@@ -155,7 +155,7 @@ M2 final completion（最终完成度）：**6 / 6 — PASS / CLOSED（通过 / 
 - STOP（停止）只停止该项目。
 - 重启后可以重新运行。
 
-当前状态：**NOT STARTED（未开始）**
+当前状态：**IN PROGRESS（进行中）— Managed VM Readiness / DNS Recovery blocker**
 
 ### M6 Final Closure Audit — PASS
 
@@ -175,6 +175,25 @@ This bounded macOS Adapter repair keeps M6 CLOSED and does not create M6.3.
 | macOS Host Runtime CI | PASS，Run `36154688284` |
 | Android W0 Shared Core boundary regression | PASS，Run `36154688417` |
 | Real Mac Easy-TDX Prepare acceptance | PENDING（待真实设备验收） |
+
+### M7 Readiness / Developer Toolbar Repair — 2026-09-26
+
+| Check | Expected | Status |
+|---|---|---|
+| Managed VM SSH readiness retry | bounded retry, `MANAGED_VM_SSH_READY=PASS/FAILED` | PASS |
+| SSH failure boundary | no `/etc/resolv.conf` `rm` / `tee` before SSH readiness | PASS |
+| Resolver inspection | DNS recovery only follows successful `resolv.conf` read | PASS |
+| Resolver inspection failure | explicit inspection failure, no blind DNS mutation | PASS |
+| Generation recovery | stale recovery does not reclassify the same live generation | PASS |
+| New generation cleanup | new `begin()` clears stale recovery state without deleting history | PASS |
+| Developer toolbar normal width | 13 buttons reflow to 2 rows | PASS |
+| Developer toolbar narrow width | 13 buttons reflow to 3 rows | PASS |
+| Very narrow layout | no zero-column result, crash, or relayout loop | PASS |
+| macOS Host Runtime CI | compile/tests/package | PASS — Run `36210492001` |
+| Android W0 regression | shared Core/Android build | PASS — Run `36210491934` |
+| Real Mac OpenBot acceptance | original OpenBot Detect → Prepare → Run → Web → Logs → Stop → Restart | PENDING |
+
+Result: **M7 IN PROGRESS / CLOUD PASS / REAL MAC PENDING**.
 
 ## M8 — Distribution（分发）
 
