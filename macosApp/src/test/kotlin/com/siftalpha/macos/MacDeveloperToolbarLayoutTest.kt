@@ -35,7 +35,11 @@ class MacDeveloperToolbarLayoutTest {
         panel.doLayout()
         assertEquals(buttonWidths.size, panel.componentCount)
         assertEquals(2, panel.components.map { it.y }.distinct().size)
-        assertTrue(panel.components.zipWithNext().all { (first, second) -> first.x <= second.x || first.y < second.y })
+        assertTrue(
+            panel.components.toList().zipWithNext().all { (first, second) ->
+                first.x <= second.x || first.y < second.y
+            },
+        )
 
         panel.setSize(430, 160)
         panel.doLayout()
