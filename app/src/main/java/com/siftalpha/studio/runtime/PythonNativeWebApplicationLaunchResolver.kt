@@ -38,13 +38,6 @@ object PythonNativeWebApplicationLaunchResolver {
         Regex("""(?m)@\s*[A-Za-z_][A-Za-z0-9_]*\.command\s*\(\s*["']serve["']"""),
         Regex("""(?m)\badd_parser\s*\(\s*["']serve["']"""),
     )
-    private val viteConfigs = setOf(
-        "vite.config.ts",
-        "vite.config.js",
-        "vite.config.mts",
-        "vite.config.mjs",
-        "vite.config.cjs",
-    )
     private val browserDisableFlags = listOf(
         "--no-open-browser",
         "--no-browser",
@@ -58,6 +51,7 @@ object PythonNativeWebApplicationLaunchResolver {
         pythonSources: Map<String, String>,
         webProjectEnabled: Boolean,
         requirementsText: String? = null,
+        packageJsonTexts: Map<String, String> = emptyMap(),
     ): PythonNativeWebLaunchCandidate? {
         if (!webProjectEnabled || !declaredRun.isNullOrBlank()) {
             return null
@@ -68,6 +62,7 @@ object PythonNativeWebApplicationLaunchResolver {
                 pyprojectToml = pyprojectToml,
                 relativePaths = relativePaths,
                 pythonSources = pythonSources,
+                packageJsonTexts = packageJsonTexts,
             )?.let { return it }
 
             // A project-owned console-script contract is stronger launch authority than a generic
@@ -249,6 +244,7 @@ object PythonNativeWebApplicationLaunchResolver {
         pyprojectToml: String,
         relativePaths: Collection<String>,
         pythonSources: Map<String, String>,
+        packageJsonTexts: Map<String, String>,
     ): PythonNativeWebLaunchCandidate? {
         val root = runCatching { Toml.parse(pyprojectToml) }.getOrNull() ?: return null
         if (root.hasErrors()) return null
@@ -286,7 +282,12 @@ object PythonNativeWebApplicationLaunchResolver {
             else -> return null
         }
 
-        if (!hasViteComponent(relativePaths)) return null
+        if (
+            ViteWebComponentDetector.detect(
+                relativePaths = relativePaths,
+                packageJsonTexts = packageJsonTexts,
+            ).isEmpty()
+        ) return null
 
         val sourceEvidence = pythonSources.entries.firstNotNullOfOrNull { (path, source) ->
             if (!sourceOwnedByScript(path, selectedScript.target)) return@firstNotNullOfOrNull null
@@ -353,21 +354,6 @@ object PythonNativeWebApplicationLaunchResolver {
             supportsHost = "--host" in source,
             browserDisableFlag = browserFlag,
         )
-    }
-
-    private fun hasViteComponent(relativePaths: Collection<String>): Boolean {
-        val normalized = relativePaths
-            .asSequence()
-            .map { it.replace('\\', '/').trim().trim('/') }
-            .filter { it.isNotBlank() }
-            .toSet()
-        return normalized.any { path ->
-            val name = path.substringAfterLast('/').lowercase()
-            if (name !in viteConfigs) return@any false
-            val parent = path.substringBeforeLast('/', missingDelimiterValue = "")
-            val packageJson = if (parent.isBlank()) "package.json" else "$parent/package.json"
-            packageJson in normalized
-        }
     }
 
     private fun canonicalCommandName(value: String): String =
