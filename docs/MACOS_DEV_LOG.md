@@ -2660,3 +2660,32 @@ Only a managed Docker executable under the SiftAlpha toolchain is eligible. On e
 - M4/M5/M6 regression probes: PASS
 - DMG packaging: PASS
 - Real Ventura + original OpenBot acceptance: PENDING
+
+## 2026-09-26 · M7 Regression Repair — Host Physical Memory and Colima Memory Units
+
+M6 remains **CLOSED** and M7 remains **IN PROGRESS**. This finite repair addresses only two real-Mac resource-fact regressions before the original OpenBot acceptance.
+
+### Problem and root cause
+
+The real Ventura Intel acceptance log reported `HOST_PHYSICAL_MEMORY_GIB=UNKNOWN`. `MacSystemFactsDiscovery` relied on JVM MXBean reflection, which did not reliably expose physical memory on that host; there was no macOS-native fallback. The missing host fact caused the managed VM recommendation, maximum-safe memory, and resource repair decision to remain unknown.
+
+The same acceptance log reported `MANAGED_VM_MEMORY_CURRENT_GIB=2147483648.0`. The Colima/Lima status contract provides `memory` as a byte count, but `MacManagedVmResourceParser` treated it as GiB and multiplied by `1024^3`.
+
+### Repair
+
+- Preserve the JVM physical-memory query as the first source.
+- On null, exception, or non-positive JVM output, call `/usr/sbin/sysctl -n hw.memsize` directly with `ProcessBuilder`.
+- Bound the sysctl process to two seconds, validate exit status, parse positive Long bytes, and return null on invalid output, failure, or timeout.
+- Parse Colima `memory` directly as Long bytes; support both real `cpus` and legacy `cpu` keys.
+- Keep `MacManagedResourcePolicy` arithmetic and all managed-only, lifecycle, retry, streaming-log, OOM, Core, Android, and OpenBot boundaries unchanged.
+
+### Tests and cloud evidence
+
+- Real-provider-shaped parser fixtures now use `2147483648`, `4294967296`, and byte-to-GiB assertions.
+- Host memory tests cover valid JVM priority, sysctl fallback, invalid output, non-zero exit, and timeout fail-closed behavior.
+- Policy integration covers a 16 GiB host with a 2 GiB VM and asserts `REPAIR_REQUIRED` with a bounded recommendation.
+- macOS Host Runtime Run `36218128238`: **PASS**; includes M4/M5/M6 regressions and DMG packaging.
+- Android W0 Cloud Build Run `36218128249`: **PASS**.
+- DMG: `siftalpha-macos-m6.2-host-network-ventura-x64-132`, artifact ID `10898375639`.
+
+The next action is real Mac + original OpenBot retest. M6 is not reopened and no new M7 substage is created.

@@ -1417,3 +1417,27 @@ M6 remains **CLOSED**. M7 remains **IN PROGRESS**; original OpenBot real-Mac acc
 - Streaming callback, secret redaction, cancellation, memory classification, resource policy, and Colima resource parser tests: **PASS**
 - Existing M4/M5/M6 regression probes and Ventura-baseline DMG packaging: **PASS**
 - Real Mac / original OpenBot acceptance: **PENDING**
+
+## 2026-09-26 · M7 Regression Repair — Host Memory and Colima Byte Semantics
+
+M6 remains **CLOSED**. M7 remains **IN PROGRESS**; original OpenBot real-Mac acceptance is still pending.
+
+### Root causes
+
+- On the real Ventura Intel host, the JVM MXBean reflection path did not reliably return physical memory, so host memory and the managed-resource recommendation became `UNKNOWN`.
+- `MacManagedVmResourceParser` interpreted Colima/Lima status JSON `memory` as GiB and multiplied it by `GIB`, although the provider contract supplies bytes. `2147483648` therefore appeared as `2147483648.0 GiB` instead of about `2.0 GiB`.
+
+### Repair
+
+- `MacSystemFactsDiscovery` keeps the JVM query first and falls back to `/usr/sbin/sysctl -n hw.memsize` through `ProcessBuilder` when the JVM value is missing, invalid, or throws. The fallback has a bounded timeout, validates exit status and positive Long-byte output, and fails closed.
+- `MacManagedVmResourceParser` now stores the JSON `memory` value directly as Long bytes and continues to accept both `cpus` and the legacy `cpu` key.
+- `MacManagedResourcePolicy`, managed-only ownership, retry bounds, Compose streaming, OOM classification, Runtime lifecycle, Shared Core, Android, and OpenBot remain unchanged.
+
+### Verification
+
+- Test-first RED: macOS Host Run `36217843712` exposed the missing fallback/parser API as expected.
+- Functional HEAD: `1255fe674e3ab8e595b3fd2828ceabe5575e7183`
+- macOS Host Runtime Run `36218128238`: **PASS**
+- Android W0 Cloud Build Run `36218128249`: **PASS**
+- DMG artifact: `siftalpha-macos-m6.2-host-network-ventura-x64-132` (macOS Run `36218128238`, artifact ID `10898375639`)
+- Real Mac / original OpenBot acceptance: **PENDING**

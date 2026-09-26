@@ -1109,3 +1109,24 @@ Closure:
 | Real acceptance | Ventura + original OpenBot | PENDING |
 
 M6 remains CLOSED and M7 remains IN PROGRESS. No new M6.x or M7.x slice is created.
+
+## M7 Regression Repair — Host Memory / Colima Byte Semantics — 2026-09-26
+
+| Check | Expected | Status |
+|---|---|---|
+| JVM physical memory | Valid JVM value wins without fallback | PASS |
+| macOS physical memory fallback | `/usr/sbin/sysctl -n hw.memsize` returns positive Long bytes | PASS |
+| sysctl failure handling | Invalid output, non-zero exit, and timeout fail closed | PASS |
+| Colima memory contract | `memory=2147483648` remains `2147483648` bytes, about 2.0 GiB | PASS |
+| CPU key compatibility | Real `cpus` and legacy `cpu` are accepted | PASS |
+| Resource policy integration | 16 GiB host + 2 GiB VM yields bounded `REPAIR_REQUIRED` recommendation | PASS |
+| Managed-only boundary | Only existing SiftAlpha managed `sa` profile remains eligible | PASS |
+| Retry boundary | Existing one repair + one Prepare retry limit unchanged | PASS |
+| Streaming logs | Existing Compose streaming path unchanged | PASS |
+| Core boundary | Shared Core unchanged | PASS |
+| Android production boundary | Android production code unchanged; W0 `36218128249` | PASS |
+| macOS Host Runtime | Run `36218128238` | PASS |
+| DMG artifact | `siftalpha-macos-m6.2-host-network-ventura-x64-132` / `10898375639` | PASS |
+| Real acceptance | Ventura + original OpenBot | PENDING |
+
+M6 remains **CLOSED** and M7 remains **IN PROGRESS**. No M7.1/M7.2 or other new stage is created.
