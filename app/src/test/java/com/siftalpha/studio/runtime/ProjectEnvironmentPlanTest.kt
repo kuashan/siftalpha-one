@@ -66,6 +66,78 @@ class ProjectEnvironmentPlanTest {
     }
 
     @Test
+    fun nestedConfiglessViteIsDetectedFromPackageManifest() {
+        val detection = detect(
+            paths = listOf(
+                "pyproject.toml",
+                "src/app.py",
+                "frontend/package.json",
+            ),
+            pyproject = """
+                [project]
+                name = "demo"
+                dependencies = ["fastapi"]
+            """.trimIndent(),
+            packageJsonTexts = mapOf(
+                "frontend/package.json" to """
+                    {
+                      "scripts": {
+                        "build": "vue-tsc -b && vite build",
+                        "dev": "vite"
+                      },
+                      "devDependencies": {
+                        "vite": "^8.1.1",
+                        "vue": "^3.5.0"
+                      }
+                    }
+                """.trimIndent(),
+            ),
+        )
+        val plan = ProjectEnvironmentPlanner.plan(detection, allCapabilities)
+
+        assertEquals(1, detection.viteComponentCount)
+        assertEquals("frontend", detection.viteComponents.single().directory)
+        assertTrue(detection.viteComponents.single().hasViteDependency)
+        assertTrue(detection.viteComponents.single().hasViteScript)
+        assertFalse(detection.viteComponents.single().hasViteConfig)
+        assertTrue(EnvironmentBuildStep.NODE_INSTALL in plan.buildSteps)
+        assertTrue(EnvironmentBuildStep.NODE_BUILD in plan.buildSteps)
+        assertEquals(EnvironmentBackend.INTERNAL_ALPINE, plan.preferredBackend)
+        assertTrue(
+            plan.diagnosticLines().contains(
+                "SIFTALPHA_ENV_WEB_COMPONENT_1_DIR=frontend",
+            ),
+        )
+    }
+
+    @Test
+    fun ordinaryNestedNodePackageIsNotMisclassifiedAsVite() {
+        val detection = detect(
+            paths = listOf(
+                "pyproject.toml",
+                "src/app.py",
+                "tools/package.json",
+            ),
+            pyproject = """
+                [project]
+                name = "demo"
+            """.trimIndent(),
+            packageJsonTexts = mapOf(
+                "tools/package.json" to """
+                    {
+                      "scripts": { "test": "node test.js" },
+                      "dependencies": { "express": "^5.0.0" },
+                      "devDependencies": { "vitest": "^3.0.0" }
+                    }
+                """.trimIndent(),
+            ),
+        )
+
+        assertEquals(0, detection.viteComponentCount)
+        assertTrue(detection.viteComponents.isEmpty())
+    }
+
+    @Test
     fun malformedPyprojectBlocksPlan() {
         val detection = detect(
             paths = listOf("pyproject.toml", "main.py"),
@@ -463,11 +535,13 @@ class ProjectEnvironmentPlanTest {
     private fun detect(
         paths: List<String>,
         pyproject: String?,
+        packageJsonTexts: Map<String, String> = emptyMap(),
     ): ProjectEnvironmentDetection = ProjectEnvironmentDetector.detect(
         ProjectEnvironmentDetectionInput(
             relativePaths = paths,
             requirementsText = null,
             pyprojectText = pyproject,
+            packageJsonTexts = packageJsonTexts,
         ),
     )
 }
