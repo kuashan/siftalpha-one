@@ -278,20 +278,17 @@ class V04ProjectGateway(private val context: Context) {
      * Full runtime facts are loaded only when a Runtime action needs them. Runtime Center refresh uses
      * root-only normalization so large repositories are not recursively scanned merely to render cards.
      */
-    fun runtimeFacts(projectDocumentId: String): RuntimeFacts =
-        runtimeSourceFacts(projectDocumentId).facts
+    fun runtimeFacts(projectDocumentId: String): RuntimeFacts {
+        val objectValue = metadata(projectDocumentId)
+        val nodes = projectStore.listProjectTreeForRuntimeFacts(projectDocumentId)
+        return buildRuntimeFacts(objectValue, nodes)
+    }
 
     fun runtimeSourceFacts(projectDocumentId: String): RuntimeSourceFactsSnapshot {
         val objectValue = metadata(projectDocumentId)
         val nodes = projectStore.listProjectTreeForRuntimeFacts(projectDocumentId)
-        val relativePaths = nodes.map { it.relativePath }
-        val facts = RuntimeFacts(
-            relativePaths = relativePaths,
-            declaredType = objectValue?.optString("type")?.takeIf { it.isNotBlank() },
-            declaredRun = objectValue?.optString("run")?.takeIf { it.isNotBlank() },
-            declaredEntry = objectValue?.optString("entry")?.takeIf { it.isNotBlank() },
-            hasExternalDependencyRequirement = requiresExternalPythonEnvironment(nodes),
-        )
+        val facts = buildRuntimeFacts(objectValue, nodes)
+        val relativePaths = facts.relativePaths
         val requirementsText = readRootTextFromNodes(nodes, "requirements.txt")
         val pyprojectText = readRootTextFromNodes(nodes, "pyproject.toml")
         val canonical = buildString {
@@ -317,6 +314,17 @@ class V04ProjectGateway(private val context: Context) {
             fingerprint = "sha256:$fingerprint",
         )
     }
+
+    private fun buildRuntimeFacts(
+        objectValue: JSONObject?,
+        nodes: List<ProjectStore.FileNode>,
+    ): RuntimeFacts = RuntimeFacts(
+        relativePaths = nodes.map { it.relativePath },
+        declaredType = objectValue?.optString("type")?.takeIf { it.isNotBlank() },
+        declaredRun = objectValue?.optString("run")?.takeIf { it.isNotBlank() },
+        declaredEntry = objectValue?.optString("entry")?.takeIf { it.isNotBlank() },
+        hasExternalDependencyRequirement = requiresExternalPythonEnvironment(nodes),
+    )
 
     private fun readRootTextFromNodes(
         nodes: List<ProjectStore.FileNode>,
