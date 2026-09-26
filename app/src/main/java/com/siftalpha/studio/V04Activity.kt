@@ -865,7 +865,11 @@ open class V04Activity : StudioActivity() {
                 ::webLearnedEndpointStore.isInitialized &&
                 RuntimeWebLearnedEndpointPolicy.canLearn(webSnapshot.source, reachableWebUrl)
             ) {
-                webLearnedEndpointStore.rememberOwnedVerified(stateKey, reachableWebUrl)
+                webLearnedEndpointStore.rememberOwnedVerified(
+                    projectKey = stateKey,
+                    url = reachableWebUrl,
+                    authorityFingerprint = webEndpointAuthorityFingerprint(webProfile),
+                )
             }
             if (::webLearnedLaunchStore.isInitialized) {
                 webLearnedLaunchStore.markVerified(stateKey)
@@ -1995,6 +1999,16 @@ open class V04Activity : StudioActivity() {
             .show()
     }
 
+    private fun webEndpointAuthorityFingerprint(
+        profile: WebProjectInspector.Profile,
+    ): String = RuntimeWebLearnedEndpointPolicy.authorityFingerprint(
+        enabled = profile.enabled,
+        framework = profile.framework,
+        source = profile.source,
+        host = profile.host,
+        detectedPort = profile.port,
+    )
+
     private fun startProject(
         project: V04ProjectGateway.RuntimeProject,
         webProfile: WebProjectInspector.Profile? = null,
@@ -2005,7 +2019,10 @@ open class V04Activity : StudioActivity() {
             webInspector.inspect(project.summary.documentId)
         }.getOrNull()
         profile?.let { webProfileCache[project.summary.documentId] = it }
-        val learnedPort = webLearnedEndpointStore.read(project.summary.documentId)?.port
+        val learnedPort = webLearnedEndpointStore.read(
+            projectKey = project.summary.documentId,
+            authorityFingerprint = profile?.let(::webEndpointAuthorityFingerprint).orEmpty(),
+        )?.port
         val webHintPorts = RuntimeWebHintPolicy.ports(
             detectedPort = profile?.port,
             framework = profile?.framework,
@@ -3199,7 +3216,10 @@ open class V04Activity : StudioActivity() {
             val resolvedProfile = cachedProfile ?: runCatching {
                 webInspector.inspect(stateKey)
             }.getOrNull()
-            val learnedPort = webLearnedEndpointStore.read(stateKey)?.port
+            val learnedPort = webLearnedEndpointStore.read(
+                projectKey = stateKey,
+                authorityFingerprint = resolvedProfile?.let(::webEndpointAuthorityFingerprint).orEmpty(),
+            )?.port
             val hintPorts = RuntimeWebHintPolicy.ports(
                 detectedPort = resolvedProfile?.port,
                 framework = resolvedProfile?.framework,
@@ -4060,7 +4080,10 @@ open class V04Activity : StudioActivity() {
             RuntimeWebHintPolicy.ports(
                 detectedPort = profile?.port,
                 framework = profile?.framework,
-                learnedPort = webLearnedEndpointStore.read(stateKey)?.port,
+                learnedPort = webLearnedEndpointStore.read(
+                    projectKey = stateKey,
+                    authorityFingerprint = profile?.let(::webEndpointAuthorityFingerprint).orEmpty(),
+                )?.port,
                 detectedSource = profile?.source,
             )
         }
