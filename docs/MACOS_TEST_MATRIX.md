@@ -1089,3 +1089,23 @@ macOS 后续每个实现/修复在进入代码前必须增加以下证据：
 
 Closure:
 **PRE-M7 SHARED CORE REALIGNMENT = PASS / CLOSED.**
+
+## M7 Regression Repair — 2026-09-26
+
+| Check | Expected | Status |
+|---|---|---|
+| Compose Build stream | Lines enter shared Coordinator history before child exit | PASS — macOS Host Runtime `36215350544` |
+| Bounded output | Final diagnostic tail remains bounded | PASS |
+| Secret redaction | Streamed lines do not expose configured project secrets | PASS |
+| Cancellation | Existing Compose child cancellation remains bounded | PASS |
+| Memory classifier | Explicit memory evidence only; plain `exit=1` / `Killed` is not enough | PASS |
+| Resource policy | Host reserve, maximum-safe memory, positive bounded recommendation | PASS |
+| Managed ownership | Only SiftAlpha managed Docker/Colima `sa` profile is eligible | PASS |
+| Resource repair | Stop → resource start → readiness → Docker/Compose/Buildx verify | PASS |
+| Retry bound | One resource repair and one Prepare retry maximum | PASS |
+| External providers | Docker Desktop/external Docker/Podman untouched | PASS |
+| Core boundary | Core unchanged | PASS |
+| Android production boundary | Android production code unchanged; W0 `36215350541` PASS | PASS |
+| Real acceptance | Ventura + original OpenBot | PENDING |
+
+M6 remains CLOSED and M7 remains IN PROGRESS. No new M6.x or M7.x slice is created.

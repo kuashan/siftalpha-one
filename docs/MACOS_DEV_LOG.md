@@ -2630,3 +2630,33 @@ Repair:
 - M6: **CLOSED**
 - M7: **IN PROGRESS**
 - Real Mac / original OpenBot acceptance: **PENDING**
+
+## 2026-09-26 · M7 Regression Repair — Compose Streaming + Managed Resource Recovery
+
+M6 remains **CLOSED**. M7 remains **IN PROGRESS**. This finite repair closes two confirmed macOS Adapter regressions before the original OpenBot acceptance; it does not create another stage or modify OpenBot.
+
+### A. Developer Mode real-time Compose logs
+
+`MacComposeContainerProvider.runCompose()` previously redirected merged stdout/stderr to a temporary file and read that file only after the child exited. This was the reason a long BuildKit build showed no activity in Developer Mode.
+
+The adapter now owns one bounded reader for the existing Compose child process. Each line is redacted and immediately passed through the existing `MacProjectWorkflowCoordinator` history callback. The final output remains bounded, timeout and cancellation still destroy the same child process, and no second Developer Mode lifecycle or Compose executor was added. Normal Mode continues to expose product status rather than raw BuildKit output.
+
+### B. Managed Colima resource recovery
+
+The repair is generic and uses host facts plus `colima status --json` facts for the SiftAlpha-managed `sa` profile:
+
+- current CPU and memory;
+- recommended CPU and memory;
+- maximum safe VM memory after a conservative host reserve;
+- fail-closed host-insufficient and unknown-resource decisions.
+
+Only a managed Docker executable under the SiftAlpha toolchain is eligible. On explicit memory exhaustion evidence from Compose Build, the controller records one `RESOURCE_REPAIR_ATTEMPT`, stops the managed profile, starts it with bounded `--cpu` / `--memory`, repeats the existing SSH readiness and resolver verification, verifies Docker/Compose/Buildx, and retries Prepare exactly once. A second memory failure returns failure without another repair. External Docker, user Colima, Podman, other profiles, Android production code, Core, OpenBot, and Normal Mode lifecycle behavior are unchanged.
+
+### Evidence
+
+- Functional HEAD: `40a9a57561c06269e09be767c53aedbe23e4753d`
+- macOS Host Runtime Run `36215350544`: PASS
+- Android W0 Cloud Build Run `36215350541`: PASS
+- M4/M5/M6 regression probes: PASS
+- DMG packaging: PASS
+- Real Ventura + original OpenBot acceptance: PENDING

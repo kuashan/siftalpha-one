@@ -1392,3 +1392,28 @@ Verification:
 Stage status:
 **Pre-M7 Functional Parity / Core Realignment = CLOSED.**
 **Next stage = M7 OpenBot Acceptance.**
+
+## 2026-09-26 · M7 Regression Repair — CLOUD PASS
+
+M6 remains **CLOSED**. M7 remains **IN PROGRESS**; original OpenBot real-Mac acceptance is still pending. This is a finite M7 regression repair, not M6.3, M7.1, or M7.2.
+
+### Problem and root cause
+
+- Developer Mode Compose output was buffered into a temporary file and entered shared Coordinator history only after the Compose process exited. Long `docker compose build` operations therefore appeared idle.
+- Managed Colima startup did not inspect the managed VM CPU/memory allocation or provide a bounded recovery path after explicit build memory exhaustion evidence.
+
+### Repair
+
+- `MacComposeContainerProvider` now reads merged Compose stdout/stderr incrementally, keeps a bounded tail, redacts project secrets before callbacks, and preserves cancellation/timeout behavior. The existing Coordinator history and Developer Mode rendering remain the only log path.
+- Managed resource policy derives current/recommended/maximum-safe CPU and memory from host facts plus managed Colima status JSON. It reserves host memory conservatively and fails closed when the host cannot safely expand the VM.
+- Only an explicitly owned SiftAlpha managed Docker/Colima toolchain and the `sa` profile may be restarted. External Docker, user Colima, Podman, other profiles, OpenBot source, Core, Android production code, and Normal Mode raw diagnostics remain untouched.
+- Explicit memory evidence (`cannot allocate memory`, `ResourceExhausted`, OOM, or build-context `Killed`/`SIGKILL`) may trigger one managed resource repair and one Prepare retry. A second failure never starts another repair; Normal Mode receives a friendly resource message while Developer Mode retains detailed facts.
+
+### Verification authority
+
+- Functional HEAD: `40a9a57561c06269e09be767c53aedbe23e4753d`
+- macOS Host Runtime Run `36215350544`: **PASS**
+- Android W0 Cloud Build Run `36215350541`: **PASS**
+- Streaming callback, secret redaction, cancellation, memory classification, resource policy, and Colima resource parser tests: **PASS**
+- Existing M4/M5/M6 regression probes and Ventura-baseline DMG packaging: **PASS**
+- Real Mac / original OpenBot acceptance: **PENDING**
