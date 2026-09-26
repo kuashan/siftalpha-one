@@ -44,6 +44,14 @@ class MacProjectWorkflowTest {
             setOf(MacHostToolKind.BUN),
             MacProjectHostToolRequirementPolicy.requiredTools(snapshot),
         )
+        assertEquals(
+            "1.3.14",
+            MacProjectHostToolRequirementPolicy.requiredBunVersion(snapshot),
+        )
+        assertEquals(
+            mapOf(MacHostToolKind.BUN to "1.3.14"),
+            MacProjectHostToolRequirementPolicy.requirements(snapshot),
+        )
     }
 
     @Test

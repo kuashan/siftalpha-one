@@ -117,6 +117,9 @@ class MacProductController(
     private val containerInstallProgress = ConcurrentHashMap<String, MacContainerInstallProgress>()
     private val containerInstallLogs = ConcurrentHashMap<String, StringBuilder>()
     private val managedPythonVersion: String? by lazy { managedPython?.version() }
+    private val managedBun = MacManagedBunRuntimeProvider(
+        File(dataRoot, "managed-runtimes/bun"),
+    )
 
     init {
         processControl.bindOwnershipStore(ownershipStore)
@@ -231,7 +234,7 @@ class MacProductController(
                 snapshot,
                 plan,
                 composePlan,
-                hostToolExecutables = hostToolExecutables(),
+                hostToolExecutables = hostToolExecutables(snapshot),
             ),
         )
         return product
@@ -252,7 +255,7 @@ class MacProductController(
                 snapshot,
                 plan,
                 composePlan,
-                hostToolExecutables = hostToolExecutables(),
+                hostToolExecutables = hostToolExecutables(snapshot),
             ),
         )
         return refreshed
@@ -411,6 +414,17 @@ class MacProductController(
 
     fun prepare(projectId: String): MacPrepareResult {
         lastErrors.remove(projectId)
+
+        if (!ensureManagedHostTools(projectId)) {
+            val detail = lastErrors[projectId] ?: "托管主机运行工具准备失败"
+            return MacPrepareResult(
+                success = false,
+                cancelled = false,
+                environment = null,
+                lines = listOf("SIFTALPHA_MANAGED_HOST_TOOLS=FAILED"),
+                detail = detail,
+            )
+        }
 
         val product = synchronized(this) { projects[projectId] }
         if (product?.isCompose == true && !coordinator.status(projectId).environmentReady) {
@@ -606,8 +620,12 @@ class MacProductController(
 
     fun start(projectId: String): Boolean {
         lastErrors.remove(projectId)
+        if (!ensureManagedHostTools(projectId)) return false
+
         val started = coordinator.start(projectId)
-        if (!started) lastErrors[projectId] = "项目启动失败"
+        if (!started && lastErrors[projectId] == null) {
+            lastErrors[projectId] = "项目启动失败"
+        }
         return started
     }
 
@@ -663,17 +681,91 @@ class MacProductController(
             ),
         )
 
-    private fun hostToolExecutables(): Map<MacHostToolKind, String> = buildMap {
+    private fun hostToolExecutables(
+        snapshot: MacProjectSnapshot,
+    ): Map<MacHostToolKind, String> = buildMap {
+        val requiredBunVersion = MacProjectHostToolRequirementPolicy.requiredBunVersion(snapshot)
         discovery.forEach { tool ->
-            if (tool.availability == MacHostToolAvailability.AVAILABLE) {
-                tool.executablePath?.let { put(tool.kind, it) }
+            if (tool.availability != MacHostToolAvailability.AVAILABLE) return@forEach
+            if (
+                tool.kind == MacHostToolKind.BUN &&
+                requiredBunVersion != null &&
+                MacManagedBunArtifactPolicy.parseInstalledVersion(tool.version) != requiredBunVersion
+            ) {
+                return@forEach
             }
+            tool.executablePath?.let { put(tool.kind, it) }
         }
         managedPython
             ?.takeIf { it.available }
             ?.pythonExecutable
             ?.absolutePath
             ?.let { put(MacHostToolKind.PYTHON, it) }
+        requiredBunVersion
+            ?.let(managedBun::locate)
+            ?.executable
+            ?.absolutePath
+            ?.let { put(MacHostToolKind.BUN, it) }
+    }
+
+    private fun ensureManagedHostTools(projectId: String): Boolean {
+        val product = synchronized(this) { projects[projectId] } ?: return false
+        if (
+            MacProjectHostLifecyclePolicy.resolve(product.snapshot.relativePaths) == null ||
+            !MacProjectHostToolRequirementPolicy.requiresBun(product.snapshot)
+        ) {
+            return true
+        }
+
+        val requiredVersion = MacProjectHostToolRequirementPolicy.requiredBunVersion(product.snapshot)
+        val discovered = discovery.firstOrNull { tool ->
+            tool.kind == MacHostToolKind.BUN &&
+                tool.availability == MacHostToolAvailability.AVAILABLE &&
+                (
+                    requiredVersion == null ||
+                        MacManagedBunArtifactPolicy.parseInstalledVersion(tool.version) == requiredVersion
+                    )
+        }
+        if (discovered?.executablePath != null) {
+            coordinator.appendDiagnostic(
+                projectId,
+                "HOST_BUN_SOURCE=SYSTEM|" +
+                    discovered.version.orEmpty() + "|" + discovered.executablePath,
+            )
+            return true
+        }
+
+        if (requiredVersion == null) {
+            val detail = "项目需要 Bun，但 packageManager 没有声明可自动准备的精确 Bun 版本。"
+            coordinator.appendDiagnostic(projectId, "MANAGED_BUN_PROVISION=FAILED exact version missing")
+            lastErrors[projectId] = detail
+            return false
+        }
+
+        coordinator.appendDiagnostic(projectId, "HOST_BUN_REQUIRED=" + requiredVersion)
+        val provisioned = managedBun.ensure(requiredVersion) { line ->
+            coordinator.appendDiagnostic(projectId, line)
+        }
+        if (!provisioned.success) {
+            val detail = "Bun $requiredVersion 自动准备失败：" +
+                (provisioned.detail ?: "未知错误")
+            coordinator.appendDiagnostic(projectId, "MANAGED_BUN_PROVISION=FAILED")
+            lastErrors[projectId] = detail
+            return false
+        }
+
+        val refreshed = refreshProject(projectId)
+        if (refreshed == null) {
+            val detail = "Bun 已准备，但项目状态刷新失败。"
+            lastErrors[projectId] = detail
+            return false
+        }
+        coordinator.appendDiagnostic(
+            projectId,
+            "HOST_BUN_SOURCE=MANAGED|" + requiredVersion + "|" +
+                provisioned.runtime?.executable?.absolutePath.orEmpty(),
+        )
+        return true
     }
 
     private fun adviceFor(project: MacProductProject): MacContainerEnvironmentAdvice? =

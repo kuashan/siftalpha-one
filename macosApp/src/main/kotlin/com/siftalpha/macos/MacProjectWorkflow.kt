@@ -35,6 +35,7 @@ data class MacProjectEnvironmentPlan(
     val preparationSteps: List<EnvironmentPreparationStep>,
     val runtimeExecutables: Map<RuntimeKind, String>,
     val issues: List<String>,
+    val hostToolRequirements: Map<MacHostToolKind, String?> = emptyMap(),
 ) {
     fun diagnosticLines(): List<String> = buildList {
         add("SIFTALPHA_M4_IMPORT=PASS")
@@ -50,6 +51,12 @@ data class MacProjectEnvironmentPlan(
         add("SIFTALPHA_M4_PREPARE_STEPS=" + preparationSteps.joinToString(",") { it.name })
         runtimeExecutables.toSortedMap(compareBy { it.id }).forEach { (kind, path) ->
             add("SIFTALPHA_M4_RUNTIME=" + kind.id + "|" + path)
+        }
+        hostToolRequirements.forEach { (kind, version) ->
+            add(
+                "SIFTALPHA_M4_HOST_TOOL_REQUIREMENT=" +
+                    kind.id + "|" + version.orEmpty(),
+            )
         }
         issues.forEachIndexed { index, issue ->
             add("SIFTALPHA_M4_ISSUE_" + (index + 1) + "=" + issue.replace('\n', ' ').take(240))
@@ -150,7 +157,10 @@ object MacProjectHostLifecyclePolicy {
 }
 
 object MacProjectHostToolRequirementPolicy {
-    fun requiredTools(snapshot: MacProjectSnapshot): Set<MacHostToolKind> = buildSet {
+    fun requiredBunVersion(snapshot: MacProjectSnapshot): String? =
+        MacManagedBunArtifactPolicy.packageManagerVersion(snapshot.packageJsonText)
+
+    fun requiresBun(snapshot: MacProjectSnapshot): Boolean {
         val rootNames = snapshot.relativePaths
             .asSequence()
             .map { it.replace('\\', '/').trim().trim('/') }
@@ -161,8 +171,16 @@ object MacProjectHostToolRequirementPolicy {
             """["']packageManager["']\s*:\s*["']bun(?:@|["'])""",
             RegexOption.IGNORE_CASE,
         ).containsMatchIn(snapshot.packageJsonText.orEmpty())
-        if (packageManagerRequiresBun || "bun.lock" in rootNames || "bun.lockb" in rootNames) {
-            add(MacHostToolKind.BUN)
+        return packageManagerRequiresBun || "bun.lock" in rootNames || "bun.lockb" in rootNames
+    }
+
+    fun requiredTools(snapshot: MacProjectSnapshot): Set<MacHostToolKind> = buildSet {
+        if (requiresBun(snapshot)) add(MacHostToolKind.BUN)
+    }
+
+    fun requirements(snapshot: MacProjectSnapshot): Map<MacHostToolKind, String?> = buildMap {
+        if (requiresBun(snapshot)) {
+            put(MacHostToolKind.BUN, requiredBunVersion(snapshot))
         }
     }
 }
@@ -294,6 +312,7 @@ object MacProjectWorkflowPlanner {
             preparationSteps = ProjectEnvironmentNeedPolicy.preparationSteps(needs),
             runtimeExecutables = availableByRuntime.filterKeys { it in requiredKinds },
             issues = issues,
+            hostToolRequirements = MacProjectHostToolRequirementPolicy.requirements(snapshot),
         )
     }
 

@@ -155,6 +155,13 @@ fun main(args: Array<String>) {
         if (!result.passed) error("M6.2 managed container install flow probe failed")
         return
     }
+    if ("--m7-managed-bun-probe" in args) {
+        val result = MacM7ManagedBunSelfTest.run()
+        println("SIFTALPHA_M7_MANAGED_BUN_PROBE=" + if (result.passed) "PASS" else "FAIL")
+        result.lines.forEach { line -> println("SIFTALPHA_M7_BUN=" + line) }
+        if (!result.passed) error("M7 managed Bun probe failed")
+        return
+    }
 
     val installation = MacInstallationGuard.assess()
     if (!installation.allowed) {
