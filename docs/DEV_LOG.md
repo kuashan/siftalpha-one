@@ -3934,3 +3934,58 @@ For a Python+Vite project that also exposes FastAPI/API:
 
 Cloud verification: pending for final v237 HEAD.
 Real-device acceptance: pending.
+
+## 2026-09-27 · Android v238 Internal Python Staging Authority Closure
+
+### Trigger
+
+Real-device v237 validation for a Python-primary project with a project-owned console script stopped before START with:
+
+`项目文件超过单文件暂存上限`
+
+The reported tracked project file was about 12.9 MB. The bounded full-project staging profile already allows 16 MiB per file, while the entrypoint-oriented profile allows only 8 MiB. The failure therefore exposed staging-profile authority drift rather than a need to raise global limits.
+
+### Root cause
+
+Internal Python START selected full-project staging only when either:
+- the Environment Plan required Node/Vite; or
+- the UI caller had already supplied a CONSOLE_SCRIPT invocation.
+
+That made staging capacity depend on presentation-time invocation propagation. A project could already own a valid `pyproject.toml [project.scripts]` launch contract yet fall back to entrypoint staging when the final invocation was temporarily absent.
+
+### Repair
+
+- Added `InternalPythonStagingProfilePolicy`.
+- Vite source builds always use FULL_PROJECT staging.
+- Explicit console-script invocations always use FULL_PROJECT staging.
+- A valid project-owned pyproject console-script contract also selects FULL_PROJECT staging before the final UI invocation exists.
+- Simple Python-file projects without such authority retain ENTRYPOINT staging.
+- Existing limits remain unchanged: entrypoint 8 MiB/file and full-project 16 MiB/file.
+- No directory-name pruning, project-name exception, easy_tdx-specific branch, staging-limit increase, Worker change, or macOS Runtime change was added.
+- v237 Launch Authority remains intact: project-owned Web/CLI contracts still outrank generic FastAPI -> uvicorn synthesis.
+
+### Regression coverage
+
+- Vite build -> FULL_PROJECT.
+- Explicit console script -> FULL_PROJECT.
+- Project-owned pyproject console script with no supplied invocation -> FULL_PROJECT.
+- Simple Python file -> ENTRYPOINT.
+- Unsupported/structured script metadata does not widen staging.
+- The current installed-guard console-script shape plus Vite and internal FastAPI evidence still resolves the project-owned `serve` launch rather than synthetic `uvicorn`.
+
+### Version
+
+- versionCode = `238`
+- versionName = `0.8.0-alpha43-r48d14-android-staging-authority-r1`
+
+### Real-device acceptance target
+
+For the same imported Python+Vite project:
+- PREPARE/START must pass the tracked >8 MiB but <16 MiB source file without raising limits;
+- START must use the project-owned console-script `serve` contract, not synthetic `uvicorn`;
+- no unrelated MARKET/CODE prompt;
+- Web Discovery + Endpoint Authority must open the complete HTML UI.
+
+Cloud verification: pending on final v238 HEAD.
+Real-device acceptance: pending.
+
