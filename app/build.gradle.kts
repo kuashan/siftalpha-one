@@ -185,8 +185,11 @@ android {
         // framework synthesis; learned Web launch reuse is source-fingerprint-bound; environment,
         // launch and CLI configuration inspection share the runtime source-facts scan; and the shared
         // Core restores the accepted Python+supplemental-Node rule that requires Vite before Node work.
-        versionCode = 236
-        versionName = "0.8.0-alpha43-r48d12-android-launch-authority-r1"
+        // v237 closes Android endpoint authority: current Web facts outrank learned ports, Python+Vite
+        // browser UI hints outrank inferred backend/API ports, learned endpoints are authority-bound,
+        // and owned multi-port discovery prefers an HTML UI before falling back to non-HTML HTTP.
+        versionCode = 237
+        versionName = "0.8.0-alpha43-r48d13-android-endpoint-authority-r1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
