@@ -191,6 +191,7 @@ android {
         // v238 closes Internal Python staging authority: Vite builds, explicit console-script launches,
         // and projects that own a pyproject console-script contract use bounded full-project staging.
         // Simple Python-file projects retain the stricter entrypoint staging profile.
+        // Exact-head closure verification runs W0 + Internal Alpine Probe after docs are finalized.
         versionCode = 238
         versionName = "0.8.0-alpha43-r48d14-android-staging-authority-r1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
