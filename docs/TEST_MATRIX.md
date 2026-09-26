@@ -1938,3 +1938,21 @@ Real-device result（真机结果）：
 - Original Run auto-resume（原运行自动恢复）: PASS（通过）
 - Infinite Termux reopen loop（反复打开外部终端循环）: FIXED / PASS（已修复 / 通过）
 - Final status（最终状态）: **PASS / CLOSED（通过 / 关闭）**
+
+## Android v237 Endpoint Authority Closure
+
+| ID | Check | Expected |
+|---|---|---|
+| EA-01 | Current detected server port + stale learned port | Current detected/framework facts outrank learned history |
+| EA-02 | Python+Vite + FastAPI, ports 5173 and 8000 | Browser UI authority tries Vite/UI before API |
+| EA-03 | Explicit configured Web port + Python+Vite | Explicit project configuration remains first |
+| EA-04 | Owned API port returns JSON, owned custom UI port returns HTML | HTML UI is selected even when API was earlier in hint order |
+| EA-05 | No HTML UI, one or more owned HTTP endpoints | First authoritative owned HTTP becomes `HTTP_FALLBACK` |
+| EA-06 | Learned endpoint after Web profile/authority changes | Old learned endpoint is not reusable |
+| EA-07 | Internal Alpine multi-port observation | HTML UI > other HTTP > unreachable, preserving same-class order |
+| EA-08 | External Termux/PRoot multi-port observation | Bounded response classification; no all-port scan |
+| EA-09 | Unrelated process listener | Cannot become a candidate; PID/socket ownership remains required |
+| EA-10 | Launch regression | Project-owned Web/CLI contract remains above generic FastAPI synthesis |
+
+Cloud result: pending final v237 W0 + Internal Alpine Probe.
+Real-device result: pending.
