@@ -20,6 +20,7 @@ class RuntimeWebLearnedLaunchStore(context: Context) {
 
     data class Entry(
         val candidate: PythonNativeWebLaunchCandidate,
+        val sourceFingerprint: String,
         val state: State,
         val updatedAtEpochMs: Long,
     )
@@ -39,6 +40,8 @@ class RuntimeWebLearnedLaunchStore(context: Context) {
                 }
             }
             val evidencePath = json.optString("evidence_path").ifBlank { "learned" }
+            val sourceFingerprint = json.optString("source_fingerprint").trim()
+            if (sourceFingerprint.isBlank()) return@runCatching null
             val state = State.valueOf(json.getString("state"))
             Entry(
                 candidate = PythonNativeWebLaunchCandidate(
@@ -46,23 +49,42 @@ class RuntimeWebLearnedLaunchStore(context: Context) {
                     arguments = arguments,
                     evidencePath = evidencePath,
                 ),
+                sourceFingerprint = sourceFingerprint,
                 state = state,
                 updatedAtEpochMs = json.optLong("updated_at", 0L),
             )
         }.getOrNull()
     }
 
-    fun readVerified(projectKey: String): PythonNativeWebLaunchCandidate? =
-        read(projectKey)?.takeIf { it.state == State.VERIFIED }?.candidate
+    fun readVerified(
+        projectKey: String,
+        sourceFingerprint: String,
+    ): PythonNativeWebLaunchCandidate? =
+        read(projectKey)
+            ?.takeIf {
+                it.state == State.VERIFIED &&
+                    it.sourceFingerprint == sourceFingerprint
+            }
+            ?.candidate
 
-    fun rememberDiscovered(projectKey: String, candidate: PythonNativeWebLaunchCandidate) {
-        write(projectKey, candidate, State.DISCOVERED)
+    fun rememberDiscovered(
+        projectKey: String,
+        candidate: PythonNativeWebLaunchCandidate,
+        sourceFingerprint: String,
+    ) {
+        require(sourceFingerprint.isNotBlank()) { "sourceFingerprint must not be blank" }
+        write(projectKey, candidate, sourceFingerprint, State.DISCOVERED)
     }
 
     fun markVerified(projectKey: String): Entry? {
         val current = read(projectKey) ?: return null
         if (current.state == State.VERIFIED) return current
-        write(projectKey, current.candidate, State.VERIFIED)
+        write(
+            projectKey = projectKey,
+            candidate = current.candidate,
+            sourceFingerprint = current.sourceFingerprint,
+            state = State.VERIFIED,
+        )
         return read(projectKey)
     }
 
@@ -73,6 +95,7 @@ class RuntimeWebLearnedLaunchStore(context: Context) {
     private fun write(
         projectKey: String,
         candidate: PythonNativeWebLaunchCandidate,
+        sourceFingerprint: String,
         state: State,
     ) {
         val now = System.currentTimeMillis()
@@ -80,6 +103,7 @@ class RuntimeWebLearnedLaunchStore(context: Context) {
             put("executable", candidate.executableName)
             put("arguments", JSONArray(candidate.arguments))
             put("evidence_path", candidate.evidencePath)
+            put("source_fingerprint", sourceFingerprint)
             put("state", state.name)
             put("updated_at", now)
         }
@@ -90,6 +114,6 @@ class RuntimeWebLearnedLaunchStore(context: Context) {
         projectKey.length.toString() + ":" + projectKey
 
     companion object {
-        private const val PREFS_NAME = "siftalpha_runtime_web_learned_launch_v3"
+        private const val PREFS_NAME = "siftalpha_runtime_web_learned_launch_v4"
     }
 }
