@@ -66,6 +66,38 @@ class PythonNativeWebApplicationLaunchResolverTest {
     }
 
     @Test
+    fun `manifest backed configless Vite still proves project owned Web launch`() {
+        val result = PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = null,
+            pyprojectToml = pyproject,
+            relativePaths = listOf(
+                "pyproject.toml",
+                "web-ui/package.json",
+                "src/easy_tdx/cli/cmd_web.py",
+            ),
+            packageJsonTexts = mapOf(
+                "web-ui/package.json" to """
+                    {
+                      "scripts": { "build": "vite build", "dev": "vite" },
+                      "devDependencies": { "vite": "^8.1.1" }
+                    }
+                """.trimIndent(),
+            ),
+            pythonSources = sources,
+            webProjectEnabled = true,
+        )
+
+        assertEquals(
+            PythonNativeWebLaunchCandidate(
+                executableName = "easy-tdx",
+                arguments = listOf("serve", "--host", "127.0.0.1", "--no-open-browser"),
+                evidencePath = "src/easy_tdx/cli/cmd_web.py",
+            ),
+            result,
+        )
+    }
+
+    @Test
     fun `strict project owned Web launch outranks generic FastAPI evidence`() {
         val result = PythonNativeWebApplicationLaunchResolver.resolve(
             declaredRun = null,
