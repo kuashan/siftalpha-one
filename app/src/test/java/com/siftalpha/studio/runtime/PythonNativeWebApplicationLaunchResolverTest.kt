@@ -256,6 +256,73 @@ class PythonNativeWebApplicationLaunchResolverTest {
     }
 
     @Test
+    fun `generic FastAPI does not override project owned console script`() {
+        val result = PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = null,
+            pyprojectToml = """
+                [project]
+                name = "cli-owned"
+                dependencies = ["fastapi", "uvicorn"]
+
+                [project.scripts]
+                cli-owned = "cli_owned.cli:main"
+            """.trimIndent(),
+            requirementsText = null,
+            relativePaths = listOf("src/cli_owned/api.py"),
+            pythonSources = mapOf(
+                "src/cli_owned/api.py" to """
+                    from fastapi import FastAPI
+                    app = FastAPI()
+                """.trimIndent(),
+            ),
+            webProjectEnabled = true,
+        )
+
+        assertNull(result)
+    }
+
+    @Test
+    fun `ambiguous FastAPI apps fail closed`() {
+        val result = PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = null,
+            pyprojectToml = """
+                [project]
+                dependencies = ["fastapi", "uvicorn"]
+            """.trimIndent(),
+            requirementsText = null,
+            relativePaths = listOf("src/demo/a.py", "src/demo/b.py"),
+            pythonSources = mapOf(
+                "src/demo/a.py" to "from fastapi import FastAPI\napp = FastAPI()",
+                "src/demo/b.py" to "from fastapi import FastAPI\napp = FastAPI()",
+            ),
+            webProjectEnabled = true,
+        )
+
+        assertNull(result)
+    }
+
+    @Test
+    fun `serve source outside console script package cannot prove project web contract`() {
+        val result = PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = null,
+            pyprojectToml = pyproject,
+            relativePaths = paths + "tools/cmd_web.py",
+            pythonSources = mapOf(
+                "tools/cmd_web.py" to """
+                    import click
+                    @click.command("serve")
+                    @click.option("--no-open-browser", is_flag=True)
+                    def serve(no_open_browser: bool):
+                        pass
+                """.trimIndent(),
+            ),
+            webProjectEnabled = true,
+        )
+
+        assertNull(result)
+    }
+
+    @Test
     fun fastApiCommonSignatureResolvesInstalledModuleTarget() {
         val result = PythonNativeWebApplicationLaunchResolver.resolve(
             declaredRun = null,
