@@ -281,7 +281,7 @@ class ProjectConfigurationInspector(context: Context) {
         "${projectDocumentId.length}:$projectDocumentId"
 
     companion object {
-        private const val CACHE_PREFS = "siftalpha_project_configuration_profile_cache_v3"
+        private const val CACHE_PREFS = "siftalpha_project_configuration_profile_cache_v4"
         private const val MAX_METADATA_BYTES = 128 * 1024
         private const val MAX_ENV_BYTES = 256 * 1024
         private const val MAX_PYTHON_FILES = 8
