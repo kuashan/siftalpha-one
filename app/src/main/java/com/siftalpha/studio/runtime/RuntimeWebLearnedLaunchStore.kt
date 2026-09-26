@@ -11,6 +11,13 @@ import org.json.JSONObject
  * entries may bypass expensive rediscovery on a later run. Endpoint reachability is still probed on
  * every run; this store remembers how to launch, not whether an old URL is still alive.
  */
+internal object RuntimeWebLearnedLaunchIdentityPolicy {
+    fun reusable(storedFingerprint: String, currentFingerprint: String): Boolean =
+        storedFingerprint.isNotBlank() &&
+            currentFingerprint.isNotBlank() &&
+            storedFingerprint == currentFingerprint
+}
+
 class RuntimeWebLearnedLaunchStore(context: Context) {
 
     enum class State {
@@ -63,7 +70,10 @@ class RuntimeWebLearnedLaunchStore(context: Context) {
         read(projectKey)
             ?.takeIf {
                 it.state == State.VERIFIED &&
-                    it.sourceFingerprint == sourceFingerprint
+                    RuntimeWebLearnedLaunchIdentityPolicy.reusable(
+                        storedFingerprint = it.sourceFingerprint,
+                        currentFingerprint = sourceFingerprint,
+                    )
             }
             ?.candidate
 
