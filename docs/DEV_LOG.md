@@ -3788,3 +3788,91 @@ Cloud verification:
 - Artifact digest: `sha256:04a92730ddf8954a455ed6c2605b456a00a443caa99bebda1ec6f4fe7378b5b5`.
 - APK SHA-256: `f961499814d9a79ec3423e77af043af6a3eab8251088476ed9cb333ededdad44`.
 - Status: **CODE / CLOUD PASS（代码 / 云端通过）; REAL DEVICE ACCEPTANCE PENDING（真机验收待确认）**.
+
+## 2026-09-26 · Android v235 Runtime Source-Fact Traversal Repair
+
+### Scope
+
+Android（安卓）only. macOS source/runtime and shared cross-platform Core contracts are not modified.
+
+### Real-device trigger
+
+v234 passed cloud verification but failed real-device acceptance on `easy_tdx_1-main`:
+
+```
+SIFTALPHA_ENV=READY
+SIFTALPHA_LAUNCH_KIND=CONSOLE_SCRIPT
+SIFTALPHA_LAUNCH_EXECUTABLE=uvicorn
+SIFTALPHA_LAUNCH_ARGUMENT_COUNT=3
+SIFTALPHA_ERROR=PYTHON_CONSOLE_SCRIPT_MISSING
+EXIT_CODE=76
+```
+
+Earlier real-device Environment Plan evidence from the same project also showed the decisive inconsistency:
+
+```
+SIFTALPHA_ENV_SUPPLEMENTAL_RUNTIMES=nodejs
+SIFTALPHA_ENV_PYTHON_OPTIONAL_GROUPS=baostock,dev,packaging,science,warehouse,web
+SIFTALPHA_ENV_PYTHON_INSTALL_EXTRAS=
+SIFTALPHA_ENV_VITE_COMPONENTS=0
+```
+
+The project source contains the strict Native-Web evidence (`web-ui/package.json`, `web-ui/vite.config.ts`, pyproject `web` extra and a project-owned `serve` command). Therefore v234's resolver priority was correct but the strict branch never received complete source facts.
+
+### Root cause
+
+Action-time `V04ProjectGateway.runtimeFacts()` and `readProjectTextFiles()` reused `ProjectStore.listProjectTree()`, which is deliberately a UI/search-oriented recursive view capped at 1500 nodes.
+
+Generated frontend output such as `dist`, caches and other runtime-created trees can consume that budget before later source files are visited. `listProjectTree()` also returns its partial node list when that UI bound is reached. The result can silently omit nested Vite structural evidence while still exposing an internal FastAPI source, causing:
+- Environment Plan to report `VITE_COMPONENTS=0`;
+- `[web]` extras not to be installed;
+- strict project-owned Web launch proof to fail;
+- generic FastAPI fallback to synthesize `uvicorn`;
+- runtime to fail because the synthetic console script is absent.
+
+This is a generic source-fact completeness defect, not an `easy_tdx` exception.
+
+### Repair
+
+- Added a dedicated Android action-time Runtime source scan.
+- The scan uses the existing r44 source-build pruning contract, excluding dependency caches and generated outputs such as `node_modules`, `dist`, `build`, `out`, cache directories, etc.
+- The scan uses the existing bounded full-project source limit (depth 20 / 8192 nodes) rather than the UI tree's 1500-node ceiling.
+- Runtime source scanning now fails closed if that bounded source tree is still too large; it no longer silently treats a truncated tree as authoritative.
+- `runtimeFacts()` uses this source-focused scan.
+- `readProjectTextFiles()` uses the same source-focused scan so prioritized launch sources cannot disappear in a second UI-bounded traversal.
+- UI file browsing/search behavior remains unchanged.
+- Learned Web launch storage namespace advances v2 -> v3 so any `uvicorn` launch learned during v234 cannot be reused.
+- v234's launch evidence priority remains intact: strict project-owned Web contract before generic framework fallback.
+- No project-name, OpenBB, easy_tdx, port, framework, or path-specific runtime exception was added.
+
+### Regression coverage
+
+JVM coverage verifies that the source-build policy:
+- preserves nested `package.json`, `vite.config.ts`, and Python Web command source evidence;
+- prunes generated `dist` output and `node_modules`;
+- preserves ordinary `web-ui` / `src` source directories.
+
+Existing Environment Plan tests continue to require nested Vite evidence to produce:
+- `SIFTALPHA_ENV_VITE_COMPONENTS=1`;
+- `SIFTALPHA_ENV_PYTHON_INSTALL_EXTRAS=web`;
+- Node install/build before Python install.
+
+Existing Native-Web resolver regression continues to require the strict project-owned `serve` contract to outrank internal FastAPI evidence.
+
+### Version
+
+- versionCode = `235`
+- versionName = `0.8.0-alpha43-r48d11-android-web-source-r1`
+
+### Real-device acceptance target
+
+For `easy_tdx_1-main`, after one PREPARE if the new plan invalidates the old environment:
+- Environment Plan must report `SIFTALPHA_ENV_VITE_COMPONENTS=1`;
+- `SIFTALPHA_ENV_PYTHON_INSTALL_EXTRAS=web`;
+- Node/Vite preparation must run;
+- START must use the project-owned `serve` contract, not generic `uvicorn`;
+- no MARKET / CODE prompt;
+- Web Discovery + Endpoint Probe must open the complete project Web UI.
+
+Cloud verification: pending.
+

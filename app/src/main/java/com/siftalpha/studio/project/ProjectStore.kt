@@ -232,6 +232,25 @@ if __name__ == "__main__":
         ).nodes
 
     /**
+     * Runtime/environment/Web launch detection must inspect authoritative source structure, not the
+     * UI-oriented 1500-node tree. Generated build outputs and dependency caches are pruned before
+     * they consume the bounded scan budget, and truncation fails closed instead of silently dropping
+     * evidence such as nested package.json / vite.config.* / Python launch sources.
+     */
+    fun listProjectTreeForRuntimeFacts(projectDocumentId: String): List<FileNode> {
+        val collected = collectProjectTree(
+            projectDocumentId = projectDocumentId,
+            maxDepth = MAX_STAGING_TREE_DEPTH,
+            maxItems = EmbeddedPythonProjectStager.FULL_PROJECT_LIMITS.maxNodes,
+            skippedDirectories = EmbeddedPythonStagingPolicy.skippedDirectoryNames(sourceBuild = true),
+        )
+        check(!collected.truncated) {
+            "项目源码树经过生成/依赖目录过滤后仍超过运行时检测边界，拒绝静默截断"
+        }
+        return collected.nodes
+    }
+
+    /**
      * Staging must never silently execute a truncated SAF tree. Generated/dependency directories are
      * pruned before they consume the staging traversal budget, while the execution copy remains
      * explicitly bounded for mobile storage and memory safety.

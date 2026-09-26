@@ -178,8 +178,11 @@ android {
         // v234 is Android-only: restore accepted Native-Web workflow and rank strict project-owned
         // Web contracts before generic framework fallback. Old learned launch entries are invalidated.
         // macOS source is unchanged.
-        versionCode = 234
-        versionName = "0.8.0-alpha43-r48d11-android-web-priority-r1"
+        // v235 is Android-only: action-time Runtime/Web facts use a source-focused bounded scan
+        // instead of the UI 1500-node tree, preventing generated dist/cache trees from hiding
+        // nested Vite/Web launch evidence. Old learned launch entries are invalidated again.
+        versionCode = 235
+        versionName = "0.8.0-alpha43-r48d11-android-web-source-r1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

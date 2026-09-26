@@ -255,4 +255,49 @@ class EmbeddedPythonProjectStagerTest {
             // expected
         }
     }
+
+    @Test
+    fun runtimeFactSourcePolicyKeepsWebContractEvidenceAndPrunesGeneratedTrees() {
+        assertTrue(
+            EmbeddedPythonStagingPolicy.shouldStage(
+                relativePath = "web-ui/package.json",
+                isDirectory = false,
+                sourceBuild = true,
+            ),
+        )
+        assertTrue(
+            EmbeddedPythonStagingPolicy.shouldStage(
+                relativePath = "web-ui/vite.config.ts",
+                isDirectory = false,
+                sourceBuild = true,
+            ),
+        )
+        assertTrue(
+            EmbeddedPythonStagingPolicy.shouldStage(
+                relativePath = "src/package/cli/cmd_web.py",
+                isDirectory = false,
+                sourceBuild = true,
+            ),
+        )
+        assertFalse(
+            EmbeddedPythonStagingPolicy.shouldStage(
+                relativePath = "web-ui/dist/assets/app.js",
+                isDirectory = false,
+                sourceBuild = true,
+            ),
+        )
+        assertFalse(
+            EmbeddedPythonStagingPolicy.shouldStage(
+                relativePath = "node_modules/pkg/index.js",
+                isDirectory = false,
+                sourceBuild = true,
+            ),
+        )
+        val skipped = EmbeddedPythonStagingPolicy.skippedDirectoryNames(sourceBuild = true)
+        assertTrue("dist" in skipped)
+        assertTrue("node_modules" in skipped)
+        assertFalse("web-ui" in skipped)
+        assertFalse("src" in skipped)
+    }
+
 }
