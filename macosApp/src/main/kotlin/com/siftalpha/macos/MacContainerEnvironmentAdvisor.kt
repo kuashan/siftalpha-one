@@ -2,6 +2,7 @@ package com.siftalpha.macos
 
 import com.siftalpha.studio.platform.CapabilityAvailability
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 data class MacSystemFacts(
     val osVersion: String,
@@ -95,12 +96,11 @@ object MacManagedResourcePolicy {
 
 object MacManagedVmResourceParser {
     private val cpuPattern = Regex("\\\"(?:cpu|cpus)\\\"\\s*:\\s*(\\d+)")
-    private val memoryPattern = Regex("\\\"memory\\\"\\s*:\\s*(\\d+(?:\\.\\d+)?)")
+    private val memoryPattern = Regex("\\\"memory\\\"\\s*:\\s*(\\d+)")
 
     fun parse(text: String): MacManagedVmResourceFacts? {
         val cpu = cpuPattern.find(text)?.groupValues?.getOrNull(1)?.toIntOrNull()
-        val memoryGiB = memoryPattern.find(text)?.groupValues?.getOrNull(1)?.toDoubleOrNull()
-        val memoryBytes = memoryGiB?.let { (it * MacManagedResourcePolicy.GIB).toLong() }
+        val memoryBytes = memoryPattern.find(text)?.groupValues?.getOrNull(1)?.toLongOrNull()
         if (cpu == null && memoryBytes == null) return null
         return MacManagedVmResourceFacts(cpuCount = cpu, memoryBytes = memoryBytes)
     }
@@ -122,7 +122,15 @@ data class MacContainerEnvironmentAdvice(
     val warnings: List<String>,
 )
 
+internal data class MacSysctlMemoryRead(
+    val stdout: String,
+    val exitCode: Int,
+    val timedOut: Boolean,
+)
+
 object MacSystemFactsDiscovery {
+    private const val SYSCTL_TIMEOUT_MILLIS = 2_000L
+
     fun discover(
         properties: Map<String, String> = mapOf(
             "os.version" to System.getProperty("os.version").orEmpty(),
@@ -147,7 +155,21 @@ object MacSystemFactsDiscovery {
         )
     }
 
-    private fun physicalMemory(): Long? =
+    internal fun physicalMemory(
+        jvmMemory: () -> Long? = ::jvmPhysicalMemory,
+        sysctlMemory: () -> MacSysctlMemoryRead? = ::readSysctlMemory,
+    ): Long? {
+        val jvmBytes = runCatching { jvmMemory() }
+            .getOrNull()
+            ?.takeIf { it > 0L }
+        if (jvmBytes != null) return jvmBytes
+
+        val sysctl = runCatching { sysctlMemory() }.getOrNull() ?: return null
+        if (sysctl.timedOut || sysctl.exitCode != 0) return null
+        return sysctl.stdout.trim().toLongOrNull()?.takeIf { it > 0L }
+    }
+
+    private fun jvmPhysicalMemory(): Long? =
         runCatching {
             val bean = java.lang.management.ManagementFactory.getOperatingSystemMXBean()
             val method = bean.javaClass.methods.firstOrNull {
@@ -155,6 +177,30 @@ object MacSystemFactsDiscovery {
             } ?: return@runCatching null
             (method.invoke(bean) as? Number)?.toLong()
         }.getOrNull()?.takeIf { it > 0L }
+
+    private fun readSysctlMemory(): MacSysctlMemoryRead? = runCatching {
+        val process = ProcessBuilder("/usr/sbin/sysctl", "-n", "hw.memsize")
+            .redirectErrorStream(true)
+            .start()
+        if (!process.waitFor(SYSCTL_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+            process.destroy()
+            if (!process.waitFor(200L, TimeUnit.MILLISECONDS)) {
+                process.destroyForcibly()
+            }
+            return@runCatching MacSysctlMemoryRead(
+                stdout = "",
+                exitCode = -1,
+                timedOut = true,
+            )
+        }
+
+        val stdout = process.inputStream.bufferedReader().use { it.readText().take(32 * 1024) }
+        MacSysctlMemoryRead(
+            stdout = stdout,
+            exitCode = process.exitValue(),
+            timedOut = false,
+        )
+    }.getOrNull()
 }
 
 object MacContainerEnvironmentAdvisor {
