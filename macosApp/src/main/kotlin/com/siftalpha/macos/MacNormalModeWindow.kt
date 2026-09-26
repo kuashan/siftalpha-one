@@ -678,7 +678,12 @@ class MacNormalModeWindow(
     private fun runProjectOperation(
         message: String,
         operation: (String) -> Boolean,
-        onComplete: ((String, Boolean) -> Unit)? = null,
+    ) = runProjectOperation(message, operation, null)
+
+    private fun runProjectOperation(
+        message: String,
+        operation: (String) -> Boolean,
+        onComplete: ((String, Boolean) -> Unit)?,
     ) {
         val id = selectedProjectId ?: return
         statusTitle.text = message

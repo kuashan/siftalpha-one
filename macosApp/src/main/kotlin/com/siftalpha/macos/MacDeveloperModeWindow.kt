@@ -626,7 +626,11 @@ class MacDeveloperModeWindow(
 
     private fun runOperation(
         operation: (String) -> Boolean,
-        onComplete: ((String, Boolean) -> Unit)? = null,
+    ) = runOperation(operation, null)
+
+    private fun runOperation(
+        operation: (String) -> Boolean,
+        onComplete: ((String, Boolean) -> Unit)?,
     ) {
         val id = selectedProjectId ?: return
         setButtonsBusy()
