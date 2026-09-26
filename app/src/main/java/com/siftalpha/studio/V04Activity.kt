@@ -46,7 +46,6 @@ import com.siftalpha.studio.runtime.RichResultDetectionPolicy
 import com.siftalpha.studio.runtime.PresentationTargetResolver
 import com.siftalpha.studio.runtime.PythonCliLaunchResolver
 import com.siftalpha.studio.runtime.PythonLaunchInvocation
-import com.siftalpha.studio.runtime.PythonLaunchCompatibilityPolicy
 import com.siftalpha.studio.runtime.PythonNativeWebLaunchCandidate
 import com.siftalpha.studio.runtime.RuntimeArgumentParser
 import com.siftalpha.studio.runtime.RuntimeCommand
@@ -2039,11 +2038,45 @@ open class V04Activity : StudioActivity() {
             project.folderName,
         )
         val requiredCli = configurationSnapshot.cliRequirements.filter { it.required }
-        val isPythonProject =
-            webProfile != null &&
-                resolvedSelection?.primary == RuntimeKind.PYTHON
+        val nativeWebProfile = webProfile?.takeIf { it.enabled }
+        val learnedNativeWebLaunch = if (
+            nativeWebProfile != null &&
+            resolvedSelection?.primary == RuntimeKind.PYTHON &&
+            ::webLearnedLaunchStore.isInitialized
+        ) {
+            webLearnedLaunchStore.readVerified(project.summary.documentId)
+        } else {
+            null
+        }
+        val nativeWebLaunch = if (
+            nativeWebProfile != null &&
+            resolvedSelection?.primary == RuntimeKind.PYTHON
+        ) {
+            learnedNativeWebLaunch ?: runCatching {
+                runtime.resolvePythonNativeWebLaunch(
+                    project = project,
+                    webProjectEnabled = true,
+                )
+            }.getOrNull()
+        } else {
+            null
+        }
+        if (nativeWebLaunch != null && nativeWebProfile != null) {
+            showPythonNativeWebRunConfirmation(
+                project = project,
+                webProfile = nativeWebProfile,
+                controlRequest = controlRequest,
+                candidate = nativeWebLaunch,
+            )
+            return
+        }
 
-        if (isPythonProject) {
+        val isPythonCliCandidate =
+            webProfile != null &&
+                resolvedSelection?.primary == RuntimeKind.PYTHON &&
+                (!webProfile.enabled || requiredCli.isNotEmpty())
+
+        if (isPythonCliCandidate) {
             val cliWebProfile = checkNotNull(webProfile)
             val resolution = runCatching {
                 runtime.resolvePythonLaunch(
@@ -2057,96 +2090,59 @@ open class V04Activity : StudioActivity() {
                 )
                 return
             }
-
-            if (!PythonLaunchCompatibilityPolicy.allowsNativeWebFallback(resolution)) {
-                if (::webLearnedLaunchStore.isInitialized) {
-                    webLearnedLaunchStore.clear(project.summary.documentId)
-                }
-                when (resolution) {
-                    is PythonCliLaunchResolver.Resolution.DeclaredRun ->
-                        showGenericRunConfirmation(project, webProfile, controlRequest)
-
-                    is PythonCliLaunchResolver.Resolution.ConsoleScripts -> {
-                        if (resolution.names.size == 1) {
-                            showPythonArgumentsDialog(
-                                project = project,
-                                webProfile = cliWebProfile,
-                                controlRequest = controlRequest,
-                                invocationFactory = { args ->
-                                    PythonLaunchInvocation.consoleScript(resolution.names.single(), args)
-                                },
-                                entryLabel = resolution.names.single(),
-                                requirements = requiredCli,
-                            )
-                        } else {
-                            showPythonConsoleScriptSelection(
-                                project = project,
-                                webProfile = cliWebProfile,
-                                controlRequest = controlRequest,
-                                names = resolution.names,
-                                requirements = requiredCli,
-                            )
-                        }
-                    }
-
-                    is PythonCliLaunchResolver.Resolution.PythonFile ->
+            when (resolution) {
+                is PythonCliLaunchResolver.Resolution.DeclaredRun ->
+                    showGenericRunConfirmation(project, webProfile, controlRequest)
+                is PythonCliLaunchResolver.Resolution.ConsoleScripts -> {
+                    if (resolution.names.size == 1) {
                         showPythonArgumentsDialog(
                             project = project,
                             webProfile = cliWebProfile,
                             controlRequest = controlRequest,
                             invocationFactory = { args ->
-                                PythonLaunchInvocation.pythonFile(resolution.entrypoint, args)
+                                PythonLaunchInvocation.consoleScript(resolution.names.single(), args)
                             },
-                            entryLabel = resolution.entrypoint,
+                            entryLabel = resolution.names.single(),
                             requirements = requiredCli,
                         )
-
-                    is PythonCliLaunchResolver.Resolution.Invalid -> {
-                        val message = when (resolution.reason) {
-                            PythonCliLaunchResolver.InvalidReason.TOML_PARSE_FAILED ->
-                                getString(R.string.runtime_cli_pyproject_invalid)
-                            PythonCliLaunchResolver.InvalidReason.SCRIPT_ENTRY_UNSUPPORTED ->
-                                getString(R.string.runtime_cli_unsupported)
-                            PythonCliLaunchResolver.InvalidReason.SCRIPT_NAME_UNSUPPORTED ->
-                                getString(R.string.runtime_cli_unsupported)
-                        }
-                        errorDialog(getString(R.string.runtime_cli_unsupported), message)
+                    } else {
+                        showPythonConsoleScriptSelection(
+                            project = project,
+                            webProfile = cliWebProfile,
+                            controlRequest = controlRequest,
+                            names = resolution.names,
+                            requirements = requiredCli,
+                        )
                     }
-
-                    PythonCliLaunchResolver.Resolution.Missing ->
-                        error("Missing launch cannot enter authoritative branch")
                 }
-                return
-            }
-
-            val nativeWebProfile = webProfile.takeIf { it.enabled }
-            if (nativeWebProfile != null) {
-                val learnedNativeWebLaunch = if (::webLearnedLaunchStore.isInitialized) {
-                    webLearnedLaunchStore.readVerified(project.summary.documentId)
-                } else {
-                    null
-                }
-                val nativeWebLaunch = learnedNativeWebLaunch ?: runCatching {
-                    runtime.resolvePythonNativeWebLaunch(
+                is PythonCliLaunchResolver.Resolution.PythonFile ->
+                    showPythonArgumentsDialog(
                         project = project,
-                        webProjectEnabled = true,
-                    )
-                }.getOrNull()
-                if (nativeWebLaunch != null) {
-                    showPythonNativeWebRunConfirmation(
-                        project = project,
-                        webProfile = nativeWebProfile,
+                        webProfile = cliWebProfile,
                         controlRequest = controlRequest,
-                        candidate = nativeWebLaunch,
+                        invocationFactory = { args ->
+                            PythonLaunchInvocation.pythonFile(resolution.entrypoint, args)
+                        },
+                        entryLabel = resolution.entrypoint,
+                        requirements = requiredCli,
                     )
-                    return
+                PythonCliLaunchResolver.Resolution.Missing ->
+                    errorDialog(
+                        getString(R.string.runtime_cli_missing),
+                        getString(R.string.runtime_cli_missing),
+                    )
+                is PythonCliLaunchResolver.Resolution.Invalid -> {
+                    val message = when (resolution.reason) {
+                        PythonCliLaunchResolver.InvalidReason.TOML_PARSE_FAILED ->
+                            getString(R.string.runtime_cli_pyproject_invalid)
+                        PythonCliLaunchResolver.InvalidReason.SCRIPT_ENTRY_UNSUPPORTED ->
+                            getString(R.string.runtime_cli_unsupported)
+                        PythonCliLaunchResolver.InvalidReason.SCRIPT_NAME_UNSUPPORTED ->
+                            getString(R.string.runtime_cli_unsupported)
+                    }
+                    errorDialog(getString(R.string.runtime_cli_unsupported), message)
                 }
             }
-
-            errorDialog(
-                getString(R.string.runtime_cli_missing),
-                getString(R.string.runtime_cli_missing),
-            )
             return
         }
 
