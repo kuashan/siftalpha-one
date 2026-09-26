@@ -2281,3 +2281,28 @@ Closure requires:
 2. final v237 Internal Alpine Probe PASS;
 3. real-device evidence showing the project-owned launch command and the correct full Web UI endpoint;
 4. no MARKET/CODE prompt caused by selecting an unrelated CLI/API entry.
+
+## Android Internal Python Staging Authority — 2026-09-27
+
+Current Android target:
+- version: `0.8.0-alpha43-r48d14-android-staging-authority-r1`
+- versionCode: `238`
+
+Authority rule:
+
+**Project Launch Contract（项目启动契约） participates in Staging Profile（暂存档位） selection.**
+
+A project-owned pyproject console-script contract is package/project-scoped execution evidence even before the UI has supplied the final invocation. Internal Python therefore uses bounded FULL_PROJECT staging for:
+- Node/Vite source builds;
+- explicit console-script launches;
+- valid project-owned pyproject console-script contracts.
+
+Simple Python-file projects retain the tighter ENTRYPOINT staging profile.
+
+This does not increase staging limits and does not classify tracked directories such as `downloads` as disposable. It prevents presentation/invocation timing from incorrectly downgrading a package-scoped project to the 8 MiB entrypoint profile.
+
+Launch Authority and Endpoint Authority from v237 remain unchanged:
+**project-owned launch > generic framework synthesis**, and **owned HTML UI > other owned HTTP endpoints**.
+
+Closure still requires exact-final-HEAD cloud verification plus real Android evidence.
+
