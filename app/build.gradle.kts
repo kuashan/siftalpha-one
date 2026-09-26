@@ -181,8 +181,12 @@ android {
         // v235 is Android-only: action-time Runtime/Web facts use a source-focused bounded scan
         // instead of the UI 1500-node tree, preventing generated dist/cache trees from hiding
         // nested Vite/Web launch evidence. Old learned launch entries are invalidated again.
-        versionCode = 235
-        versionName = "0.8.0-alpha43-r48d11-android-web-source-r1"
+        // v236 closes Android launch authority: project-owned console/Web contracts outrank generic
+        // framework synthesis; learned Web launch reuse is source-fingerprint-bound; environment,
+        // launch and CLI configuration inspection share the runtime source-facts scan; and the shared
+        // Core restores the accepted Python+supplemental-Node rule that requires Vite before Node work.
+        versionCode = 236
+        versionName = "0.8.0-alpha43-r48d12-android-launch-authority-r1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
