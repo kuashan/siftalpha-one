@@ -140,8 +140,140 @@ SIFTALPHA_PYTHON_VERSION_RESOLVER
             return 1
           fi
 
-          managed_python="${'$'}("${'$'}uv_bin" python find "${'$'}requested_version" \
-            --managed-python --no-python-downloads --no-config 2>>"${'$'}log")" || {
+          managed_python="${'
+              echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_DISCOVERY_FAILED'
+              return 1
+            }
+          [ -x "${'$'}managed_python" ] || {
+            echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_DISCOVERY_FAILED'
+            return 1
+          }
+
+          actual_version="${'$'}("${'$'}managed_python" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))')"
+          actual_platform="${'$'}("${'$'}managed_python" -c 'import sysconfig; print(sysconfig.get_platform())')"
+          actual_executable="${'$'}("${'$'}managed_python" -c 'import sys; print(sys.executable)')"
+
+          if [ "${'$'}actual_version" != "${'$'}requested_version" ]; then
+            echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_VERSION_MISMATCH'
+            return 1
+          fi
+          case "${'$'}actual_executable" in
+            /data/data/com.termux/*)
+              echo 'SIFTALPHA_ERROR=EXTERNAL_PYTHON_IDENTITY_INVALID'
+              return 1
+              ;;
+          esac
+          case "${'$'}actual_platform" in
+            *android*|'')
+              echo 'SIFTALPHA_ERROR=EXTERNAL_PYTHON_IDENTITY_INVALID'
+              return 1
+              ;;
+          esac
+          return 0
+        }
+    """.trimIndent()
+}
+}("${'
+              echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_DISCOVERY_FAILED'
+              return 1
+            }
+          [ -x "${'$'}managed_python" ] || {
+            echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_DISCOVERY_FAILED'
+            return 1
+          }
+
+          actual_version="${'$'}("${'$'}managed_python" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))')"
+          actual_platform="${'$'}("${'$'}managed_python" -c 'import sysconfig; print(sysconfig.get_platform())')"
+          actual_executable="${'$'}("${'$'}managed_python" -c 'import sys; print(sys.executable)')"
+
+          if [ "${'$'}actual_version" != "${'$'}requested_version" ]; then
+            echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_VERSION_MISMATCH'
+            return 1
+          fi
+          case "${'$'}actual_executable" in
+            /data/data/com.termux/*)
+              echo 'SIFTALPHA_ERROR=EXTERNAL_PYTHON_IDENTITY_INVALID'
+              return 1
+              ;;
+          esac
+          case "${'$'}actual_platform" in
+            *android*|'')
+              echo 'SIFTALPHA_ERROR=EXTERNAL_PYTHON_IDENTITY_INVALID'
+              return 1
+              ;;
+          esac
+          return 0
+        }
+    """.trimIndent()
+}
+}uv_bin" python find "${'
+              echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_DISCOVERY_FAILED'
+              return 1
+            }
+          [ -x "${'$'}managed_python" ] || {
+            echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_DISCOVERY_FAILED'
+            return 1
+          }
+
+          actual_version="${'$'}("${'$'}managed_python" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))')"
+          actual_platform="${'$'}("${'$'}managed_python" -c 'import sysconfig; print(sysconfig.get_platform())')"
+          actual_executable="${'$'}("${'$'}managed_python" -c 'import sys; print(sys.executable)')"
+
+          if [ "${'$'}actual_version" != "${'$'}requested_version" ]; then
+            echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_VERSION_MISMATCH'
+            return 1
+          fi
+          case "${'$'}actual_executable" in
+            /data/data/com.termux/*)
+              echo 'SIFTALPHA_ERROR=EXTERNAL_PYTHON_IDENTITY_INVALID'
+              return 1
+              ;;
+          esac
+          case "${'$'}actual_platform" in
+            *android*|'')
+              echo 'SIFTALPHA_ERROR=EXTERNAL_PYTHON_IDENTITY_INVALID'
+              return 1
+              ;;
+          esac
+          return 0
+        }
+    """.trimIndent()
+}
+}requested_version" \
+            --no-python-downloads --no-config 2>>"${'
+              echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_DISCOVERY_FAILED'
+              return 1
+            }
+          [ -x "${'$'}managed_python" ] || {
+            echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_DISCOVERY_FAILED'
+            return 1
+          }
+
+          actual_version="${'$'}("${'$'}managed_python" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))')"
+          actual_platform="${'$'}("${'$'}managed_python" -c 'import sysconfig; print(sysconfig.get_platform())')"
+          actual_executable="${'$'}("${'$'}managed_python" -c 'import sys; print(sys.executable)')"
+
+          if [ "${'$'}actual_version" != "${'$'}requested_version" ]; then
+            echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_VERSION_MISMATCH'
+            return 1
+          fi
+          case "${'$'}actual_executable" in
+            /data/data/com.termux/*)
+              echo 'SIFTALPHA_ERROR=EXTERNAL_PYTHON_IDENTITY_INVALID'
+              return 1
+              ;;
+          esac
+          case "${'$'}actual_platform" in
+            *android*|'')
+              echo 'SIFTALPHA_ERROR=EXTERNAL_PYTHON_IDENTITY_INVALID'
+              return 1
+              ;;
+          esac
+          return 0
+        }
+    """.trimIndent()
+}
+}log")" || {
               echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_DISCOVERY_FAILED'
               return 1
             }
