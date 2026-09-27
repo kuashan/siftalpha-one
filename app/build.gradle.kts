@@ -192,8 +192,11 @@ android {
         // and projects that own a pyproject console-script contract use bounded full-project staging.
         // Simple Python-file projects retain the stricter entrypoint staging profile.
         // Exact-head closure verification runs W0 + Internal Alpine Probe after docs are finalized.
-        versionCode = 238
-        versionName = "0.8.0-alpha43-r48d14-android-staging-authority-r1"
+        // v239 unifies generic Vite Web-component evidence across Environment Detection,
+        // Environment Plan, supplemental Node preparation/status, and project-owned Web launch.
+        // It supports bounded manifest-backed/config-less Vite without project-specific rules.
+        versionCode = 239
+        versionName = "0.8.0-alpha43-r48d15-web-component-contract-r1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
