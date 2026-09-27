@@ -264,7 +264,7 @@ object PythonNativeWebApplicationLaunchResolver {
         val root = runCatching { Toml.parse(pyprojectToml) }.getOrNull() ?: return null
         if (root.hasErrors()) return null
         val project = root.get("project") as? TomlTable ?: return null
-        if ("web" !in PythonWebEnvironmentCapabilityPolicy.installExtras(pyprojectToml)) return null
+        if (PythonWebEnvironmentCapabilityPolicy.installExtras(pyprojectToml).isEmpty()) return null
 
         val scripts = project.get("scripts") as? TomlTable ?: return null
         val scriptEntries = scripts.keySet()
