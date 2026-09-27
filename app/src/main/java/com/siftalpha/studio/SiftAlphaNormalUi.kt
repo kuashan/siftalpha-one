@@ -55,7 +55,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -143,7 +142,7 @@ internal fun SiftAlphaNormalTheme(content: @Composable () -> Unit) {
         val previousLightStatusBars = controller?.isAppearanceLightStatusBars
         controller?.isAppearanceLightStatusBars = false
         onDispose {
-            if (previousLightStatusBars != null) {
+            if (controller != null && previousLightStatusBars != null) {
                 controller.isAppearanceLightStatusBars = previousLightStatusBars
             }
         }
