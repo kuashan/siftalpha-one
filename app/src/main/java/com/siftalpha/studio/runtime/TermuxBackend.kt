@@ -26,7 +26,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
     }
 
     override fun execute(command: RuntimeCommand): Int {
-        check(isTermuxInstalled()) { "未检测到 Termux" }
+        check(isTermuxInstalled()) { "æœªæ£€æµ‹åˆ° Termux" }
 
         // Sensitive data is resolved only immediately before dispatch. It never enters
         // RuntimeCommand.shellScript / label / description.
@@ -226,7 +226,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
                 fi
             """.trimIndent(),
             label = "SiftAlpha Studio 运行环境检测",
-            description = "检测 Termux、共享存储、proot-distro#��SiftAlpha Ubuntu 24.04、Python、pip、venv、Git、tmux 与 libc。",
+            description = "检测 Termux、共享存储、proot-distro、SiftAlpha Ubuntu 24.04、Python、pip、venv、Git、tmux 与 libc。",
         )
     }
 }
