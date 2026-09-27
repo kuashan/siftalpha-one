@@ -387,8 +387,8 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                     onSelectRuntime = { selectRuntime(it) },
                     onOpenDeveloper = { openDeveloperWorkspace() },
                     onRequestPermission = { requestRunCommandPermission() },
-                    onOpenTermux = { openTermux() },
-                    onRecheckExternal = { recheckExternalProvider() },
+                    onOpenTermux = { openExternalRuntimeSettings() },
+                    onRecheckExternal = { openExternalRuntimeSettings() },
                 )
             }
         }
@@ -666,20 +666,9 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 
     private fun refreshExternalPreflight(retryIfNeeded: Boolean) {
         if (!::externalPreflight.isInitialized) return
-        val result = if (retryIfNeeded) {
-            val current = externalPreflight.current()
-            if (
-                current.readiness == ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED ||
-                current.readiness == ExternalProviderReadiness.BRIDGE_UNRESPONSIVE ||
-                current.readiness == ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED
-            ) {
-                externalPreflight.probe()
-            } else {
-                current
-            }
-        } else {
-            externalPreflight.current()
-        }
+        // Project surfaces only read Shared Core readiness. Installation/setup probing belongs to
+        // Settings > External Runtime Setup and must not hijack normal project interaction.
+        val result = externalPreflight.current()
         screenState.value = screenState.value.copy(externalReadiness = result.readiness)
     }
 
@@ -706,42 +695,10 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             is ExternalActionGate.Decision.Rejected -> decision.readiness
             ExternalActionGate.Decision.Proceed -> ExternalProviderReadiness.READY
         }
-        screenState.value = screenState.value.copy(externalReadiness = readiness)
-        when (com.siftalpha.studio.runtime.ExternalProviderRecoveryPolicy.actionFor(readiness)) {
-            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.REQUEST_RUN_COMMAND_PERMISSION ->
-                requestRunCommandPermission()
-
-            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.INSTALL_PROVIDER ->
-                screenState.value = screenState.value.copy(
-                    externalReadiness = readiness,
-                    message = getString(R.string.normal_external_provider_install_termux),
-                )
-
-            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.OPEN_PROVIDER ->
-                screenState.value = screenState.value.copy(
-                    externalReadiness = readiness,
-                    message = if (readiness == ExternalProviderReadiness.BRIDGE_UNRESPONSIVE) {
-                        getString(R.string.normal_external_provider_no_response)
-                    } else {
-                        getString(R.string.normal_external_provider_open_termux)
-                    },
-                )
-
-            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.RECHECK_PROVIDER,
-            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.WAIT_FOR_PROBE,
-            -> screenState.value = screenState.value.copy(
-                externalReadiness = readiness,
-                message = getString(R.string.normal_external_provider_checking),
-            )
-
-            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.NONE ->
-                if (readiness == ExternalProviderReadiness.UNAVAILABLE) {
-                    screenState.value = screenState.value.copy(
-                        externalReadiness = readiness,
-                        message = getString(R.string.normal_external_provider_unavailable),
-                    )
-                }
-        }
+        screenState.value = screenState.value.copy(
+            externalReadiness = readiness,
+            message = getString(R.string.settings_external_runtime_project_not_ready),
+        )
         return false
     }
 
@@ -1669,24 +1626,11 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 origin = ExternalActionGate.Origin.NORMAL_MODE,
             )
         }
-        val readiness = rejected.readiness
-        if (readiness == null) return
-        when (com.siftalpha.studio.runtime.ExternalProviderRecoveryPolicy.actionFor(readiness)) {
-            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.REQUEST_RUN_COMMAND_PERMISSION ->
-                requestRunCommandPermission()
-            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.INSTALL_PROVIDER ->
-                screenState.value = screenState.value.copy(
-                    externalReadiness = readiness,
-                    message = getString(R.string.normal_external_provider_install_termux),
-                )
-            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.OPEN_PROVIDER ->
-                screenState.value = screenState.value.copy(
-                    externalReadiness = readiness,
-                    message = getString(R.string.normal_external_provider_open_termux),
-                )
-            else -> screenState.value =
-                screenState.value.copy(externalReadiness = readiness)
-        }
+        val readiness = rejected.readiness ?: return
+        screenState.value = screenState.value.copy(
+            externalReadiness = readiness,
+            message = getString(R.string.settings_external_runtime_project_not_ready),
+        )
     }
 
     private fun requestRunCommandPermission() {
@@ -1751,15 +1695,18 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 
     private fun resumePendingExternalProviderRecovery() {
         if (externalActionGate.pending(project.summary.documentId) == null) return
-        val result = externalPreflight.ensureReady()
+        val result = externalPreflight.current()
         screenState.value = screenState.value.copy(externalReadiness = result.readiness)
-        when (result.recoveryAction) {
-            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.REQUEST_RUN_COMMAND_PERMISSION ->
-                requestRunCommandPermission()
-            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.NONE ->
-                if (result.ready) resumeExternalActionGate()
-            else -> Unit
-        }
+        if (result.ready) resumeExternalActionGate()
+    }
+
+    private fun openExternalRuntimeSettings() {
+        startActivity(
+            Intent(this, SettingsActivity::class.java).apply {
+                putExtra(SettingsActivity.EXTRA_NORMAL_MODE, true)
+                putExtra(SettingsActivity.EXTRA_OPEN_EXTERNAL_RUNTIME_SETUP, true)
+            },
+        )
     }
 
     private fun openTermux() {
