@@ -84,6 +84,7 @@ class SettingsActivity : StudioComposeActivity() {
                         storageAccessCommand = TermuxBackend.STORAGE_ACCESS_SETUP_COMMAND,
                         prootCommand = TermuxBackend.PROOT_DISTRO_INSTALL_COMMAND,
                         ubuntuCommand = TermuxBackend.UBUNTU_INSTALL_COMMAND,
+                        ubuntuPythonCommand = TermuxBackend.UBUNTU_PYTHON_INSTALL_COMMAND,
                         onBack = { onBackPressedDispatcher.onBackPressed() },
                         onDownloadTermux = { openOfficialTermuxInstallPage() },
                         onRequestPermission = { requestRunCommandPermission() },
@@ -98,6 +99,9 @@ class SettingsActivity : StudioComposeActivity() {
                         },
                         onCopyUbuntuCommand = {
                             copySetupCommand(TermuxBackend.UBUNTU_INSTALL_COMMAND)
+                        },
+                        onCopyUbuntuPythonCommand = {
+                            copySetupCommand(TermuxBackend.UBUNTU_PYTHON_INSTALL_COMMAND)
                         },
                         onOpenTermux = { openTermux() },
                         onRecheck = { refreshExternalRuntimeSetup(forceProbe = true) },
