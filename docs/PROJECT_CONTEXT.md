@@ -2306,3 +2306,30 @@ Launch Authority and Endpoint Authority from v237 remain unchanged:
 
 Closure still requires exact-final-HEAD cloud verification plus real Android evidence.
 
+## Generic Web Component Contract — 2026-09-27
+
+Android target version:
+- `versionCode = 239`
+- `versionName = 0.8.0-alpha43-r48d15-web-component-contract-r1`
+
+Current invariant:
+
+**Project source facts → Web Component evidence → Environment Plan → preparation → Launch Authority must be one contract, not independent guesses.**
+
+For Vite, package-local high-confidence evidence is centralized in `ViteWebComponentDetector`. A component is anchored by `package.json` and can be proven by an exact Vite dependency, a package script invoking Vite, or an adjacent Vite config. This includes config-less Vite projects.
+
+Python-root polyglot projects remain Python-primary. Detected Vite applications are supplemental Node/Web components. Their directories are carried by the Environment Plan into Node PREPARE/STATUS; execution does not independently rescan and reinterpret the project.
+
+Launch invariant remains:
+
+**explicit/project-owned launch > generic framework synthesis**.
+
+Therefore a nested FastAPI implementation cannot steal authority from a proven project-owned Web serve contract. A one-shot Python file remains a separate task entry rather than the project's inferred Web identity.
+
+Environment Plan schema is 3. Relevant package-manifest Web facts are part of environment identity so stale plans cannot silently reuse pre-Web-detection state.
+
+No project-specific exception, fixed port, Worker change, or macOS Runtime behavior change is part of this closure.
+
+Pre-closure source verification: W0 #947 PASS on `dbc4fea2b3c3a51457a3faca70b5aa02b3092911`.
+Final exact-head cloud verification and real-device acceptance remain the closure gates.
+
