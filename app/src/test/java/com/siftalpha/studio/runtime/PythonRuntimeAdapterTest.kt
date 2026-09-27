@@ -109,7 +109,7 @@ class PythonRuntimeAdapterTest {
         assertEquals("Sample · 准备环境", command.label)
         assertTrue(script.contains("HOST_WRAP_BEGIN"))
         assertFalse(script.contains("HOST_CANCELABLE_BEGIN:runtime-id:prepare"))
-        assertTrue(script.contains("ubuntu_python='/usr/bin/python3'"))
+        assertTrue(script.contains("bootstrap_python='/usr/bin/python3.12'"))
         assertTrue(script.contains("\"${'$'}ubuntu_python\" -m venv"))
         assertFalse(script.contains("venv.prepare-"))
         assertTrue(script.contains("venv.backup-"))
@@ -121,6 +121,10 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("\"${'$'}ubuntu_python\" -m pip --version"))
         assertTrue(script.contains("SIFTALPHA_EXTERNAL_PYTHON_EXECUTABLE"))
         assertTrue(script.contains("SIFTALPHA_EXTERNAL_PYTHON_PLATFORM"))
+        assertTrue(script.contains("SIFTALPHA_EXTERNAL_PYTHON_SELECTED"))
+        assertTrue(script.contains("managed-python-v1"))
+        assertTrue(script.contains("3.12.14,3.11.16,3.13.15,3.14.7"))
+        assertTrue(script.contains("siftalpha_resolve_python_version"))
         assertTrue(script.contains("EXTERNAL_PYTHON_IDENTITY_INVALID"))
         assertTrue(script.contains("DEPENDENCY_SOURCE=requirements.txt"))
         assertTrue(script.contains("DEPENDENCY_SOURCE=pyproject.toml"))
@@ -188,13 +192,13 @@ class PythonRuntimeAdapterTest {
         val start = adapter.start(project).shellScript
         val status = adapter.status(project).shellScript
 
-        assertTrue(prepare.contains("ubuntu_python='/usr/bin/python3'"))
+        assertTrue(prepare.contains("bootstrap_python='/usr/bin/python3.12'"))
         assertTrue(prepare.contains("EXTERNAL_PYTHON_IDENTITY_INVALID"))
         assertTrue(prepare.contains("sysconfig.get_platform"))
         assertTrue(prepare.contains("\"${'$'}ubuntu_python\" -m venv"))
         assertTrue(prepare.contains("/usr/bin/python3 \"${'$'}source_manager\""))
         assertFalse(prepare.contains("command -v python3"))
-        assertTrue(start.contains("/usr/bin/python3"))
+        assertTrue(start.contains("/usr/bin/python3.12"))
         assertTrue(
             start.contains(
                 "/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
