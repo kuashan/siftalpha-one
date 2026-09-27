@@ -172,8 +172,9 @@ android {
         // PREPARE after CPython 3.12.14 installed successfully.
         // v231 / r48d11.2 stops relying on uv's second-stage discovery and resolves the exact
         // installed interpreter directly from SiftAlpha's owned managed-Python directory.
-        versionCode = 231
-        versionName = "0.8.0-alpha43-r48d11.2"
+        // v232 / r48d11.3 fixes Bash find-expression escaping in the generated managed-Python shell.
+        versionCode = 232
+        versionName = "0.8.0-alpha43-r48d11.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

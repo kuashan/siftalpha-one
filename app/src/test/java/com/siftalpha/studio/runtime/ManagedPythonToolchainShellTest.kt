@@ -26,6 +26,8 @@ class ManagedPythonToolchainShellTest {
         assertTrue(shell.contains("cpython-"))
         assertTrue(shell.contains("requested_version"))
         assertTrue(shell.contains("SIFTALPHA_MANAGED_PYTHON_DIR"))
+        assertTrue(shell.contains("\\( -type f -o -type l \\)"))
+        assertFalse(shell.contains("\\\\( -type f"))
         assertTrue(shell.contains("SIFTALPHA_ERROR=MANAGED_PYTHON_INSTALL_FAILED"))
     }
 
