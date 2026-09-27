@@ -170,8 +170,10 @@ android {
         // container plus managed CPython selection with 3.12 as the compatibility-first default.
         // v230 / r48d11.1 removes the duplicate uv managed-Python selector found by real-device
         // PREPARE after CPython 3.12.14 installed successfully.
-        versionCode = 230
-        versionName = "0.8.0-alpha43-r48d11.1"
+        // v231 / r48d11.2 stops relying on uv's second-stage discovery and resolves the exact
+        // installed interpreter directly from SiftAlpha's owned managed-Python directory.
+        versionCode = 231
+        versionName = "0.8.0-alpha43-r48d11.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
