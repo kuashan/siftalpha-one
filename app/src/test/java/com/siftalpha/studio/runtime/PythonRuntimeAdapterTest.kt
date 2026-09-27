@@ -109,7 +109,8 @@ class PythonRuntimeAdapterTest {
         assertEquals("Sample · 准备环境", command.label)
         assertTrue(script.contains("HOST_WRAP_BEGIN"))
         assertFalse(script.contains("HOST_CANCELABLE_BEGIN:runtime-id:prepare"))
-        assertTrue(script.contains("python3 -m venv"))
+        assertTrue(script.contains("ubuntu_python='/usr/bin/python3'"))
+        assertTrue(script.contains("\"${'$'}ubuntu_python\" -m venv"))
         assertFalse(script.contains("venv.prepare-"))
         assertTrue(script.contains("venv.backup-"))
         assertTrue(script.contains("ready.backup-"))
@@ -117,8 +118,10 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("ENVIRONMENT_ACTIVATION_FAILED"))
         assertTrue(script.contains("ENVIRONMENT_ROLLBACK_FAILED"))
         assertTrue(script.contains("PYTHON_ENVIRONMENT_PREFIX_MISMATCH"))
-        assertTrue(script.contains("python3 -m pip --version"))
-        assertTrue(script.contains("apt-get install -y python3-venv python3-pip"))
+        assertTrue(script.contains("\"${'$'}ubuntu_python\" -m pip --version"))
+        assertTrue(script.contains("SIFTALPHA_EXTERNAL_PYTHON_EXECUTABLE"))
+        assertTrue(script.contains("SIFTALPHA_EXTERNAL_PYTHON_PLATFORM"))
+        assertTrue(script.contains("EXTERNAL_PYTHON_IDENTITY_INVALID"))
         assertTrue(script.contains("DEPENDENCY_SOURCE=requirements.txt"))
         assertTrue(script.contains("DEPENDENCY_SOURCE=pyproject.toml"))
         assertTrue(script.contains("SIFTALPHA_PYPROJECT_EXTRAS=none"))
@@ -138,7 +141,7 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("SIFTALPHA_PREPARE_COMMITTED=1"))
         assertTrue(script.contains("SIFTALPHA_ENV=READY"))
 
-        val finalVenvCreation = script.indexOf("python3 -m venv \"${'$'}venv\"")
+        val finalVenvCreation = script.indexOf("\"${'$'}ubuntu_python\" -m venv \"${'$'}venv\"")
         val pythonValidation = script.indexOf(
             "\"${'$'}venv/bin/python\" -m pip install",
             finalVenvCreation,
@@ -180,11 +183,34 @@ class PythonRuntimeAdapterTest {
     }
 
     @Test
+    fun `external Python never falls through to Termux interpreter identity`() {
+        val prepare = adapter.prepare(project).shellScript
+        val start = adapter.start(project).shellScript
+        val status = adapter.status(project).shellScript
+
+        assertTrue(prepare.contains("ubuntu_python='/usr/bin/python3'"))
+        assertTrue(prepare.contains("EXTERNAL_PYTHON_IDENTITY_INVALID"))
+        assertTrue(prepare.contains("sysconfig.get_platform"))
+        assertTrue(prepare.contains("\"${'$'}ubuntu_python\" -m venv"))
+        assertTrue(prepare.contains("/usr/bin/python3 \"${'$'}source_manager\""))
+        assertFalse(prepare.contains("command -v python3"))
+        assertTrue(start.contains("/usr/bin/python3"))
+        assertTrue(
+            start.contains(
+                "/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            ),
+        )
+        assertTrue(status.contains("current_base_python"))
+        assertTrue(status.contains("current_python_platform"))
+        assertTrue(status.contains("EXTERNAL_PYTHON_IDENTITY_INVALID"))
+    }
+
+    @Test
     fun `prepare transaction never relocates a built virtual environment`() {
         val script = adapter.prepare(project).shellScript
 
         val backupMove = script.indexOf("mv -- \"${'$'}venv\" \"${'$'}backup\"")
-        val createFinal = script.indexOf("python3 -m venv \"${'$'}venv\"")
+        val createFinal = script.indexOf("\"${'$'}ubuntu_python\" -m venv \"${'$'}venv\"")
         val installFinal = script.indexOf("\"${'$'}venv/bin/python\" -m pip install")
         val readyWrite = script.indexOf("ready_commit=")
         val disableRollback = script.indexOf("trap - EXIT", readyWrite)
