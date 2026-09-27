@@ -165,7 +165,7 @@ class PythonRuntimeAdapterTest {
         val script = adapter.prepare(project).shellScript
 
         val backupMove = script.indexOf("mv -- \"${'$'}venv\" \"${'$'}backup\"")
-        val createFinal = script.indexOf("python3 -m venv \"${'$'}venv\"")
+        val createFinal = script.indexOf("\"${'$'}guest_python\" -m venv \"${'$'}venv\"")
         val installFinal = script.indexOf("\"${'$'}venv/bin/python\" -m pip install")
         val readyWrite = script.indexOf("ready_commit=")
         val disableRollback = script.indexOf("trap - EXIT", readyWrite)
