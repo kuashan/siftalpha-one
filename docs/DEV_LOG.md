@@ -5,6 +5,52 @@
 历史条目中的 W2、W3、W4、W5 仅按当时命名记录已发生的工作、构建或发布，不表示当前 Roadmap 阶段。
 
 
+## 2026-09-27 · R48d10.2 External Provider Installation Recovery（外部运行环境安装恢复）
+
+### Source boundary（源码边界）
+
+- 起点：`r48d10.1` 最终文档 HEAD `e87ec4e2f47400efcf69e5e62c6df76827cd6466`。
+- 修复分支：`codex/r48d10-external-provider-install-recovery`。
+- 功能验证 HEAD：`b69cae818afe62d1a840670908b3ac7ebce4b59f`。
+- 验证版本：`0.8.0-alpha43-r48d10.2` / versionCode `224`。
+
+### Real-device input（真机输入）
+
+- 用户确认 `r48d10.1` 的 Internal Runtime（内部运行环境）已可正常运行 easy_tdx，并可直接打开网页，不再要求额外配置。
+- 本轮因此不重写 Launch Authority；External Termux 必须复用上一轮已验证的同一 `PythonLaunchInvocation`。
+
+### Problem（问题）
+
+- Termux 已卸载时，Shared Core 能检测到 `TERMUX_NOT_INSTALLED`，但旧 bridge/probe READY 证据没有同步失效，导致 UI 可能同时显示“未检测到 Termux”与“继续使用已验证的 Termux 桥接”。
+- External Action Gate 把 `TERMUX_NOT_INSTALLED`、bridge setup failure 和 unresponsive 当作 terminal failure，会提前删除用户原来的 PREPARE / RUN 待办，破坏“安装/设置完成后自动继续”。
+- Normal Mode 与 Developer Mode 对“Termux 未安装”都只提供“打开 Termux”，无法直接到官方安装入口。
+- External console-script launch 缺少专门回归锁，无法显式证明与 Internal 已验证 Launch Contract 保持一致。
+
+### Repair（修复）
+
+- Shared Core 增加 `ExternalProviderDescriptor`、`ExternalProviderRecoveryAction` 与统一 recovery policy。
+- `TERMUX_NOT_INSTALLED` → `INSTALL_PROVIDER`；权限缺失 → `REQUEST_RUN_COMMAND_PERMISSION`；setup / unresponsive → `OPEN_PROVIDER`；probe required → `RECHECK_PROVIDER`。
+- 当 Termux package 或 RUN_COMMAND permission 不存在时，`ExternalProviderReadinessStore.recordHostFacts()` 会清空旧 bridge state、probe stage、probe execution、probe result、timestamp 与 detail，旧 READY 不再继续参与判断。
+- External Action Gate 只把真正 `UNAVAILABLE` 视为 terminal；安装缺失、权限、setup、probe timeout 均保留 project+action+generation 待办。
+- 用户安装/设置 Termux 返回 SiftAlpha 后，Normal Mode / Developer Mode 重新调用共享 preflight；ready 后复用现有 gate 自动继续原 PREPARE / RUN。
+- Termux 未安装时，两套 UI 均提供“下载 Termux”，Android platform adapter 打开 Termux 官方 GitHub latest releases 页面；Termux 已安装但 setup 未完成时仍提供“打开 Termux / 重新检测”。
+- External Python Runtime 继续消费 `ProjectControlHub.RunRequest.launchInvocation`；新增回归测试确认 console script `easy-tdx serve --host 127.0.0.1 --no-open-browser` 被 `PythonRuntimeAdapter` 原样生成到 Termux runner，且不会回退为 `uvicorn`。
+- 无 easy_tdx 专用业务分支、无 uvicorn 特判、Internal Runtime 业务逻辑未改。
+
+### Verification（验证）
+
+- Internal Alpine Probe #135 / Run ID `36290090117`：PASS（业务改动后的 Internal Alpine 资产验证）。
+- W0 #968：FAIL，新增测试参数名误写；业务源码编译链未作为最终证据。
+- W0 #969：FAIL，新增测试错误地把 raw host input 当成小写 launch kind；700 tests 中 699 PASS。
+- W0 #970：FAIL，测试直接检查 shell-escaped outer script，断言层级错误；业务实现未修改。
+- W0 Cloud Build #971 / Run ID `36291377522`：PASS；validators、700 unit tests、`assembleDebug`、APK evidence、stable signing 全部通过。
+- Artifact：`siftalpha-w0-971` / ID `10922143433` / digest `sha256:92a489d6357df285df4275a93a5971e875d34215823349f43a7da9b2d2827a0a`。
+- APK SHA-256：`a7df0d10fe6e38878c9c2c10ef1ef44daa33bc025ba7752914eb82fb06fd4aa2`。
+- APK signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+- 真机待验收：卸载 Termux → External PREPARE 显示下载入口；安装/首次打开/授权/setup → 返回 SiftAlpha → shared preflight 恢复 → 原操作自动继续；External easy_tdx 最终应使用项目自有 console-script Launch Contract。
+
+
+
 ## 2026-09-27 · R48d10.1 Launch Authority + Environment Capability Closure（启动权 + 环境能力闭环）
 
 ### Source boundary（源码边界）
@@ -37,7 +83,7 @@
 - Artifact：`siftalpha-w0-964` / ID `10921162074` / digest `sha256:14c1817dbf512d9911d6b0d7ce6b2f936317d074a34e7bd0641356cbb97b090c`。
 - APK SHA-256：`a129e9f0b78a376442e1086a5436105a1202e51544176e410567b838c0a78eff`。
 - APK signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
-- 真机 easy_tdx 回归：待安装 `r48d10.1` 后验证实际 launch 为项目自有 contract，且不再出现 `/siftalpha-env/venv/bin/uvicorn: not found`。
+- 真机 easy_tdx 回归：PASS（user-confirmed）；Internal Runtime 已可正常运行并直接打开网页，不再出现 `/siftalpha-env/venv/bin/uvicorn: not found`。
 
 ## 2026-09-21 · R48a6 Shared Core Realignment（共享核心重新对齐） + External Provider Preflight（外部执行环境前置检查）
 

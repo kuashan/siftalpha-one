@@ -1,15 +1,16 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-27（R48d10.1 Launch Authority + Environment Capability Closure）
+最后更新：2026-09-27（R48d10.2 External Provider Installation Recovery）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
-当前文档/验收分支：`codex/r48d10-launch-authority-capability`
-Current functional source HEAD：`5efbcedefa774721efa777efefc923f466542792`
+当前文档/验收分支：`codex/r48d10-external-provider-install-recovery`
+Current functional source HEAD：`b69cae818afe62d1a840670908b3ac7ebce4b59f`
 R48d10 唯一源码基线：`a60d7fb5d81a6611ea6695c023c1c70e8181388c`
-当前测试版本：`0.8.0-alpha43-r48d10.1` / versionCode `223`。
-R48d10.1 W0 Cloud Build：Run #964 / Run ID `36288629558` / artifact `siftalpha-w0-964` / artifact ID `10921162074` / APK SHA-256 `a129e9f0b78a376442e1086a5436105a1202e51544176e410567b838c0a78eff` / conclusion `success`。
-R48d10.1 Internal Alpine Probe：Run #134 / Run ID `36288629580` / conclusion `success`。
-R48d10.1 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
-当前真机待验收：easy_tdx 内部执行应优先使用项目自有 serve contract，且不得再出现 `/siftalpha-env/venv/bin/uvicorn: not found`。
+当前测试版本：`0.8.0-alpha43-r48d10.2` / versionCode `224`。
+R48d10.2 W0 Cloud Build：Run #971 / Run ID `36291377522` / artifact `siftalpha-w0-971` / artifact ID `10922143433` / APK SHA-256 `a7df0d10fe6e38878c9c2c10ef1ef44daa33bc025ba7752914eb82fb06fd4aa2` / conclusion `success`。
+R48d10.2 Internal Alpine Probe：Run #135 / Run ID `36290090117` / conclusion `success`。
+R48d10.2 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+已真机确认：R48d10.1 Internal easy_tdx 可正常运行并直接打开网页。
+当前真机待验收：Termux 未安装时下载入口、安装/初始化/授权后的 shared preflight 恢复、原 PREPARE/RUN 自动继续，以及 External easy_tdx 使用与 Internal 相同的项目自有 Launch Contract。
 alpha43 production source baseline：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`  
 `main` 保持历史 production baseline，本轮未修改。  
 alpha30 source / real-device evidence remains historical; current branch continues from the alpha31 version-identity baseline。  

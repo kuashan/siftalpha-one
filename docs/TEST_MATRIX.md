@@ -17,6 +17,33 @@
 本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
 
 
+## R48d10.2 — External Provider Installation Recovery（外部运行环境安装恢复）
+
+| ID | 验证项 | 期望 | 状态 |
+|---|---|---|---|
+| R48D10.2-01 | Shared stale readiness invalidation | Termux/permission 消失时清空旧 bridge/probe READY 证据 | PASS — unit + W0 #971 |
+| R48D10.2-02 | Shared recovery action | 未安装、权限、setup、recheck、waiting 由统一 recovery policy 返回 | PASS — unit + W0 #971 |
+| R48D10.2-03 | Deferred action survival | `TERMUX_NOT_INSTALLED` / setup / unresponsive 不删除原 PREPARE/RUN generation | PASS — unit + W0 #971 |
+| R48D10.2-04 | Normal Mode install UX | 未安装显示“下载 Termux”，不再错误显示“打开 Termux” | PASS — source + localization validator；待真机 |
+| R48D10.2-05 | Developer Mode install UX | 未安装弹窗提供官方 Termux 下载动作；setup 状态继续提供打开 Termux | PASS — source + W0 #971；待真机 |
+| R48D10.2-06 | Return-and-resume | 返回 SiftAlpha 后重新 preflight，READY 后由既有 External Action Gate 自动继续原操作 | PASS — source + unit；待真机 |
+| R48D10.2-07 | External launch contract parity | External `PythonRuntimeAdapter` 原样消费 shared console-script invocation，不重新推断 uvicorn | PASS — unit + W0 #971 |
+| R48D10.2-08 | Internal regression boundary | Internal easy_tdx 已正常运行并直接打开网页，本轮不修改其业务启动链 | PASS — user-confirmed + scope |
+| R48D10.2-09 | Internal Alpine Probe | 业务改动后的 Internal Alpine 资产验证 | PASS — Probe #135 |
+| R48D10.2-10 | Version | `0.8.0-alpha43-r48d10.2` / versionCode `224` | PASS — APK badging |
+| R48D10.2-11 | W0 Cloud Build | validators + 700 unit tests + assembleDebug + signing | PASS — W0 #971 |
+| R48D10.2-12 | Real-device External install recovery | 卸载→下载→安装/初始化/授权→返回→自动继续 PREPARE/RUN | 待真机 |
+| R48D10.2-13 | Real-device External easy_tdx | Termux 环境执行项目自有 `easy-tdx serve ...`，网页可打开 | 待真机 |
+
+R48d10.2 APK evidence：
+- functional source: `b69cae818afe62d1a840670908b3ac7ebce4b59f`
+- artifact: `siftalpha-w0-971` / ID `10922143433`
+- artifact digest: `sha256:92a489d6357df285df4275a93a5971e875d34215823349f43a7da9b2d2827a0a`
+- APK SHA-256: `a7df0d10fe6e38878c9c2c10ef1ef44daa33bc025ba7752914eb82fb06fd4aa2`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+
+
+
 ## R48d10.1 — Launch Authority + Environment Capability Closure（启动权 + 环境能力闭环）
 
 | ID | 验证项 | 期望 | 状态 |
@@ -31,7 +58,7 @@
 | R48D10.1-08 | Version | `0.8.0-alpha43-r48d10.1` / versionCode `223` | PASS — APK badging |
 | R48D10.1-09 | W0 Cloud Build | validators + unit tests + assembleDebug + signing | PASS — W0 #964 |
 | R48D10.1-10 | Internal Alpine Probe | reproducible Internal Alpine assets | PASS — Probe #134 |
-| R48D10.1-11 | easy_tdx real-device regression | 不再错误执行缺失的 `uvicorn`；项目自有启动契约实际可运行 | 待真机 |
+| R48D10.1-11 | easy_tdx real-device regression | 不再错误执行缺失的 `uvicorn`；项目自有启动契约实际可运行 | PASS — user-confirmed |
 
 R48d10.1 APK evidence：
 - functional source: `5efbcedefa774721efa777efefc923f466542792`

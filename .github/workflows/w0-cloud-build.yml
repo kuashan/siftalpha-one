@@ -12,7 +12,6 @@ on:
       - codex/siftalpha-x-embedded-cpython-spike
       - codex/siftalpha-no-worker-alpha43
       - codex/r48-shared-core-realignment
-      - codex/r48d10-external-provider-install-recovery
   workflow_dispatch:
 
 permissions:
