@@ -22,9 +22,9 @@ class PythonRuntimeAdapter(
     )
 
     override val environmentRequirements: List<RuntimeEnvironmentRequirement> = listOf(
-        RuntimeEnvironmentRequirement("python3", "Python interpreter"),
-        RuntimeEnvironmentRequirement("python3 -m pip", "Python package manager"),
-        RuntimeEnvironmentRequirement("python3 -m venv", "Python virtual environment support"),
+        RuntimeEnvironmentRequirement("/usr/bin/python3", "Ubuntu Python interpreter"),
+        RuntimeEnvironmentRequirement("/usr/bin/python3 -m pip", "Ubuntu Python package manager"),
+        RuntimeEnvironmentRequirement("/usr/bin/python3 -m venv", "Ubuntu Python virtual environment support"),
     )
 
     override fun prepare(project: RuntimeProjectSpec): RuntimeCommand = RuntimeCommand(
@@ -88,23 +88,37 @@ class PythonRuntimeAdapter(
             planned_extras=${sh(plannedExtrasValue)}
             mkdir -p /root/venvs /root/siftalpha/logs "${'$'}work_root"
             : >"${'$'}log"
-            if ! command -v python3 >/dev/null 2>&1; then
-              echo 'SIFTALPHA_ERROR=PYTHON_MISSING'
+            ubuntu_python='/usr/bin/python3'
+            if [ ! -x "${'$'}ubuntu_python" ]; then
+              echo 'SIFTALPHA_ERROR=UBUNTU_PYTHON_MISSING'
               exit 72
             fi
-            need_tools=0
-            python3 -m venv --help >/dev/null 2>&1 || need_tools=1
-            python3 -m pip --version >/dev/null 2>&1 || need_tools=1
-            if [ "${'$'}need_tools" -ne 0 ]; then
-              export DEBIAN_FRONTEND=noninteractive
-              apt-get update >>"${'$'}log" 2>&1
-              apt-get install -y python3-venv python3-pip >>"${'$'}log" 2>&1
+            if ! "${'$'}ubuntu_python" -m venv --help >/dev/null 2>&1 || \
+               ! "${'$'}ubuntu_python" -m pip --version >/dev/null 2>&1; then
+              echo 'SIFTALPHA_ERROR=UBUNTU_PYTHON_TOOLING_MISSING'
+              exit 72
             fi
+            ubuntu_python_executable="${'$'}("${'$'}ubuntu_python" -c 'import sys; print(sys.executable)' 2>/dev/null || true)"
+            ubuntu_python_platform="${'$'}("${'$'}ubuntu_python" -c 'import sysconfig; print(sysconfig.get_platform())' 2>/dev/null || true)"
+            case "${'$'}ubuntu_python_executable" in
+              /data/data/com.termux/*)
+                echo 'SIFTALPHA_ERROR=EXTERNAL_PYTHON_IDENTITY_INVALID'
+                exit 74
+                ;;
+            esac
+            case "${'$'}ubuntu_python_platform" in
+              *android*|'')
+                echo 'SIFTALPHA_ERROR=EXTERNAL_PYTHON_IDENTITY_INVALID'
+                exit 74
+                ;;
+            esac
+            printf 'SIFTALPHA_EXTERNAL_PYTHON_EXECUTABLE=%s\n' "${'$'}ubuntu_python_executable"
+            printf 'SIFTALPHA_EXTERNAL_PYTHON_PLATFORM=%s\n' "${'$'}ubuntu_python_platform"
 
-            python_version="${'$'}(python3 -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))')"
+            python_version="${'$'}("${'$'}ubuntu_python" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))')"
             if [ -n "${'$'}required_python" ]; then
               set +e
-              python3 - "${'$'}required_python" <<'SIFTALPHA_PYTHON_REQUIRES_CHECK'
+              "${'$'}ubuntu_python" - "${'$'}required_python" <<'SIFTALPHA_PYTHON_REQUIRES_CHECK'
 import sys
 from pip._vendor.packaging.specifiers import SpecifierSet
 from pip._vendor.packaging.version import Version
@@ -238,7 +252,7 @@ SIFTALPHA_PYTHON_REQUIRES_CHECK
             trap rollback_prepare EXIT
 
             rm -rf -- "${'$'}venv"
-            python3 -m venv "${'$'}venv" >>"${'$'}log" 2>&1
+            "${'$'}ubuntu_python" -m venv "${'$'}venv" >>"${'$'}log" 2>&1
 
             if [ "${'$'}dependency_source" = 'requirements.txt' ]; then
               echo 'DEPENDENCY_SOURCE=requirements.txt'
@@ -265,6 +279,8 @@ SIFTALPHA_PYTHON_REQUIRES_CHECK
             "${'$'}venv/bin/python" --version 2>&1
             prepared_python_version="${'$'}("${'$'}venv/bin/python" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))')"
             prepared_python_executable="${'$'}("${'$'}venv/bin/python" -c 'import sys; print(sys.executable)')"
+            prepared_base_python="${'$'}("${'$'}venv/bin/python" -c 'import sys; print(getattr(sys, "_base_executable", ""))')"
+            prepared_python_platform="${'$'}("${'$'}venv/bin/python" -c 'import sysconfig; print(sysconfig.get_platform())')"
             if [ "${'$'}prepared_python_version" != "${'$'}python_version" ]; then
               echo 'SIFTALPHA_ERROR=PYTHON_RUNTIME_IDENTITY_CHANGED_DURING_PREPARE'
               exit 74
@@ -275,6 +291,15 @@ SIFTALPHA_PYTHON_REQUIRES_CHECK
               printf 'SIFTALPHA_PYTHON_EXPECTED=%s\n' "${'$'}venv/bin/python"
               exit 76
             fi
+            if printf '%s\n' "${'$'}prepared_base_python" | grep -q '^/data/data/com.termux/' || \
+               printf '%s\n' "${'$'}prepared_python_platform" | grep -qi 'android'; then
+              echo 'SIFTALPHA_ERROR=EXTERNAL_PYTHON_IDENTITY_INVALID'
+              printf 'SIFTALPHA_PYTHON_BASE=%s\n' "${'$'}prepared_base_python"
+              printf 'SIFTALPHA_PYTHON_PLATFORM=%s\n' "${'$'}prepared_python_platform"
+              exit 74
+            fi
+            printf 'SIFTALPHA_PYTHON_BASE=%s\n' "${'$'}prepared_base_python"
+            printf 'SIFTALPHA_PYTHON_PLATFORM=%s\n' "${'$'}prepared_python_platform"
 
             umask 077
             ready_commit="${'$'}ready.commit-${'$'}${'$'}"
@@ -505,7 +530,7 @@ $launchArgumentAssignments
 
             export PYTHONUNBUFFERED=1
             export VIRTUAL_ENV="${'$'}venv"
-            export PATH="${'$'}venv/bin:${'$'}PATH"
+            export PATH="${'$'}venv/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
             if [ "${'$'}launch_mode" = "1" ]; then
               printf 'SIFTALPHA_LAUNCH_KIND=%s\n' "${'$'}launch_kind"
               printf 'SIFTALPHA_LAUNCH_EXECUTABLE=%s\n' "${'$'}launch_display"
@@ -554,6 +579,10 @@ $launchArgumentAssignments
             incoming="/root/.siftalpha-host/${id}.secrets.in"
             mkdir -p /root/siftalpha/logs "${'$'}work_root"
             : >"${'$'}log"
+            if [ ! -x /usr/bin/python3 ]; then
+              echo 'SIFTALPHA_ERROR=UBUNTU_PYTHON_MISSING'
+              exit 72
+            fi
             ${pythonWorkspaceSyncShell()}
             ${environmentReadyCheckShell(project)}
             if [ "${'$'}env_ready" -ne 1 ]; then
@@ -1043,7 +1072,7 @@ os.chmod(tmp, 0o600)
 os.replace(tmp, manifest_path)
 SIFTALPHA_PYTHON_SOURCE_SYNC
         chmod 600 "${'$'}source_manager"
-        if ! python3 "${'$'}source_manager" "${'$'}source" "${'$'}project" "${'$'}work_root/source-manifest.json" >>"${'$'}log" 2>&1; then
+        if ! /usr/bin/python3 "${'$'}source_manager" "${'$'}source" "${'$'}project" "${'$'}work_root/source-manifest.json" >>"${'$'}log" 2>&1; then
           echo 'SIFTALPHA_DIAG=PYTHON_WORKSPACE_SYNC_FAILED'
           if tail -n 120 "${'$'}log" 2>/dev/null | grep -Eqi 'Permission denied|PermissionError'; then
             echo 'SIFTALPHA_ERROR=PROJECT_SOURCE_PERMISSION_DENIED'
@@ -1088,8 +1117,14 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
         env_reason='VENV_MISSING'
         if [ -x "${'$'}venv/bin/python" ]; then
           current_python_version="${'$'}("${'$'}venv/bin/python" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))' 2>/dev/null || true)"
+          current_base_python="${'$'}("${'$'}venv/bin/python" -c 'import sys; print(getattr(sys, "_base_executable", ""))' 2>/dev/null || true)"
+          current_python_platform="${'$'}("${'$'}venv/bin/python" -c 'import sysconfig; print(sysconfig.get_platform())' 2>/dev/null || true)"
           if [ -z "${'$'}current_python_version" ]; then
             env_reason='PYTHON_RUNTIME_UNAVAILABLE'
+          elif printf '%s\n' "${'$'}current_base_python" | grep -q '^/data/data/com.termux/'; then
+            env_reason='EXTERNAL_PYTHON_IDENTITY_INVALID'
+          elif printf '%s\n' "${'$'}current_python_platform" | grep -qi 'android'; then
+            env_reason='EXTERNAL_PYTHON_IDENTITY_INVALID'
           else
             env_reason='PREPARE_MARKER_MISSING'
             if [ -f "${'$'}ready" ]; then
