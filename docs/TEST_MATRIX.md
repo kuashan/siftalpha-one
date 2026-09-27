@@ -1975,3 +1975,27 @@ Real-device result: pending.
 Cloud result: pending final v238 W0 + Internal Alpine Probe.
 Real-device result: pending.
 
+## Android v239 Generic Web Component Environment Contract
+
+| ID | Check | Expected |
+|---|---|---|
+| WC-01 | Python root + nested package.json + vite.config.* | Python primary, Node supplemental, one Vite Web component |
+| WC-02 | Config-less package with exact vite dependency | Vite Web component detected |
+| WC-03 | Config-less package with script invoking vite | Vite Web component detected |
+| WC-04 | Node package without Vite evidence | Not classified as Vite |
+| WC-05 | Multiple package.json files | Each component is independently bounded and evidence-based |
+| WC-06 | Environment diagnostics | Component count, directory, kind and evidence are emitted |
+| WC-07 | Environment identity | Relevant package-manifest Web facts participate in Plan ID |
+| WC-08 | Supplemental Node PREPARE/STATUS | Consume Plan-owned component directories; no runtime source-tree rediscovery |
+| WC-09 | Config-less build output | Standard Vite dist directory accepted |
+| WC-10 | Explicit Vite outDir | Existing safe config resolution preserved |
+| WC-11 | Python + Vite + internal FastAPI + project-owned serve | Project-owned serve outranks synthetic uvicorn |
+| WC-12 | One-shot Python CLI | Remains independently runnable; does not become Web identity |
+| WC-13 | Bounds | At most 32 package manifests, max 256 KiB each |
+| WC-14 | Project-specific behavior | No project/repository/folder-name or fixed-port special case |
+| WC-15 | Existing Android suite | testDebugUnitTest + assembleDebug PASS |
+
+Pre-closure W0 #947: PASS.
+Final exact-head W0 + Internal Alpine Probe: pending.
+Real-device Web/Vite acceptance: pending.
+
