@@ -150,6 +150,7 @@ class InternalAlpineRuntimeTest {
             requirementsText = "requests\n",
             pyprojectText = "[project]\nname='demo'\n",
             requiresNodeVite = true,
+            viteComponentDirectories = listOf("web-ui"),
         )
 
         assertEquals(InternalAlpineDependencySource.Kind.REQUIREMENTS_TXT, plain.kind)
@@ -171,14 +172,49 @@ class InternalAlpineRuntimeTest {
 
     @Test
     fun viteBuildBootstrapUsesNpmAndRejectsUnmodeledPackageManagers() {
-        val command = InternalAlpineViteBuildBootstrap.buildCommand()
+        val command = InternalAlpineViteBuildBootstrap.buildCommand(listOf("web-ui"))
 
-        assertTrue(command.contains("vite.config.ts"))
+        assertTrue(command.contains("/workspace/web-ui/package.json"))
+        assertFalse(command.contains("vite.config.ts"))
+        assertFalse(command.contains("find /workspace"))
         assertTrue(command.contains("npm ci --no-audit --no-fund"))
         assertTrue(command.contains("npm install --no-audit --no-fund --package-lock=false"))
         assertTrue(command.contains("npm run build"))
         assertTrue(command.contains("UNSUPPORTED_PACKAGE_MANAGER"))
         assertTrue(command.contains("SIFTALPHA_NODE_ENV=READY"))
+    }
+
+    @Test
+    fun viteBuildBootstrapUsesOnlyPlanOwnedComponentsAndSupportsConfiglessVite() {
+        val command = InternalAlpineViteBuildBootstrap.buildCommand(
+            listOf(".", "apps/dashboard"),
+        )
+
+        assertTrue(command.contains("/workspace/package.json"))
+        assertTrue(command.contains("/workspace/apps/dashboard/package.json"))
+        assertFalse(command.contains("find /workspace"))
+        assertFalse(command.contains("vite.config"))
+        assertTrue(command.contains("PLANNED_COMPONENT_MISSING"))
+        assertTrue(command.contains("npm run build"))
+    }
+
+    @Test
+    fun plannedViteDirectoriesParticipateInAlpineEnvironmentIdentity() {
+        val first = InternalAlpineDependencySource.fromProjectFiles(
+            requirementsText = null,
+            pyprojectText = "[project]\nname='demo'\n",
+            requiresNodeVite = true,
+            viteComponentDirectories = listOf("web-ui"),
+        )
+        val second = InternalAlpineDependencySource.fromProjectFiles(
+            requirementsText = null,
+            pyprojectText = "[project]\nname='demo'\n",
+            requiresNodeVite = true,
+            viteComponentDirectories = listOf("frontend"),
+        )
+
+        assertTrue(first.sourceFingerprint != second.sourceFingerprint)
+        assertEquals(listOf("web-ui"), first.viteComponentDirectories)
     }
 
     @Test
@@ -200,11 +236,13 @@ class InternalAlpineRuntimeTest {
             requirementsText = null,
             pyprojectText = "[project]\nname='demo'\n",
             requiresNodeVite = true,
+            viteComponentDirectories = listOf("web-ui"),
         )
         val web = InternalAlpineDependencySource.fromProjectFiles(
             requirementsText = null,
             pyprojectText = "[project]\nname='demo'\n",
             requiresNodeVite = true,
+            viteComponentDirectories = listOf("web-ui"),
             pythonInstallExtras = listOf("web"),
         )
 
