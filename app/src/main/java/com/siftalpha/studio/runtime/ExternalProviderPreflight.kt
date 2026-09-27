@@ -131,6 +131,7 @@ enum class ExternalRuntimeSetupStage {
     STORAGE_ACCESS,
     PROOT_DISTRO,
     UBUNTU,
+    UBUNTU_PYTHON,
     FINAL_CHECK,
     READY,
 }
@@ -143,6 +144,7 @@ data class ExternalRuntimeSetupStatus(
     val storageAccessReady: Boolean?,
     val prootDistroReady: Boolean?,
     val ubuntuReady: Boolean?,
+    val ubuntuPythonReady: Boolean?,
     val ready: Boolean,
     val checking: Boolean,
     val detail: String? = null,
@@ -152,6 +154,7 @@ object ExternalRuntimeSetupGuide {
     private const val STORAGE_MARKER = "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=SHARED_STORAGE_ACCESS"
     private const val PROOT_MARKER = "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=PROOT_DISTRO"
     private const val UBUNTU_MARKER = "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU"
+    private const val UBUNTU_PYTHON_MARKER = "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
 
     fun evaluate(result: ExternalProviderPreflightResult): ExternalRuntimeSetupStatus {
         val detail = result.detail.orEmpty()
@@ -170,6 +173,7 @@ object ExternalRuntimeSetupGuide {
                 storageAccessReady = true,
                 prootDistroReady = true,
                 ubuntuReady = true,
+                ubuntuPythonReady = true,
                 ready = true,
                 checking = false,
                 detail = result.detail,
@@ -188,6 +192,7 @@ object ExternalRuntimeSetupGuide {
                 storageAccessReady = false,
                 prootDistroReady = null,
                 ubuntuReady = null,
+                ubuntuPythonReady = null,
                 ready = false,
                 checking = false,
                 detail = result.detail,
@@ -202,6 +207,22 @@ object ExternalRuntimeSetupGuide {
                 storageAccessReady = true,
                 prootDistroReady = false,
                 ubuntuReady = null,
+                ubuntuPythonReady = null,
+                ready = false,
+                checking = false,
+                detail = result.detail,
+            )
+        }
+        if (runtimeStage && failed && UBUNTU_PYTHON_MARKER in detail) {
+            return ExternalRuntimeSetupStatus(
+                stage = ExternalRuntimeSetupStage.UBUNTU_PYTHON,
+                termuxInstalled = true,
+                runCommandPermissionGranted = true,
+                allowExternalAppsReady = true,
+                storageAccessReady = true,
+                prootDistroReady = true,
+                ubuntuReady = true,
+                ubuntuPythonReady = false,
                 ready = false,
                 checking = false,
                 detail = result.detail,
@@ -216,6 +237,7 @@ object ExternalRuntimeSetupGuide {
                 storageAccessReady = true,
                 prootDistroReady = true,
                 ubuntuReady = false,
+                ubuntuPythonReady = null,
                 ready = false,
                 checking = false,
                 detail = result.detail,
@@ -238,6 +260,7 @@ object ExternalRuntimeSetupGuide {
                 storageAccessReady = null,
                 prootDistroReady = null,
                 ubuntuReady = null,
+                ubuntuPythonReady = null,
                 ready = false,
                 checking = false,
                 detail = result.detail,
@@ -256,6 +279,7 @@ object ExternalRuntimeSetupGuide {
             storageAccessReady = if (runtimeStage) true else null,
             prootDistroReady = null,
             ubuntuReady = null,
+                ubuntuPythonReady = null,
             ready = false,
             checking = result.readiness == ExternalProviderReadiness.BRIDGE_CHECKING,
             detail = result.detail,
@@ -273,6 +297,7 @@ object ExternalRuntimeSetupGuide {
         storageAccessReady = null,
         prootDistroReady = null,
         ubuntuReady = null,
+                ubuntuPythonReady = null,
         ready = false,
         checking = false,
         detail = result.detail,
@@ -560,7 +585,7 @@ class ExternalProviderReadinessStore internal constructor(
         private const val FIELD_DETAIL = "detail"
         private const val FIELD_SETUP_COMPLETE = "setup_complete"
         private const val FIELD_SETUP_CONTRACT_VERSION = "setup_contract_version"
-        private const val CURRENT_SETUP_CONTRACT_VERSION = 2
+        private const val CURRENT_SETUP_CONTRACT_VERSION = 3
         private const val MAX_DETAIL_LENGTH = 240
     }
 }
