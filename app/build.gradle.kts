@@ -168,8 +168,10 @@ android {
         // Python/venv/pip identity so Termux Android Python cannot masquerade as guest Python.
         // v229 / r48d11 establishes External Runtime Baseline v1: a SiftAlpha-owned Ubuntu 24.04
         // container plus managed CPython selection with 3.12 as the compatibility-first default.
-        versionCode = 229
-        versionName = "0.8.0-alpha43-r48d11"
+        // v230 / r48d11.1 removes the duplicate uv managed-Python selector found by real-device
+        // PREPARE after CPython 3.12.14 installed successfully.
+        versionCode = 230
+        versionName = "0.8.0-alpha43-r48d11.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
