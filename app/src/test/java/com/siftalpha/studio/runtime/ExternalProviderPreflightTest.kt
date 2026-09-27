@@ -1,6 +1,7 @@
 package com.siftalpha.studio.runtime
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -191,6 +192,16 @@ class ExternalProviderPreflightTest {
 
     @Test
     fun setupCommandsAreCopyableAndCapabilityProbeHasExplicitUbuntuMarker() {
+        assertTrue(
+            TermuxBackend.FIRST_RUN_SETUP_COMMAND.contains(
+                "printf '\\nallow-external-apps = true\\n'",
+            ),
+        )
+        assertFalse(
+            TermuxBackend.FIRST_RUN_SETUP_COMMAND.contains(
+                "printf '\\\\nallow-external-apps = true\\\\n'",
+            ),
+        )
         assertTrue(TermuxBackend.FIRST_RUN_SETUP_COMMAND.contains("allow-external-apps = true"))
         assertEquals("pkg install -y proot-distro", TermuxBackend.PROOT_DISTRO_INSTALL_COMMAND)
         assertEquals("proot-distro install ubuntu", TermuxBackend.UBUNTU_INSTALL_COMMAND)
@@ -202,7 +213,7 @@ class ExternalProviderPreflightTest {
     }
 
     @Test
-    fun staleReadyFactMustBeProbedAgain() {
+    fun staleRuntimeProofRequiresHealthRecheckButKeepsSetupComplete() {
         val result = ExternalProviderPreflight.evaluate(
             facts = facts(
                 bridgeState = ExternalProviderBridgeState.PASS,
@@ -214,6 +225,12 @@ class ExternalProviderPreflightTest {
         )
 
         assertEquals(ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED, result.readiness)
+        assertFalse(result.ready)
+        assertTrue(result.setupComplete)
+
+        val setup = ExternalRuntimeSetupGuide.evaluate(result)
+        assertEquals(ExternalRuntimeSetupStage.READY, setup.stage)
+        assertTrue(setup.ready)
     }
 
     private fun facts(
