@@ -351,6 +351,7 @@ object ProjectEnvironmentDetector {
         var embeddedCpythonEligible =
             resolved?.primary == RuntimeKind.PYTHON &&
                 viteComponents.isEmpty() &&
+                pythonWebCapabilityExtras.isEmpty() &&
                 !blocking &&
                 dependencySource != EnvironmentDependencySource.UNSUPPORTED
 
