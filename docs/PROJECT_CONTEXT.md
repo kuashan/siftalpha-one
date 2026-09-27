@@ -1,17 +1,17 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-27（R48d10.5 External Python Workspace + Shared Storage Access）
+最后更新：2026-09-27（R48d10.6 External Ubuntu Python Identity）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
-当前文档/验收分支：`codex/r48d10-external-python-workspace`
-Current functional source HEAD：`bb12aabfcfde3fdf3fcfaa387cfd45dbc283142c`
+当前文档/验收分支：`codex/r48d10-external-ubuntu-python-identity`
+Current functional source HEAD：`75ca8a05cf8684b0488c30b2a4cd3957f0a13695`
 R48d10 唯一源码基线：`a60d7fb5d81a6611ea6695c023c1c70e8181388c`
-当前测试版本：`0.8.0-alpha43-r48d10.5` / versionCode `227`。
-R48d10.5 W0 Cloud Build：Run #982 / Run ID `36297047413` / artifact `siftalpha-w0-982` / artifact ID `10924726048` / APK SHA-256 `1577472c9f0d25904290f0a62ccf388aaa09d5065a18520f2596355b7fe5a16f` / conclusion `success`。
-R48d10.5 Internal Alpine Probe：Run #138 / Run ID `36296484366` / conclusion `success`。
-R48d10.5 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
-已真机确认：Internal easy_tdx 可正常运行并打开网页；External setup 已推进至 Python PREPARE，R48d10.4 真机暴露 Android shared-source bind 上 `pyproject.toml Permission denied`。
-当前架构边界：Android shared project 永远是 Source of Truth；External Python 通过 `/root/siftalpha/python-exec-workspaces/<runtimeId>/repo` 执行，PREPARE/START 先同步 source，CLEAN 只清 Runtime 副本；External setup contract 额外要求 Termux shared-storage access。
-当前真机待验收：R48d10.5 的 `termux-setup-storage` 引导、Python workspace sync、External easy_tdx PREPARE → RUN → Web 打开，以及 Runtime Storage Manager 的 PYTHON_WORKSPACE 展示/清理。
+当前测试版本：`0.8.0-alpha43-r48d10.6` / versionCode `228`。
+R48d10.6 W0 Cloud Build：Run #986 / Run ID `36300947324` / artifact `siftalpha-w0-986` / artifact ID `10926265054` / APK SHA-256 `51ebd8098dbcb7912fdc32790b065d4e1dd75508b7389113e69eb8f4e02c6550` / conclusion `success`。
+R48d10.6 Internal Alpine Probe：Run #139 / Run ID `36300482495` / conclusion `success`。
+R48d10.6 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+已真机确认：R48d10.5 External Python workspace sync 已 PASS，项目已从 Android source 正确同步到 Runtime-owned workspace；随后 easy_tdx PREPARE 暴露 pandas 走源码包 `pandas-2.3.3.tar.gz` 并长时间准备 native build dependencies。
+当前架构边界：Android shared project 仍是 Source of Truth；External Python workspace 继续负责可执行副本；R48d10.6 进一步要求 External Python 必须来自 Ubuntu 自己的 `/usr/bin/python3`，不得回落到 Termux Android Python。
+当前真机待验收：Settings > External Runtime Setup 的 Ubuntu Python 修复步骤、External capability identity proof、easy_tdx PREPARE 是否改用 pandas manylinux wheel，以及 PREPARE → RUN → Web 打开。
 alpha43 production source baseline：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`  
 `main` 保持历史 production baseline，本轮未修改。  
 alpha30 source / real-device evidence remains historical; current branch continues from the alpha31 version-identity baseline。  
