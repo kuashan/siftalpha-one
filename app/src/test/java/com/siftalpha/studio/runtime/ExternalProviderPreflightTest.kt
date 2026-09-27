@@ -249,8 +249,8 @@ class ExternalProviderPreflightTest {
         assertTrue(TermuxBackend.FIRST_RUN_SETUP_COMMAND.contains("allow-external-apps = true"))
         assertEquals("termux-setup-storage", TermuxBackend.STORAGE_ACCESS_SETUP_COMMAND)
         assertEquals("pkg install -y proot-distro", TermuxBackend.PROOT_DISTRO_INSTALL_COMMAND)
-        assertEquals("proot-distro install ubuntu:24.04", TermuxBackend.UBUNTU_INSTALL_COMMAND)
-        assertTrue(TermuxBackend.UBUNTU_PYTHON_INSTALL_COMMAND.contains("python3-venv"))
+        assertEquals("proot-distro install --name siftalpha-ubuntu-24.04 ubuntu:24.04", TermuxBackend.UBUNTU_INSTALL_COMMAND)
+        assertTrue(TermuxBackend.UBUNTU_PYTHON_INSTALL_COMMAND.contains("python3.12-venv"))
         assertTrue(TermuxBackend.UBUNTU_PYTHON_INSTALL_COMMAND.contains("python3-pip"))
         assertTrue(
             TermuxBackend.RUNTIME_CAPABILITY_TEST.shellScript.contains(
@@ -267,7 +267,9 @@ class ExternalProviderPreflightTest {
                 "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON",
             ),
         )
-        assertTrue(TermuxBackend.RUNTIME_CAPABILITY_TEST.shellScript.contains("/usr/bin/python3"))
+        assertTrue(TermuxBackend.RUNTIME_CAPABILITY_TEST.shellScript.contains("/usr/bin/python3.12"))
+        assertTrue(TermuxBackend.RUNTIME_CAPABILITY_TEST.shellScript.contains("external-runtime-v1-ubuntu-24.04"))
+        assertTrue(TermuxBackend.RUNTIME_CAPABILITY_TEST.shellScript.contains("siftalpha-ubuntu-24.04"))
     }
 
     @Test
