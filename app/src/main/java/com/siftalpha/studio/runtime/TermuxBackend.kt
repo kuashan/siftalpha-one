@@ -82,9 +82,12 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
 
         const val STORAGE_ACCESS_SETUP_COMMAND = "termux-setup-storage"
         const val PROOT_DISTRO_INSTALL_COMMAND = "pkg install -y proot-distro"
-        const val UBUNTU_INSTALL_COMMAND = "proot-distro install ubuntu:24.04"
+        const val UBUNTU_INSTALL_COMMAND =
+            "proot-distro install --name siftalpha-ubuntu-24.04 ubuntu:24.04"
         const val UBUNTU_PYTHON_INSTALL_COMMAND =
-            "proot-distro login ubuntu -- bash -lc 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates python3 python3-venv python3-pip && update-ca-certificates'"
+            "proot-distro login siftalpha-ubuntu-24.04 -- bash -lc 'apt-get update && " +
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl tar gzip " +
+                "python3.12 python3.12-venv python3-pip && update-ca-certificates'"
 
         val CONNECTION_TEST = RuntimeCommand(
             shellScript = "printf 'SIFTALPHA_TERMUX_BRIDGE_OK\\n'; printf 'TERMUX_PREFIX=%s\\n' \"${'$'}PREFIX\"; uname -m",
@@ -110,16 +113,16 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
                 }
 
                 set +e
-                ubuntu_probe="$(proot-distro login ubuntu -- bash -lc '
+                ubuntu_probe="$(proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
                   set -eu
                   printf "SIFTALPHA_EXTERNAL_RUNTIME_OK\\n"
                   uname -m >/dev/null
-                  if [ ! -x /usr/bin/python3 ]; then
+                  ubuntu_version="${'
                     echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                     exit 35
                   fi
-                  python_executable="$(/usr/bin/python3 -c "import sys; print(sys.executable)")"
-                  python_platform="$(/usr/bin/python3 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
                   case "${'$'}python_executable" in
                     /data/data/com.termux/*)
                       echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
@@ -132,11 +135,99 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
                       exit 35
                       ;;
                   esac
-                  /usr/bin/python3 -m venv --help >/dev/null 2>&1 || {
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
                     echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                     exit 35
                   }
-                  /usr/bin/python3 -m pip --version >/dev/null 2>&1 || {
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_RUNTIME_BASELINE=external-runtime-v1-ubuntu-24.04\\n"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_VERSION=%s\\n" "${'
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、SiftAlpha Ubuntu 24.04 基线与 Python 3.12 bootstrap。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "UBUNTU_VERSION="; (. /etc/os-release 2>/dev/null; printf "%s\\n" "${'
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
                     echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                     exit 35
                   }
@@ -179,14 +270,3935 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
                 fi
 
                 echo '--- Ubuntu ---'
-                if proot-distro login ubuntu -- bash -lc '
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
                   echo UBUNTU=OK
-                  printf "PYTHON="; /usr/bin/python3 --version 2>&1 || true
-                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3 -c "import sys; print(sys.executable)" 2>&1 || true
-                  printf "PYTHON_PLATFORM="; /usr/bin/python3 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
-                  printf "PIP="; /usr/bin/python3 -m pip --version 2>&1 || true
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
                   printf "GIT="; git --version 2>&1 || true
-                  printf "VENV="; /usr/bin/python3 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}{VERSION_ID:-}")"
+                  if [ "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version" != "24.04" ]; then
+                    printf "SIFTALPHA_EXTERNAL_UBUNTU_VERSION=%s\\n" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version"
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU"
+                    exit 33
+                  fi
+                  for tool in curl tar sha256sum; do
+                    command -v "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}tool" >/dev/null 2>&1 || {
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                    }
+                  done
+                  if [ ! -x /usr/bin/python3.12 ]; then
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}{VERSION_ID:-}")"
+                  if [ "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version" != "24.04" ]; then
+                    printf "SIFTALPHA_EXTERNAL_UBUNTU_VERSION=%s\\n" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version"
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU"
+                    exit 33
+                  fi
+                  for tool in curl tar sha256sum; do
+                    command -v "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}tool" >/dev/null 2>&1 || {
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                    }
+                  done
+                  if [ ! -x /usr/bin/python3.12 ]; then
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}{VERSION_ID:-}")"
+                  if [ "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version" != "24.04" ]; then
+                    printf "SIFTALPHA_EXTERNAL_UBUNTU_VERSION=%s\\n" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version"
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU"
+                    exit 33
+                  fi
+                  for tool in curl tar sha256sum; do
+                    command -v "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}tool" >/dev/null 2>&1 || {
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                    }
+                  done
+                  if [ ! -x /usr/bin/python3.12 ]; then
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}{VERSION_ID:-}")"
+                  if [ "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version" != "24.04" ]; then
+                    printf "SIFTALPHA_EXTERNAL_UBUNTU_VERSION=%s\\n" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version"
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU"
+                    exit 33
+                  fi
+                  for tool in curl tar sha256sum; do
+                    command -v "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}tool" >/dev/null 2>&1 || {
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                    }
+                  done
+                  if [ ! -x /usr/bin/python3.12 ]; then
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}{VERSION_ID:-UNKNOWN}") || true
+                  printf "RUNTIME_BASELINE=external-runtime-v1-ubuntu-24.04\\n"
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}{VERSION_ID:-}")"
+                  if [ "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version" != "24.04" ]; then
+                    printf "SIFTALPHA_EXTERNAL_UBUNTU_VERSION=%s\\n" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version"
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU"
+                    exit 33
+                  fi
+                  for tool in curl tar sha256sum; do
+                    command -v "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}tool" >/dev/null 2>&1 || {
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                    }
+                  done
+                  if [ ! -x /usr/bin/python3.12 ]; then
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}{VERSION_ID:-}")"
+                  if [ "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version" != "24.04" ]; then
+                    printf "SIFTALPHA_EXTERNAL_UBUNTU_VERSION=%s\\n" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version"
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU"
+                    exit 33
+                  fi
+                  for tool in curl tar sha256sum; do
+                    command -v "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}tool" >/dev/null 2>&1 || {
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                    }
+                  done
+                  if [ ! -x /usr/bin/python3.12 ]; then
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}{VERSION_ID:-}")"
+                  if [ "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version" != "24.04" ]; then
+                    printf "SIFTALPHA_EXTERNAL_UBUNTU_VERSION=%s\\n" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version"
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU"
+                    exit 33
+                  fi
+                  for tool in curl tar sha256sum; do
+                    command -v "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}tool" >/dev/null 2>&1 || {
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                    }
+                  done
+                  if [ ! -x /usr/bin/python3.12 ]; then
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}{VERSION_ID:-}")"
+                  if [ "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version" != "24.04" ]; then
+                    printf "SIFTALPHA_EXTERNAL_UBUNTU_VERSION=%s\\n" "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}ubuntu_version"
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU"
+                    exit 33
+                  fi
+                  for tool in curl tar sha256sum; do
+                    command -v "${'
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
+                  printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
+                '; then
+                  echo 'UBUNTU_LOGIN=OK'
+                else
+                  code=${'$'}?
+                  printf 'UBUNTU_LOGIN=FAILED:%s\\n' "${'$'}code"
+                  exit "${'$'}code"
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 运行环境检测",
+            description = "检测 Termux、共享存储、proot-distro、Ubuntu、Python、pip、venv、Git、tmux 与 libc。",
+        )
+    }
+}
+}tool" >/dev/null 2>&1 || {
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                    }
+                  done
+                  if [ ! -x /usr/bin/python3.12 ]; then
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3.12 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "${'$'}python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "${'$'}python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3.12 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
+            """.trimIndent(),
+            label = "SiftAlpha Studio 外部运行能力检测",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
+        )
+
+        val ENVIRONMENT_PROBE = RuntimeCommand(
+            shellScript = """
+                echo '=== SiftAlpha Runtime Probe ==='
+                printf 'TERMUX=OK\\n'
+                printf 'ARCH='; uname -m
+
+                if [ -d /storage/emulated/0 ]; then
+                  echo 'SHARED_STORAGE=OK'
+                else
+                  echo 'SHARED_STORAGE=MISSING'
+                fi
+
+                if command -v proot-distro >/dev/null 2>&1; then
+                  echo 'PROOT_DISTRO=OK'
+                else
+                  echo 'PROOT_DISTRO=MISSING'
+                  exit 20
+                fi
+
+                echo '--- Ubuntu ---'
+                if proot-distro login siftalpha-ubuntu-24.04 -- bash -lc '
+                  echo UBUNTU=OK
+                  printf "PYTHON="; /usr/bin/python3.12 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3.12 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3.12 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3.12 -m pip --version 2>&1 || true
+                  printf "GIT="; git --version 2>&1 || true
+                  printf "VENV="; /usr/bin/python3.12 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
                   printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
                   printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
                 '; then
