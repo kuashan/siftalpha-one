@@ -136,7 +136,10 @@ class ProjectRunWorkflowCoordinator(
         }
 
         val requiredCli = configuration.cliRequirements.filter { it.required }
-        val shouldResolveCli = !webEnabled || requiredCli.isNotEmpty()
+        val shouldResolveCli = PythonLaunchCompatibilityPolicy.shouldResolveCli(
+            primaryRuntime = resolvedSelection?.primary,
+            nativeWebLaunch = nativeWebLaunch,
+        )
         if (!shouldResolveCli) {
             return Preparation.Ready(
                 ProjectControlHub.RunRequest(

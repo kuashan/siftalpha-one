@@ -2,6 +2,7 @@ package com.siftalpha.studio.runtime
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PythonNativeWebApplicationLaunchResolverTest {
@@ -320,6 +321,22 @@ class PythonNativeWebApplicationLaunchResolverTest {
         )
 
         assertNull(result)
+    }
+
+    @Test
+    fun `project owned package sources outrank unrelated global command files`() {
+        val unrelated = (1..40).map { index -> "tools/tool_$index/cmd_web.py" }
+        val owned = "src/easy_tdx/cli/cmd_web.py"
+
+        val selected = PythonNativeWebApplicationLaunchResolver.selectSourcePaths(
+            pyprojectToml = pyproject,
+            relativePaths = unrelated + owned,
+            maxFiles = 32,
+        )
+
+        assertEquals(owned, selected.first())
+        assertTrue(owned in selected)
+        assertEquals(32, selected.size)
     }
 
     @Test

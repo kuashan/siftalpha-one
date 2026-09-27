@@ -15,14 +15,12 @@ class PythonLaunchCompatibilityPolicyTest {
         assertTrue(
             PythonLaunchCompatibilityPolicy.shouldResolveCli(
                 primaryRuntime = RuntimeKind.PYTHON,
-                webProjectEnabled = true,
                 nativeWebLaunch = null,
             ),
         )
         assertFalse(
             PythonLaunchCompatibilityPolicy.shouldResolveCli(
                 primaryRuntime = RuntimeKind.PYTHON,
-                webProjectEnabled = true,
                 nativeWebLaunch = PythonNativeWebLaunchCandidate(
                     executableName = "project-web",
                     arguments = listOf("serve"),
@@ -32,8 +30,7 @@ class PythonLaunchCompatibilityPolicyTest {
         )
         assertFalse(
             PythonLaunchCompatibilityPolicy.shouldResolveCli(
-                primaryRuntime = RuntimeKind.NODE,
-                webProjectEnabled = true,
+                primaryRuntime = RuntimeKind.NODE_JS,
                 nativeWebLaunch = null,
             ),
         )

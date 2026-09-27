@@ -77,11 +77,17 @@ object PythonNativeWebApplicationLaunchResolver {
             if (hasProjectOwnedCliContract(pyprojectToml)) return null
         }
 
+        val pythonSourcesComplete = completePythonSourceSample(
+            relativePaths = relativePaths,
+            pythonSources = pythonSources,
+        )
+
         return resolveCommonWebLaunch(
             requirementsText = requirementsText,
             pyprojectToml = pyprojectToml,
             relativePaths = relativePaths,
             pythonSources = pythonSources,
+            pythonSourcesComplete = pythonSourcesComplete,
         )
     }
 
@@ -90,6 +96,7 @@ object PythonNativeWebApplicationLaunchResolver {
         pyprojectToml: String?,
         relativePaths: Collection<String>,
         pythonSources: Map<String, String>,
+        pythonSourcesComplete: Boolean,
     ): PythonNativeWebLaunchCandidate? {
         val signature = CommonWebSignatureRegistry.detectPython(
             requirements = requirementsText,
@@ -118,7 +125,7 @@ object PythonNativeWebApplicationLaunchResolver {
                 )
             }
 
-            "fastapi" -> fastApiCandidate(pythonSources)
+            "fastapi" -> if (pythonSourcesComplete) fastApiCandidate(pythonSources) else null
 
             "django" -> relativePaths
                 .asSequence()
@@ -257,34 +264,7 @@ object PythonNativeWebApplicationLaunchResolver {
         val webExtra = optional.get("web") as? TomlArray ?: return null
         if (webExtra.size() == 0) return null
 
-        val scripts = project.get("scripts") as? TomlTable ?: return null
-        val scriptEntries = scripts.keySet()
-            .asSequence()
-            .sorted()
-            .mapNotNull { name ->
-                val target = scripts.get(name) as? String ?: return@mapNotNull null
-                if (
-                    target.isNotBlank() &&
-                    PythonCliLaunchResolver.isSafeCommandName(name) &&
-                    consoleScriptTarget.matches(target.trim())
-                ) {
-                    ProjectScript(name = name, target = target.trim())
-                } else {
-                    null
-                }
-            }
-            .toList()
-        if (scriptEntries.isEmpty()) return null
-
-        val projectName = (project.get("name") as? String).orEmpty()
-        val selectedScript = when {
-            scriptEntries.size == 1 -> scriptEntries.single()
-            projectName.isNotBlank() -> {
-                val wanted = canonicalCommandName(projectName)
-                scriptEntries.singleOrNull { canonicalCommandName(it.name) == wanted } ?: return null
-            }
-            else -> return null
-        }
+        val selectedScript = selectedProjectScript(project) ?: return null
 
         if (!hasViteComponent(relativePaths)) return null
 
@@ -313,6 +293,66 @@ object PythonNativeWebApplicationLaunchResolver {
         val target: String,
     )
 
+    internal fun selectSourcePaths(
+        pyprojectToml: String?,
+        relativePaths: Collection<String>,
+        maxFiles: Int,
+    ): List<String> {
+        require(maxFiles > 0) { "源码候选数量上限必须大于零" }
+        val ownedPackage = selectedProjectPackage(pyprojectToml)
+        return relativePaths
+            .asSequence()
+            .map { it.replace('\\', '/').trim().trim('/') }
+            .filter { it.endsWith(".py", ignoreCase = true) }
+            .filterNot(::isGeneratedOrDependencyPythonPath)
+            .distinct()
+            .sortedWith(
+                compareBy<String> { path ->
+                    if (ownedPackage != null && sourceOwnedByPackage(path, ownedPackage)) 0 else 1
+                }.thenBy(::nativeWebSourcePriority)
+                    .thenBy { it.count { ch -> ch == '/' } }
+                    .thenBy { it.lowercase() },
+            )
+            .take(maxFiles)
+            .toList()
+    }
+
+    private fun selectedProjectPackage(pyprojectToml: String?): String? {
+        if (pyprojectToml.isNullOrBlank()) return null
+        val root = runCatching { Toml.parse(pyprojectToml) }.getOrNull() ?: return null
+        if (root.hasErrors()) return null
+        val project = root.get("project") as? TomlTable ?: return null
+        val target = selectedProjectScript(project)?.target ?: return null
+        return target.substringBefore(':').substringBefore('.')
+            .takeIf(PYTHON_MODULE_SEGMENT::matches)
+    }
+
+    private fun selectedProjectScript(project: TomlTable): ProjectScript? {
+        val scripts = project.get("scripts") as? TomlTable ?: return null
+        val entries = scripts.keySet()
+            .asSequence()
+            .sorted()
+            .mapNotNull { name ->
+                val target = scripts.get(name) as? String ?: return@mapNotNull null
+                val normalizedTarget = target.trim()
+                if (
+                    PythonCliLaunchResolver.isSafeCommandName(name) &&
+                    consoleScriptTarget.matches(normalizedTarget)
+                ) {
+                    ProjectScript(name = name, target = normalizedTarget)
+                } else {
+                    null
+                }
+            }
+            .toList()
+        if (entries.isEmpty()) return null
+        if (entries.size == 1) return entries.single()
+        val projectName = (project.get("name") as? String).orEmpty()
+        if (projectName.isBlank()) return null
+        val wanted = canonicalCommandName(projectName)
+        return entries.singleOrNull { canonicalCommandName(it.name) == wanted }
+    }
+
     private data class ServeSourceEvidence(
         val path: String,
         val supportsHost: Boolean,
@@ -338,10 +378,46 @@ object PythonNativeWebApplicationLaunchResolver {
         val module = normalizedTarget.substringBefore(':')
         val topLevelPackage = module.substringBefore('.')
         if (!PYTHON_MODULE_SEGMENT.matches(topLevelPackage)) return false
+        return sourceOwnedByPackage(path, topLevelPackage)
+    }
+
+    private fun sourceOwnedByPackage(path: String, topLevelPackage: String): Boolean {
         val normalized = normalizedSafePythonPath(path) ?: return false
         val sourcePath = normalized.removePrefix("src/")
-        return sourcePath == "$topLevelPackage.py" ||
-            sourcePath.startsWith("$topLevelPackage/")
+        return sourcePath == "$topLevelPackage.py" || sourcePath.startsWith("$topLevelPackage/")
+    }
+
+    private fun completePythonSourceSample(
+        relativePaths: Collection<String>,
+        pythonSources: Map<String, String>,
+    ): Boolean {
+        val expected = relativePaths
+            .asSequence()
+            .map { it.replace('\\', '/').trim().trim('/') }
+            .filter { it.endsWith(".py", ignoreCase = true) }
+            .filterNot(::isGeneratedOrDependencyPythonPath)
+            .mapNotNull(::normalizedSafePythonPath)
+            .toSet()
+        val inspected = pythonSources.keys.mapNotNull(::normalizedSafePythonPath).toSet()
+        return expected.all { it in inspected }
+    }
+
+    private fun isGeneratedOrDependencyPythonPath(path: String): Boolean =
+        path.split('/').any { it.lowercase() in ignoredPythonPathSegments }
+
+    private fun nativeWebSourcePriority(path: String): Int {
+        val normalized = path.replace('\\', '/').lowercase()
+        val name = normalized.substringAfterLast('/')
+        return when {
+            name == "cmd_web.py" -> 0
+            name in setOf("web.py", "server.py", "serve.py") -> 1
+            "/web/" in normalized -> 2
+            "/cli/" in normalized && name.startsWith("cmd_") -> 3
+            name == "__main__.py" -> 4
+            name == "cli.py" -> 5
+            name == "app.py" -> 6
+            else -> 20
+        }
     }
 
     private fun inspectServeSource(path: String, source: String): ServeSourceEvidence? {
@@ -376,5 +452,15 @@ object PythonNativeWebApplicationLaunchResolver {
     private val PYTHON_MODULE_SEGMENT = Regex("^[A-Za-z_][A-Za-z0-9_]*$")
     private val consoleScriptTarget = Regex(
         "^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_]*$",
+    )
+    private val ignoredPythonPathSegments = setOf(
+        ".git",
+        ".venv",
+        "venv",
+        "__pycache__",
+        "node_modules",
+        "dist",
+        "build",
+        "site-packages",
     )
 }

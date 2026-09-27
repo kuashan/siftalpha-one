@@ -9,6 +9,12 @@ import com.siftalpha.studio.project.PythonCliRequirement
  */
 internal object PythonLaunchCompatibilityPolicy {
 
+    /** Native Web inference is optional; a miss must preserve the normal Python CLI authority. */
+    fun shouldResolveCli(
+        primaryRuntime: RuntimeKind?,
+        nativeWebLaunch: PythonNativeWebLaunchCandidate?,
+    ): Boolean = primaryRuntime == RuntimeKind.PYTHON && nativeWebLaunch == null
+
     fun fallbackEntrypoint(
         summaryEntry: String,
         relativePaths: Collection<String>,

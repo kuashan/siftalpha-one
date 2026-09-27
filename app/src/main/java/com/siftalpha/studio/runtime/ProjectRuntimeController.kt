@@ -896,32 +896,20 @@ class ProjectRuntimeController(
             null
         }
 
-        val sourcePaths = facts.relativePaths
-            .asSequence()
-            .map { it.replace('\\', '/').trim().trim('/') }
-            .filter { it.endsWith(".py", ignoreCase = true) }
-            .filterNot { path ->
-                path.split('/').any { part ->
-                    part in setOf(
-                        ".git",
-                        ".venv",
-                        "venv",
-                        "__pycache__",
-                        "node_modules",
-                        "dist",
-                        "build",
-                        "site-packages",
-                    )
-                }
-            }
-            .sortedWith(
-                compareBy<String> { nativeWebSourcePriority(it) }
-                    .thenBy { it.count { ch -> ch == '/' } }
-                    .thenBy { it.lowercase() },
+        val sourcePaths = PythonNativeWebApplicationLaunchResolver.selectSourcePaths(
+            pyprojectToml = pyprojectToml,
+            relativePaths = facts.relativePaths,
+            maxFiles = 32,
+        )
+        val sources = if (sourcePaths.isEmpty()) {
+            emptyMap()
+        } else {
+            gateway.readProjectTextFiles(
+                projectDocumentId = projectId,
+                relativePaths = sourcePaths,
+                maxFiles = sourcePaths.size,
             )
-            .take(32)
-            .toList()
-        val sources = gateway.readProjectTextFiles(projectId, sourcePaths)
+        }
 
         return PythonNativeWebApplicationLaunchResolver.resolve(
             declaredRun = facts.declaredRun,
@@ -933,20 +921,6 @@ class ProjectRuntimeController(
         )
     }
 
-    private fun nativeWebSourcePriority(path: String): Int {
-        val normalized = path.replace('\\', '/').lowercase()
-        val name = normalized.substringAfterLast('/')
-        return when {
-            name == "cmd_web.py" -> 0
-            name in setOf("web.py", "server.py", "serve.py") -> 1
-            "/web/" in normalized -> 2
-            "/cli/" in normalized && name.startsWith("cmd_") -> 3
-            name == "__main__.py" -> 4
-            name == "cli.py" -> 5
-            name == "app.py" -> 6
-            else -> 20
-        }
-    }
     fun prepare(project: V04ProjectGateway.RuntimeProject): RuntimeCommand {
         val context = executionContext(project)
         val plan = context.environmentPlan

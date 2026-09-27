@@ -45,6 +45,7 @@ import com.siftalpha.studio.runtime.PresentationTarget
 import com.siftalpha.studio.runtime.RichResultDetectionPolicy
 import com.siftalpha.studio.runtime.PresentationTargetResolver
 import com.siftalpha.studio.runtime.PythonCliLaunchResolver
+import com.siftalpha.studio.runtime.PythonLaunchCompatibilityPolicy
 import com.siftalpha.studio.runtime.PythonLaunchInvocation
 import com.siftalpha.studio.runtime.PythonNativeWebLaunchCandidate
 import com.siftalpha.studio.runtime.RuntimeArgumentParser
@@ -2065,8 +2066,10 @@ open class V04Activity : StudioActivity() {
 
         val isPythonCliCandidate =
             webProfile != null &&
-                resolvedSelection?.primary == RuntimeKind.PYTHON &&
-                (!webProfile.enabled || requiredCli.isNotEmpty())
+                PythonLaunchCompatibilityPolicy.shouldResolveCli(
+                    primaryRuntime = resolvedSelection?.primary,
+                    nativeWebLaunch = nativeWebLaunch,
+                )
 
         if (isPythonCliCandidate) {
             val cliWebProfile = checkNotNull(webProfile)
