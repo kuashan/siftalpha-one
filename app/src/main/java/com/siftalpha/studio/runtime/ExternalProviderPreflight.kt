@@ -128,6 +128,7 @@ enum class ExternalRuntimeSetupStage {
     TERMUX,
     RUN_COMMAND_PERMISSION,
     EXTERNAL_APPS,
+    STORAGE_ACCESS,
     PROOT_DISTRO,
     UBUNTU,
     FINAL_CHECK,
@@ -139,6 +140,7 @@ data class ExternalRuntimeSetupStatus(
     val termuxInstalled: Boolean,
     val runCommandPermissionGranted: Boolean,
     val allowExternalAppsReady: Boolean?,
+    val storageAccessReady: Boolean?,
     val prootDistroReady: Boolean?,
     val ubuntuReady: Boolean?,
     val ready: Boolean,
@@ -147,6 +149,7 @@ data class ExternalRuntimeSetupStatus(
 )
 
 object ExternalRuntimeSetupGuide {
+    private const val STORAGE_MARKER = "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=SHARED_STORAGE_ACCESS"
     private const val PROOT_MARKER = "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=PROOT_DISTRO"
     private const val UBUNTU_MARKER = "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU"
 
@@ -164,6 +167,7 @@ object ExternalRuntimeSetupGuide {
                 termuxInstalled = true,
                 runCommandPermissionGranted = true,
                 allowExternalAppsReady = true,
+                storageAccessReady = true,
                 prootDistroReady = true,
                 ubuntuReady = true,
                 ready = true,
@@ -175,12 +179,27 @@ object ExternalRuntimeSetupGuide {
         val runtimeStage =
             result.probeStage == ExternalProviderProbeStage.RUNTIME_CAPABILITY
         val failed = result.lastProbeResult == ExternalProviderProbeResult.FAIL
+        if (runtimeStage && failed && STORAGE_MARKER in detail) {
+            return ExternalRuntimeSetupStatus(
+                stage = ExternalRuntimeSetupStage.STORAGE_ACCESS,
+                termuxInstalled = true,
+                runCommandPermissionGranted = true,
+                allowExternalAppsReady = true,
+                storageAccessReady = false,
+                prootDistroReady = null,
+                ubuntuReady = null,
+                ready = false,
+                checking = false,
+                detail = result.detail,
+            )
+        }
         if (runtimeStage && failed && PROOT_MARKER in detail) {
             return ExternalRuntimeSetupStatus(
                 stage = ExternalRuntimeSetupStage.PROOT_DISTRO,
                 termuxInstalled = true,
                 runCommandPermissionGranted = true,
                 allowExternalAppsReady = true,
+                storageAccessReady = true,
                 prootDistroReady = false,
                 ubuntuReady = null,
                 ready = false,
@@ -194,6 +213,7 @@ object ExternalRuntimeSetupGuide {
                 termuxInstalled = true,
                 runCommandPermissionGranted = true,
                 allowExternalAppsReady = true,
+                storageAccessReady = true,
                 prootDistroReady = true,
                 ubuntuReady = false,
                 ready = false,
@@ -215,6 +235,7 @@ object ExternalRuntimeSetupGuide {
                 termuxInstalled = true,
                 runCommandPermissionGranted = true,
                 allowExternalAppsReady = false,
+                storageAccessReady = null,
                 prootDistroReady = null,
                 ubuntuReady = null,
                 ready = false,
@@ -232,6 +253,7 @@ object ExternalRuntimeSetupGuide {
                 result.allowExternalApps == true -> true
                 else -> null
             },
+            storageAccessReady = if (runtimeStage) true else null,
             prootDistroReady = null,
             ubuntuReady = null,
             ready = false,
@@ -248,6 +270,7 @@ object ExternalRuntimeSetupGuide {
         termuxInstalled = result.termuxInstalled,
         runCommandPermissionGranted = result.runCommandPermissionGranted,
         allowExternalAppsReady = null,
+        storageAccessReady = null,
         prootDistroReady = null,
         ubuntuReady = null,
         ready = false,
@@ -346,11 +369,7 @@ object ExternalProviderPreflight {
         detail = facts.detail,
         probeStage = facts.probeStage,
         lastProbeResult = facts.lastProbeResult,
-        setupComplete = facts.setupComplete ||
-            (
-                facts.probeStage == ExternalProviderProbeStage.RUNTIME_CAPABILITY &&
-                    facts.lastProbeResult == ExternalProviderProbeResult.PASS
-                ),
+        setupComplete = facts.setupComplete,
     )
 }
 
@@ -403,7 +422,9 @@ class ExternalProviderReadinessStore internal constructor(
             runCatching { ExternalProviderProbeResult.valueOf(it) }.getOrNull()
         },
         detail = prefs.getString(FIELD_DETAIL, null),
-        setupComplete = prefs.getBoolean(FIELD_SETUP_COMPLETE, false),
+        setupComplete =
+            prefs.getBoolean(FIELD_SETUP_COMPLETE, false) &&
+                prefs.getInt(FIELD_SETUP_CONTRACT_VERSION, 0) == CURRENT_SETUP_CONTRACT_VERSION,
     )
 
     override fun recordHostFacts(
@@ -423,6 +444,7 @@ class ExternalProviderReadinessStore internal constructor(
                     remove(FIELD_LAST_PROBE_RESULT)
                     remove(FIELD_DETAIL)
                     putBoolean(FIELD_SETUP_COMPLETE, false)
+                    remove(FIELD_SETUP_CONTRACT_VERSION)
                 }
             }
             .apply()
@@ -465,6 +487,7 @@ class ExternalProviderReadinessStore internal constructor(
                     currentStage == ExternalProviderProbeStage.RUNTIME_CAPABILITY
                 ) {
                     putBoolean(FIELD_SETUP_COMPLETE, true)
+                    putInt(FIELD_SETUP_CONTRACT_VERSION, CURRENT_SETUP_CONTRACT_VERSION)
                 } else if (result == ExternalProviderProbeResult.FAIL) {
                     putBoolean(FIELD_SETUP_COMPLETE, false)
                 }
@@ -517,6 +540,7 @@ class ExternalProviderReadinessStore internal constructor(
             .putLong(FIELD_LAST_PROBE_AT, atEpochMs)
             .remove(FIELD_LAST_PROBE_ID)
             .putBoolean(FIELD_SETUP_COMPLETE, true)
+            .putInt(FIELD_SETUP_CONTRACT_VERSION, CURRENT_SETUP_CONTRACT_VERSION)
             .apply {
                 if (detail.isNullOrBlank()) remove(FIELD_DETAIL)
                 else putString(FIELD_DETAIL, detail.trim().take(MAX_DETAIL_LENGTH))
@@ -535,6 +559,8 @@ class ExternalProviderReadinessStore internal constructor(
         private const val FIELD_LAST_PROBE_RESULT = "last_probe_result"
         private const val FIELD_DETAIL = "detail"
         private const val FIELD_SETUP_COMPLETE = "setup_complete"
+        private const val FIELD_SETUP_CONTRACT_VERSION = "setup_contract_version"
+        private const val CURRENT_SETUP_CONTRACT_VERSION = 2
         private const val MAX_DETAIL_LENGTH = 240
     }
 }
