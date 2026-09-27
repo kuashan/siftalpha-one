@@ -1552,10 +1552,12 @@ This repair does not change External Provider（外部运行环境）, Termux, W
 Runtime lifecycle, or either product surface's layout. Endpoint Probe（端点探测）remains the only
 authority that may mark a Web endpoint verified and offer Open（打开）.
 
-Cloud verification for functional source `474dd05fa62482755f43e071565c166e3d1c559e` is complete:
-W0 Cloud Build（W0 云端构建）#962 / Run `36287655479` and Internal Alpine Probe（内部 Alpine
-探针）#133 / Run `36287655468` both passed. The resulting trusted debug APK is version
+Cloud verification for functional source `9e92828e60f6dc7d2cf7884a3b1d366daeb66b4f` is complete:
+W0 Cloud Build（W0 云端构建）#965 / Run `36288705705` passed after an independent review closed
+the normal-CLI fallback and incomplete-source FastAPI ambiguity boundaries. Internal Alpine
+Probe（内部 Alpine 探针）#133 / Run `36287655468` remains PASS for the unchanged probe-scoped
+build/assets. The resulting trusted debug APK is version
 `0.8.0-alpha43-r48d10-r1` / versionCode `223`, APK SHA-256
-`719f1091d735050ee50c2a443243eb79714e42d38858255ee0a82ce5a5572132`, with the unchanged signer
+`24165d416c97a723432ba17c036e3670016b8c0c7322f97ac5b46c23ec5b1bc3`, with the unchanged signer
 certificate SHA-256 `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`.
 Real-device acceptance remains pending and must not be inferred from cloud PASS.

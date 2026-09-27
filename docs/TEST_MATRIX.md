@@ -1873,6 +1873,8 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | External Provider / Termux | all paths | unchanged |
 | Worker / STOP / lifecycle | all paths | unchanged |
 | Version | installable trusted debug APK | `0.8.0-alpha43-r48d10-r1` / versionCode 223 |
-| W0 / unit tests / assembleDebug | cloud build | PASS — Run #962 / `36287655479` on functional source `474dd05fa62482755f43e071565c166e3d1c559e`; artifact `siftalpha-w0-962` / ID `10920794285`; APK SHA-256 `719f1091d735050ee50c2a443243eb79714e42d38858255ee0a82ce5a5572132` |
-| Internal Alpine Probe | cloud probe | PASS — Run #133 / `36287655468` |
+| Web-native miss -> CLI | Web enabled; native resolver returns null | both Normal and Developer surfaces run the shared normal Python CLI resolver |
+| Incomplete FastAPI sample | eligible Python files exceed/read outside selected sample | generic `uvicorn` synthesis fails closed; project-package source candidates are prioritized |
+| W0 / unit tests / assembleDebug | cloud build | PASS — Run #965 / `36288705705` on functional source `9e92828e60f6dc7d2cf7884a3b1d366daeb66b4f`; artifact `siftalpha-w0-965` / ID `10921622557`; APK SHA-256 `24165d416c97a723432ba17c036e3670016b8c0c7322f97ac5b46c23ec5b1bc3` |
+| Internal Alpine Probe | cloud probe | PASS — Run #133 / `36287655468`; probe-scoped build/assets unchanged by fallback follow-up |
 | Real device | easy_tdx Internal Prepare -> Run -> Open | PENDING |

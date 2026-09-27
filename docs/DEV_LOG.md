@@ -3512,17 +3512,23 @@ selected the synthetic `uvicorn` console script and failed with exit 127 because
 - Added coverage for strict serve priority, project CLI authority, ambiguous FastAPI apps, package
   ownership of serve evidence, generic standalone FastAPI fallback, and Runtime-fact pruning that
   preserves `package.json`, `vite.config.ts`, and `cmd_web.py`.
+- Independent review then found two remaining fallback boundaries. RED W0 #963 / Run
+  `36288306597` proved the missing shared CLI-authority policy before the production follow-up.
+- Both execution surfaces now run normal Python CLI resolution whenever native Web inference returns
+  no candidate, including Web-enabled projects. Action-time reads consume the full selected set up
+  to 32 files, project-package sources outrank unrelated global command files, and generic FastAPI
+  synthesis requires complete coverage of every eligible Python source path.
 
 Target:
 - versionCode = 223
 - versionName = 0.8.0-alpha43-r48d10-r1
-- Functional source: `474dd05fa62482755f43e071565c166e3d1c559e`
-- W0 Cloud Build #962 / Run `36287655479`: PASS; repository validators, unit tests,
+- Functional source: `9e92828e60f6dc7d2cf7884a3b1d366daeb66b4f`
+- W0 Cloud Build #965 / Run `36288705705`: PASS; repository validators, unit tests,
   `assembleDebug`, APK evidence, and stable signing all passed.
-- Internal Alpine Probe #133 / Run `36287655468`: PASS.
-- Artifact: `siftalpha-w0-962` / artifact ID `10920794285` / artifact digest
-  `sha256:1a308f257d9893bd34dee4bd7d8843c206559f848b8f63bcdded03d94021bbe3`.
-- APK SHA-256: `719f1091d735050ee50c2a443243eb79714e42d38858255ee0a82ce5a5572132`.
+- Internal Alpine Probe #133 / Run `36287655468`: PASS on the unchanged probe-scoped build/assets.
+- Artifact: `siftalpha-w0-965` / artifact ID `10921622557` / artifact digest
+  `sha256:de610a0c00946b655c62add5c6d3d9cb443d55f8366fa3722a11c055c57d869d`.
+- APK SHA-256: `24165d416c97a723432ba17c036e3670016b8c0c7322f97ac5b46c23ec5b1bc3`.
 - APK package/version: `com.siftalpha.studio` / `0.8.0-alpha43-r48d10-r1` /
   `versionCode 223`.
 - Signer certificate SHA-256 remains
