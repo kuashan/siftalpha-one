@@ -22,8 +22,8 @@ data class PythonNativeWebLaunchCandidate(
  * Project-owned Python Web launch discovery.
  *
  * Resolution order:
- * 1. common high-confidence Web signatures;
- * 2. the existing stricter Python+Vite project contract;
+ * 1. project-authored console script + serve contract;
+ * 2. common high-confidence Web framework signatures whose runtime capability is prepared;
  * 3. null, which preserves the normal CLI fallback.
  *
  * Static recognition never marks a Web endpoint verified. Runtime Identity, scoped Web Discovery
@@ -34,13 +34,6 @@ object PythonNativeWebApplicationLaunchResolver {
         Regex("""(?m)@\s*click\.command\s*\(\s*["']serve["']"""),
         Regex("""(?m)@\s*[A-Za-z_][A-Za-z0-9_]*\.command\s*\(\s*["']serve["']"""),
         Regex("""(?m)\badd_parser\s*\(\s*["']serve["']"""),
-    )
-    private val viteConfigs = setOf(
-        "vite.config.ts",
-        "vite.config.js",
-        "vite.config.mts",
-        "vite.config.mjs",
-        "vite.config.cjs",
     )
     private val browserDisableFlags = listOf(
         "--no-open-browser",
@@ -60,15 +53,15 @@ object PythonNativeWebApplicationLaunchResolver {
             return null
         }
 
-        resolveCommonWebLaunch(
-            requirementsText = requirementsText,
-            pyprojectToml = pyprojectToml,
-            relativePaths = relativePaths,
-            pythonSources = pythonSources,
-        )?.let { return it }
+        if (!pyprojectToml.isNullOrBlank()) {
+            resolveProjectOwnedServeLaunch(
+                pyprojectToml = pyprojectToml,
+                pythonSources = pythonSources,
+            )?.let { return it }
+        }
 
-        if (pyprojectToml.isNullOrBlank()) return null
-        return resolvePythonViteWebLaunch(
+        return resolveCommonWebLaunch(
+            requirementsText = requirementsText,
             pyprojectToml = pyprojectToml,
             relativePaths = relativePaths,
             pythonSources = pythonSources,
@@ -87,6 +80,29 @@ object PythonNativeWebApplicationLaunchResolver {
             relativePaths = relativePaths,
             pythonSources = pythonSources,
         ) ?: return null
+
+        val frameworkPackage = when (signature.framework) {
+            "streamlit" -> "streamlit"
+            "fastapi" -> "fastapi"
+            "django" -> "django"
+            "flask" -> "flask"
+            "gradio" -> "gradio"
+            "nicegui" -> "nicegui"
+            "dash" -> "dash"
+            "aiohttp" -> "aiohttp"
+            "tornado" -> "tornado"
+            else -> null
+        }
+        if (
+            frameworkPackage != null &&
+            !PythonWebEnvironmentCapabilityPolicy.providesPackage(
+                packageName = frameworkPackage,
+                requirementsText = requirementsText,
+                pyprojectToml = pyprojectToml,
+            )
+        ) {
+            return null
+        }
 
         return when (signature.framework) {
             "streamlit" -> sourceCandidate(
@@ -108,7 +124,19 @@ object PythonNativeWebApplicationLaunchResolver {
                 )
             }
 
-            "fastapi" -> fastApiCandidate(pythonSources)
+            "fastapi" -> {
+                if (
+                    !PythonWebEnvironmentCapabilityPolicy.providesPackage(
+                        packageName = "uvicorn",
+                        requirementsText = requirementsText,
+                        pyprojectToml = pyprojectToml,
+                    )
+                ) {
+                    null
+                } else {
+                    fastApiCandidate(pythonSources)
+                }
+            }
 
             "django" -> relativePaths
                 .asSequence()
@@ -230,17 +258,14 @@ object PythonNativeWebApplicationLaunchResolver {
         return normalized
     }
 
-    private fun resolvePythonViteWebLaunch(
+    private fun resolveProjectOwnedServeLaunch(
         pyprojectToml: String,
-        relativePaths: Collection<String>,
         pythonSources: Map<String, String>,
     ): PythonNativeWebLaunchCandidate? {
         val root = runCatching { Toml.parse(pyprojectToml) }.getOrNull() ?: return null
         if (root.hasErrors()) return null
         val project = root.get("project") as? TomlTable ?: return null
-        val optional = project.get("optional-dependencies") as? TomlTable ?: return null
-        val webExtra = optional.get("web") as? TomlArray ?: return null
-        if (webExtra.size() == 0) return null
+        if ("web" !in PythonWebEnvironmentCapabilityPolicy.installExtras(pyprojectToml)) return null
 
         val scripts = project.get("scripts") as? TomlTable ?: return null
         val scriptEntries = scripts.keySet()
@@ -270,8 +295,6 @@ object PythonNativeWebApplicationLaunchResolver {
             }
             else -> return null
         }
-
-        if (!hasViteComponent(relativePaths)) return null
 
         val sourceEvidence = pythonSources.entries.firstNotNullOfOrNull { (path, source) ->
             inspectServeSource(path, source)
@@ -307,21 +330,6 @@ object PythonNativeWebApplicationLaunchResolver {
             supportsHost = "--host" in source,
             browserDisableFlag = browserFlag,
         )
-    }
-
-    private fun hasViteComponent(relativePaths: Collection<String>): Boolean {
-        val normalized = relativePaths
-            .asSequence()
-            .map { it.replace('\\', '/').trim().trim('/') }
-            .filter { it.isNotBlank() }
-            .toSet()
-        return normalized.any { path ->
-            val name = path.substringAfterLast('/').lowercase()
-            if (name !in viteConfigs) return@any false
-            val parent = path.substringBeforeLast('/', missingDelimiterValue = "")
-            val packageJson = if (parent.isBlank()) "package.json" else "$parent/package.json"
-            packageJson in normalized
-        }
     }
 
     private fun canonicalCommandName(value: String): String =
