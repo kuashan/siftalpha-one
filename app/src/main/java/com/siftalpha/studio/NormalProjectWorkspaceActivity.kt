@@ -1750,7 +1750,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
     }
 
     private fun resumePendingExternalProviderRecovery() {
-        val pending = externalActionGate.pending(project.summary.documentId) ?: return
+        if (externalActionGate.pending(project.summary.documentId) == null) return
         val result = externalPreflight.ensureReady()
         screenState.value = screenState.value.copy(externalReadiness = result.readiness)
         when (result.recoveryAction) {

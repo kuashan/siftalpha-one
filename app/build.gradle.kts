@@ -157,8 +157,11 @@ android {
         // v223 / r48d10.1 repairs generic Launch Authority and Environment Capability closure:
         // project-owned serve contracts precede framework inference, and planned Web capabilities
         // are installed by the same environment/backend contract used by the eventual launch.
-        versionCode = 223
-        versionName = "0.8.0-alpha43-r48d10.1"
+        // v224 / r48d10.2 adds the shared External Provider installation-recovery contract:
+        // stale Termux bridge proof is invalidated when the package/permission disappears, missing
+        // Termux links to the official installer, and deferred actions survive install/setup recovery.
+        versionCode = 224
+        versionName = "0.8.0-alpha43-r48d10.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {

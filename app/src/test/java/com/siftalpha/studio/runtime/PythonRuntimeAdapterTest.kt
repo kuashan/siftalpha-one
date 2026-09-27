@@ -470,6 +470,32 @@ class PythonRuntimeAdapterTest {
     }
 
     @Test
+    fun `structured console script launch is preserved for External Provider`() {
+        host.quotedInputs.clear()
+        adapter.start(
+            project.copy(
+                pythonLaunchInvocation = PythonLaunchInvocation.consoleScript(
+                    executableName = "easy-tdx",
+                    arguments = listOf(
+                        "serve",
+                        "--host",
+                        "127.0.0.1",
+                        "--no-open-browser",
+                    ),
+                ),
+            ),
+        )
+        val runner = host.quotedInputs.joinToString("\n---\n")
+
+        assertTrue(runner.contains("launch_kind='console_script'"))
+        assertTrue(runner.contains("launch_display='easy-tdx'"))
+        assertTrue(runner.contains("/root/venvs/runtime-id/bin/easy-tdx"))
+        assertTrue(runner.contains("serve"))
+        assertTrue(runner.contains("--no-open-browser"))
+        assertFalse(runner.contains("launch_display='uvicorn'"))
+    }
+
+    @Test
     fun `custom run command remains delegated instead of forced to python entry`() {
         host.quotedInputs.clear()
         val custom = project.copy(run = "python -m package.worker --mode live")
