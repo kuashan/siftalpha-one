@@ -205,7 +205,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
         )
     }
 }
-}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+}(. /etc/os-release 2>/dev/null; printf '%s' "${'
                     echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                     exit 35
                   fi
@@ -719,7 +719,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
         )
     }
 }
-}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+}(. /etc/os-release 2>/dev/null; printf '%s' "${'
                     echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                     exit 35
                   fi
@@ -1233,7 +1233,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
         )
     }
 }
-}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+}(. /etc/os-release 2>/dev/null; printf '%s' "${'
                     echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                     exit 35
                   fi
@@ -1746,7 +1746,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
         )
     }
 }
-}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+}(. /etc/os-release 2>/dev/null; printf '%s' "${'
                     echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                     exit 35
                   fi
@@ -2221,7 +2221,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
         )
     }
 }
-}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+}(. /etc/os-release 2>/dev/null; printf '%s' "${'
                     echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                     exit 35
                   fi
@@ -2735,7 +2735,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
         )
     }
 }
-}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+}(. /etc/os-release 2>/dev/null; printf '%s' "${'
                     echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                     exit 35
                   fi
@@ -3249,7 +3249,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
         )
     }
 }
-}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+}(. /etc/os-release 2>/dev/null; printf '%s' "${'
                     echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                     exit 35
                   fi
@@ -3762,7 +3762,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
         )
     }
 }
-}(. /etc/os-release 2>/dev/null; printf "%s" "${'
+}(. /etc/os-release 2>/dev/null; printf '%s' "${'
                     echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                     exit 35
                   fi
