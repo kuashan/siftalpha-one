@@ -5,6 +5,58 @@
 历史条目中的 W2、W3、W4、W5 仅按当时命名记录已发生的工作、构建或发布，不表示当前 Roadmap 阶段。
 
 
+## 2026-09-27 · R48d10.4 External Setup Completion + Health Sync（外部设置完成态 + 健康检测同步）
+
+### Source boundary（源码边界）
+
+- 起点：R48d10.3 最终文档 HEAD `236674f4269e46d20410028e54b9284b0b2198d1`。
+- 修复分支：`codex/r48d10-external-readiness-sync`。
+- 功能验证 HEAD：`9d5083d85825e93ef2b2f2969049f3be6136f4a0`。
+- 验证版本：`0.8.0-alpha43-r48d10.4` / versionCode `226`。
+
+### Real-device trigger（真机触发）
+
+- 用户已完成 Termux、RUN_COMMAND、`allow-external-apps`、PRoot-Distro、Ubuntu 的外部空间设置。
+- 随后在项目中选择 External Runtime 并点击 PREPARE，仍被提示再次进入设置。
+- 源码确认根因：Shared Core 将“Runtime Capability 已完整验证”与“最近探测是否仍在 60 秒 freshness window”绑定为同一个 READY；证据过期后变为 `BRIDGE_CHECK_REQUIRED`，项目页误把“需要健康复检”当成“需要重新设置”。
+
+### Repair（修复）
+
+- Shared Core 新增持久 `setupComplete` 事实：
+  - Runtime Capability PASS 后写入；
+  - Termux / RUN_COMMAND 权限消失，或真实 bridge/runtime capability probe FAIL 时清除；
+  - 仅 freshness 过期、重新检测中、偶发 timeout 不清除。
+- 兼容 R48d10.3 既有用户：如果旧 store 已保存 `RUNTIME_CAPABILITY + PASS`，升级后直接推导 `setupComplete=true`，不会要求重新设置。
+- `READY` 继续表示“当前健康探测新鲜且通过”；`setupComplete` 表示“外部运行空间已经完成安装配置”。两者不再混淆。
+- PREPARE / RUN 遇到 setupComplete=true 但 probe 过期时，只在 Shared Core 静默重新执行 Bridge → Runtime Capability health check；PASS 后 External Action Gate 自动继续原操作。
+- 只有 setupComplete=false 的真实缺失/失败才进入 Settings > External Runtime Setup。
+- Normal Mode 选择 External Runtime 时：
+  - setupComplete=true：不提示；必要时静默健康复检。
+  - setupComplete=false：直接进入外部运行空间设置向导。
+- Developer Mode 使用同一规则，不再因为 60 秒 freshness 过期弹出设置提示。
+- Home runtime bridge 改为读取同一个 Shared Core：设置完成后返回首页可同步显示连接完成，而不是继续依赖首页自己的旧 bridge 状态。
+- 修复设置向导复制命令的 shell escaping：`printf '\nallow-external-apps = true\n'`，不再复制双反斜杠 `\\n`。
+- Normal Mode 保持原深蓝背景，仅将 Android status bar 的时间/信号/Wi-Fi/电量图标强制为白色；离开 Normal Theme 时恢复之前状态。
+- Internal Runtime、PRoot/Ubuntu 安装命令、Launch Authority、easy_tdx 项目自有 launch contract 均未修改。
+
+### Verification（验证）
+
+- Internal Alpine Probe #137 / Run ID `36295191558`：PASS。
+- W0 #975：因连续推送被 concurrency 取消，不作为最终证据。
+- W0 Cloud Build #976 / Run ID `36295191519`：PASS；repository validators、unit tests、`assembleDebug`、APK evidence、stable signing 全部通过。
+- Gradle：`BUILD SUCCESSFUL in 3m 21s` / 45 actionable tasks。
+- Artifact：`siftalpha-w0-976` / ID `10923707607` / digest `sha256:8a9d18f09940aeab4150bfde92dda9f1312e67c2842c0f43db60b96525e72bf5`。
+- APK SHA-256：`771c3e645c4ebd79c8604ad6382273046fbe30a562655dd4b97b5d9902d73e8f`。
+- APK signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+- 真机待验收：
+  1. 已完成外部设置后等待 >60 秒，External PREPARE 不再跳设置，而是静默复检后自动继续；
+  2. 选择 External Runtime：已配置不提示，未配置直接进入设置向导；
+  3. 首页运行时桥与 Settings Shared Core 状态同步；
+  4. Normal Mode 顶部系统状态栏图标为白色；
+  5. 新复制的 `allow-external-apps` 命令实际写入正确换行。
+
+
+
 ## 2026-09-27 · R48d10.3 External Runtime Setup Guide + Project Flow Decoupling（外部运行空间引导 + 项目流程解耦）
 
 ### Source boundary（源码边界）

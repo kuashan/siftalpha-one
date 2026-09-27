@@ -1,17 +1,17 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-27（R48d10.3 External Runtime Setup Guide + Project Flow Decoupling）
+最后更新：2026-09-27（R48d10.4 External Setup Completion + Health Sync）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
-当前文档/验收分支：`codex/r48d10-external-runtime-setup-guide`
-Current functional source HEAD：`3fca16334dacdb3493e26eca97f9657192ce00e5`
+当前文档/验收分支：`codex/r48d10-external-readiness-sync`
+Current functional source HEAD：`9d5083d85825e93ef2b2f2969049f3be6136f4a0`
 R48d10 唯一源码基线：`a60d7fb5d81a6611ea6695c023c1c70e8181388c`
-当前测试版本：`0.8.0-alpha43-r48d10.3` / versionCode `225`。
-R48d10.3 W0 Cloud Build：Run #974 / Run ID `36293475233` / artifact `siftalpha-w0-974` / artifact ID `10922569711` / APK SHA-256 `2db23ef49be2b2ee5eff7d10c389661e4536006e8e451d8cb0f35f88c38833f7` / conclusion `success`。
-R48d10.3 Internal Alpine Probe：Run #136 / Run ID `36293240226` / conclusion `success`。
-R48d10.3 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
-已真机确认：R48d10.1 Internal easy_tdx 可正常运行并直接打开网页；R48d10.2 可进入 Termux RUN_COMMAND / allow-external-apps 链并真实发现全新 Termux 缺少 PRoot-Distro。
-当前架构边界：项目页只消费 External Runtime READY/NOT_READY；Termux 下载、权限、allow-external-apps、PRoot-Distro、Ubuntu 与最终检测全部收口到 Settings > External Runtime Setup。
-当前真机待验收：R48d10.3 五步设置向导从全新 Termux 推进至 READY，以及 External easy_tdx PREPARE → RUN → Web 打开。
+当前测试版本：`0.8.0-alpha43-r48d10.4` / versionCode `226`。
+R48d10.4 W0 Cloud Build：Run #976 / Run ID `36295191519` / artifact `siftalpha-w0-976` / artifact ID `10923707607` / APK SHA-256 `771c3e645c4ebd79c8604ad6382273046fbe30a562655dd4b97b5d9902d73e8f` / conclusion `success`。
+R48d10.4 Internal Alpine Probe：Run #137 / Run ID `36295191558` / conclusion `success`。
+R48d10.4 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+已真机确认：R48d10.1 Internal easy_tdx 可正常运行并直接打开网页；R48d10.2/R48d10.3 已完成 Termux、allow-external-apps、PRoot-Distro、Ubuntu 设置流程，但 R48d10.3 暴露了 60 秒 freshness 过期被误判为“需要重新设置”。
+当前架构边界：Shared Core 分离持久 setupComplete 与短期 health probe freshness；项目页只在真实 setup 缺失时进入 Settings，引导完成后 stale health 只静默复检。
+当前真机待验收：R48d10.4 stale health 自动复检/继续、External 选择跳转规则、首页运行时桥同步、Normal status bar 白色图标，以及 External easy_tdx PREPARE → RUN → Web 打开。
 alpha43 production source baseline：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`  
 `main` 保持历史 production baseline，本轮未修改。  
 alpha30 source / real-device evidence remains historical; current branch continues from the alpha31 version-identity baseline。  

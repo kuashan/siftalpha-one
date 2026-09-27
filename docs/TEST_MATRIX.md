@@ -17,6 +17,34 @@
 本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
 
 
+## R48d10.4 — External Setup Completion + Health Sync（外部设置完成态 + 健康检测同步）
+
+| ID | 验证项 | 期望 | 状态 |
+|---|---|---|---|
+| R48D10.4-01 | Setup / health separation | 60 秒 freshness 过期只要求健康复检，不丢失 setupComplete | PASS — unit + W0 #976 |
+| R48D10.4-02 | Legacy proof migration | 旧 `RUNTIME_CAPABILITY + PASS` 可直接推导 setupComplete | PASS — unit + W0 #976 |
+| R48D10.4-03 | Silent recheck | setupComplete=true 时 PREPARE/RUN 静默 Bridge→Runtime probe，READY 后自动继续 | PASS — shared gate/source + W0 #976；待真机 |
+| R48D10.4-04 | Real setup failure | Termux/permission/probe FAIL 时清除 setupComplete 并进入 Settings 引导 | PASS — source/unit；待真机 |
+| R48D10.4-05 | External selection | 已配置无提示；未配置直接打开 External Runtime Setup | PASS — source + W0 #976；待真机 |
+| R48D10.4-06 | Normal/Developer parity | 两套 UI 使用同一 setupComplete/health 语义 | PASS — source + shared core |
+| R48D10.4-07 | Home bridge sync | 首页运行时桥读取 Shared Core 最新设置完成态 | PASS — source + W0 #976；待真机 |
+| R48D10.4-08 | Copied Termux command | `printf '\n...\n'` 仅单层 shell 转义，不再复制 `\\n` | PASS — unit + W0 #976；待真机 |
+| R48D10.4-09 | Normal status bar | 深色 Normal UI 上系统状态栏图标强制白色且离开后恢复 | PASS — source + W0 #976；待真机 |
+| R48D10.4-10 | Internal boundary | Internal Runtime / Launch Authority / easy_tdx launch 不修改 | PASS — scope + Probe #137 |
+| R48D10.4-11 | Version | `0.8.0-alpha43-r48d10.4` / versionCode `226` | PASS — APK badging |
+| R48D10.4-12 | Cloud gate | validators + unit tests + assembleDebug + signing | PASS — W0 #976 |
+| R48D10.4-13 | Real-device stale proof | 完成设置后 >60 秒再 PREPARE，不进入设置并自动继续 | 待真机 |
+| R48D10.4-14 | External easy_tdx | External PREPARE → RUN → 项目自有 Web 页面正常打开 | 待真机 |
+
+R48d10.4 APK evidence：
+- functional source: `9d5083d85825e93ef2b2f2969049f3be6136f4a0`
+- artifact: `siftalpha-w0-976` / ID `10923707607`
+- artifact digest: `sha256:8a9d18f09940aeab4150bfde92dda9f1312e67c2842c0f43db60b96525e72bf5`
+- APK SHA-256: `771c3e645c4ebd79c8604ad6382273046fbe30a562655dd4b97b5d9902d73e8f`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+
+
+
 ## R48d10.3 — External Runtime Setup Guide + Project Flow Decoupling（外部运行空间引导 + 项目流程解耦）
 
 | ID | 验证项 | 期望 | 状态 |
