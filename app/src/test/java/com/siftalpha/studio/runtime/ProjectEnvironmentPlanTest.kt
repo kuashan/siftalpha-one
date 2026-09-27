@@ -227,6 +227,8 @@ class ProjectEnvironmentPlanTest {
 
         assertEquals(listOf("web"), detection.pythonOptionalDependencyGroups)
         assertEquals(listOf("web"), detection.pythonWebCapabilityExtras)
+        assertFalse(detection.embeddedCpythonEligible)
+        assertEquals(EnvironmentBackend.INTERNAL_ALPINE, plan.preferredBackend)
         assertEquals(listOf("web"), plan.pythonInstallExtras)
         assertTrue(
             plan.diagnosticLines().contains(
