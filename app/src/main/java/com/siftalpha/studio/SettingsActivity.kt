@@ -15,6 +15,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.siftalpha.studio.runtime.ExternalProviderPreflightResult
 import com.siftalpha.studio.runtime.ExternalProviderProbeCoordinator
@@ -51,6 +52,7 @@ class SettingsActivity : StudioComposeActivity() {
         externalBackend = TermuxBackend(applicationContext)
         externalPreflight = ExternalProviderProbeCoordinator.shared(applicationContext)
         externalSetupResult = externalPreflight.current()
+        externalSetupVisible = intent.getBooleanExtra(EXTRA_OPEN_EXTERNAL_RUNTIME_SETUP, false)
 
         onBackPressedDispatcher.addCallback(
             this,
@@ -69,9 +71,9 @@ class SettingsActivity : StudioComposeActivity() {
 
         val normalMode = intent.getBooleanExtra(EXTRA_NORMAL_MODE, false)
         setContent {
-            var developerModeEnabled by mutableStateOf(
-                DeveloperModeStore(this@SettingsActivity).isEnabled(),
-            )
+            var developerModeEnabled by remember {
+                mutableStateOf(DeveloperModeStore(this@SettingsActivity).isEnabled())
+            }
             val screen: @Composable () -> Unit = {
                 if (externalSetupVisible) {
                     ExternalRuntimeSetupScreen(
@@ -252,6 +254,7 @@ class SettingsActivity : StudioComposeActivity() {
 
     companion object {
         const val EXTRA_NORMAL_MODE = "settings.extra.NORMAL_MODE"
+        const val EXTRA_OPEN_EXTERNAL_RUNTIME_SETUP = "settings.extra.OPEN_EXTERNAL_RUNTIME_SETUP"
         private const val REQUEST_RUN_COMMAND = 7401
     }
 }
