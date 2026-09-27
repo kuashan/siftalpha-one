@@ -85,6 +85,23 @@ class PythonRuntimeAdapterTest {
     }
 
     @Test
+    fun `prepare synchronizes Android source into Runtime owned Python workspace before pip`() {
+        val script = adapter.prepare(project).shellScript
+
+        assertTrue(script.contains("source='/root/projects/Sample'"))
+        assertTrue(script.contains("work_root='/root/siftalpha/python-exec-workspaces/runtime-id'"))
+        assertTrue(script.contains("project='/root/siftalpha/python-exec-workspaces/runtime-id/repo'"))
+        assertTrue(script.contains("SIFTALPHA_PYTHON_WORKSPACE_SYNC=PASS"))
+        assertTrue(script.contains("source-manifest.json"))
+        assertTrue(script.contains("PROJECT_SOURCE_PERMISSION_DENIED"))
+        val sync = script.indexOf("SIFTALPHA_PYTHON_WORKSPACE_SYNC=PASS")
+        val dependencyFingerprint = script.indexOf("dependency_source='none'", sync)
+        val pip = script.indexOf(""\$venv/bin/python" -m pip install", dependencyFingerprint)
+        assertTrue("source sync must finish before dependency fingerprinting", dependencyFingerprint > sync)
+        assertTrue("pip must install only after Runtime workspace synchronization", pip > dependencyFingerprint)
+    }
+
+    @Test
     fun `prepare preserves venv pip dependency source and durable readiness contract`() {
         val command = adapter.prepare(project)
         val script = command.shellScript
@@ -494,6 +511,26 @@ class PythonRuntimeAdapterTest {
         assertTrue(runner.contains("launch_args+=( '--no-open-browser' )"))
         assertTrue(runner.contains("\"\$launch_executable\" \"\${launch_args[@]}\""))
         assertFalse(runner.contains("launch_display='uvicorn'"))
+    }
+
+    @Test
+    fun `start refreshes Runtime Python workspace and runs from stable workspace path`() {
+        host.quotedInputs.clear()
+        adapter.start(project)
+        val raw = host.quotedInputs.joinToString("\n---\n")
+
+        assertTrue(raw.contains("source='/root/projects/Sample'"))
+        assertTrue(raw.contains("project='/root/siftalpha/python-exec-workspaces/runtime-id/repo'"))
+        assertTrue(raw.contains("SIFTALPHA_PYTHON_WORKSPACE_SYNC=PASS"))
+        assertTrue(raw.contains("cd \"\$project\""))
+    }
+
+    @Test
+    fun `clean removes Runtime Python workspace without deleting Android source`() {
+        val script = adapter.clean(project).shellScript
+
+        assertTrue(script.contains("/root/siftalpha/python-exec-workspaces/runtime-id"))
+        assertFalse(script.contains("rm -rf -- '/root/projects/Sample'"))
     }
 
     @Test
