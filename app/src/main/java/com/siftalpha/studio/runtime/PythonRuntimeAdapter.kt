@@ -1054,7 +1054,7 @@ os.chmod(tmp, 0o600)
 os.replace(tmp, manifest_path)
 SIFTALPHA_PYTHON_SOURCE_SYNC
         chmod 600 "${'$'}source_manager"
-        if ! /usr/bin/python3.12 "${' "${'$'}source" "${'$'}project" "${'$'}work_root/source-manifest.json" >>"${'$'}log" 2>&1; then}source_manager" "${'$'}source" "${'$'}project" "${'$'}work_root/source-manifest.json" >>"${'$'}log" 2>&1; then
+        if ! /usr/bin/python3.12 "${'$'}source_manager" "${'$'}source" "${'$'}project" "${'$'}work_root/source-manifest.json" >>"${'$'}log" 2>&1; then
           echo 'SIFTALPHA_DIAG=PYTHON_WORKSPACE_SYNC_FAILED'
           if tail -n 120 "${'$'}log" 2>/dev/null | grep -Eqi 'Permission denied|PermissionError'; then
             echo 'SIFTALPHA_ERROR=PROJECT_SOURCE_PERMISSION_DENIED'
