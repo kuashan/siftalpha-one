@@ -82,7 +82,9 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
 
         const val STORAGE_ACCESS_SETUP_COMMAND = "termux-setup-storage"
         const val PROOT_DISTRO_INSTALL_COMMAND = "pkg install -y proot-distro"
-        const val UBUNTU_INSTALL_COMMAND = "proot-distro install ubuntu"
+        const val UBUNTU_INSTALL_COMMAND = "proot-distro install ubuntu:24.04"
+        const val UBUNTU_PYTHON_INSTALL_COMMAND =
+            "proot-distro login ubuntu -- bash -lc 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates python3 python3-venv python3-pip && update-ca-certificates'"
 
         val CONNECTION_TEST = RuntimeCommand(
             shellScript = "printf 'SIFTALPHA_TERMUX_BRIDGE_OK\\n'; printf 'TERMUX_PREFIX=%s\\n' \"${'$'}PREFIX\"; uname -m",
@@ -106,16 +108,55 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
                   echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=PROOT_DISTRO' >&2
                   exit 32
                 }
-                if ! proot-distro login ubuntu -- bash -lc '
+
+                set +e
+                ubuntu_probe="$(proot-distro login ubuntu -- bash -lc '
+                  set -eu
                   printf "SIFTALPHA_EXTERNAL_RUNTIME_OK\\n"
                   uname -m >/dev/null
-                '; then
+                  if [ ! -x /usr/bin/python3 ]; then
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  fi
+                  python_executable="$(/usr/bin/python3 -c "import sys; print(sys.executable)")"
+                  python_platform="$(/usr/bin/python3 -c "import sysconfig; print(sysconfig.get_platform())")"
+                  case "$python_executable" in
+                    /data/data/com.termux/*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  case "$python_platform" in
+                    *android*)
+                      echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                      exit 35
+                      ;;
+                  esac
+                  /usr/bin/python3 -m venv --help >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  /usr/bin/python3 -m pip --version >/dev/null 2>&1 || {
+                    echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
+                    exit 35
+                  }
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "$python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "$python_platform"
+                ' 2>&1)"
+                ubuntu_code=$?
+                set -e
+                printf '%s\\n' "$ubuntu_probe"
+                if [ "$ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "$ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                    echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
+                    exit 35
+                  fi
                   echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
                   exit 33
                 fi
             """.trimIndent(),
             label = "SiftAlpha Studio 外部运行能力检测",
-            description = "验证 Termux 后台命令能够真正进入 proot-distro Ubuntu 并返回。",
+            description = "验证 Termux、共享存储、PRoot Ubuntu 与 Ubuntu 自有 Python/venv/pip。",
         )
 
         val ENVIRONMENT_PROBE = RuntimeCommand(
@@ -140,10 +181,10 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
                 echo '--- Ubuntu ---'
                 if proot-distro login ubuntu -- bash -lc '
                   echo UBUNTU=OK
-                  printf "PYTHON="; python3 --version 2>&1 || true
-                  printf "PIP="; python3 -m pip --version 2>&1 || true
+                  printf "PYTHON="; /usr/bin/python3 --version 2>&1 || true\n                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3 -c "import sys; print(sys.executable)" 2>&1 || true\n                  printf "PYTHON_PLATFORM="; /usr/bin/python3 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PIP="; /usr/bin/python3 -m pip --version 2>&1 || true
                   printf "GIT="; git --version 2>&1 || true
-                  printf "VENV="; python3 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
+                  printf "VENV="; /usr/bin/python3 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
                   printf "TMUX="; command -v tmux >/dev/null 2>&1 && tmux -V || echo MISSING
                   printf "LIBC="; (ldd --version 2>&1 | head -n 1) || echo MISSING
                 '; then
