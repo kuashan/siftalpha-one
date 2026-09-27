@@ -213,6 +213,43 @@ class InternalAlpineRuntimeTest {
         assertEquals(listOf("web"), web.pythonInstallExtras)
     }
 
+
+    @Test
+    fun requirementsEnvironmentAlsoInstallsPlannedWebExtras() {
+        val first = InternalAlpineDependencySource.fromProjectFiles(
+            requirementsText = "requests\n",
+            pyprojectText = """
+                [project]
+                name = "demo"
+
+                [project.optional-dependencies]
+                web = ["fastapi", "uvicorn"]
+            """.trimIndent(),
+            pythonInstallExtras = listOf("web"),
+        )
+        val changedProject = InternalAlpineDependencySource.fromProjectFiles(
+            requirementsText = "requests\n",
+            pyprojectText = """
+                [project]
+                name = "demo"
+
+                [project.optional-dependencies]
+                web = ["fastapi", "uvicorn", "httpx"]
+            """.trimIndent(),
+            pythonInstallExtras = listOf("web"),
+        )
+        val command = InternalAlpineDependencyBootstrap.installCommand(
+            kind = InternalAlpineDependencySource.Kind.REQUIREMENTS_TXT,
+            installExtras = listOf("web"),
+        )
+
+        assertEquals(InternalAlpineDependencySource.Kind.REQUIREMENTS_TXT, first.kind)
+        assertTrue(first.sourceFingerprint != changedProject.sourceFingerprint)
+        assertTrue(command.contains("-r /workspace/requirements.txt"))
+        assertTrue(command.contains("SIFTALPHA_PYPROJECT_EXTRAS=web"))
+        assertTrue(command.contains("'/workspace[web]'"))
+    }
+
     @Test
     fun dependencyBootstrapAvoidsInstallTimeBytecodeCompilationAndBoundsNetworkWaits() {
         val command = InternalAlpineDependencyBootstrap.installCommand(
