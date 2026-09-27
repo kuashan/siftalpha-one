@@ -31,9 +31,10 @@
     <string name="settings_external_runtime_intro">Complete the checks in order. Copy a command, run it in Termux, then return to SiftAlpha for automatic re-detection.</string>
     <string name="settings_external_step_termux">1. Termux</string>
     <string name="settings_external_step_bridge">2. SiftAlpha access</string>
-    <string name="settings_external_step_proot">3. PRoot-Distro</string>
-    <string name="settings_external_step_ubuntu">4. Ubuntu Runtime</string>
-    <string name="settings_external_step_final">5. Final check</string>
+    <string name="settings_external_step_storage">3. Shared storage access</string>
+    <string name="settings_external_step_proot">4. PRoot-Distro</string>
+    <string name="settings_external_step_ubuntu">5. Ubuntu Runtime</string>
+    <string name="settings_external_step_final">6. Final check</string>
     <string name="settings_external_status_complete">Complete</string>
     <string name="settings_external_status_done">Done</string>
     <string name="settings_external_status_pending">Pending</string>
@@ -46,6 +47,8 @@
     <string name="settings_external_download_termux">Download Termux</string>
     <string name="settings_external_copy_setup">Copy setup command</string>
     <string name="settings_external_open_termux">Open Termux</string>
+    <string name="settings_external_storage_missing">Termux cannot access Android shared storage yet. Copy the command below, run it in Termux, and grant storage access.</string>
+    <string name="settings_external_copy_storage">Copy storage setup command</string>
     <string name="settings_external_proot_missing">PRoot-Distro was not detected. Copy the install command below and run it in Termux.</string>
     <string name="settings_external_ubuntu_missing">Ubuntu Runtime was not detected. Copy the install command below and run it in Termux.</string>
     <string name="settings_external_copy_install">Copy install command</string>
