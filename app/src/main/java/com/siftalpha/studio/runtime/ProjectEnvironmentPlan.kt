@@ -64,6 +64,7 @@ data class ProjectEnvironmentDetection(
     val directDependencyCount: Int,
     val pythonRequiresVersion: String?,
     val pythonOptionalDependencyGroups: List<String>,
+    val pythonWebCapabilityExtras: List<String>,
     val viteComponentCount: Int,
     val declaredEntry: String?,
     val declaredRun: String?,
@@ -106,6 +107,10 @@ data class ProjectEnvironmentPlan(
             "SIFTALPHA_ENV_PYTHON_OPTIONAL_GROUPS=" +
                 detection.pythonOptionalDependencyGroups.joinToString(","),
         )
+        add(
+            "SIFTALPHA_ENV_PYTHON_WEB_CAPABILITY_EXTRAS=" +
+                detection.pythonWebCapabilityExtras.joinToString(","),
+        )
         add("SIFTALPHA_ENV_PYTHON_INSTALL_EXTRAS=" + pythonInstallExtras.joinToString(","))
         add("SIFTALPHA_ENV_VITE_COMPONENTS=" + detection.viteComponentCount)
         add(
@@ -126,7 +131,7 @@ data class ProjectEnvironmentPlan(
     }
 
     companion object {
-        const val CURRENT_SCHEMA_VERSION = 2
+        const val CURRENT_SCHEMA_VERSION = 3
         private const val MAX_DIAGNOSTIC_ISSUES = 12
     }
 }
@@ -315,6 +320,8 @@ object ProjectEnvironmentDetector {
 
         val pythonOptionalDependencyGroups =
             optionalDependencyGroups(projectTable, issues)
+        val pythonWebCapabilityExtras =
+            PythonWebEnvironmentCapabilityPolicy.installExtras(input.pyprojectText)
 
         val directDependencyCount = when (dependencySource) {
             EnvironmentDependencySource.REQUIREMENTS_TXT ->
@@ -392,6 +399,7 @@ object ProjectEnvironmentDetector {
             directDependencyCount = directDependencyCount,
             pythonRequiresVersion = requiresPython,
             pythonOptionalDependencyGroups = pythonOptionalDependencyGroups,
+            pythonWebCapabilityExtras = pythonWebCapabilityExtras,
             viteComponentCount = viteComponents.size,
             declaredEntry = input.declaredEntry,
             declaredRun = input.declaredRun,
@@ -560,6 +568,92 @@ object ProjectEnvironmentDetector {
     )
 }
 
+/**
+ * Shared Python Web environment capability policy.
+ *
+ * Only semantically Web-scoped optional dependency groups are auto-installed. This keeps Launch
+ * resolution and Environment preparation on the same capability contract without pulling unrelated
+ * dev/test extras into a runnable project environment.
+ */
+object PythonWebEnvironmentCapabilityPolicy {
+    private val webExtraNames = setOf("web", "server", "serve", "ui", "dashboard")
+    private val webPackages = setOf(
+        "aiohttp",
+        "bokeh",
+        "dash",
+        "django",
+        "fastapi",
+        "flask",
+        "gradio",
+        "nicegui",
+        "panel",
+        "streamlit",
+        "tornado",
+        "uvicorn",
+    )
+    private val requirementName = Regex("""^\s*([A-Za-z0-9][A-Za-z0-9._-]*)""")
+
+    fun installExtras(pyprojectToml: String?): List<String> {
+        val root = pyprojectToml
+            ?.let { runCatching { Toml.parse(it) }.getOrNull() }
+            ?.takeUnless { it.hasErrors() }
+            ?: return emptyList()
+        val project = root.get("project") as? TomlTable ?: return emptyList()
+        val optional = project.get("optional-dependencies") as? TomlTable ?: return emptyList()
+        return optional.keySet()
+            .asSequence()
+            .filter { canonicalName(it) in webExtraNames }
+            .filter { group ->
+                dependencyNames(optional.get(group)).any { it in webPackages }
+            }
+            .sorted()
+            .toList()
+    }
+
+    fun providesPackage(
+        packageName: String,
+        requirementsText: String?,
+        pyprojectToml: String?,
+    ): Boolean {
+        val wanted = canonicalName(packageName)
+        if (wanted.isBlank()) return false
+        if (requirementsText
+                .orEmpty()
+                .lineSequence()
+                .mapNotNull(::dependencyName)
+                .any { it == wanted }
+        ) {
+            return true
+        }
+
+        val root = pyprojectToml
+            ?.let { runCatching { Toml.parse(it) }.getOrNull() }
+            ?.takeUnless { it.hasErrors() }
+            ?: return false
+        val project = root.get("project") as? TomlTable ?: return false
+        if (wanted in dependencyNames(project.get("dependencies"))) return true
+
+        val optional = project.get("optional-dependencies") as? TomlTable ?: return false
+        return installExtras(pyprojectToml).any { group ->
+            wanted in dependencyNames(optional.get(group))
+        }
+    }
+
+    private fun dependencyNames(value: Any?): Set<String> {
+        val array = value as? org.tomlj.TomlArray ?: return emptySet()
+        return (0 until array.size())
+            .mapNotNull { index -> array.get(index) as? String }
+            .mapNotNull(::dependencyName)
+            .toSet()
+    }
+
+    private fun dependencyName(value: String): String? =
+        requirementName.find(value)?.groupValues?.getOrNull(1)?.let(::canonicalName)
+
+    private fun canonicalName(value: String): String =
+        value.trim().lowercase().replace('_', '-').replace('.', '-')
+}
+
 object ProjectEnvironmentPlanner {
 
     fun plan(
@@ -622,14 +716,19 @@ object ProjectEnvironmentPlanner {
     private fun buildPythonInstallExtras(
         detection: ProjectEnvironmentDetection,
     ): List<String> = buildList {
+        if (detection.primaryRuntime != RuntimeKind.PYTHON) return@buildList
+
+        addAll(detection.pythonWebCapabilityExtras)
+
+        // Preserve the established Python+Vite contract even when the project's Web extra uses
+        // project-specific packages that are not in the common Web package registry.
         if (
-            detection.primaryRuntime == RuntimeKind.PYTHON &&
             detection.viteComponentCount > 0 &&
             "web" in detection.pythonOptionalDependencyGroups
         ) {
             add("web")
         }
-    }
+    }.distinct().sorted()
 
     private fun buildSteps(detection: ProjectEnvironmentDetection): List<EnvironmentBuildStep> {
         if (detection.blockingIssues.isNotEmpty() || detection.primaryRuntime == null) {
@@ -679,6 +778,9 @@ object ProjectEnvironmentPlanner {
             append("python=").append(detection.pythonRequiresVersion.orEmpty()).append('\n')
             append("python_optional_groups=")
                 .append(detection.pythonOptionalDependencyGroups.joinToString(","))
+                .append('\n')
+            append("python_web_capability_extras=")
+                .append(detection.pythonWebCapabilityExtras.joinToString(","))
                 .append('\n')
             append("python_install_extras=").append(pythonInstallExtras.joinToString(",")).append('\n')
             append("backends=").append(candidates.joinToString(",") { it.wireValue }).append('\n')
