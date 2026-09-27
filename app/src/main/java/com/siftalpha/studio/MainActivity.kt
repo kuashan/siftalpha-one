@@ -53,6 +53,10 @@ class MainActivity : StudioComposeActivity() {
     private val homeState = mutableStateOf(HomeState())
     private val showLaunchBrand = mutableStateOf(false)
     private var autoBridgeProbeStarted = false
+    private val externalPreflightListener: (com.siftalpha.studio.runtime.ExternalProviderPreflightResult) -> Unit =
+        { result ->
+            runOnUiThread { syncHomeExternalProviderState(result) }
+        }
     private val pendingGitHubImports =
         mutableMapOf<Int, ProjectRuntimeController.GitHubCloneSpec>()
 
@@ -195,19 +199,30 @@ class MainActivity : StudioComposeActivity() {
     override fun onStart() {
         super.onStart()
         TermuxResultBus.addListener(resultListener)
+        externalPreflight.addListener(externalPreflightListener)
         refreshDeveloperMode()
         refreshTermuxState()
-        if (homeState.value.developerModeEnabled) maybeAutoProbeBridge()
+        val provider = externalPreflight.current()
+        syncHomeExternalProviderState(provider)
+        if (homeState.value.developerModeEnabled && !provider.setupComplete) {
+            maybeAutoProbeBridge()
+        }
     }
 
     override fun onResume() {
         super.onResume()
         refreshDeveloperMode()
+        if (::externalPreflight.isInitialized) {
+            syncHomeExternalProviderState(externalPreflight.current())
+        }
         if (::projectStore.isInitialized) refreshProjects()
     }
 
     override fun onStop() {
         TermuxResultBus.removeListener(resultListener)
+        if (::externalPreflight.isInitialized) {
+            externalPreflight.removeListener(externalPreflightListener)
+        }
         super.onStop()
     }
 
@@ -865,6 +880,30 @@ class MainActivity : StudioComposeActivity() {
         homeState.value = homeState.value.copy(
             termuxInstalled = installed,
             permissionGranted = permissionGranted,
+        )
+    }
+
+    private fun syncHomeExternalProviderState(
+        result: com.siftalpha.studio.runtime.ExternalProviderPreflightResult,
+    ) {
+        val bridgeState = when {
+            result.setupComplete -> HomeBridgeState.CONNECTED
+            result.readiness == ExternalProviderReadiness.TERMUX_NOT_INSTALLED ->
+                HomeBridgeState.UNAVAILABLE
+            result.readiness == ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED ->
+                HomeBridgeState.WAITING_PERMISSION
+            result.readiness == ExternalProviderReadiness.BRIDGE_CHECKING ->
+                HomeBridgeState.DETECTING
+            result.readiness == ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED ||
+                result.readiness == ExternalProviderReadiness.BRIDGE_UNRESPONSIVE ||
+                result.readiness == ExternalProviderReadiness.UNAVAILABLE ->
+                HomeBridgeState.ABNORMAL
+            else -> HomeBridgeState.READY
+        }
+        homeState.value = homeState.value.copy(
+            termuxInstalled = result.termuxInstalled,
+            permissionGranted = result.runCommandPermissionGranted,
+            bridgeState = bridgeState,
         )
     }
 
