@@ -162,8 +162,10 @@ android {
         // Termux links to the official installer, and deferred actions survive install/setup recovery.
         // v225 / r48d10.3 moves External Runtime installation/setup out of project pages
         // into Settings, while project surfaces only consume Shared Core READY/NOT_READY facts.
-        versionCode = 225
-        versionName = "0.8.0-alpha43-r48d10.3"
+        // v226 / r48d10.4 separates persistent External Runtime setup completion
+        // from short-lived health-probe freshness and synchronizes Normal Mode surfaces.
+        versionCode = 226
+        versionName = "0.8.0-alpha43-r48d10.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
