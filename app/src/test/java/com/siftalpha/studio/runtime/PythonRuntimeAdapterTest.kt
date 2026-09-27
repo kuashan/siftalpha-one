@@ -88,7 +88,7 @@ class PythonRuntimeAdapterTest {
     fun `prepare synchronizes Android source into Runtime owned Python workspace before pip`() {
         val script = adapter.prepare(project).shellScript
 
-        assertTrue(script.contains("source='/root/projects/Sample'"))
+        assertTrue(script.contains("source='/root/projects/sample-project'"))
         assertTrue(script.contains("work_root='/root/siftalpha/python-exec-workspaces/runtime-id'"))
         assertTrue(script.contains("project='/root/siftalpha/python-exec-workspaces/runtime-id/repo'"))
         assertTrue(script.contains("SIFTALPHA_PYTHON_WORKSPACE_SYNC=PASS"))
@@ -519,7 +519,7 @@ class PythonRuntimeAdapterTest {
         adapter.start(project)
         val raw = host.quotedInputs.joinToString("\n---\n")
 
-        assertTrue(raw.contains("source='/root/projects/Sample'"))
+        assertTrue(raw.contains("source='/root/projects/sample-project'"))
         assertTrue(raw.contains("project='/root/siftalpha/python-exec-workspaces/runtime-id/repo'"))
         assertTrue(raw.contains("SIFTALPHA_PYTHON_WORKSPACE_SYNC=PASS"))
         assertTrue(raw.contains("cd \"\$project\""))
