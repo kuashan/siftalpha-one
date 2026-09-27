@@ -34,6 +34,7 @@ class ExternalProviderPreflightTest {
                 probeStage = ExternalProviderProbeStage.RUNTIME_CAPABILITY,
                 lastProbeAtEpochMs = 950L,
                 lastProbeResult = ExternalProviderProbeResult.PASS,
+                setupComplete = true,
             ),
             nowEpochMs = 1_000L,
         )
@@ -129,6 +130,27 @@ class ExternalProviderPreflightTest {
     }
 
     @Test
+    fun setupGuideRoutesMissingSharedStorageAccessBeforeProot() {
+        val result = ExternalProviderPreflight.evaluate(
+            facts = facts(
+                bridgeState = ExternalProviderBridgeState.FAIL,
+                probeStage = ExternalProviderProbeStage.RUNTIME_CAPABILITY,
+                lastProbeAtEpochMs = 950L,
+                lastProbeResult = ExternalProviderProbeResult.FAIL,
+                detail = "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=SHARED_STORAGE_ACCESS",
+            ),
+            nowEpochMs = 1_000L,
+        )
+
+        val setup = ExternalRuntimeSetupGuide.evaluate(result)
+
+        assertEquals(ExternalRuntimeSetupStage.STORAGE_ACCESS, setup.stage)
+        assertEquals(true, setup.allowExternalAppsReady)
+        assertEquals(false, setup.storageAccessReady)
+        assertNull(setup.prootDistroReady)
+    }
+
+    @Test
     fun setupGuideRoutesRuntimeCapabilityFailureToProotStep() {
         val result = ExternalProviderPreflight.evaluate(
             facts = facts(
@@ -186,6 +208,7 @@ class ExternalProviderPreflightTest {
 
         assertEquals(ExternalRuntimeSetupStage.READY, setup.stage)
         assertTrue(setup.ready)
+        assertEquals(true, setup.storageAccessReady)
         assertEquals(true, setup.prootDistroReady)
         assertEquals(true, setup.ubuntuReady)
     }
@@ -203,8 +226,14 @@ class ExternalProviderPreflightTest {
             ),
         )
         assertTrue(TermuxBackend.FIRST_RUN_SETUP_COMMAND.contains("allow-external-apps = true"))
+        assertEquals("termux-setup-storage", TermuxBackend.STORAGE_ACCESS_SETUP_COMMAND)
         assertEquals("pkg install -y proot-distro", TermuxBackend.PROOT_DISTRO_INSTALL_COMMAND)
         assertEquals("proot-distro install ubuntu", TermuxBackend.UBUNTU_INSTALL_COMMAND)
+        assertTrue(
+            TermuxBackend.RUNTIME_CAPABILITY_TEST.shellScript.contains(
+                "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=SHARED_STORAGE_ACCESS",
+            ),
+        )
         assertTrue(
             TermuxBackend.RUNTIME_CAPABILITY_TEST.shellScript.contains(
                 "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU",
@@ -220,6 +249,7 @@ class ExternalProviderPreflightTest {
                 probeStage = ExternalProviderProbeStage.RUNTIME_CAPABILITY,
                 lastProbeAtEpochMs = 1L,
                 lastProbeResult = ExternalProviderProbeResult.PASS,
+                setupComplete = true,
             ),
             nowEpochMs = 100_000L,
         )
@@ -241,6 +271,7 @@ class ExternalProviderPreflightTest {
         lastProbeAtEpochMs: Long? = null,
         lastProbeResult: ExternalProviderProbeResult? = null,
         detail: String? = null,
+        setupComplete: Boolean = false,
     ) = ExternalProviderFacts(
         termuxInstalled = termuxInstalled,
         runCommandPermissionGranted = runCommandPermissionGranted,
@@ -249,5 +280,6 @@ class ExternalProviderPreflightTest {
         lastProbeAtEpochMs = lastProbeAtEpochMs,
         lastProbeResult = lastProbeResult,
         detail = detail,
+        setupComplete = setupComplete,
     )
 }
