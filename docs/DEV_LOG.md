@@ -4,6 +4,41 @@
 
 历史条目中的 W2、W3、W4、W5 仅按当时命名记录已发生的工作、构建或发布，不表示当前 Roadmap 阶段。
 
+
+## 2026-09-27 · R48d10.1 Launch Authority + Environment Capability Closure（启动权 + 环境能力闭环）
+
+### Source boundary（源码边界）
+
+- 基线：`baseline/r48d10` / `a60d7fb5d81a6611ea6695c023c1c70e8181388c` / versionCode `222`。
+- 修复分支：`codex/r48d10-launch-authority-capability`。
+- 功能验证 HEAD：`5efbcedefa774721efa777efefc923f466542792`。
+- 验证版本：`0.8.0-alpha43-r48d10.1` / versionCode `223`。
+
+### Problem（问题）
+
+- Python Web 自动识别可先于项目自己的 `[project.scripts]` / `serve` 契约生成框架启动命令。
+- FastAPI 可被推断为 `uvicorn`，但 Environment Plan 不保证 `uvicorn` 或 Web optional extra 已安装。
+- Internal R 可能先准备 Embedded CPython，RUN 时因 console script 再切 Internal Alpine，形成 prepare/run backend 漂移。
+
+### Repair（修复）
+
+- 项目自有 console script + `serve` 契约优先于通用框架推断；显式 declared run 继续保持最高权威。
+- 新增共享 Python Web Environment Capability policy；只有语义明确的 Web extra（如 web/server/serve/ui/dashboard）且包含支持的 Web 包时才进入安装计划，避免误装 dev/test extras。
+- FastAPI 只有在 Environment capability 能证明 `uvicorn` 会存在时才允许生成 uvicorn launch。
+- 带计划 Web capability 的 Internal Python 项目不再优先选择 Embedded CPython，而使用 Internal Alpine，保持 PREPARE / RUN backend 一致。
+- requirements.txt 为主依赖源时，External Python 与 Internal Alpine 仍会额外安装 Environment Plan 已明确选择的 pyproject Web extras。
+- Internal Alpine 环境 fingerprint 纳入 planned extras 及对应 pyproject 内容，Web extra 变化会正确触发重建。
+- 无 easy_tdx 专用分支、无 OCI 特殊补丁、Worker 语义未改。
+
+### Verification（验证）
+
+- W0 Cloud Build #964 / Run ID `36288629558`：PASS；validators、unit tests、`assembleDebug`、APK evidence、stable signing 全部通过。
+- Internal Alpine Probe #134 / Run ID `36288629580`：PASS。
+- Artifact：`siftalpha-w0-964` / ID `10921162074` / digest `sha256:14c1817dbf512d9911d6b0d7ce6b2f936317d074a34e7bd0641356cbb97b090c`。
+- APK SHA-256：`a129e9f0b78a376442e1086a5436105a1202e51544176e410567b838c0a78eff`。
+- APK signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+- 真机 easy_tdx 回归：待安装 `r48d10.1` 后验证实际 launch 为项目自有 contract，且不再出现 `/siftalpha-env/venv/bin/uvicorn: not found`。
+
 ## 2026-09-21 · R48a6 Shared Core Realignment（共享核心重新对齐） + External Provider Preflight（外部执行环境前置检查）
 
 ### Source boundary（源码边界）

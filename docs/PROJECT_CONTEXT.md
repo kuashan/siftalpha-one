@@ -1,15 +1,15 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-21（R48a6.1 Real Device Failure Repair cloud candidate）
+最后更新：2026-09-27（R48d10.1 Launch Authority + Environment Capability Closure）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
-当前文档/验收分支：`codex/r48-shared-core-realignment`
-Current functional source HEAD：`049e35f8cd32803f13dd33672f059406874b8a9c`
-R48a5 唯一源码基线：`8c8ede3eff9a8c0cf4dcdea4d2fd67a7d808e8e2`
-当前测试版本：`0.8.0-alpha43-r48a6.1` / versionCode `187`。
-R48a6.1 W0 Cloud Build：Run #487 / Run ID `35601141522` / artifact `siftalpha-w0-487` / artifact ID `10639401416` / APK SHA-256 `ccf988663935e59c238c2805adb8fd6ed613f565e535c25467a2007fc35124af` / conclusion `success`。
-R48a6.1 Internal Alpine Probe：Run #76 / Run ID `35601141621` / conclusion `success`。
-R48a6.1 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
-R48a6 original real-device acceptance：FAIL（External PREPARE/STOP indefinite wait + Normal Mode long diagnostic non-scrollable）；R48a6.1 repair candidate awaits fresh real-device acceptance。
+当前文档/验收分支：`codex/r48d10-launch-authority-capability`
+Current functional source HEAD：`5efbcedefa774721efa777efefc923f466542792`
+R48d10 唯一源码基线：`a60d7fb5d81a6611ea6695c023c1c70e8181388c`
+当前测试版本：`0.8.0-alpha43-r48d10.1` / versionCode `223`。
+R48d10.1 W0 Cloud Build：Run #964 / Run ID `36288629558` / artifact `siftalpha-w0-964` / artifact ID `10921162074` / APK SHA-256 `a129e9f0b78a376442e1086a5436105a1202e51544176e410567b838c0a78eff` / conclusion `success`。
+R48d10.1 Internal Alpine Probe：Run #134 / Run ID `36288629580` / conclusion `success`。
+R48d10.1 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+当前真机待验收：easy_tdx 内部执行应优先使用项目自有 serve contract，且不得再出现 `/siftalpha-env/venv/bin/uvicorn: not found`。
 alpha43 production source baseline：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`  
 `main` 保持历史 production baseline，本轮未修改。  
 alpha30 source / real-device evidence remains historical; current branch continues from the alpha31 version-identity baseline。  

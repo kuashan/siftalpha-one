@@ -16,6 +16,30 @@
 
 本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
 
+
+## R48d10.1 — Launch Authority + Environment Capability Closure（启动权 + 环境能力闭环）
+
+| ID | 验证项 | 期望 | 状态 |
+|---|---|---|---|
+| R48D10.1-01 | Source baseline | 从 `baseline/r48d10@a60d7fb5...` 开始，不修改 baseline | PASS |
+| R48D10.1-02 | Launch Authority | 项目自有 console script + serve contract 先于 FastAPI/uvicorn 自动推断 | PASS — unit + W0 #964 |
+| R48D10.1-03 | Executable closure | 仅当 Environment capability 可证明 `uvicorn` 被准备时才允许 uvicorn launch | PASS — unit + W0 #964 |
+| R48D10.1-04 | Web extra planning | Web capability optional extra 无需 Vite 才可进入 Environment Plan；dev/test extra 不误装 | PASS — unit + W0 #964 |
+| R48D10.1-05 | Internal backend closure | planned Web capability 时 Internal PREPARE 与 console-script RUN 均落在 Internal Alpine | PASS — unit + W0 #964 |
+| R48D10.1-06 | requirements + pyproject extra | requirements 主依赖源仍安装明确计划的 Web extra | PASS — unit + W0 #964 |
+| R48D10.1-07 | Internal Alpine identity | planned extras / pyproject Web capability 参与环境 fingerprint | PASS — unit + Probe #134 |
+| R48D10.1-08 | Version | `0.8.0-alpha43-r48d10.1` / versionCode `223` | PASS — APK badging |
+| R48D10.1-09 | W0 Cloud Build | validators + unit tests + assembleDebug + signing | PASS — W0 #964 |
+| R48D10.1-10 | Internal Alpine Probe | reproducible Internal Alpine assets | PASS — Probe #134 |
+| R48D10.1-11 | easy_tdx real-device regression | 不再错误执行缺失的 `uvicorn`；项目自有启动契约实际可运行 | 待真机 |
+
+R48d10.1 APK evidence：
+- functional source: `5efbcedefa774721efa777efefc923f466542792`
+- artifact: `siftalpha-w0-964` / ID `10921162074`
+- artifact digest: `sha256:14c1817dbf512d9911d6b0d7ce6b2f936317d074a34e7bd0641356cbb97b090c`
+- APK SHA-256: `a129e9f0b78a376442e1086a5436105a1202e51544176e410567b838c0a78eff`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+
 ## R48a6.1 — Real Device Failure Repair（真机失败修复）
 
 | ID | 验证项 | 期望 | 状态 |
