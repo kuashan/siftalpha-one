@@ -1551,3 +1551,11 @@ plus its baseline documentation and fixes one Internal Web launch contract:
 This repair does not change External Provider（外部运行环境）, Termux, Worker, project-scoped STOP,
 Runtime lifecycle, or either product surface's layout. Endpoint Probe（端点探测）remains the only
 authority that may mark a Web endpoint verified and offer Open（打开）.
+
+Cloud verification for functional source `474dd05fa62482755f43e071565c166e3d1c559e` is complete:
+W0 Cloud Build（W0 云端构建）#962 / Run `36287655479` and Internal Alpine Probe（内部 Alpine
+探针）#133 / Run `36287655468` both passed. The resulting trusted debug APK is version
+`0.8.0-alpha43-r48d10-r1` / versionCode `223`, APK SHA-256
+`719f1091d735050ee50c2a443243eb79714e42d38858255ee0a82ce5a5572132`, with the unchanged signer
+certificate SHA-256 `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`.
+Real-device acceptance remains pending and must not be inferred from cloud PASS.

@@ -1873,6 +1873,6 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | External Provider / Termux | all paths | unchanged |
 | Worker / STOP / lifecycle | all paths | unchanged |
 | Version | installable trusted debug APK | `0.8.0-alpha43-r48d10-r1` / versionCode 223 |
-| W0 / unit tests / assembleDebug | cloud build | PENDING |
-| Internal Alpine Probe | cloud probe | PENDING |
+| W0 / unit tests / assembleDebug | cloud build | PASS — Run #962 / `36287655479` on functional source `474dd05fa62482755f43e071565c166e3d1c559e`; artifact `siftalpha-w0-962` / ID `10920794285`; APK SHA-256 `719f1091d735050ee50c2a443243eb79714e42d38858255ee0a82ce5a5572132` |
+| Internal Alpine Probe | cloud probe | PASS — Run #133 / `36287655468` |
 | Real device | easy_tdx Internal Prepare -> Run -> Open | PENDING |

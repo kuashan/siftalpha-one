@@ -3516,6 +3516,15 @@ selected the synthetic `uvicorn` console script and failed with exit 127 because
 Target:
 - versionCode = 223
 - versionName = 0.8.0-alpha43-r48d10-r1
-- W0 Cloud Build: PENDING
-- Internal Alpine Probe: PENDING
+- Functional source: `474dd05fa62482755f43e071565c166e3d1c559e`
+- W0 Cloud Build #962 / Run `36287655479`: PASS; repository validators, unit tests,
+  `assembleDebug`, APK evidence, and stable signing all passed.
+- Internal Alpine Probe #133 / Run `36287655468`: PASS.
+- Artifact: `siftalpha-w0-962` / artifact ID `10920794285` / artifact digest
+  `sha256:1a308f257d9893bd34dee4bd7d8843c206559f848b8f63bcdded03d94021bbe3`.
+- APK SHA-256: `719f1091d735050ee50c2a443243eb79714e42d38858255ee0a82ce5a5572132`.
+- APK package/version: `com.siftalpha.studio` / `0.8.0-alpha43-r48d10-r1` /
+  `versionCode 223`.
+- Signer certificate SHA-256 remains
+  `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`.
 - Real-device acceptance: PENDING
