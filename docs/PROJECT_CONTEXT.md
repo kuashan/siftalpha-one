@@ -2333,3 +2333,31 @@ No project-specific exception, fixed port, Worker change, or macOS Runtime behav
 Pre-closure source verification: W0 #947 PASS on `dbc4fea2b3c3a51457a3faca70b5aa02b3092911`.
 Final exact-head cloud verification and real-device acceptance remain the closure gates.
 
+## Internal Alpine consumes Web Component authority — 2026-09-27
+
+Android target version:
+- `versionCode = 240`
+- `versionName = 0.8.0-alpha43-r48d16-internal-vite-authority-r1`
+
+v239 established structured Vite Web-component evidence at Environment Detection / Plan level. v240 closes the remaining Internal Alpine split-brain path.
+
+Invariant:
+
+**Environment Detection chooses Web components once; every Runtime executor consumes that component set and must not independently reinterpret the source tree.**
+
+For Internal Alpine Python + Vite projects:
+
+1. source facts and bounded package manifests produce structured Vite components;
+2. their exact relative directories are carried into `InternalAlpineDependencySource`;
+3. source staging prunes generated frontend output;
+4. Internal Alpine builds exactly those planned components;
+5. only after that build succeeds may Python pyproject/package metadata/install run;
+6. the component directory set participates in environment identity.
+
+This permits config-less Vite projects and avoids the failure mode where planning says “Vite required” but Runtime execution says “Vite not required.”
+
+No easy_tdx-specific rule is part of this repair. easy_tdx is only the real-device reproducer that exposed the generic contract gap.
+
+Pre-closure W0 #956 PASS on `870821ab260bbe4f6782f332fa7ba275c1fccd1e`.
+Final exact-head cloud verification and real-device acceptance remain required.
+
