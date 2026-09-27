@@ -518,7 +518,7 @@ SIFTALPHA_PYTHON_VERSION_RESOLVER
 }
 }managed_python" ] || {
             echo 'SIFTALPHA_ERROR=MANAGED_PYTHON_DISCOVERY_FAILED'
-            printf 'SIFTALPHA_MANAGED_PYTHON_DIR=%s\\n' "${'
+            printf 'SIFTALPHA_MANAGED_PYTHON_DIR=%s\n' "${'
 
           actual_version="${'$'}("${'$'}managed_python" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))')"
           actual_platform="${'$'}("${'$'}managed_python" -c 'import sysconfig; print(sysconfig.get_platform())')"
@@ -571,7 +571,7 @@ SIFTALPHA_PYTHON_VERSION_RESOLVER
         }
     """.trimIndent()
 }
-}python_install_dir" -maxdepth 3 -type f -o -type l 2>/dev/null | head -n 40 || true
+}python_install_dir" -maxdepth 3 \( -type f -o -type l \) -print 2>/dev/null | head -n 40 || true
             return 1
           }
 
