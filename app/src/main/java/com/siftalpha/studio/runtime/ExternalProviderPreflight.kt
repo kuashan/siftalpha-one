@@ -112,12 +112,146 @@ data class ExternalProviderPreflightResult(
     val lastProbeAtEpochMs: Long?,
     val probeExecutionId: Int? = null,
     val detail: String? = null,
+    val probeStage: ExternalProviderProbeStage? = null,
+    val lastProbeResult: ExternalProviderProbeResult? = null,
     val provider: ExternalProviderDescriptor = ExternalProviderCatalog.TERMUX,
     val recoveryAction: ExternalProviderRecoveryAction =
         ExternalProviderRecoveryPolicy.actionFor(readiness),
 ) {
     val ready: Boolean
         get() = readiness == ExternalProviderReadiness.READY
+}
+
+enum class ExternalRuntimeSetupStage {
+    TERMUX,
+    RUN_COMMAND_PERMISSION,
+    EXTERNAL_APPS,
+    PROOT_DISTRO,
+    UBUNTU,
+    FINAL_CHECK,
+    READY,
+}
+
+data class ExternalRuntimeSetupStatus(
+    val stage: ExternalRuntimeSetupStage,
+    val termuxInstalled: Boolean,
+    val runCommandPermissionGranted: Boolean,
+    val allowExternalAppsReady: Boolean?,
+    val prootDistroReady: Boolean?,
+    val ubuntuReady: Boolean?,
+    val ready: Boolean,
+    val checking: Boolean,
+    val detail: String? = null,
+)
+
+object ExternalRuntimeSetupGuide {
+    private const val PROOT_MARKER = "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=PROOT_DISTRO"
+    private const val UBUNTU_MARKER = "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU"
+
+    fun evaluate(result: ExternalProviderPreflightResult): ExternalRuntimeSetupStatus {
+        val detail = result.detail.orEmpty()
+        if (!result.termuxInstalled) {
+            return status(result, ExternalRuntimeSetupStage.TERMUX)
+        }
+        if (!result.runCommandPermissionGranted) {
+            return status(result, ExternalRuntimeSetupStage.RUN_COMMAND_PERMISSION)
+        }
+        if (result.ready) {
+            return ExternalRuntimeSetupStatus(
+                stage = ExternalRuntimeSetupStage.READY,
+                termuxInstalled = true,
+                runCommandPermissionGranted = true,
+                allowExternalAppsReady = true,
+                prootDistroReady = true,
+                ubuntuReady = true,
+                ready = true,
+                checking = false,
+                detail = result.detail,
+            )
+        }
+
+        val runtimeStage =
+            result.probeStage == ExternalProviderProbeStage.RUNTIME_CAPABILITY
+        val failed = result.lastProbeResult == ExternalProviderProbeResult.FAIL
+        if (runtimeStage && failed && PROOT_MARKER in detail) {
+            return ExternalRuntimeSetupStatus(
+                stage = ExternalRuntimeSetupStage.PROOT_DISTRO,
+                termuxInstalled = true,
+                runCommandPermissionGranted = true,
+                allowExternalAppsReady = true,
+                prootDistroReady = false,
+                ubuntuReady = null,
+                ready = false,
+                checking = false,
+                detail = result.detail,
+            )
+        }
+        if (runtimeStage && failed && UBUNTU_MARKER in detail) {
+            return ExternalRuntimeSetupStatus(
+                stage = ExternalRuntimeSetupStage.UBUNTU,
+                termuxInstalled = true,
+                runCommandPermissionGranted = true,
+                allowExternalAppsReady = true,
+                prootDistroReady = true,
+                ubuntuReady = false,
+                ready = false,
+                checking = false,
+                detail = result.detail,
+            )
+        }
+
+        val bridgeFailed =
+            result.probeStage == ExternalProviderProbeStage.BRIDGE &&
+                result.lastProbeResult == ExternalProviderProbeResult.FAIL
+        if (
+            bridgeFailed ||
+            result.readiness == ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED ||
+            result.readiness == ExternalProviderReadiness.BRIDGE_UNRESPONSIVE
+        ) {
+            return ExternalRuntimeSetupStatus(
+                stage = ExternalRuntimeSetupStage.EXTERNAL_APPS,
+                termuxInstalled = true,
+                runCommandPermissionGranted = true,
+                allowExternalAppsReady = false,
+                prootDistroReady = null,
+                ubuntuReady = null,
+                ready = false,
+                checking = false,
+                detail = result.detail,
+            )
+        }
+
+        return ExternalRuntimeSetupStatus(
+            stage = ExternalRuntimeSetupStage.FINAL_CHECK,
+            termuxInstalled = true,
+            runCommandPermissionGranted = true,
+            allowExternalAppsReady = when {
+                runtimeStage -> true
+                result.allowExternalApps == true -> true
+                else -> null
+            },
+            prootDistroReady = null,
+            ubuntuReady = null,
+            ready = false,
+            checking = result.readiness == ExternalProviderReadiness.BRIDGE_CHECKING,
+            detail = result.detail,
+        )
+    }
+
+    private fun status(
+        result: ExternalProviderPreflightResult,
+        stage: ExternalRuntimeSetupStage,
+    ) = ExternalRuntimeSetupStatus(
+        stage = stage,
+        termuxInstalled = result.termuxInstalled,
+        runCommandPermissionGranted = result.runCommandPermissionGranted,
+        allowExternalAppsReady = null,
+        prootDistroReady = null,
+        ubuntuReady = null,
+        ready = false,
+        checking = false,
+        detail = result.detail,
+    )
 }
 
 interface ExternalProviderPreflightGate {
@@ -208,6 +342,8 @@ object ExternalProviderPreflight {
         lastProbeAtEpochMs = facts.lastProbeAtEpochMs,
         probeExecutionId = facts.lastProbeExecutionId,
         detail = facts.detail,
+        probeStage = facts.probeStage,
+        lastProbeResult = facts.lastProbeResult,
     )
 }
 
