@@ -112,11 +112,7 @@ fun ExternalRuntimeSetupScreen(
                         label = stringResource(R.string.settings_external_grant_permission),
                         onClick = onRequestPermission,
                     )
-                } else if (
-                    status.termuxInstalled &&
-                    status.runCommandPermissionGranted &&
-                    status.allowExternalAppsReady != true
-                ) {
+                } else if (status.stage == ExternalRuntimeSetupStage.EXTERNAL_APPS) {
                     CommandBlock(
                         command = externalAppsCommand,
                         copyLabel = stringResource(R.string.settings_external_copy_setup),
@@ -206,7 +202,7 @@ fun ExternalRuntimeSetupScreen(
                 if (!status.detail.isNullOrBlank() && !status.ready) {
                     Spacer(modifier = Modifier.height(spacing.small))
                     Text(
-                        text = status.detail,
+                        text = status.detail.orEmpty(),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
