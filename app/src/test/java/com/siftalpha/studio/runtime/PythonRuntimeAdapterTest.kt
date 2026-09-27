@@ -80,7 +80,13 @@ class PythonRuntimeAdapterTest {
 
         assertTrue(script.contains("planned_extras='web'"))
         assertTrue(script.contains("pip install -r"))
-        assertTrue(script.contains("install_target=\"\${'        val command = adapter.prepare(project)
+        assertTrue(script.contains("SIFTALPHA_PYPROJECT_EXTRAS=%s"))
+        assertTrue(script.contains("pip install -e"))
+    }
+
+    @Test
+    fun `prepare preserves venv pip dependency source and durable readiness contract`() {
+        val command = adapter.prepare(project)
         val script = command.shellScript
 
         assertEquals("Sample · 准备环境", command.label)
