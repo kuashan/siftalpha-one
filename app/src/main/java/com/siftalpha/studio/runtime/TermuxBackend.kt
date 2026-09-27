@@ -76,7 +76,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
             mkdir -p ~/.termux
             touch ~/.termux/termux.properties
             sed -i '/allow-external-apps/d' ~/.termux/termux.properties
-            printf '\\nallow-external-apps = true\\n' >> ~/.termux/termux.properties
+            printf '\nallow-external-apps = true\n' >> ~/.termux/termux.properties
             termux-reload-settings
         """.trimIndent()
 
