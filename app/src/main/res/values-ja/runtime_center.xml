@@ -213,7 +213,11 @@
     <string name="runtime_external_provider_diagnostics_title">外部プロバイダーの事前チェック</string>
     <string name="runtime_external_provider_diagnostics_format">TERMUX_INSTALLED=%1$s\nRUN_COMMAND_PERMISSION=%2$s\nALLOW_EXTERNAL_APPS=%3$s\nBRIDGE_PROBE=%4$s\nEXTERNAL_PROVIDER_READY=%5$s</string>
     <string name="runtime_termux_missing_title">Termux が見つかりません</string>
-    <string name="runtime_termux_missing_message">プロジェクト実行では、検証済みの Termux ランタイムブリッジを引き続き使用します。</string>
+    <string name="runtime_termux_missing_message">外部実行環境を使用するには Termux のインストールが必要です。インストール後に一度 Termux を開いて初期化を完了し、SiftAlpha に戻ってください。</string>
+    <string name="runtime_termux_download">Termux をダウンロード</string>
+    <string name="runtime_termux_download_failed">Termux の公式ダウンロードページを開けませんでした。</string>
+    <string name="runtime_termux_setup_title">Termux の設定が必要です</string>
+    <string name="runtime_termux_setup_message">Termux はインストールされていますが、SiftAlpha はまだ外部実行ブリッジを利用できません。Termux を開いて初期化と外部アプリからの呼び出し設定を完了し、SiftAlpha に戻って再検出してください。</string>
     <string name="runtime_permission_missing_title">RUN_COMMAND が未許可です</string>
     <string name="runtime_permission_missing_message">ホームに戻り、Termux の RUN_COMMAND 権限を許可してください。</string>
     <string name="runtime_open_source_failed">ソースを開けません</string>

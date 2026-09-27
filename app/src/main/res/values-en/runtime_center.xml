@@ -213,7 +213,11 @@
     <string name="runtime_external_provider_diagnostics_title">External provider preflight</string>
     <string name="runtime_external_provider_diagnostics_format">TERMUX_INSTALLED=%1$s\nRUN_COMMAND_PERMISSION=%2$s\nALLOW_EXTERNAL_APPS=%3$s\nBRIDGE_PROBE=%4$s\nEXTERNAL_PROVIDER_READY=%5$s</string>
     <string name="runtime_termux_missing_title">Termux not detected</string>
-    <string name="runtime_termux_missing_message">Project execution continues to use the verified Termux runtime bridge.</string>
+    <string name="runtime_termux_missing_message">Termux is required for the external runtime. Install it, open it once to finish initialization, then return to SiftAlpha.</string>
+    <string name="runtime_termux_download">Download Termux</string>
+    <string name="runtime_termux_download_failed">Could not open the official Termux download page.</string>
+    <string name="runtime_termux_setup_title">Termux setup required</string>
+    <string name="runtime_termux_setup_message">Termux is installed, but SiftAlpha cannot use the external runtime bridge yet. Open Termux, finish initialization and external-app access setup, then return to SiftAlpha to recheck.</string>
     <string name="runtime_permission_missing_title">RUN_COMMAND not granted</string>
     <string name="runtime_permission_missing_message">Return to Home and grant Termux RUN_COMMAND permission.</string>
     <string name="runtime_open_source_failed">Could not open source</string>

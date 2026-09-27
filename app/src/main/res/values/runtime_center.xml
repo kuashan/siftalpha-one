@@ -213,7 +213,11 @@
     <string name="runtime_external_provider_diagnostics_title">外部执行环境前置检查</string>
     <string name="runtime_external_provider_diagnostics_format">TERMUX_INSTALLED=%1$s\nRUN_COMMAND_PERMISSION=%2$s\nALLOW_EXTERNAL_APPS=%3$s\nBRIDGE_PROBE=%4$s\nEXTERNAL_PROVIDER_READY=%5$s</string>
     <string name="runtime_termux_missing_title">未检测到 Termux</string>
-    <string name="runtime_termux_missing_message">项目运行继续使用已验证的 Termux 运行时桥接。</string>
+    <string name="runtime_termux_missing_message">使用外部运行空间前，需要先安装 Termux。安装并首次打开后，返回 SiftAlpha 即可继续。</string>
+    <string name="runtime_termux_download">下载 Termux</string>
+    <string name="runtime_termux_download_failed">无法打开 Termux 官方下载页面。</string>
+    <string name="runtime_termux_setup_title">Termux 需要完成设置</string>
+    <string name="runtime_termux_setup_message">Termux 已安装，但 SiftAlpha 尚未能使用外部运行桥接。请打开 Termux 完成初始化和外部应用调用设置，然后返回 SiftAlpha 重新检测。</string>
     <string name="runtime_permission_missing_title">RUN_COMMAND 未授权</string>
     <string name="runtime_permission_missing_message">请返回首页完成 Termux RUN_COMMAND 授权。</string>
     <string name="runtime_open_source_failed">无法打开来源</string>
