@@ -652,7 +652,7 @@ SIFTALPHA_RUNNER
               --bind "${'$'}ROOT:/root/projects" \
               --bind "${'$'}runtime_dir:/root/.siftalpha-host" \
               --bind "${'$'}identity_dir:${guestRuntimeRoot}/${id}" \
-              ubuntu -- bash -lc ${sh(setupInner)}
+              siftalpha-ubuntu-24.04 -- bash -lc ${sh(setupInner)}
 
             rm -f -- "${'$'}secret_input_file"
             trap - EXIT
@@ -660,12 +660,12 @@ SIFTALPHA_RUNNER
             : >"${'$'}launch_log"
             rm -f "${'$'}pgid_file"
             if command -v setsid >/dev/null 2>&1; then
-              nohup setsid proot-distro login --bind "${'$'}ROOT:/root/projects" --bind "${'$'}identity_dir:${guestRuntimeRoot}/${id}" ubuntu -- bash ${sh(runner)} >"${'$'}launch_log" 2>&1 < /dev/null &
+              nohup setsid proot-distro login --bind "${'$'}ROOT:/root/projects" --bind "${'$'}identity_dir:${guestRuntimeRoot}/${id}" siftalpha-ubuntu-24.04 -- bash ${sh(runner)} >"${'$'}launch_log" 2>&1 < /dev/null &
               pid=${'$'}!
               printf '%s\n' "${'$'}pid" >"${'$'}pgid_file"
               echo 'SIFTALPHA_RUNTIME_SESSION=SETSID'
             else
-              nohup proot-distro login --bind "${'$'}ROOT:/root/projects" --bind "${'$'}identity_dir:${guestRuntimeRoot}/${id}" ubuntu -- bash ${sh(runner)} >"${'$'}launch_log" 2>&1 < /dev/null &
+              nohup proot-distro login --bind "${'$'}ROOT:/root/projects" --bind "${'$'}identity_dir:${guestRuntimeRoot}/${id}" siftalpha-ubuntu-24.04 -- bash ${sh(runner)} >"${'$'}launch_log" 2>&1 < /dev/null &
               pid=${'$'}!
               echo 'SIFTALPHA_RUNTIME_SESSION=PID_TREE'
             fi
@@ -688,14 +688,14 @@ SIFTALPHA_RUNNER
             pgid="${'$'}(cat "${'$'}pgid_file" 2>/dev/null || true)"
             if kill -0 "${'$'}pid" 2>/dev/null || { [ -n "${'$'}pgid" ] && kill -0 -- "-${'$'}pgid" 2>/dev/null; }; then
               echo 'SIFTALPHA_STATUS=RUNNING'
-              proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${sh(inspectInner)} || true
+              proot-distro login --bind "${'$'}ROOT:/root/projects" siftalpha-ubuntu-24.04 -- bash -lc ${sh(inspectInner)} || true
               exit 0
             fi
 
             rm -f "${'$'}pid_file" "${'$'}pgid_file"
-            proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${sh(clearSecretInner)} >/dev/null 2>&1 || true
+            proot-distro login --bind "${'$'}ROOT:/root/projects" siftalpha-ubuntu-24.04 -- bash -lc ${sh(clearSecretInner)} >/dev/null 2>&1 || true
             echo 'SIFTALPHA_STATUS=COMPLETED_OR_EXITED'
-            result="${'$'}(proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${sh(inspectInner)} 2>&1 || true)"
+            result="${'$'}(proot-distro login --bind "${'$'}ROOT:/root/projects" siftalpha-ubuntu-24.04 -- bash -lc ${sh(inspectInner)} 2>&1 || true)"
             printf '%s\n' "${'$'}result"
             if [ -s "${'$'}launch_log" ]; then
               echo '--- launcher ---'
@@ -764,7 +764,7 @@ SIFTALPHA_RUNNER
                 exit 78
               fi
               echo 'SIFTALPHA_PREPARE_STOPPED=1'
-              if ! proot-distro login ubuntu -- bash -lc ${sh(recoverInterruptedPrepare)}; then
+              if ! proot-distro login siftalpha-ubuntu-24.04 -- bash -lc ${sh(recoverInterruptedPrepare)}; then
                 echo 'SIFTALPHA_ERROR=ENVIRONMENT_ROLLBACK_FAILED'
                 exit 76
               fi
@@ -782,7 +782,7 @@ SIFTALPHA_RUNNER
             fi
 
             rm -f "${'$'}pid_file" "${'$'}pgid_file" "${'$'}runtime_dir/${id}.secrets.in"
-            proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${sh(markStopped)} >/dev/null 2>&1 || true
+            proot-distro login --bind "${'$'}ROOT:/root/projects" siftalpha-ubuntu-24.04 -- bash -lc ${sh(markStopped)} >/dev/null 2>&1 || true
             echo 'SIFTALPHA_STATUS=STOPPED_BY_USER'
             echo 'SIFTALPHA_RUNTIME_STATE=STOPPED_BY_USER'
             if [ -s "${'$'}launch_log" ]; then
@@ -821,7 +821,7 @@ SIFTALPHA_RUNNER
             pgid_file="${'$'}runtime_dir/${id}.pgid"
             launch_log="${'$'}runtime_dir/${id}.launch.log"
 
-            result="${'$'}(proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${sh(statusInner)} 2>&1 || true)"
+            result="${'$'}(proot-distro login --bind "${'$'}ROOT:/root/projects" siftalpha-ubuntu-24.04 -- bash -lc ${sh(statusInner)} 2>&1 || true)"
             printf '%s\n' "${'$'}result"
 
             pid="${'$'}(cat "${'$'}pid_file" 2>/dev/null || true)"
@@ -906,7 +906,7 @@ SIFTALPHA_RUNNER
             else
               siftalpha_web_procfs_success=0
             fi
-            proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${sh(logsInner)} siftalpha-web-logs "${'$'}siftalpha_web_procfs_success" || true
+            proot-distro login --bind "${'$'}ROOT:/root/projects" siftalpha-ubuntu-24.04 -- bash -lc ${sh(logsInner)} siftalpha-web-logs "${'$'}siftalpha_web_procfs_success" || true
             unset siftalpha_web_procfs_output siftalpha_web_procfs_success
             if [ -s "${'$'}launch_log" ]; then
               echo '--- launcher ---'
@@ -939,7 +939,7 @@ SIFTALPHA_RUNNER
             fi
 
             rm -f "${'$'}pid_file" "${'$'}pgid_file" "${'$'}launch_log" "${'$'}runtime_dir/${id}.secrets.in"
-            proot-distro login --bind "${'$'}ROOT:/root/projects" ubuntu -- bash -lc ${sh(cleanInner)}
+            proot-distro login --bind "${'$'}ROOT:/root/projects" siftalpha-ubuntu-24.04 -- bash -lc ${sh(cleanInner)}
             echo 'SIFTALPHA_ENV=CLEANED'
             echo 'SIFTALPHA_STATUS=STOPPED'
         """.trimIndent()
