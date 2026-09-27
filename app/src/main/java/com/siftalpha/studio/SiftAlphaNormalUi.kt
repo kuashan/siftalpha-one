@@ -1429,128 +1429,29 @@ private fun ExternalRecoveryCard(
 ) {
     GlowCard {
         Text(
-            stringResource(R.string.brand_external_attention),
+            stringResource(R.string.settings_external_runtime_project_not_ready_title),
             color = Amber,
             fontWeight = FontWeight.Bold,
             fontSize = 13.sp,
         )
         Spacer(Modifier.height(5.dp))
         Text(
-            stringResource(R.string.brand_external_attention_detail),
+            stringResource(R.string.settings_external_runtime_project_not_ready),
             color = Muted,
             fontSize = 11.sp,
             lineHeight = 16.sp,
         )
         Spacer(Modifier.height(12.dp))
-
-        when (readiness) {
-            ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED -> {
-                GradientPrimaryButton(
-                    stringResource(R.string.normal_external_provider_allow),
-                    onRequestPermission,
-                )
-            }
-
-            ExternalProviderReadiness.TERMUX_NOT_INSTALLED -> {
-                OutlinedButton(
-                    onClick = onOpenTermux,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, Border),
-                ) {
-                    Text(
-                        stringResource(R.string.normal_external_provider_download_termux_action),
-                        color = TextPrimary,
-                    )
-                }
-            }
-
-            ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED -> {
-                OutlinedButton(
-                    onClick = onOpenTermux,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, Border),
-                ) {
-                    Text(
-                        stringResource(R.string.normal_external_provider_open_termux_action),
-                        color = TextPrimary,
-                    )
-                }
-            }
-
-            ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED -> {
-                Text(
-                    stringResource(R.string.normal_external_provider_check_required),
-                    color = Muted,
-                    fontSize = 11.sp,
-                )
-            }
-
-            ExternalProviderReadiness.BRIDGE_CHECKING -> {
-                Text(
-                    stringResource(R.string.normal_external_provider_checking),
-                    color = Muted,
-                    fontSize = 11.sp,
-                )
-                Spacer(Modifier.height(9.dp))
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(3.dp)),
-                    color = Cyan,
-                    trackColor = Color.White.copy(alpha = .08f),
-                )
-            }
-
-            ExternalProviderReadiness.BRIDGE_UNRESPONSIVE -> {
-                Text(
-                    stringResource(R.string.normal_external_provider_no_response),
-                    color = Muted,
-                    fontSize = 11.sp,
-                )
-                Spacer(Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(9.dp),
-                ) {
-                    OutlinedButton(
-                        onClick = onOpenTermux,
-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, Border),
-                    ) {
-                        Text(
-                            stringResource(R.string.normal_external_provider_open_termux_action),
-                            color = TextPrimary,
-                            fontSize = 11.sp,
-                        )
-                    }
-                    OutlinedButton(
-                        onClick = onRecheck,
-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, Border),
-                    ) {
-                        Text(
-                            stringResource(R.string.normal_external_provider_recheck),
-                            color = TextPrimary,
-                            fontSize = 11.sp,
-                        )
-                    }
-                }
-            }
-
-            ExternalProviderReadiness.UNAVAILABLE -> {
-                Text(
-                    stringResource(R.string.normal_external_provider_unavailable),
-                    color = Muted,
-                    fontSize = 11.sp,
-                )
-            }
-
-            ExternalProviderReadiness.READY -> Unit
+        OutlinedButton(
+            onClick = onOpenTermux,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, Border),
+        ) {
+            Text(
+                stringResource(R.string.settings_external_runtime_go_to_setup),
+                color = TextPrimary,
+            )
         }
     }
 }
