@@ -75,14 +75,13 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
         val FIRST_RUN_SETUP_COMMAND = """
             mkdir -p ~/.termux
             touch ~/.termux/termux.properties
-            if grep -qE '^\\s*allow-external-apps\\s*=\\s*true\\s*$' ~/.termux/termux.properties; then
-              echo 'allow-external-apps already enabled'
-            else
-              printf '\\nallow-external-apps=true\\n' >> ~/.termux/termux.properties
-            fi
-            termux-reload-settings 2>/dev/null || true
-            echo 'SiftAlpha Studio Termux bridge setup complete.'
+            sed -i '/allow-external-apps/d' ~/.termux/termux.properties
+            printf '\\nallow-external-apps = true\\n' >> ~/.termux/termux.properties
+            termux-reload-settings
         """.trimIndent()
+
+        const val PROOT_DISTRO_INSTALL_COMMAND = "pkg install -y proot-distro"
+        const val UBUNTU_INSTALL_COMMAND = "proot-distro install ubuntu"
 
         val CONNECTION_TEST = RuntimeCommand(
             shellScript = "printf 'SIFTALPHA_TERMUX_BRIDGE_OK\\n'; printf 'TERMUX_PREFIX=%s\\n' \"${'$'}PREFIX\"; uname -m",
@@ -101,10 +100,13 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
                   echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=PROOT_DISTRO' >&2
                   exit 32
                 }
-                proot-distro login ubuntu -- bash -lc '
+                if ! proot-distro login ubuntu -- bash -lc '
                   printf "SIFTALPHA_EXTERNAL_RUNTIME_OK\\n"
                   uname -m >/dev/null
-                '
+                '; then
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU' >&2
+                  exit 33
+                fi
             """.trimIndent(),
             label = "SiftAlpha Studio 外部运行能力检测",
             description = "验证 Termux 后台命令能够真正进入 proot-distro Ubuntu 并返回。",
