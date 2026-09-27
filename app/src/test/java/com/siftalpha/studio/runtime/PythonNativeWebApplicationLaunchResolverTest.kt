@@ -230,6 +230,32 @@ class PythonNativeWebApplicationLaunchResolverTest {
     }
 
     @Test
+    fun `generic FastAPI does not override project owned console script`() {
+        val result = PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = null,
+            pyprojectToml = """
+                [project]
+                name = "cli-owned"
+                dependencies = ["fastapi", "uvicorn"]
+
+                [project.scripts]
+                cli-owned = "cli_owned.cli:main"
+            """.trimIndent(),
+            requirementsText = null,
+            relativePaths = listOf("src/cli_owned/api.py"),
+            pythonSources = mapOf(
+                "src/cli_owned/api.py" to """
+                    from fastapi import FastAPI
+                    app = FastAPI()
+                """.trimIndent(),
+            ),
+            webProjectEnabled = true,
+        )
+
+        assertNull(result)
+    }
+
+    @Test
     fun fastApiCommonSignatureResolvesInstalledModuleTarget() {
         val result = PythonNativeWebApplicationLaunchResolver.resolve(
             declaredRun = null,
