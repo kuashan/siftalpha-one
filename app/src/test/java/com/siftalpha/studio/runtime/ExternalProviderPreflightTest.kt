@@ -128,6 +128,80 @@ class ExternalProviderPreflightTest {
     }
 
     @Test
+    fun setupGuideRoutesRuntimeCapabilityFailureToProotStep() {
+        val result = ExternalProviderPreflight.evaluate(
+            facts = facts(
+                bridgeState = ExternalProviderBridgeState.FAIL,
+                probeStage = ExternalProviderProbeStage.RUNTIME_CAPABILITY,
+                lastProbeAtEpochMs = 950L,
+                lastProbeResult = ExternalProviderProbeResult.FAIL,
+                detail = "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=PROOT_DISTRO",
+            ),
+            nowEpochMs = 1_000L,
+        )
+
+        val setup = ExternalRuntimeSetupGuide.evaluate(result)
+
+        assertEquals(ExternalRuntimeSetupStage.PROOT_DISTRO, setup.stage)
+        assertEquals(true, setup.allowExternalAppsReady)
+        assertEquals(false, setup.prootDistroReady)
+        assertNull(setup.ubuntuReady)
+    }
+
+    @Test
+    fun setupGuideRoutesUbuntuFailureAfterProot() {
+        val result = ExternalProviderPreflight.evaluate(
+            facts = facts(
+                bridgeState = ExternalProviderBridgeState.FAIL,
+                probeStage = ExternalProviderProbeStage.RUNTIME_CAPABILITY,
+                lastProbeAtEpochMs = 950L,
+                lastProbeResult = ExternalProviderProbeResult.FAIL,
+                detail = "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU",
+            ),
+            nowEpochMs = 1_000L,
+        )
+
+        val setup = ExternalRuntimeSetupGuide.evaluate(result)
+
+        assertEquals(ExternalRuntimeSetupStage.UBUNTU, setup.stage)
+        assertEquals(true, setup.allowExternalAppsReady)
+        assertEquals(true, setup.prootDistroReady)
+        assertEquals(false, setup.ubuntuReady)
+    }
+
+    @Test
+    fun setupGuideReportsReadyOnlyAfterRuntimeCapabilityProof() {
+        val result = ExternalProviderPreflight.evaluate(
+            facts = facts(
+                bridgeState = ExternalProviderBridgeState.PASS,
+                probeStage = ExternalProviderProbeStage.RUNTIME_CAPABILITY,
+                lastProbeAtEpochMs = 950L,
+                lastProbeResult = ExternalProviderProbeResult.PASS,
+            ),
+            nowEpochMs = 1_000L,
+        )
+
+        val setup = ExternalRuntimeSetupGuide.evaluate(result)
+
+        assertEquals(ExternalRuntimeSetupStage.READY, setup.stage)
+        assertTrue(setup.ready)
+        assertEquals(true, setup.prootDistroReady)
+        assertEquals(true, setup.ubuntuReady)
+    }
+
+    @Test
+    fun setupCommandsAreCopyableAndCapabilityProbeHasExplicitUbuntuMarker() {
+        assertTrue(TermuxBackend.FIRST_RUN_SETUP_COMMAND.contains("allow-external-apps = true"))
+        assertEquals("pkg install -y proot-distro", TermuxBackend.PROOT_DISTRO_INSTALL_COMMAND)
+        assertEquals("proot-distro install ubuntu", TermuxBackend.UBUNTU_INSTALL_COMMAND)
+        assertTrue(
+            TermuxBackend.RUNTIME_CAPABILITY_TEST.shellScript.contains(
+                "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU",
+            ),
+        )
+    }
+
+    @Test
     fun staleReadyFactMustBeProbedAgain() {
         val result = ExternalProviderPreflight.evaluate(
             facts = facts(
@@ -149,6 +223,7 @@ class ExternalProviderPreflightTest {
         probeStage: ExternalProviderProbeStage? = null,
         lastProbeAtEpochMs: Long? = null,
         lastProbeResult: ExternalProviderProbeResult? = null,
+        detail: String? = null,
     ) = ExternalProviderFacts(
         termuxInstalled = termuxInstalled,
         runCommandPermissionGranted = runCommandPermissionGranted,
@@ -156,5 +231,6 @@ class ExternalProviderPreflightTest {
         probeStage = probeStage,
         lastProbeAtEpochMs = lastProbeAtEpochMs,
         lastProbeResult = lastProbeResult,
+        detail = detail,
     )
 }
