@@ -200,6 +200,7 @@ class ExternalProviderPreflightTest {
                 probeStage = ExternalProviderProbeStage.RUNTIME_CAPABILITY,
                 lastProbeAtEpochMs = 950L,
                 lastProbeResult = ExternalProviderProbeResult.PASS,
+                setupComplete = true,
             ),
             nowEpochMs = 1_000L,
         )
