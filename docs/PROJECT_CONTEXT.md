@@ -1,16 +1,17 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-27（R48d10.2 External Provider Installation Recovery）
+最后更新：2026-09-27（R48d10.3 External Runtime Setup Guide + Project Flow Decoupling）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
-当前文档/验收分支：`codex/r48d10-external-provider-install-recovery`
-Current functional source HEAD：`b69cae818afe62d1a840670908b3ac7ebce4b59f`
+当前文档/验收分支：`codex/r48d10-external-runtime-setup-guide`
+Current functional source HEAD：`3fca16334dacdb3493e26eca97f9657192ce00e5`
 R48d10 唯一源码基线：`a60d7fb5d81a6611ea6695c023c1c70e8181388c`
-当前测试版本：`0.8.0-alpha43-r48d10.2` / versionCode `224`。
-R48d10.2 W0 Cloud Build：Run #971 / Run ID `36291377522` / artifact `siftalpha-w0-971` / artifact ID `10922143433` / APK SHA-256 `a7df0d10fe6e38878c9c2c10ef1ef44daa33bc025ba7752914eb82fb06fd4aa2` / conclusion `success`。
-R48d10.2 Internal Alpine Probe：Run #135 / Run ID `36290090117` / conclusion `success`。
-R48d10.2 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
-已真机确认：R48d10.1 Internal easy_tdx 可正常运行并直接打开网页。
-当前真机待验收：Termux 未安装时下载入口、安装/初始化/授权后的 shared preflight 恢复、原 PREPARE/RUN 自动继续，以及 External easy_tdx 使用与 Internal 相同的项目自有 Launch Contract。
+当前测试版本：`0.8.0-alpha43-r48d10.3` / versionCode `225`。
+R48d10.3 W0 Cloud Build：Run #974 / Run ID `36293475233` / artifact `siftalpha-w0-974` / artifact ID `10922569711` / APK SHA-256 `2db23ef49be2b2ee5eff7d10c389661e4536006e8e451d8cb0f35f88c38833f7` / conclusion `success`。
+R48d10.3 Internal Alpine Probe：Run #136 / Run ID `36293240226` / conclusion `success`。
+R48d10.3 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+已真机确认：R48d10.1 Internal easy_tdx 可正常运行并直接打开网页；R48d10.2 可进入 Termux RUN_COMMAND / allow-external-apps 链并真实发现全新 Termux 缺少 PRoot-Distro。
+当前架构边界：项目页只消费 External Runtime READY/NOT_READY；Termux 下载、权限、allow-external-apps、PRoot-Distro、Ubuntu 与最终检测全部收口到 Settings > External Runtime Setup。
+当前真机待验收：R48d10.3 五步设置向导从全新 Termux 推进至 READY，以及 External easy_tdx PREPARE → RUN → Web 打开。
 alpha43 production source baseline：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`  
 `main` 保持历史 production baseline，本轮未修改。  
 alpha30 source / real-device evidence remains historical; current branch continues from the alpha31 version-identity baseline。  

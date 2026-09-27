@@ -5,6 +5,46 @@
 历史条目中的 W2、W3、W4、W5 仅按当时命名记录已发生的工作、构建或发布，不表示当前 Roadmap 阶段。
 
 
+## 2026-09-27 · R48d10.3 External Runtime Setup Guide + Project Flow Decoupling（外部运行空间引导 + 项目流程解耦）
+
+### Source boundary（源码边界）
+
+- 起点：R48d10.2 最终文档 HEAD `361a982a06f2da363d35d55d6c244b6ed201d71a`。
+- 修复分支：`codex/r48d10-external-runtime-setup-guide`。
+- 功能验证 HEAD：`3fca16334dacdb3493e26eca97f9657192ce00e5`。
+- 验证版本：`0.8.0-alpha43-r48d10.3` / versionCode `225`。
+
+### Real-device trigger（真机触发）
+
+- R48d10.2 真机已证明 Termux 下载、RUN_COMMAND 调用和 `allow-external-apps` 配置可以继续向前。
+- 新安装的 Termux 随后进入 `SIFTALPHA_ERROR=PROOT_DISTRO_MISSING`。
+- 同时确认现有项目页会把 Termux 安装、权限、桥接、PRoot/Ubuntu 准备连续塞进项目操作，导致用户在 External Runtime 未初始化时被安装流程强制占据。
+
+### Architecture / UX boundary（架构与体验边界）
+
+- Settings 新增独立 **External Runtime Setup（外部运行空间设置）** 二级页面。
+- 项目页不再承担 Termux 安装/初始化；Normal Mode 与 Developer Mode 都只消费 Shared Core 的 READY / NOT_READY 事实。
+- External Runtime 未就绪时，项目页只显示“外部运行空间尚未就绪”与“前往设置”；返回、编辑项目、切换 Internal Runtime 等操作不被安装流程劫持。
+- External Action Gate 的 deferred project action 仍保留；设置向导最终达到 READY 后，回到项目页可沿用已有 gate 恢复原操作。
+- Settings 向导按顺序处理：Termux → RUN_COMMAND / `allow-external-apps` → PRoot-Distro → Ubuntu Runtime → Final Check。
+- Shared Core 新增 `ExternalRuntimeSetupGuide` / `ExternalRuntimeSetupStage`，并把 probe stage / probe result 暴露到统一 preflight result；两个 UI 不建立第二套检测状态机。
+- Termux setup 命令、`pkg install -y proot-distro`、`proot-distro install ubuntu` 由共享 Termux contract 提供，可在向导中一键复制。
+- Runtime capability probe 对缺失 Ubuntu 增加明确 `SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU` marker，使向导可以区分 PRoot-Distro 与 Ubuntu。
+- 用户从 Termux 返回 Settings 时自动重新探测；也保留显式“重新检测”。
+- Internal Runtime、Launch Authority、easy_tdx 项目自有 console-script launch contract 均未修改。
+
+### Verification（验证）
+
+- Internal Alpine Probe #136 / Run ID `36293240226`：PASS。
+- W0 #973：FAIL，仅因新增 Settings permission callback 的 Kotlin override 参数类型为 `Array<out String>`，与当前 AndroidX 签名不一致。
+- 修正为 `Array<String>` 后，W0 Cloud Build #974 / Run ID `36293475233`：PASS；repository validators、unit tests、`assembleDebug`、APK evidence、stable signing 全部通过。
+- Artifact：`siftalpha-w0-974` / ID `10922569711` / digest `sha256:e742b1d779265b6af1ca64fa797fbd2e9a054e7d6d478c75b90119f235dece93`。
+- APK SHA-256：`2db23ef49be2b2ee5eff7d10c389661e4536006e8e451d8cb0f35f88c38833f7`。
+- APK signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+- 真机待验收：Settings 向导的五步状态推进、复制命令/打开 Termux/返回自动检测、项目页非阻塞行为，以及 External easy_tdx 最终 PREPARE → RUN → Web 打开。
+
+
+
 ## 2026-09-27 · R48d10.2 External Provider Installation Recovery（外部运行环境安装恢复）
 
 ### Source boundary（源码边界）

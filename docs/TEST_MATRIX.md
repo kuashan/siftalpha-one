@@ -17,6 +17,34 @@
 本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
 
 
+## R48d10.3 — External Runtime Setup Guide + Project Flow Decoupling（外部运行空间引导 + 项目流程解耦）
+
+| ID | 验证项 | 期望 | 状态 |
+|---|---|---|---|
+| R48D10.3-01 | Settings dedicated setup | 外部运行空间安装/初始化只在 Settings 二级页面完成 | PASS — source + W0 #974；待真机 |
+| R48D10.3-02 | Project non-blocking boundary | Normal/Developer 项目页不再下载 Termux、请求权限或连续探测，只提示前往设置 | PASS — source + W0 #974；待真机 |
+| R48D10.3-03 | Shared setup state | Termux / permission / external-apps / PRoot / Ubuntu / final check / READY 由 Shared Core 统一派生 | PASS — unit + W0 #974 |
+| R48D10.3-04 | Termux download | Termux 缺失时设置向导提供官方 GitHub releases 下载入口 | PASS — source；待真机 |
+| R48D10.3-05 | allow-external-apps setup | 提供可复制 `termux.properties` 配置命令并可打开 Termux | PASS — unit/source；待真机 |
+| R48D10.3-06 | PRoot-Distro setup | 缺失时识别 marker 并提供 `pkg install -y proot-distro` | PASS — unit + W0 #974；待真机 |
+| R48D10.3-07 | Ubuntu setup | 缺失时识别显式 Ubuntu marker 并提供 `proot-distro install ubuntu` | PASS — unit + W0 #974；待真机 |
+| R48D10.3-08 | Return auto recheck | 从 Termux 返回设置向导后自动重新执行 shared probe | PASS — source；待真机 |
+| R48D10.3-09 | Deferred project action | External Action Gate 待办保留；READY 后项目页可恢复原操作 | PASS — existing gate + source；待真机 |
+| R48D10.3-10 | Internal boundary | Internal easy_tdx 成功链与 Launch Authority 不修改 | PASS — scope + Probe #136 |
+| R48D10.3-11 | Version | `0.8.0-alpha43-r48d10.3` / versionCode `225` | PASS — APK badging |
+| R48D10.3-12 | Cloud gate | validators + unit tests + assembleDebug + signing | PASS — W0 #974 |
+| R48D10.3-13 | Real-device wizard | 五步引导从全新 Termux 推进到 External Runtime READY | 待真机 |
+| R48D10.3-14 | External easy_tdx | 外部空间 PREPARE → RUN → 项目自有 Web 页面正常打开 | 待真机 |
+
+R48d10.3 APK evidence：
+- functional source: `3fca16334dacdb3493e26eca97f9657192ce00e5`
+- artifact: `siftalpha-w0-974` / ID `10922569711`
+- artifact digest: `sha256:e742b1d779265b6af1ca64fa797fbd2e9a054e7d6d478c75b90119f235dece93`
+- APK SHA-256: `2db23ef49be2b2ee5eff7d10c389661e4536006e8e451d8cb0f35f88c38833f7`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+
+
+
 ## R48d10.2 — External Provider Installation Recovery（外部运行环境安装恢复）
 
 | ID | 验证项 | 期望 | 状态 |
