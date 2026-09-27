@@ -26,7 +26,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
     }
 
     override fun execute(command: RuntimeCommand): Int {
-        check(isTermuxInstalled()) { "æœªæ£€æµ‹åˆ° Termux" }
+        check(isTermuxInstalled()) { "未检测到 Termux" }
 
         // Sensitive data is resolved only immediately before dispatch. It never enters
         // RuntimeCommand.shellScript / label / description.
