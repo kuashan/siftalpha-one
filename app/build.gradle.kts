@@ -164,8 +164,10 @@ android {
         // into Settings, while project surfaces only consume Shared Core READY/NOT_READY facts.
         // v227 / r48d10.5 gives External Python a Runtime-owned project workspace
         // and makes Termux shared-storage access part of the External setup contract.
-        versionCode = 227
-        versionName = "0.8.0-alpha43-r48d10.5"
+        // v228 / r48d10.6 pins new External Ubuntu installs to 24.04 and requires Ubuntu-native
+        // Python/venv/pip identity so Termux Android Python cannot masquerade as guest Python.
+        versionCode = 228
+        versionName = "0.8.0-alpha43-r48d10.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
