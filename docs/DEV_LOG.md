@@ -3989,3 +3989,75 @@ For the same imported Python+Vite project:
 Cloud verification: pending on final v238 HEAD.
 Real-device acceptance: pending.
 
+## 2026-09-27 · Android v239 Generic Web Component Environment Contract Closure
+
+### Trigger
+
+Real-device validation of a Python-primary polyglot project exposed a split-brain environment interpretation:
+
+- Runtime selection correctly reported Python primary + Node.js supplemental;
+- the imported tree contained a nested Vite application;
+- Environment Detection still reported `SIFTALPHA_ENV_VITE_COMPONENTS=0`;
+- the project then fell back to a one-shot Python entry instead of reaching its project-owned Web launch contract.
+
+The repair is intentionally generic. No project name, repository name, folder name, fixed port, or application-specific path is recognized.
+
+### Root cause
+
+Vite knowledge was duplicated across layers. Static Environment Detection inferred a Vite component from a narrow path-only `package.json + vite.config.*` rule, while Node preparation independently re-scanned the mounted project tree and Python Web launch used its own Vite predicate. These independently derived facts could disagree. Config-less Vite projects were also not representable.
+
+### Repair
+
+- Added one bounded `ViteWebComponentDetector` as the Android source of truth for Vite component evidence.
+- Every candidate is anchored by a real `package.json`.
+- Vite may be proven by any high-confidence package-local evidence:
+  - an exact `vite` dependency/devDependency/peerDependency;
+  - a package script that invokes the `vite` executable;
+  - an adjacent `vite.config.{ts,js,mts,mjs,cjs}`.
+- Package manifests are read through the existing project filesystem abstraction with a hard bound of 32 files × 256 KiB.
+- Environment Plan now carries structured Vite component evidence and emits component directory/evidence diagnostics.
+- Environment Plan schema is now 3 and package-manifest Web facts participate in plan identity.
+- Python Native-Web Launch Authority consumes the same detector rather than reimplementing a Vite predicate.
+- Node supplemental PREPARE/STATUS consume plan-owned component directories instead of recursively rediscovering them at execution time.
+- Config-less Vite projects use Vite's standard `dist` output contract; an explicit Vite config may still override `outDir`.
+- Python remains primary for Python-root polyglot projects. Vite is a supplemental Web component and does not steal the project lifecycle.
+- Project-owned Web/CLI launch remains stronger than generic framework synthesis such as FastAPI → uvicorn.
+- One-shot Python CLI entries remain available as explicit task launches; they do not become the project's Web identity.
+
+### Diagnostics
+
+Environment output now includes, in addition to the compatibility count:
+
+`SIFTALPHA_ENV_WEB_COMPONENT_COUNT=<n>`
+
+and bounded per-component facts such as:
+
+`SIFTALPHA_ENV_WEB_COMPONENT_1_DIR=web-ui`
+`SIFTALPHA_ENV_WEB_COMPONENT_1_KIND=vite`
+`SIFTALPHA_ENV_WEB_COMPONENT_1_EVIDENCE=package_json,vite_dependency,vite_script,vite_config`
+
+This makes a future source-scan, manifest-read, or rule-classification failure directly observable instead of collapsing to an unexplained zero.
+
+### Regression coverage
+
+Generic fixtures cover:
+
+- nested Vite component under a Python root;
+- config-backed Vite;
+- config-less Vite proven by manifest dependency/script;
+- non-Vite Node package rejection;
+- Python + Vite + internal FastAPI where project-owned serve retains Launch Authority;
+- plan-owned Node execution without runtime rediscovery;
+- package-manifest changes altering Environment Plan identity;
+- existing Python/Node lifecycle regression suite.
+
+Pre-closure W0 #947 on source HEAD `dbc4fea2b3c3a51457a3faca70b5aa02b3092911`: PASS.
+Final exact-head W0 + Internal Alpine Probe: pending after version/docs closure.
+
+### Version target
+
+- versionCode: `239`
+- versionName: `0.8.0-alpha43-r48d15-web-component-contract-r1`
+
+Real-device acceptance remains required before declaring the behavior fully closed.
+
