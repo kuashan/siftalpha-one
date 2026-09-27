@@ -110,7 +110,7 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("HOST_WRAP_BEGIN"))
         assertFalse(script.contains("HOST_CANCELABLE_BEGIN:runtime-id:prepare"))
         assertTrue(script.contains("bootstrap_python='/usr/bin/python3.12'"))
-        assertTrue(script.contains("\"${'$'}ubuntu_python\" -m venv"))
+        assertTrue(script.contains("\"${'$'}selected_python\" -m venv"))
         assertFalse(script.contains("venv.prepare-"))
         assertTrue(script.contains("venv.backup-"))
         assertTrue(script.contains("ready.backup-"))
@@ -118,7 +118,7 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("ENVIRONMENT_ACTIVATION_FAILED"))
         assertTrue(script.contains("ENVIRONMENT_ROLLBACK_FAILED"))
         assertTrue(script.contains("PYTHON_ENVIRONMENT_PREFIX_MISMATCH"))
-        assertTrue(script.contains("\"${'$'}ubuntu_python\" -m pip --version"))
+        assertTrue(script.contains("bootstrap_python='/usr/bin/python3.12'"))
         assertTrue(script.contains("SIFTALPHA_EXTERNAL_PYTHON_EXECUTABLE"))
         assertTrue(script.contains("SIFTALPHA_EXTERNAL_PYTHON_PLATFORM"))
         assertTrue(script.contains("SIFTALPHA_EXTERNAL_PYTHON_SELECTED"))
@@ -145,7 +145,7 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("SIFTALPHA_PREPARE_COMMITTED=1"))
         assertTrue(script.contains("SIFTALPHA_ENV=READY"))
 
-        val finalVenvCreation = script.indexOf("\"${'$'}ubuntu_python\" -m venv \"${'$'}venv\"")
+        val finalVenvCreation = script.indexOf("\"${'$'}selected_python\" -m venv \"${'$'}venv\"")
         val pythonValidation = script.indexOf(
             "\"${'$'}venv/bin/python\" -m pip install",
             finalVenvCreation,
@@ -195,8 +195,8 @@ class PythonRuntimeAdapterTest {
         assertTrue(prepare.contains("bootstrap_python='/usr/bin/python3.12'"))
         assertTrue(prepare.contains("EXTERNAL_PYTHON_IDENTITY_INVALID"))
         assertTrue(prepare.contains("sysconfig.get_platform"))
-        assertTrue(prepare.contains("\"${'$'}ubuntu_python\" -m venv"))
-        assertTrue(prepare.contains("/usr/bin/python3 \"${'$'}source_manager\""))
+        assertTrue(prepare.contains("\"${'$'}selected_python\" -m venv"))
+        assertTrue(prepare.contains("/usr/bin/python3.12"))
         assertFalse(prepare.contains("command -v python3"))
         assertTrue(start.contains("/usr/bin/python3.12"))
         assertTrue(
@@ -214,7 +214,7 @@ class PythonRuntimeAdapterTest {
         val script = adapter.prepare(project).shellScript
 
         val backupMove = script.indexOf("mv -- \"${'$'}venv\" \"${'$'}backup\"")
-        val createFinal = script.indexOf("\"${'$'}ubuntu_python\" -m venv \"${'$'}venv\"")
+        val createFinal = script.indexOf("\"${'$'}selected_python\" -m venv \"${'$'}venv\"")
         val installFinal = script.indexOf("\"${'$'}venv/bin/python\" -m pip install")
         val readyWrite = script.indexOf("ready_commit=")
         val disableRollback = script.indexOf("trap - EXIT", readyWrite)
@@ -450,7 +450,7 @@ class PythonRuntimeAdapterTest {
             procfsGuardStart,
         )
         val guestLogs = script.indexOf(
-            "proot-distro login --bind \"${'$'}ROOT:/root/projects\" ubuntu -- bash -lc",
+            "proot-distro login --bind \"${'$'}ROOT:/root/projects\" siftalpha-ubuntu-24.04 -- bash -lc",
             procfsGuardEnd,
         )
 
