@@ -22,9 +22,9 @@
 | ID | 验证项 | 期望 | 状态 |
 |---|---|---|---|
 | R48D10.6-01 | Fixed Ubuntu baseline | 新安装 External Ubuntu 使用 `ubuntu:24.04`，不再随 latest 漂移 | PASS — source/unit + W0 #986；待真机 |
-| R48D10.6-02 | Ubuntu-native Python capability | READY 前必须证明 `/usr/bin/python3`、pip、venv 可用 | PASS — unit/source + W0 #986；待真机 |
+| R48D10.6-02 | Ubuntu-native Python capability | READY 前必须证明 `/usr/bin/python3`、pip、venv 可用 | PASS — unit/source + W0 #986 + user-confirmed real device |
 | R48D10.6-03 | Termux Python rejection | guest Python executable/platform 不得是 Termux/Android identity | PASS — unit/source + W0 #986 |
-| R48D10.6-04 | Existing Ubuntu recovery | Ubuntu 已存在但缺 Python 时进入独立 Ubuntu Python 修复步骤，不删除 rootfs | PASS — setup guide/unit + W0 #986；待真机 |
+| R48D10.6-04 | Existing Ubuntu recovery | Ubuntu 已存在但缺 Python 时进入独立 Ubuntu Python 修复步骤，不删除 rootfs | PASS — setup guide/unit + W0 #986 + user-confirmed real device |
 | R48D10.6-05 | Setup contract versioning | r48d10.5 的 setup proof 升级后必须按新 Python identity contract 重新验证 | PASS — shared store/source + W0 #986 |
 | R48D10.6-06 | PREPARE interpreter | External Python venv 强制由 `/usr/bin/python3 -m venv` 创建 | PASS — unit/source + W0 #986 |
 | R48D10.6-07 | Existing venv identity | 旧 venv 若 base interpreter 来自 Termux/Android，不得复用 | PASS — unit/source + W0 #986 |
@@ -32,8 +32,13 @@
 | R48D10.6-09 | Internal boundary | Internal Runtime 未改动并保持资产验证通过 | PASS — Probe #139 |
 | R48D10.6-10 | Version | `0.8.0-alpha43-r48d10.6` / versionCode `228` | PASS — APK badging |
 | R48D10.6-11 | Cloud gate | repository validators + unit tests + assembleDebug + stable signing | PASS — W0 #986 |
-| R48D10.6-12 | Real-device pandas wheel | easy_tdx PREPARE 不再因错误 Python identity 回落到 pandas source build | 待真机 |
-| R48D10.6-13 | External easy_tdx E2E | PREPARE → RUN → Web 页面打开 | 待真机 |
+| R48D10.6-12 | Real-device pandas regression | easy_tdx PREPARE 不再被错误 External Python identity 阻塞于 pandas source-build 路径 | PASS — user-confirmed current regression scenario；详细 pip wheel 文件名未单独留档 |
+| R48D10.6-13 | External easy_tdx E2E | PREPARE → RUN → Web 页面打开 | PASS — user-confirmed real device |
+
+R48d10.6 baseline acceptance：
+- 2026-09-27：用户确认当前 v228 真机测试通过。
+- Baseline branch：`baseline/r48d10.6`。
+- Closure：CLOUD PASS + REAL-DEVICE PASS；后续改动不得回写此基线语义。
 
 R48d10.6 APK evidence：
 - functional source: `75ca8a05cf8684b0488c30b2a4cd3957f0a13695`

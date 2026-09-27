@@ -56,12 +56,14 @@
 - Artifact：`siftalpha-w0-986` / ID `10926265054` / digest `sha256:673a7d67ce2a088148de99d203332579a8d25ba0767eefc25919a5367935195e`。
 - APK SHA-256：`51ebd8098dbcb7912fdc32790b065d4e1dd75508b7389113e69eb8f4e02c6550`。
 - APK signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
-- 真机待验收：
-  1. 升级后进入 Settings > External Runtime Setup，让 setup contract v3 重新检测当前 Ubuntu；
-  2. 若出现 Ubuntu Python 待修复，复制修复命令到 Termux 执行并返回；
-  3. READY 后 External easy_tdx PREPARE 应输出 Ubuntu-native executable/platform identity；
-  4. 观察 pandas 是否使用 compatible manylinux wheel，而不是 `pandas-2.3.3.tar.gz`；
-  5. 完成 PREPARE → RUN → Web 页面打开。
+### Real-device acceptance + baseline closure（真机验收 + 基线收尾）
+
+- 2026-09-27：用户确认 R48d10.6 / v228 当前版本真机测试通过。
+- 已确认现有 Ubuntu 的 Ubuntu Python 修复流程可完成，不需要删除或 reset 现有 rootfs。
+- External Runtime 当前回归场景已通过，easy_tdx 真机流程由用户确认 PASS。
+- pandas 的具体 wheel 文件名未单独保留日志，因此文档只记录“原回归场景已通过”，不虚构未留存的 pip 选择细节。
+- 正式固定稳定基线分支：`baseline/r48d10.6`。
+- 本轮状态：CLOSED / PASS。后续 Android 开发必须从该基线或其明确后继开发分支继续，不在基线上直接叠加临时修复。
 
 
 ## 2026-09-27 · R48d10.5 External Python Workspace + Shared Storage Access（外部 Python 工作区 + 共享存储访问）
