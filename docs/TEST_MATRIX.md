@@ -1999,3 +1999,23 @@ Pre-closure W0 #947: PASS.
 Final exact-head W0 + Internal Alpine Probe: pending.
 Real-device Web/Vite acceptance: pending.
 
+## Android v240 Internal Alpine Vite Authority
+
+| ID | Check | Expected |
+|---|---|---|
+| IA-VITE-01 | Environment Plan identifies nested/config-less Vite | Exact component directory carried into Internal Alpine source |
+| IA-VITE-02 | Internal Alpine build bootstrap | Uses Plan-owned component list; no recursive rediscovery |
+| IA-VITE-03 | Config-less Vite | `npm run build` executes without requiring vite.config.* |
+| IA-VITE-04 | Missing planned package.json | Fail closed with PLANNED_COMPONENT_MISSING |
+| IA-VITE-05 | Invalid component path | Reject traversal/absolute-style unsafe input |
+| IA-VITE-06 | Environment identity | Vite component directory set participates in source fingerprint |
+| IA-VITE-07 | Phase ordering | Vite install/build finishes before Python pyproject install |
+| IA-VITE-08 | Generated dist absent from staged source | Build recreates artifact before hatchling/pip metadata phase |
+| IA-VITE-09 | Existing npm package-manager policy | npm supported; pnpm/yarn fail closed as before |
+| IA-VITE-10 | Project-specific logic | No repository/project-name/fixed-path special case |
+| IA-VITE-11 | Existing Android regression suite | testDebugUnitTest + assembleDebug PASS |
+
+Pre-closure W0 #956: PASS.
+Final exact-head W0 + Internal Alpine Probe: pending.
+Real-device Web/Vite prepare + launch acceptance: pending.
+
