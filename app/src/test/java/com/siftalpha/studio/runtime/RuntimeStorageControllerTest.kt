@@ -22,9 +22,10 @@ class RuntimeStorageControllerTest {
                 SIFTALPHA_STORAGE_NPM_CACHE_KB=125000
                 SIFTALPHA_STORAGE_APT_CACHE_KB=30000
                 SIFTALPHA_STORAGE_PROJECT_COMPONENT=project-a|project-a-a1|PYTHON_VENV|240000
+                SIFTALPHA_STORAGE_PROJECT_COMPONENT=project-a|project-a-a1|PYTHON_WORKSPACE|50000
                 SIFTALPHA_STORAGE_PROJECT_COMPONENT=project-a|project-a-a1|NODE_SUPPLEMENTAL_WORKSPACE|110000
                 SIFTALPHA_STORAGE_PROJECT_COMPONENT=project-a|project-a-a1|RUNTIME_STATE|10000
-                SIFTALPHA_STORAGE_PROJECT=project-a|project-a-a1|360000
+                SIFTALPHA_STORAGE_PROJECT=project-a|project-a-a1|410000
                 SIFTALPHA_STORAGE_PROJECT_COMPONENT=project-b|project-b-b2|NODE_PRIMARY_WORKSPACE|640000
                 SIFTALPHA_STORAGE_PROJECT_COMPONENT=project-b|project-b-b2|RUNTIME_STATE|5000
                 SIFTALPHA_STORAGE_PROJECT=project-b|project-b-b2|645000
@@ -58,7 +59,12 @@ class RuntimeStorageControllerTest {
 
         val mixedProject = snapshot.projects.last()
         assertEquals("project-a", mixedProject.folderName)
-        assertEquals(3, mixedProject.components.size)
+        assertEquals(4, mixedProject.components.size)
+        assertTrue(
+            mixedProject.components.any {
+                it.componentId == RuntimeStorageController.COMPONENT_PYTHON_WORKSPACE
+            },
+        )
         assertEquals("old-project-c3", snapshot.orphans.single().runtimeId)
         assertEquals(45_000L, snapshot.orphans.single().sizeKb)
         assertEquals(2, snapshot.orphans.single().components.size)
