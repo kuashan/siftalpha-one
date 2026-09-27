@@ -55,6 +55,51 @@ class ExternalProviderProbeCoordinatorTest {
     }
 
     @Test
+    fun staleHealthProofKeepsSetupCompleteWhileSharedRecheckRuns() {
+        val store = MemoryReadinessStore()
+        val bridge = FakeBridge()
+        var now = 1_000L
+        val coordinator = ExternalProviderProbeCoordinator(
+            bridge = bridge,
+            store = store,
+            nowEpochMs = { now },
+        )
+
+        coordinator.ensureReady()
+        TermuxResultBus.publish(
+            RuntimeResult(
+                executionId = bridge.lastExecutionId,
+                stdout = "SIFTALPHA_TERMUX_BRIDGE_OK",
+                stderr = "",
+                exitCode = 0,
+                internalErrorCode = 0,
+                internalErrorMessage = "",
+            ),
+        )
+        TermuxResultBus.publish(
+            RuntimeResult(
+                executionId = bridge.lastExecutionId,
+                stdout = "SIFTALPHA_EXTERNAL_RUNTIME_OK",
+                stderr = "",
+                exitCode = 0,
+                internalErrorCode = 0,
+                internalErrorMessage = "",
+            ),
+        )
+
+        assertEquals(true, coordinator.current().setupComplete)
+
+        now = 100_000L
+        val stale = coordinator.current()
+        assertEquals(ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED, stale.readiness)
+        assertEquals(true, stale.setupComplete)
+
+        val checking = coordinator.ensureReady()
+        assertEquals(ExternalProviderReadiness.BRIDGE_CHECKING, checking.readiness)
+        assertEquals(true, checking.setupComplete)
+    }
+
+    @Test
     fun probeTimesOutAfterThreeSecondsAndBecomesRecoverable() {
         val store = MemoryReadinessStore()
         val bridge = FakeBridge()
@@ -251,6 +296,11 @@ class ExternalProviderProbeCoordinatorTest {
             facts = facts.copy(
                 termuxInstalled = termuxInstalled,
                 runCommandPermissionGranted = runCommandPermissionGranted,
+                setupComplete = if (termuxInstalled && runCommandPermissionGranted) {
+                    facts.setupComplete
+                } else {
+                    false
+                },
             )
         }
 
@@ -271,6 +321,7 @@ class ExternalProviderProbeCoordinatorTest {
             atEpochMs: Long,
             detail: String?,
         ) {
+            val currentStage = facts.probeStage
             facts = facts.copy(
                 bridgeState = if (result == ExternalProviderProbeResult.PASS) {
                     ExternalProviderBridgeState.PASS
@@ -281,6 +332,11 @@ class ExternalProviderProbeCoordinatorTest {
                 lastProbeAtEpochMs = atEpochMs,
                 lastProbeResult = result,
                 detail = detail,
+                setupComplete = when {
+                    result == ExternalProviderProbeResult.FAIL -> false
+                    currentStage == ExternalProviderProbeStage.RUNTIME_CAPABILITY -> true
+                    else -> facts.setupComplete
+                },
             )
         }
 
