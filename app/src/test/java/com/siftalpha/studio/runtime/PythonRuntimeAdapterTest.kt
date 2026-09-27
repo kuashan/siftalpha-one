@@ -475,7 +475,7 @@ class PythonRuntimeAdapterTest {
         adapter.start(
             project.copy(
                 pythonLaunchInvocation = PythonLaunchInvocation.consoleScript(
-                    executableName = "easy-tdx",
+                    name = "easy-tdx",
                     arguments = listOf(
                         "serve",
                         "--host",
