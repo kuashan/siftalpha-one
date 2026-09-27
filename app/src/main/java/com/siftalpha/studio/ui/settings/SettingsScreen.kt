@@ -40,6 +40,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onChangeLanguage: () -> Unit,
     onChangeBrowser: () -> Unit,
+    onOpenExternalRuntimeSetup: () -> Unit,
     onDeveloperModeChanged: (Boolean) -> Unit,
 ) {
     val spacing = StudioThemeTokens.spacing
@@ -115,6 +116,24 @@ fun SettingsScreen(
 
             StudioSectionCard {
                 Text(
+                    text = stringResource(R.string.settings_external_runtime_section),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(modifier = Modifier.height(spacing.small))
+                Text(
+                    text = stringResource(R.string.settings_external_runtime_summary),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(spacing.medium))
+                StudioPrimaryAction(
+                    label = stringResource(R.string.settings_external_runtime_open),
+                    onClick = onOpenExternalRuntimeSetup,
+                )
+            }
+
+            StudioSectionCard {
+                Text(
                     text = stringResource(R.string.settings_developer_mode_section),
                     style = MaterialTheme.typography.titleMedium,
                 )
@@ -185,6 +204,7 @@ private fun SettingsScreenLightPreview() {
             onBack = {},
             onChangeLanguage = {},
             onChangeBrowser = {},
+            onOpenExternalRuntimeSetup = {},
             onDeveloperModeChanged = {},
         )
     }
@@ -203,6 +223,7 @@ private fun SettingsScreenDarkPreview() {
             onBack = {},
             onChangeLanguage = {},
             onChangeBrowser = {},
+            onOpenExternalRuntimeSetup = {},
             onDeveloperModeChanged = {},
         )
     }
