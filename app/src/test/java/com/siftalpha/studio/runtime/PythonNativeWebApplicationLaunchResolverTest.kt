@@ -301,6 +301,28 @@ class PythonNativeWebApplicationLaunchResolverTest {
     }
 
     @Test
+    fun `partial Python source sample cannot prove generic FastAPI uniqueness`() {
+        val result = PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = null,
+            pyprojectToml = """
+                [project]
+                dependencies = ["fastapi", "uvicorn"]
+            """.trimIndent(),
+            requirementsText = null,
+            relativePaths = listOf(
+                "src/demo/a.py",
+                "src/demo/b.py",
+            ),
+            pythonSources = mapOf(
+                "src/demo/a.py" to "from fastapi import FastAPI\napp = FastAPI()",
+            ),
+            webProjectEnabled = true,
+        )
+
+        assertNull(result)
+    }
+
+    @Test
     fun `serve source outside console script package cannot prove project web contract`() {
         val result = PythonNativeWebApplicationLaunchResolver.resolve(
             declaredRun = null,

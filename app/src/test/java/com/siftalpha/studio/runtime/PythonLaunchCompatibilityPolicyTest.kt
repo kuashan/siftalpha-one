@@ -4,9 +4,40 @@ import com.siftalpha.studio.project.ConfigurationEvidence
 import com.siftalpha.studio.project.PythonCliArgumentKind
 import com.siftalpha.studio.project.PythonCliRequirement
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PythonLaunchCompatibilityPolicyTest {
+
+    @Test
+    fun `Web detection without native launch still resolves normal Python CLI`() {
+        assertTrue(
+            PythonLaunchCompatibilityPolicy.shouldResolveCli(
+                primaryRuntime = RuntimeKind.PYTHON,
+                webProjectEnabled = true,
+                nativeWebLaunch = null,
+            ),
+        )
+        assertFalse(
+            PythonLaunchCompatibilityPolicy.shouldResolveCli(
+                primaryRuntime = RuntimeKind.PYTHON,
+                webProjectEnabled = true,
+                nativeWebLaunch = PythonNativeWebLaunchCandidate(
+                    executableName = "project-web",
+                    arguments = listOf("serve"),
+                    evidencePath = "src/project/cli.py",
+                ),
+            ),
+        )
+        assertFalse(
+            PythonLaunchCompatibilityPolicy.shouldResolveCli(
+                primaryRuntime = RuntimeKind.NODE,
+                webProjectEnabled = true,
+                nativeWebLaunch = null,
+            ),
+        )
+    }
 
     @Test
     fun `existing summary entry wins when it still exists in imported project`() {
