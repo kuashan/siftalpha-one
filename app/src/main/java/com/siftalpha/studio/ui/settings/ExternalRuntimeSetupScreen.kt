@@ -37,12 +37,14 @@ import com.siftalpha.studio.ui.theme.StudioThemeTokens
 fun ExternalRuntimeSetupScreen(
     status: ExternalRuntimeSetupStatus,
     externalAppsCommand: String,
+    storageAccessCommand: String,
     prootCommand: String,
     ubuntuCommand: String,
     onBack: () -> Unit,
     onDownloadTermux: () -> Unit,
     onRequestPermission: () -> Unit,
     onCopyExternalAppsCommand: () -> Unit,
+    onCopyStorageAccessCommand: () -> Unit,
     onCopyProotCommand: () -> Unit,
     onCopyUbuntuCommand: () -> Unit,
     onOpenTermux: () -> Unit,
@@ -117,6 +119,33 @@ fun ExternalRuntimeSetupScreen(
                         command = externalAppsCommand,
                         copyLabel = stringResource(R.string.settings_external_copy_setup),
                         onCopy = onCopyExternalAppsCommand,
+                    )
+                    Spacer(modifier = Modifier.height(spacing.medium))
+                    OutlinedButton(
+                        onClick = onOpenTermux,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.settings_external_open_termux))
+                    }
+                }
+            }
+
+            SetupStepCard(
+                title = stringResource(R.string.settings_external_step_storage),
+                complete = status.storageAccessReady == true,
+                detail = when {
+                    status.storageAccessReady == true ->
+                        stringResource(R.string.settings_external_status_complete)
+                    status.stage == ExternalRuntimeSetupStage.STORAGE_ACCESS ->
+                        stringResource(R.string.settings_external_storage_missing)
+                    else -> stringResource(R.string.settings_external_wait_previous)
+                },
+            ) {
+                if (status.stage == ExternalRuntimeSetupStage.STORAGE_ACCESS) {
+                    CommandBlock(
+                        command = storageAccessCommand,
+                        copyLabel = stringResource(R.string.settings_external_copy_storage),
+                        onCopy = onCopyStorageAccessCommand,
                     )
                     Spacer(modifier = Modifier.height(spacing.medium))
                     OutlinedButton(
