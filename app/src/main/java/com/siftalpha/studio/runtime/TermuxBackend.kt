@@ -120,13 +120,13 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
                   fi
                   python_executable="$(/usr/bin/python3 -c "import sys; print(sys.executable)")"
                   python_platform="$(/usr/bin/python3 -c "import sysconfig; print(sysconfig.get_platform())")"
-                  case "$python_executable" in
+                  case "${'$'}python_executable" in
                     /data/data/com.termux/*)
                       echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                       exit 35
                       ;;
                   esac
-                  case "$python_platform" in
+                  case "${'$'}python_platform" in
                     *android*)
                       echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                       exit 35
@@ -140,14 +140,14 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
                     echo "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON"
                     exit 35
                   }
-                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "$python_executable"
-                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "$python_platform"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PYTHON=%s\\n" "${'$'}python_executable"
+                  printf "SIFTALPHA_EXTERNAL_UBUNTU_PLATFORM=%s\\n" "${'$'}python_platform"
                 ' 2>&1)"
                 ubuntu_code=$?
                 set -e
-                printf '%s\\n' "$ubuntu_probe"
-                if [ "$ubuntu_code" -ne 0 ]; then
-                  if printf '%s\\n' "$ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
+                printf '%s\\n' "${'$'}ubuntu_probe"
+                if [ "${'$'}ubuntu_code" -ne 0 ]; then
+                  if printf '%s\\n' "${'$'}ubuntu_probe" | grep -q '^SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON$'; then
                     echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON' >&2
                     exit 35
                   fi
