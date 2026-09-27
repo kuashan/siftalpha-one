@@ -90,6 +90,6 @@ class RuntimeWebLearnedLaunchStore(context: Context) {
         projectKey.length.toString() + ":" + projectKey
 
     companion object {
-        private const val PREFS_NAME = "siftalpha_runtime_web_learned_launch_v1"
+        private const val PREFS_NAME = "siftalpha_runtime_web_learned_launch_v2"
     }
 }

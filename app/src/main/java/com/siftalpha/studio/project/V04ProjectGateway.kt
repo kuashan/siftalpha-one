@@ -267,7 +267,7 @@ class V04ProjectGateway(private val context: Context) {
      */
     fun runtimeFacts(projectDocumentId: String): RuntimeFacts {
         val objectValue = metadata(projectDocumentId)
-        val nodes = projectStore.listProjectTree(projectDocumentId)
+        val nodes = projectStore.listProjectTreeForRuntimeFacts(projectDocumentId)
         return RuntimeFacts(
             relativePaths = nodes.map { it.relativePath },
             declaredType = objectValue?.optString("type")?.takeIf { it.isNotBlank() },
@@ -359,7 +359,7 @@ class V04ProjectGateway(private val context: Context) {
         if (requested.isEmpty()) return emptyMap()
 
         val wanted = requested.toSet()
-        val files = projectStore.listProjectTree(projectDocumentId)
+        val files = projectStore.listProjectTreeForRuntimeFacts(projectDocumentId)
             .asSequence()
             .filterNot { it.isDirectory }
             .map { node ->

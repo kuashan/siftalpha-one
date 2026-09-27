@@ -1855,3 +1855,24 @@ Failure of any REQUIRED row = UI regression（界面回归）. Do not present th
 | Developer Mode（开发者模式） external one-click continuation | PASS — real device |
 | STOP（停止） project-scoped pending cancellation | PASS — real device |
 | Baseline status | FROZEN / DO NOT MODIFY |
+
+### R48-D10-r1 v223 — Internal Web launch authority
+
+| Area | Verification | Expected |
+| --- | --- | --- |
+| Runtime source facts | generated `dist` / caches exceed legacy UI tree budget | generated/dependency trees pruned before bounded source scan |
+| Source truncation | filtered source still exceeds 8192-node bound | fail closed; never silently accept partial launch/environment facts |
+| Web evidence | nested `package.json`, `vite.config.ts`, `cmd_web.py` | preserved for Environment Plan and Launch Resolver |
+| Environment Plan | Python + Vite + declared `[web]` extra | `VITE_COMPONENTS=1`; `PYTHON_INSTALL_EXTRAS=web` |
+| Launch authority | project serve contract plus internal FastAPI app | project console script `serve` wins |
+| CLI authority | valid `[project.scripts]` but strict Web proof incomplete | generic FastAPI must not synthesize `uvicorn`; normal CLI resolver owns fallback |
+| Generic FastAPI | no project-owned CLI contract; one unambiguous app object | `uvicorn module:app --host 127.0.0.1` remains supported |
+| Ambiguous FastAPI | multiple app objects | fail closed |
+| Serve ownership | serve source outside selected console-script package | fail closed |
+| Learned launch | candidate saved by old resolver policy | invalidated by storage namespace change |
+| External Provider / Termux | all paths | unchanged |
+| Worker / STOP / lifecycle | all paths | unchanged |
+| Version | installable trusted debug APK | `0.8.0-alpha43-r48d10-r1` / versionCode 223 |
+| W0 / unit tests / assembleDebug | cloud build | PENDING |
+| Internal Alpine Probe | cloud probe | PENDING |
+| Real device | easy_tdx Internal Prepare -> Run -> Open | PENDING |

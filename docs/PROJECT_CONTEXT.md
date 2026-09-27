@@ -1534,3 +1534,20 @@ Direct Developer Mode source modification is authorized only for this gate wirin
 It represents version `0.8.0-alpha43-r48d10` / versionCode `222`, after W0 Cloud Build（云端构建）Run #660 passed and the user completed real-device acceptance with all targeted R48-D10 behavior passing.
 
 This branch is reference-only. Do not modify, rebase, merge into, or force-move it. New work must preserve the ability to compare directly with this commit.
+
+## 2026-09-27 · R48-D10-r1 Internal launch authority
+
+The frozen `baseline/r48d10` remains unchanged. The v223 repair line starts from that accepted code
+plus its baseline documentation and fixes one Internal Web launch contract:
+
+- action-time Runtime facts use a generated-output-pruned, bounded source traversal rather than the
+  UI tree's 1500-node view;
+- a complete project-owned Python Web serve contract outranks generic framework synthesis;
+- an existing safe project console-script contract blocks generic FastAPI launch synthesis when the
+  strict Web contract is incomplete;
+- standalone unambiguous FastAPI projects retain generic `uvicorn` fallback;
+- old learned launch candidates are invalidated.
+
+This repair does not change External Provider（外部运行环境）, Termux, Worker, project-scoped STOP,
+Runtime lifecycle, or either product surface's layout. Endpoint Probe（端点探测）remains the only
+authority that may mark a Web endpoint verified and offer Open（打开）.

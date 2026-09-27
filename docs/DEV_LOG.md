@@ -3468,3 +3468,54 @@ Baseline rule（基线规则）:
 - `baseline/r48d10` is frozen and must not be moved, rebased, merged into, or force-updated.
 - Future development must branch from this baseline or a later explicitly accepted baseline.
 - If a later change regresses Runtime（运行时）, Environment（环境）, lifecycle（生命周期）, external provider（外部运行环境）, Normal Mode（普通模式）, or Developer Mode（开发者模式）, compare first against this frozen commit.
+
+## 2026-09-27 · R48-D10-r1 Internal Web Launch Authority Repair
+
+### Trigger
+
+Real-device Internal Alpine evidence for `easy_tdx_1-main` reported a READY environment but START
+selected the synthetic `uvicorn` console script and failed with exit 127 because
+`/siftalpha-env/venv/bin/uvicorn` did not exist. The imported presentation entry remained
+`python run_all_strategies.py`, so the displayed fallback and actual Runtime launch also diverged.
+
+### Root cause
+
+- Runtime/environment/Web launch facts reused the UI-oriented recursive tree capped at 1500 nodes.
+- Generated frontend output and caches could exhaust that budget before nested project-owned Web
+  evidence such as `web-ui/vite.config.ts` and `src/easy_tdx/cli/cmd_web.py` was reached.
+- The truncated tree was silently accepted as authoritative, producing `VITE_COMPONENTS=0`, no
+  `[web]` install extra, and no strict project-owned launch proof.
+- Generic FastAPI recognition then synthesized `uvicorn`, even though the project declared its own
+  safe console script and `serve` contract.
+
+### Repair
+
+- Added a Runtime-facts traversal separate from the UI tree. It reuses the bounded full-source
+  staging limits, prunes generated/dependency directories before they consume the budget, and fails
+  closed if the filtered source tree still exceeds the bound.
+- `runtimeFacts()` and bounded action-time source reads now consume that same authoritative source
+  traversal.
+- Native Python Web launch order is explicit project run metadata -> strict project-owned Web
+  contract -> generic framework fallback -> normal CLI fallback.
+- A valid project-owned console-script contract prevents generic FastAPI synthesis when the strict
+  Web contract cannot be proven. Ambiguous FastAPI app objects also fail closed.
+- Strict serve evidence must belong to the package named by the selected console-script target.
+- The learned Web launch namespace advances so an old synthetic `uvicorn` candidate cannot be reused.
+- No project name, easy_tdx path, port, dependency package, Termux behavior, Worker behavior, or
+  project-specific Runtime exception is hard-coded.
+
+### Regression evidence
+
+- RED: W0 #961 / Run `36287318950` failed only the new launch-authority regression at
+  `PythonNativeWebApplicationLaunchResolverTest.kt:255`, proving generic FastAPI overrode a
+  project-owned console script.
+- Added coverage for strict serve priority, project CLI authority, ambiguous FastAPI apps, package
+  ownership of serve evidence, generic standalone FastAPI fallback, and Runtime-fact pruning that
+  preserves `package.json`, `vite.config.ts`, and `cmd_web.py`.
+
+Target:
+- versionCode = 223
+- versionName = 0.8.0-alpha43-r48d10-r1
+- W0 Cloud Build: PENDING
+- Internal Alpine Probe: PENDING
+- Real-device acceptance: PENDING
