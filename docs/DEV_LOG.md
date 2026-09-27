@@ -4061,3 +4061,52 @@ Final exact-head W0 + Internal Alpine Probe: pending after version/docs closure.
 
 Real-device acceptance remains required before declaring the behavior fully closed.
 
+## 2026-09-27 · Android v240 Internal Alpine Vite Authority Closure
+
+### Real-device trigger
+
+v239 correctly promoted a Python-primary polyglot project to Node/Vite supplemental preparation, but Internal Alpine PREPARE still failed later during Python package metadata generation:
+
+`FileNotFoundError: Forced include not found: /workspace/web-ui/dist`
+
+The failure occurred after Environment Detection had already selected the `web` Python extra. This proved that static Vite detection and Internal Alpine Vite execution were still not using one authority contract.
+
+### Root cause
+
+v239 unified Environment Detection, Environment Plan, Python Web launch, and the External Node adapter around plan-owned Vite component evidence. Internal Alpine retained an older independent runtime scan that only treated `package.json + vite.config.*` as a Vite component.
+
+That meant a config-less Vite application could be correctly detected from `package.json` dependency/script evidence, set `requiresNodeVite=true`, and cause generated frontend directories to be pruned from staging, while the Internal Alpine build phase independently found zero components and silently returned `NOT_REQUIRED`. Python packaging then ran before the required Vite artifact existed.
+
+### Repair
+
+- `InternalAlpineDependencySource` now carries the exact Plan-owned Vite component directories.
+- Planned component directories participate in the Internal Alpine environment source fingerprint.
+- Internal Alpine Vite PREPARE no longer recursively rediscovers or requires `vite.config.*`.
+- The Vite build bootstrap consumes only the component directories selected by Environment Detection.
+- Config-less Vite is therefore supported consistently in both planning and Internal Alpine execution.
+- A missing planned `package.json` now fails closed with `SIFTALPHA_NODE_DIAG=PLANNED_COMPONENT_MISSING` instead of silently skipping the frontend build.
+- Invalid/traversing component paths are rejected before shell construction.
+- Python packaging remains ordered strictly after the Vite build phase.
+- No project/repository/folder-name, fixed-port, or easy_tdx-specific exception was added.
+
+### Regression coverage
+
+Generic tests now cover:
+
+- plan-owned nested Vite component;
+- root and nested config-less Vite components;
+- no Internal Alpine recursive `find /workspace` rediscovery;
+- unsupported package managers remain rejected;
+- planned Vite directories alter Internal Alpine environment identity;
+- existing Vite npm install/build contract;
+- existing Python + Node/Vite environment preparation regression suite.
+
+Pre-closure W0 #956 on source HEAD `870821ab260bbe4f6782f332fa7ba275c1fccd1e`: PASS (724+ tests / assembleDebug).
+
+### Version target
+
+- versionCode: `240`
+- versionName: `0.8.0-alpha43-r48d16-internal-vite-authority-r1`
+
+Final exact-head W0 + Internal Alpine Probe and real-device revalidation remain closure gates.
+
