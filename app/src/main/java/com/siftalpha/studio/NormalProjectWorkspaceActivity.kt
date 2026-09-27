@@ -416,7 +416,11 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         super.onResume()
         if (::project.isInitialized) {
             if (shouldProbeExternalProvider()) {
-                refreshExternalPreflight(retryIfNeeded = true)
+                if (externalActionGate.pending(project.summary.documentId) != null) {
+                    resumePendingExternalProviderRecovery()
+                } else {
+                    refreshExternalPreflight(retryIfNeeded = true)
+                }
             } else {
                 screenState.value = screenState.value.copy(externalReadiness = null)
             }
@@ -703,32 +707,40 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             ExternalActionGate.Decision.Proceed -> ExternalProviderReadiness.READY
         }
         screenState.value = screenState.value.copy(externalReadiness = readiness)
-        when (readiness) {
-            ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED ->
+        when (com.siftalpha.studio.runtime.ExternalProviderRecoveryPolicy.actionFor(readiness)) {
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.REQUEST_RUN_COMMAND_PERMISSION ->
                 requestRunCommandPermission()
 
-            ExternalProviderReadiness.TERMUX_NOT_INSTALLED,
-            ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED,
-            ExternalProviderReadiness.BRIDGE_UNRESPONSIVE,
-            -> screenState.value = screenState.value.copy(
-                externalReadiness = readiness,
-                message = getString(R.string.normal_external_provider_open_termux),
-            )
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.INSTALL_PROVIDER ->
+                screenState.value = screenState.value.copy(
+                    externalReadiness = readiness,
+                    message = getString(R.string.normal_external_provider_install_termux),
+                )
 
-            ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED,
-            ExternalProviderReadiness.BRIDGE_CHECKING,
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.OPEN_PROVIDER ->
+                screenState.value = screenState.value.copy(
+                    externalReadiness = readiness,
+                    message = if (readiness == ExternalProviderReadiness.BRIDGE_UNRESPONSIVE) {
+                        getString(R.string.normal_external_provider_no_response)
+                    } else {
+                        getString(R.string.normal_external_provider_open_termux)
+                    },
+                )
+
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.RECHECK_PROVIDER,
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.WAIT_FOR_PROBE,
             -> screenState.value = screenState.value.copy(
                 externalReadiness = readiness,
                 message = getString(R.string.normal_external_provider_checking),
             )
 
-            ExternalProviderReadiness.UNAVAILABLE ->
-                screenState.value = screenState.value.copy(
-                    externalReadiness = readiness,
-                    message = getString(R.string.normal_external_provider_unavailable),
-                )
-
-            ExternalProviderReadiness.READY -> Unit
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.NONE ->
+                if (readiness == ExternalProviderReadiness.UNAVAILABLE) {
+                    screenState.value = screenState.value.copy(
+                        externalReadiness = readiness,
+                        message = getString(R.string.normal_external_provider_unavailable),
+                    )
+                }
         }
         return false
     }
@@ -1657,21 +1669,23 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 origin = ExternalActionGate.Origin.NORMAL_MODE,
             )
         }
-        when (rejected.readiness) {
-            ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED -> requestRunCommandPermission()
-            ExternalProviderReadiness.TERMUX_NOT_INSTALLED,
-            ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED,
-            -> screenState.value = screenState.value.copy(
-                externalReadiness = rejected.readiness,
-                message = getString(R.string.normal_external_provider_open_termux),
-            )
-            ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED,
-            ExternalProviderReadiness.BRIDGE_CHECKING,
-            ExternalProviderReadiness.BRIDGE_UNRESPONSIVE,
-            ExternalProviderReadiness.READY,
-            ExternalProviderReadiness.UNAVAILABLE,
-            null,
-            -> screenState.value = screenState.value.copy(externalReadiness = rejected.readiness)
+        val readiness = rejected.readiness
+        if (readiness == null) return
+        when (com.siftalpha.studio.runtime.ExternalProviderRecoveryPolicy.actionFor(readiness)) {
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.REQUEST_RUN_COMMAND_PERMISSION ->
+                requestRunCommandPermission()
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.INSTALL_PROVIDER ->
+                screenState.value = screenState.value.copy(
+                    externalReadiness = readiness,
+                    message = getString(R.string.normal_external_provider_install_termux),
+                )
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.OPEN_PROVIDER ->
+                screenState.value = screenState.value.copy(
+                    externalReadiness = readiness,
+                    message = getString(R.string.normal_external_provider_open_termux),
+                )
+            else -> screenState.value =
+                screenState.value.copy(externalReadiness = readiness)
         }
     }
 
@@ -1735,13 +1749,40 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         )
     }
 
+    private fun resumePendingExternalProviderRecovery() {
+        val pending = externalActionGate.pending(project.summary.documentId) ?: return
+        val result = externalPreflight.ensureReady()
+        screenState.value = screenState.value.copy(externalReadiness = result.readiness)
+        when (result.recoveryAction) {
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.REQUEST_RUN_COMMAND_PERMISSION ->
+                requestRunCommandPermission()
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.NONE ->
+                if (result.ready) resumeExternalActionGate()
+            else -> Unit
+        }
+    }
+
     private fun openTermux() {
         val launch = packageManager.getLaunchIntentForPackage(TermuxContract.PACKAGE_NAME)
         if (launch != null) {
             startActivity(launch)
         } else {
-            Toast.makeText(this, getString(R.string.home_no_launchable_termux), Toast.LENGTH_SHORT).show()
+            openOfficialTermuxInstallPage()
         }
+    }
+
+    private fun openOfficialTermuxInstallPage() {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(TermuxContract.OFFICIAL_INSTALL_URL)).apply {
+            addCategory(Intent.CATEGORY_BROWSABLE)
+        }
+        runCatching { startActivity(intent) }
+            .onFailure {
+                Toast.makeText(
+                    this,
+                    getString(R.string.runtime_termux_download_failed),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
     }
 
     private fun resultMessage(result: ProjectControlHub.Result): String = when (result) {

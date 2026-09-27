@@ -472,9 +472,7 @@ open class V04Activity : StudioActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (::externalActionGate.isInitialized && externalPreflight.current().ready) {
-            resumeExternalActionGate()
-        }
+        resumePendingExternalProviderRecovery()
         if (::projectList.isInitialized) refresh()
         resumeEmbeddedPolling()
         resumeExternalObservations()
@@ -4923,40 +4921,49 @@ open class V04Activity : StudioActivity() {
         }
 
         val result = externalPreflight.current()
-        when (result.readiness) {
-            ExternalProviderReadiness.TERMUX_NOT_INSTALLED,
-            ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED,
-            -> AlertDialog.Builder(this)
-                .setTitle(getString(R.string.runtime_termux_missing_title))
-                .setMessage(
-                    result.detail ?: getString(R.string.runtime_termux_missing_message),
+        when (result.recoveryAction) {
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.INSTALL_PROVIDER ->
+                AlertDialog.Builder(this)
+                    .setTitle(getString(R.string.runtime_termux_missing_title))
+                    .setMessage(getString(R.string.runtime_termux_missing_message))
+                    .setNegativeButton(getString(R.string.common_cancel), null)
+                    .setPositiveButton(getString(R.string.runtime_termux_download)) { _, _ ->
+                        openOfficialTermuxInstallPage()
+                    }
+                    .show()
+
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.REQUEST_RUN_COMMAND_PERMISSION ->
+                requestPermissions(
+                    arrayOf(TermuxContract.RUN_COMMAND_PERMISSION),
+                    REQUEST_RUN_COMMAND,
                 )
-                .setNegativeButton(getString(R.string.common_cancel), null)
-                .setPositiveButton(getString(R.string.home_open_termux)) { _, _ -> openTermux() }
-                .show()
 
-            ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED -> requestPermissions(
-                arrayOf(TermuxContract.RUN_COMMAND_PERMISSION),
-                REQUEST_RUN_COMMAND,
-            )
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.OPEN_PROVIDER ->
+                AlertDialog.Builder(this)
+                    .setTitle(getString(R.string.runtime_termux_setup_title))
+                    .setMessage(
+                        if (result.readiness == ExternalProviderReadiness.BRIDGE_UNRESPONSIVE) {
+                            getString(R.string.normal_external_provider_no_response)
+                        } else {
+                            getString(R.string.runtime_termux_setup_message)
+                        },
+                    )
+                    .setNegativeButton(getString(R.string.common_cancel), null)
+                    .setPositiveButton(getString(R.string.home_open_termux)) { _, _ -> openTermux() }
+                    .show()
 
-            ExternalProviderReadiness.BRIDGE_CHECKING,
-            ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED,
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.RECHECK_PROVIDER,
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.WAIT_FOR_PROBE,
             -> toast(getString(R.string.normal_external_provider_checking))
 
-            ExternalProviderReadiness.BRIDGE_UNRESPONSIVE -> AlertDialog.Builder(this)
-                .setTitle(getString(R.string.runtime_termux_missing_title))
-                .setMessage(getString(R.string.normal_external_provider_no_response))
-                .setNegativeButton(getString(R.string.common_cancel), null)
-                .setPositiveButton(getString(R.string.home_open_termux)) { _, _ -> openTermux() }
-                .show()
-
-            ExternalProviderReadiness.UNAVAILABLE -> errorDialog(
-                getString(R.string.runtime_termux_missing_title),
-                result.detail ?: getString(R.string.normal_external_provider_unavailable),
-            )
-
-            ExternalProviderReadiness.READY -> Unit
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.NONE -> {
+                if (result.readiness == ExternalProviderReadiness.UNAVAILABLE) {
+                    errorDialog(
+                        getString(R.string.runtime_termux_missing_title),
+                        result.detail ?: getString(R.string.normal_external_provider_unavailable),
+                    )
+                }
+            }
         }
         return false
     }
@@ -4984,13 +4991,42 @@ open class V04Activity : StudioActivity() {
         }
     }
 
+    private fun resumePendingExternalProviderRecovery() {
+        if (
+            !::externalActionGate.isInitialized ||
+            !::externalPreflight.isInitialized ||
+            externalGateDeferredActions.isEmpty()
+        ) {
+            return
+        }
+        val result = externalPreflight.ensureReady()
+        when (result.recoveryAction) {
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.REQUEST_RUN_COMMAND_PERMISSION ->
+                requestPermissions(
+                    arrayOf(TermuxContract.RUN_COMMAND_PERMISSION),
+                    REQUEST_RUN_COMMAND,
+                )
+            com.siftalpha.studio.runtime.ExternalProviderRecoveryAction.NONE ->
+                if (result.ready) resumeExternalActionGate()
+            else -> Unit
+        }
+    }
+
     private fun openTermux() {
         val launch = packageManager.getLaunchIntentForPackage(TermuxContract.PACKAGE_NAME)
         if (launch != null) {
             startActivity(launch)
         } else {
-            toast(getString(R.string.home_no_launchable_termux))
+            openOfficialTermuxInstallPage()
         }
+    }
+
+    private fun openOfficialTermuxInstallPage() {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(TermuxContract.OFFICIAL_INSTALL_URL)).apply {
+            addCategory(Intent.CATEGORY_BROWSABLE)
+        }
+        runCatching { startActivity(intent) }
+            .onFailure { toast(getString(R.string.runtime_termux_download_failed)) }
     }
 
     @Suppress("DEPRECATION")
@@ -5020,10 +5056,14 @@ open class V04Activity : StudioActivity() {
             return false
         }
         if (!backend.isTermuxInstalled()) {
-            errorDialog(
-                getString(R.string.runtime_termux_missing_title),
-                getString(R.string.runtime_termux_missing_message),
-            )
+            AlertDialog.Builder(this)
+                .setTitle(getString(R.string.runtime_termux_missing_title))
+                .setMessage(getString(R.string.runtime_termux_missing_message))
+                .setNegativeButton(getString(R.string.common_cancel), null)
+                .setPositiveButton(getString(R.string.runtime_termux_download)) { _, _ ->
+                    openOfficialTermuxInstallPage()
+                }
+                .show()
             return false
         }
         if (!backend.hasRunCommandPermission()) {

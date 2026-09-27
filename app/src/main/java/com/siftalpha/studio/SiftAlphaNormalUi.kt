@@ -1451,9 +1451,21 @@ private fun ExternalRecoveryCard(
                 )
             }
 
-            ExternalProviderReadiness.TERMUX_NOT_INSTALLED,
-            ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED,
-            -> {
+            ExternalProviderReadiness.TERMUX_NOT_INSTALLED -> {
+                OutlinedButton(
+                    onClick = onOpenTermux,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, Border),
+                ) {
+                    Text(
+                        stringResource(R.string.normal_external_provider_download_termux_action),
+                        color = TextPrimary,
+                    )
+                }
+            }
+
+            ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED -> {
                 OutlinedButton(
                     onClick = onOpenTermux,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
