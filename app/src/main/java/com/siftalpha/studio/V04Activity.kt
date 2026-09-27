@@ -364,6 +364,13 @@ open class V04Activity : StudioActivity() {
             updateExternalProviderDiagnostics()
             if (result.ready) {
                 resumeExternalActionGate()
+            } else if (
+                externalGateDeferredActions.isNotEmpty() &&
+                !result.setupComplete &&
+                result.readiness != ExternalProviderReadiness.BRIDGE_CHECKING &&
+                result.readiness != ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED
+            ) {
+                showExternalRuntimeSetupRequired()
             }
             if (!isFinishing && !isDestroyed && ::projectList.isInitialized) refresh()
         }
@@ -4920,8 +4927,10 @@ open class V04Activity : StudioActivity() {
             externalGateDeferredActions.remove(projectId)
         }
 
-        externalPreflight.current()
-        showExternalRuntimeSetupRequired()
+        val status = externalPreflight.current()
+        if (!status.setupComplete) {
+            showExternalRuntimeSetupRequired()
+        }
         return false
     }
 
@@ -4956,7 +4965,10 @@ open class V04Activity : StudioActivity() {
         ) {
             return
         }
-        val result = externalPreflight.current()
+        var result = externalPreflight.current()
+        if (result.setupComplete && !result.ready) {
+            result = externalPreflight.ensureReady()
+        }
         if (result.ready) resumeExternalActionGate()
     }
 
