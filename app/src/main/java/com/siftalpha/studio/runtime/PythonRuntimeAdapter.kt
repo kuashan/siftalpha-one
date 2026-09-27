@@ -98,7 +98,6 @@ class PythonRuntimeAdapter(
               echo 'SIFTALPHA_ERROR=UBUNTU_PYTHON_TOOLING_MISSING'
               exit 72
             fi
-
             ${ManagedPythonToolchainShell.toolchainShell()}
             set +e
             python_version="${'$'}(siftalpha_resolve_python_version "${'$'}required_python")"
@@ -287,7 +286,7 @@ class PythonRuntimeAdapter(
             umask 077
             ready_commit="${'$'}ready.commit-${'$'}${'$'}"
             printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nINSTALL_EXTRAS=%s\nPLAN_ID=%s\n' \
-              "${'$'}dependency_source" "${'$'}dependency_hash" "${' "${'$'}planned_extras" "${'$'}required_plan" >"${'$'}ready_commit"}python_version" "${ManagedPythonToolchainShell.POLICY_ID}" "${' "${'$'}planned_extras" "${'$'}required_plan" >"${'$'}ready_commit"}required_python" "${'$'}planned_extras" "${'$'}required_plan" >"${'$'}ready_commit"
+              "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}python_version" "${'$'}required_python" "${'$'}planned_extras" "${'$'}required_plan" >"${'$'}ready_commit"
             mv -f -- "${'$'}ready_commit" "${'$'}ready"
 
             # Commit is complete once the validated venv and READY marker are both durable.
@@ -1101,7 +1100,6 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
         expected_python_version="${'$'}(siftalpha_resolve_python_version "${'$'}required_python")"
         python_resolver_code=${'$'}?
         set -e
-
         env_ready=0
         env_reason='VENV_MISSING'
         if [ "${'$'}python_resolver_code" -eq 2 ]; then
@@ -1116,7 +1114,6 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
             env_reason='PYTHON_RUNTIME_UNAVAILABLE'
           elif [ "${'$'}current_python_version" != "${'$'}expected_python_version" ]; then
             env_reason='PYTHON_RUNTIME_VERSION_CHANGED'
-            env_reason='PYTHON_RUNTIME_UNAVAILABLE'
           elif printf '%s\n' "${'$'}current_base_python" | grep -q '^/data/data/com.termux/'; then
             env_reason='EXTERNAL_PYTHON_IDENTITY_INVALID'
           elif printf '%s\n' "${'$'}current_python_platform" | grep -qi 'android'; then
@@ -1127,7 +1124,6 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
               saved_source="${'$'}(awk -F= '/^SOURCE=/{print substr(${ '$' }0,8); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_hash="${'$'}(awk -F= '/^HASH=/{print substr(${ '$' }0,6); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_python="${'$'}(awk -F= '/^PYTHON_VERSION=/{print substr(${ '$' }0,16); exit}' "${'$'}ready" 2>/dev/null || true)"
-              saved_policy="${'$'}(awk -F= '/^PYTHON_POLICY=/{print substr(${$' }0,15); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_requires="${'$'}(awk -F= '/^REQUIRES_PYTHON=/{print substr(${ '$' }0,17); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_extras="${'$'}(awk -F= '/^INSTALL_EXTRAS=/{print substr(${ '$' }0,16); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_extras_present=0
@@ -1135,8 +1131,6 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
               saved_plan="${'$'}(awk -F= '/^PLAN_ID=/{print substr(${ '$' }0,9); exit}' "${'$'}ready" 2>/dev/null || true)"
               if [ "${'$'}saved_source" != "${'$'}dependency_source" ] || [ "${'$'}saved_hash" != "${'$'}dependency_hash" ]; then
                 env_reason='DEPENDENCY_MANIFEST_CHANGED'
-              elif [ "${'$'}saved_policy" != "${ManagedPythonToolchainShell.POLICY_ID}" ]; then
-                env_reason='PYTHON_RUNTIME_POLICY_CHANGED'
               elif [ -z "${'$'}saved_python" ]; then
                 if grep -q '^PYTHON_VERSION=' "${'$'}ready" 2>/dev/null || grep -q '^REQUIRES_PYTHON=' "${'$'}ready" 2>/dev/null; then
                   env_reason='PYTHON_RUNTIME_VERSION_UNKNOWN'
@@ -1155,7 +1149,7 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
                       umask 077
                       migrated_ready="${'$'}ready.migrate-${'$'}${'$'}"
                       printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nINSTALL_EXTRAS=%s\nPLAN_ID=%s\n' \
-                        "${'$'}dependency_source" "${'$'}dependency_hash" "${' "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"}current_python_version" "${ManagedPythonToolchainShell.POLICY_ID}" "${' "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
+                        "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
                       mv -f -- "${'$'}migrated_ready" "${'$'}ready"
                       env_ready=1
                       env_reason='READY_MIGRATED'
@@ -1175,7 +1169,7 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
                   umask 077
                   migrated_ready="${'$'}ready.plan-${'$'}${'$'}"
                   printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nINSTALL_EXTRAS=%s\nPLAN_ID=%s\n' \
-                    "${'$'}dependency_source" "${'$'}dependency_hash" "${' "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"}current_python_version" "${ManagedPythonToolchainShell.POLICY_ID}" "${' "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
+                    "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
                   mv -f -- "${'$'}migrated_ready" "${'$'}ready"
                   env_ready=1
                   env_reason='READY_PLAN_MIGRATED'
@@ -1188,7 +1182,7 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
                 umask 077
                 migrated_ready="${'$'}ready.plan-${'$'}${'$'}"
                 printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nINSTALL_EXTRAS=%s\nPLAN_ID=%s\n' \
-                  "${'$'}dependency_source" "${'$'}dependency_hash" "${' "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"}current_python_version" "${ManagedPythonToolchainShell.POLICY_ID}" "${' "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
+                  "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
                 mv -f -- "${'$'}migrated_ready" "${'$'}ready"
                 env_ready=1
                 env_reason='READY_PLAN_MIGRATED'
@@ -1198,7 +1192,6 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
               fi
             fi
           fi
-        fi
         fi
     """.trimIndent()
 
