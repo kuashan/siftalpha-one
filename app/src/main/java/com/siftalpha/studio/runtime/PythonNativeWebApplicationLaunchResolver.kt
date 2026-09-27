@@ -3,7 +3,6 @@ package com.siftalpha.studio.runtime
 import com.siftalpha.studio.project.CommonWebSignatureRegistry
 import com.siftalpha.studio.project.EmbeddedPythonEntrypointPolicy
 import org.tomlj.Toml
-import org.tomlj.TomlArray
 import org.tomlj.TomlTable
 
 data class PythonNativeWebLaunchCandidate(
