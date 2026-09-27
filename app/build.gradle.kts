@@ -166,8 +166,10 @@ android {
         // and makes Termux shared-storage access part of the External setup contract.
         // v228 / r48d10.6 pins new External Ubuntu installs to 24.04 and requires Ubuntu-native
         // Python/venv/pip identity so Termux Android Python cannot masquerade as guest Python.
-        versionCode = 228
-        versionName = "0.8.0-alpha43-r48d10.6"
+        // v229 / r48d11 establishes External Runtime Baseline v1: a SiftAlpha-owned Ubuntu 24.04
+        // container plus managed CPython selection with 3.12 as the compatibility-first default.
+        versionCode = 229
+        versionName = "0.8.0-alpha43-r48d11"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
