@@ -265,12 +265,23 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         }
     }
 
+    private var externalSetupRedirectInFlight = false
+
     private val preflightListener: (ExternalProviderPreflightResult) -> Unit = { result ->
         runOnUiThread {
             if (!::project.isInitialized) return@runOnUiThread
-            screenState.value = screenState.value.copy(externalReadiness = result.readiness)
+            screenState.value = screenState.value.copy(
+                externalReadiness = projectExternalReadiness(result),
+            )
             if (result.ready) {
                 resumeExternalActionGate()
+            } else if (
+                externalActionGate.pending(project.summary.documentId) != null &&
+                !result.setupComplete &&
+                result.readiness != ExternalProviderReadiness.BRIDGE_CHECKING &&
+                result.readiness != ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED
+            ) {
+                openExternalRuntimeSettings()
             } else {
                 refreshSharedState()
             }
@@ -414,6 +425,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 
     override fun onResume() {
         super.onResume()
+        externalSetupRedirectInFlight = false
         if (::project.isInitialized) {
             if (shouldProbeExternalProvider()) {
                 if (externalActionGate.pending(project.summary.documentId) != null) {
@@ -649,7 +661,7 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
             failureReason = lifecycle.failureReason,
             runtimeSelection = selection,
             externalReadiness = if (selection == ProjectRuntimeSelection.TERMUX) {
-                externalPreflight.current().readiness
+                projectExternalReadiness(externalPreflight.current())
             } else {
                 null
             },
@@ -666,11 +678,17 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 
     private fun refreshExternalPreflight(retryIfNeeded: Boolean) {
         if (!::externalPreflight.isInitialized) return
-        // Project surfaces only read Shared Core readiness. Installation/setup probing belongs to
-        // Settings > External Runtime Setup and must not hijack normal project interaction.
+        // Project surfaces distinguish persistent setup completion from short-lived health proof.
         val result = externalPreflight.current()
-        screenState.value = screenState.value.copy(externalReadiness = result.readiness)
+        screenState.value = screenState.value.copy(
+            externalReadiness = projectExternalReadiness(result),
+        )
     }
+
+    private fun projectExternalReadiness(
+        result: ExternalProviderPreflightResult,
+    ): ExternalProviderReadiness =
+        if (result.setupComplete) ExternalProviderReadiness.READY else result.readiness
 
     private fun shouldProbeExternalProvider(): Boolean =
         ::project.isInitialized &&
@@ -690,15 +708,18 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
         )
         if (decision is ExternalActionGate.Decision.Proceed) return true
 
-        val readiness = when (decision) {
-            is ExternalActionGate.Decision.Awaiting -> decision.readiness
-            is ExternalActionGate.Decision.Rejected -> decision.readiness
-            ExternalActionGate.Decision.Proceed -> ExternalProviderReadiness.READY
-        }
+        val status = externalPreflight.current()
         screenState.value = screenState.value.copy(
-            externalReadiness = readiness,
-            message = getString(R.string.settings_external_runtime_project_not_ready),
+            externalReadiness = projectExternalReadiness(status),
+            message = if (status.setupComplete) {
+                getString(R.string.normal_external_provider_checking)
+            } else {
+                getString(R.string.settings_external_runtime_project_not_ready)
+            },
         )
+        if (!status.setupComplete) {
+            openExternalRuntimeSettings()
+        }
         return false
     }
 
@@ -728,6 +749,16 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
                 runtimeSelectionLabel(selection),
             ),
         )
+        if (selection == ProjectRuntimeSelection.TERMUX) {
+            val status = externalPreflight.current()
+            if (status.setupComplete) {
+                if (!status.ready) {
+                    externalPreflight.ensureReady()
+                }
+            } else {
+                openExternalRuntimeSettings()
+            }
+        }
     }
 
     private fun runtimeSelectionLabel(selection: ProjectRuntimeSelection): String = when (selection) {
@@ -1695,12 +1726,19 @@ class NormalProjectWorkspaceActivity : StudioComposeActivity() {
 
     private fun resumePendingExternalProviderRecovery() {
         if (externalActionGate.pending(project.summary.documentId) == null) return
-        val result = externalPreflight.current()
-        screenState.value = screenState.value.copy(externalReadiness = result.readiness)
+        var result = externalPreflight.current()
+        if (result.setupComplete && !result.ready) {
+            result = externalPreflight.ensureReady()
+        }
+        screenState.value = screenState.value.copy(
+            externalReadiness = projectExternalReadiness(result),
+        )
         if (result.ready) resumeExternalActionGate()
     }
 
     private fun openExternalRuntimeSettings() {
+        if (externalSetupRedirectInFlight) return
+        externalSetupRedirectInFlight = true
         startActivity(
             Intent(this, SettingsActivity::class.java).apply {
                 putExtra(SettingsActivity.EXTRA_NORMAL_MODE, true)
