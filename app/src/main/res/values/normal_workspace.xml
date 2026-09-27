@@ -33,6 +33,8 @@
     <string name="normal_external_provider_permission_required">需要允许 SiftAlpha 通过 RUN_COMMAND 调用 Termux。</string>
     <string name="normal_external_provider_allow">允许调用</string>
     <string name="normal_external_provider_open_termux">请打开 Termux 并完成外部应用调用设置，然后返回 SiftAlpha。</string>
+    <string name="normal_external_provider_install_termux">使用外部运行空间前，需要先安装 Termux。安装后请先打开一次完成初始化，再返回 SiftAlpha。</string>
+    <string name="normal_external_provider_download_termux_action">下载 Termux</string>
     <string name="normal_external_provider_open_termux_action">打开 Termux</string>
     <string name="normal_external_provider_check_required">正在等待外部执行环境检查。</string>
     <string name="normal_external_provider_checking">正在检查外部执行环境…</string>

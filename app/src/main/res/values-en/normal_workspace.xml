@@ -33,6 +33,8 @@
     <string name="normal_external_provider_permission_required">Allow SiftAlpha to call Termux through RUN_COMMAND.</string>
     <string name="normal_external_provider_allow">Allow access</string>
     <string name="normal_external_provider_open_termux">Open Termux, finish external-app setup, then return to SiftAlpha.</string>
+    <string name="normal_external_provider_install_termux">Install Termux to use the external runtime. Open it once after installation, then return to SiftAlpha.</string>
+    <string name="normal_external_provider_download_termux_action">Download Termux</string>
     <string name="normal_external_provider_open_termux_action">Open Termux</string>
     <string name="normal_external_provider_check_required">The external provider check is required.</string>
     <string name="normal_external_provider_checking">Checking the external provider…</string>
