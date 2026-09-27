@@ -216,27 +216,27 @@ internal object InternalAlpineViteBuildBootstrap {
         }
         return """
             set -eu
-            components_file="/tmp/siftalpha-vite-components-${'$'}{${'$'}}"
+            components_file="/tmp/siftalpha-vite-components-${'$'}${'$'}"
             trap 'rm -f "${'$'}components_file"' EXIT
             : >"${'$'}components_file"
-            ${'$'}manifestLines
+            $manifestLines
 
-            component_count="${'$'}(wc -l <\"${'$'}components_file\" | tr -d ' ')"
+            component_count="${'$'}(wc -l <"${'$'}components_file" | tr -d ' ')"
             if [ "${'$'}component_count" -lt 1 ]; then
               echo 'SIFTALPHA_NODE_DIAG=PLANNED_VITE_COMPONENTS_MISSING'
               exit 69
             fi
 
-            printf 'SIFTALPHA_NODE_COMPONENTS=%s\\n' "${'$'}component_count"
+            printf 'SIFTALPHA_NODE_COMPONENTS=%s\n' "${'$'}component_count"
             while IFS= read -r package_json; do
               [ -n "${'$'}package_json" ] || continue
               if [ ! -f "${'$'}package_json" ]; then
                 echo 'SIFTALPHA_NODE_DIAG=PLANNED_COMPONENT_MISSING'
-                printf 'SIFTALPHA_NODE_COMPONENT=%s\\n' "${'$'}package_json"
+                printf 'SIFTALPHA_NODE_COMPONENT=%s\n' "${'$'}package_json"
                 exit 69
               fi
               package_dir="${'$'}{package_json%/package.json}"
-              printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=VITE_INSTALL path=%s\\n' "${'$'}package_dir"
+              printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=VITE_INSTALL path=%s\n' "${'$'}package_dir"
               if [ -f "${'$'}package_dir/pnpm-lock.yaml" ] || [ -f "${'$'}package_dir/yarn.lock" ]; then
                 echo 'SIFTALPHA_NODE_DIAG=UNSUPPORTED_PACKAGE_MANAGER'
                 exit 68
@@ -248,7 +248,7 @@ internal object InternalAlpineViteBuildBootstrap {
                 else
                   npm install --no-audit --no-fund --package-lock=false
                 fi
-                printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=VITE_BUILD path=%s\\n' "${'$'}package_dir"
+                printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=VITE_BUILD path=%s\n' "${'$'}package_dir"
                 npm run build
               )
             done <"${'$'}components_file"
