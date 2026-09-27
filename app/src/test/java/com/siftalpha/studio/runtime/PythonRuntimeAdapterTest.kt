@@ -96,7 +96,7 @@ class PythonRuntimeAdapterTest {
         assertTrue(script.contains("PROJECT_SOURCE_PERMISSION_DENIED"))
         val sync = script.indexOf("SIFTALPHA_PYTHON_WORKSPACE_SYNC=PASS")
         val dependencyFingerprint = script.indexOf("dependency_source='none'", sync)
-        val pip = script.indexOf(""\$venv/bin/python" -m pip install", dependencyFingerprint)
+        val pip = script.indexOf("\"\${'$'}venv/bin/python\" -m pip install", dependencyFingerprint)
         assertTrue("source sync must finish before dependency fingerprinting", dependencyFingerprint > sync)
         assertTrue("pip must install only after Runtime workspace synchronization", pip > dependencyFingerprint)
     }
