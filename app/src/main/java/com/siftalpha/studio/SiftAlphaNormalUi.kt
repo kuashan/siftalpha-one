@@ -1,5 +1,8 @@
 package com.siftalpha.studio
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.animation.ValueAnimator
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.core.LinearEasing
@@ -52,6 +55,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -60,6 +64,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -80,6 +85,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.unit.sp
 import com.siftalpha.studio.presentation.DecorativeMotionPolicy
 import com.siftalpha.studio.presentation.NormalProjectPrimaryActionPolicy
@@ -130,6 +136,18 @@ private val NormalColors = darkColorScheme(
 
 @Composable
 internal fun SiftAlphaNormalTheme(content: @Composable () -> Unit) {
+    val view = LocalView.current
+    val activity = view.context.findActivity()
+    DisposableEffect(view, activity) {
+        val controller = activity?.window?.let { WindowCompat.getInsetsController(it, view) }
+        val previousLightStatusBars = controller?.isAppearanceLightStatusBars
+        controller?.isAppearanceLightStatusBars = false
+        onDispose {
+            if (previousLightStatusBars != null) {
+                controller.isAppearanceLightStatusBars = previousLightStatusBars
+            }
+        }
+    }
     StudioTheme(darkTheme = true) {
         MaterialTheme(
             colorScheme = NormalColors,
@@ -138,6 +156,12 @@ internal fun SiftAlphaNormalTheme(content: @Composable () -> Unit) {
             content = content,
         )
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 
