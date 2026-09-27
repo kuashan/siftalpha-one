@@ -5,6 +5,81 @@
 历史条目中的 W2、W3、W4、W5 仅按当时命名记录已发生的工作、构建或发布，不表示当前 Roadmap 阶段。
 
 
+## 2026-09-27 · R48d10.5 External Python Workspace + Shared Storage Access（外部 Python 工作区 + 共享存储访问）
+
+### Source boundary（源码边界）
+
+- 起点：R48d10.4 最终文档 HEAD `554b3cb31ed2456ac3ce0a815c73506b8a7e99ec`。
+- 修复分支：`codex/r48d10-external-python-workspace`。
+- APK / 功能验证 HEAD：`bb12aabfcfde3fdf3fcfaa387cfd45dbc283142c`。
+- 验证版本：`0.8.0-alpha43-r48d10.5` / versionCode `227`。
+
+### Real-device trigger（真机触发）
+
+- 用户完成 External Runtime（Termux / RUN_COMMAND / allow-external-apps / PRoot-Distro / Ubuntu）后，easy_tdx External PREPARE 已真正进入 Python dependency install。
+- 真机日志：
+  - `Obtaining file:///root/projects/easy_tdx_1-main`
+  - `Permission denied: '/root/projects/easy_tdx_1-main/pyproject.toml'`
+  - `sha256sum: .../pyproject.toml: Permission denied`
+- 根因边界：
+  1. External Python 仍直接在 Android shared-storage bind `/root/projects/<folder>` 上执行 fingerprint / editable install / workload；
+  2. 新安装 Termux 若未完成 shared-storage permission，甚至无法可靠读取 Android source；
+  3. Python 缺少 Node 已有的 Runtime-local executable workspace。
+
+### Repair（修复）
+
+- Android shared storage 中的项目继续作为唯一 Source of Truth（源码事实源），不移动、不 chmod、不删除。
+- External Runtime setup contract 升级到 version 2，并增加 **Shared Storage Access（共享存储访问）**：
+  - Runtime capability probe 要求 `/storage/emulated/0` 可实际读取；
+  - 缺失时返回 `SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=SHARED_STORAGE_ACCESS`；
+  - Settings > External Runtime Setup 新增第 3 步，共享命令 `termux-setup-storage` 可复制后在 Termux 执行；
+  - PRoot-Distro / Ubuntu / Final Check 顺延。
+- setup contract versioning：R48d10.4 的旧 setup-complete 证明不会直接被 R48d10.5 当作新契约 READY；升级后会重新进行一次 capability proof，确保 shared-storage access 已真实通过。
+- External Python 新增 Runtime-owned workspace：
+  - Source：`/root/projects/<folder>`（Android shared source bind，只读事实源角色）；
+  - Workspace：`/root/siftalpha/python-exec-workspaces/<runtimeId>/repo`；
+  - Manifest：`source-manifest.json`。
+- PREPARE：
+  1. 从 Source 同步 authoritative source paths 到 Runtime workspace；
+  2. 在 workspace 计算 dependency fingerprint；
+  3. `pip install -e <workspace>[extras]`；
+  4. venv 仍保持稳定路径 `/root/venvs/<runtimeId>`。
+- START：
+  - 启动前再次同步 Source → workspace；
+  - Environment readiness / dependency hash 在 workspace 校验；
+  - Runner 的 working directory 和 Python file execution 使用 workspace；
+  - 既有 `PythonLaunchInvocation` / easy_tdx console-script Launch Contract 保持不变。
+- STATUS：只读取最后已同步 workspace，不在状态查询中修改 Source 或主动同步。
+- CLEAN：删除 Python venv + Python Runtime workspace + runtime state，不删除 Android 原项目。
+- Python source sync：
+  - 只覆盖/删除 authoritative source manifest 中的路径；
+  - Runtime 生成但从未属于 source 的文件可以保留；
+  - 拒绝 absolute / escaping symlink；
+  - 若 Source 无法读取，明确返回 `PROJECT_SOURCE_PERMISSION_DENIED` / `PYTHON_WORKSPACE_SYNC_FAILED`，而不是伪装为 pip dependency failure。
+- Runtime Storage Manager 增加 `PYTHON_WORKSPACE` component，纳入项目占用、orphan 识别和清理。
+- Node External workspace 逻辑未重写；新增 shared-storage setup contract 同样为 Node source sync 提供前置保证。
+- Internal Runtime、Launch Authority、Worker、easy_tdx 特例均未修改；没有 `chmod 777`，没有修改用户原项目权限。
+
+### Verification（验证）
+
+- Internal Alpine Probe #138 / Run ID `36296484366`：PASS。
+- W0 #978：FAIL，仅为新增 Python workspace test 的 Kotlin 字符串引号语法错误；业务源码未作为最终失败结论。
+- W0 #980：编译成功，709 tests 中 3 条新增测试预期写错（display name 与 folderName 混淆 + setupComplete 测试输入缺失）；业务实现未修改。
+- W0 #981：后续提交触发 concurrency cancel，不作为证据。
+- W0 Cloud Build #982 / Run ID `36297047413`：PASS；repository validators、**709 unit tests**、`assembleDebug`、APK evidence、stable signing 全部通过。
+- Gradle：`BUILD SUCCESSFUL in 3m 38s` / 45 actionable tasks。
+- Artifact：`siftalpha-w0-982` / ID `10924726048` / digest `sha256:40619eaffa00185c8bee24ce672eca9e2957704cc8bfea22c867f68a4eef7265`。
+- APK SHA-256：`1577472c9f0d25904290f0a62ccf388aaa09d5065a18520f2596355b7fe5a16f`。
+- APK signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+- 真机待验收：
+  1. 升级后 Settings > External Runtime Setup 若显示 Shared Storage Access，执行 `termux-setup-storage` 并允许权限；
+  2. 返回 SiftAlpha 后 capability proof 达到 READY；
+  3. External easy_tdx PREPARE 出现 `SIFTALPHA_PYTHON_WORKSPACE_SYNC=PASS`，不再出现 `/root/projects/.../pyproject.toml Permission denied`；
+  4. PREPARE → RUN → Web 页面可打开；
+  5. Runtime Storage Manager 可看到/清理 `PYTHON_WORKSPACE`，且 Android 原项目保持不变。
+
+
+
 ## 2026-09-27 · R48d10.4 External Setup Completion + Health Sync（外部设置完成态 + 健康检测同步）
 
 ### Source boundary（源码边界）

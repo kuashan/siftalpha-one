@@ -1,17 +1,17 @@
 # SiftAlpha Studio 项目上下文
 
-最后更新：2026-09-27（R48d10.4 External Setup Completion + Health Sync）
+最后更新：2026-09-27（R48d10.5 External Python Workspace + Shared Storage Access）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
-当前文档/验收分支：`codex/r48d10-external-readiness-sync`
-Current functional source HEAD：`9d5083d85825e93ef2b2f2969049f3be6136f4a0`
+当前文档/验收分支：`codex/r48d10-external-python-workspace`
+Current functional source HEAD：`bb12aabfcfde3fdf3fcfaa387cfd45dbc283142c`
 R48d10 唯一源码基线：`a60d7fb5d81a6611ea6695c023c1c70e8181388c`
-当前测试版本：`0.8.0-alpha43-r48d10.4` / versionCode `226`。
-R48d10.4 W0 Cloud Build：Run #976 / Run ID `36295191519` / artifact `siftalpha-w0-976` / artifact ID `10923707607` / APK SHA-256 `771c3e645c4ebd79c8604ad6382273046fbe30a562655dd4b97b5d9902d73e8f` / conclusion `success`。
-R48d10.4 Internal Alpine Probe：Run #137 / Run ID `36295191558` / conclusion `success`。
-R48d10.4 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
-已真机确认：R48d10.1 Internal easy_tdx 可正常运行并直接打开网页；R48d10.2/R48d10.3 已完成 Termux、allow-external-apps、PRoot-Distro、Ubuntu 设置流程，但 R48d10.3 暴露了 60 秒 freshness 过期被误判为“需要重新设置”。
-当前架构边界：Shared Core 分离持久 setupComplete 与短期 health probe freshness；项目页只在真实 setup 缺失时进入 Settings，引导完成后 stale health 只静默复检。
-当前真机待验收：R48d10.4 stale health 自动复检/继续、External 选择跳转规则、首页运行时桥同步、Normal status bar 白色图标，以及 External easy_tdx PREPARE → RUN → Web 打开。
+当前测试版本：`0.8.0-alpha43-r48d10.5` / versionCode `227`。
+R48d10.5 W0 Cloud Build：Run #982 / Run ID `36297047413` / artifact `siftalpha-w0-982` / artifact ID `10924726048` / APK SHA-256 `1577472c9f0d25904290f0a62ccf388aaa09d5065a18520f2596355b7fe5a16f` / conclusion `success`。
+R48d10.5 Internal Alpine Probe：Run #138 / Run ID `36296484366` / conclusion `success`。
+R48d10.5 signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+已真机确认：Internal easy_tdx 可正常运行并打开网页；External setup 已推进至 Python PREPARE，R48d10.4 真机暴露 Android shared-source bind 上 `pyproject.toml Permission denied`。
+当前架构边界：Android shared project 永远是 Source of Truth；External Python 通过 `/root/siftalpha/python-exec-workspaces/<runtimeId>/repo` 执行，PREPARE/START 先同步 source，CLEAN 只清 Runtime 副本；External setup contract 额外要求 Termux shared-storage access。
+当前真机待验收：R48d10.5 的 `termux-setup-storage` 引导、Python workspace sync、External easy_tdx PREPARE → RUN → Web 打开，以及 Runtime Storage Manager 的 PYTHON_WORKSPACE 展示/清理。
 alpha43 production source baseline：`66f9153e57547c4d8b6e50956b48ddf86b9dc656`  
 `main` 保持历史 production baseline，本轮未修改。  
 alpha30 source / real-device evidence remains historical; current branch continues from the alpha31 version-identity baseline。  

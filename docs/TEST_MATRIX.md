@@ -17,6 +17,35 @@
 本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
 
 
+## R48d10.5 — External Python Workspace + Shared Storage Access（外部 Python 工作区 + 共享存储访问）
+
+| ID | 验证项 | 期望 | 状态 |
+|---|---|---|---|
+| R48D10.5-01 | Shared storage capability | External Runtime READY 前必须证明 Termux 可读取 Android shared storage | PASS — unit/source + W0 #982；待真机 |
+| R48D10.5-02 | Storage setup guide | 缺权限时 Settings 显示 Shared Storage Access 并提供 `termux-setup-storage` | PASS — localization/source + W0 #982；待真机 |
+| R48D10.5-03 | Setup contract versioning | 旧 r48d10.4 setup proof 不绕过新 shared-storage capability | PASS — shared store + W0 #982 |
+| R48D10.5-04 | Python PREPARE workspace | Source 先同步到 `python-exec-workspaces/<id>/repo`，再 fingerprint / pip install | PASS — unit + W0 #982；待真机 |
+| R48D10.5-05 | Python START workspace | START 再同步 source，并从稳定 Runtime workspace 执行 | PASS — unit + W0 #982；待真机 |
+| R48D10.5-06 | Source immutability | 不 chmod / 删除 Android source；CLEAN 只清 Runtime workspace/venv/state | PASS — unit + source |
+| R48D10.5-07 | Safe sync | stale authoritative source paths 清理；Runtime-only files 保留；escaping symlink 拒绝 | PASS — source + W0 #982 |
+| R48D10.5-08 | Permission diagnostic | source sync 权限失败明确输出 `PROJECT_SOURCE_PERMISSION_DENIED` | PASS — unit/source |
+| R48D10.5-09 | Storage Manager | `PYTHON_WORKSPACE` 被统计并进入项目/orphan 清理模型 | PASS — unit + W0 #982 |
+| R48D10.5-10 | Launch contract boundary | easy_tdx console-script / Launch Authority 不改，venv executable contract 保持 | PASS — existing regression + W0 #982 |
+| R48D10.5-11 | Internal boundary | Internal Runtime 不受 External workspace 改动影响 | PASS — Probe #138 |
+| R48D10.5-12 | Version | `0.8.0-alpha43-r48d10.5` / versionCode `227` | PASS — APK badging |
+| R48D10.5-13 | Cloud gate | validators + 709 tests + assembleDebug + signing | PASS — W0 #982 |
+| R48D10.5-14 | Real-device source sync | easy_tdx PREPARE 不再出现 shared-bind pyproject Permission denied | 待真机 |
+| R48D10.5-15 | External easy_tdx E2E | PREPARE → RUN → Web 页面打开 | 待真机 |
+
+R48d10.5 APK evidence：
+- functional source: `bb12aabfcfde3fdf3fcfaa387cfd45dbc283142c`
+- artifact: `siftalpha-w0-982` / ID `10924726048`
+- artifact digest: `sha256:40619eaffa00185c8bee24ce672eca9e2957704cc8bfea22c867f68a4eef7265`
+- APK SHA-256: `1577472c9f0d25904290f0a62ccf388aaa09d5065a18520f2596355b7fe5a16f`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+
+
+
 ## R48d10.4 — External Setup Completion + Health Sync（外部设置完成态 + 健康检测同步）
 
 | ID | 验证项 | 期望 | 状态 |
