@@ -154,8 +154,11 @@ android {
         // v221 moves External Python PREPARE's success boundary ahead of potentially slow rollback-
         // backup deletion and caps opportunistic backup cleanup so a committed READY environment
         // cannot leave the shared operation stuck in PREPARING for minutes.
-        versionCode = 222
-        versionName = "0.8.0-alpha43-r48d10"
+        // v223 / r48d10.1 repairs generic Launch Authority and Environment Capability closure:
+        // project-owned serve contracts precede framework inference, and planned Web capabilities
+        // are installed by the same environment/backend contract used by the eventual launch.
+        versionCode = 223
+        versionName = "0.8.0-alpha43-r48d10.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
