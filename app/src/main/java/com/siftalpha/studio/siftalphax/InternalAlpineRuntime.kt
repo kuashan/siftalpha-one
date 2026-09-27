@@ -72,7 +72,12 @@ data class InternalAlpineDependencySource(
             }
             val fingerprintSource = legacyFingerprintSource +
                 "\nREQUIRES_PYTHON=" + projectRequiresPython.orEmpty() +
-                "\nPYTHON_INSTALL_EXTRAS=" + normalizedExtras.joinToString(",")
+                "\nPYTHON_INSTALL_EXTRAS=" + normalizedExtras.joinToString(",") +
+                "\nPYPROJECT_FOR_EXTRAS=" + if (normalizedExtras.isNotEmpty()) {
+                    pyprojectText.orEmpty().replace("\r\n", "\n").replace("\r", "\n")
+                } else {
+                    ""
+                }
             fun fingerprint(value: String): String =
                 "sha256:" + MessageDigest.getInstance("SHA-256")
                     .digest(value.toByteArray(Charsets.UTF_8))
@@ -240,6 +245,17 @@ internal object InternalAlpineDependencyBootstrap {
                 append("/siftalpha-env/venv/bin/python -m pip install ")
                 append(PIP_COMMON)
                 append(" -r /workspace/requirements.txt\n")
+                val extras = normalizedExtras.joinToString(",")
+                if (extras.isNotEmpty()) {
+                    append("echo 'SIFTALPHA_PYPROJECT_EXTRAS=")
+                    append(extras)
+                    append("'\n")
+                    append("/siftalpha-env/venv/bin/python -m pip install ")
+                    append(PIP_COMMON)
+                    append(" '/workspace[")
+                    append(extras)
+                    append("]'\n")
+                }
             }
             InternalAlpineDependencySource.Kind.PYPROJECT_TOML -> {
                 append("printf 'SIFTALPHA_X_INTERNAL_PREPARE_STEP=INSTALL_DEPENDENCIES\\n'\n")
