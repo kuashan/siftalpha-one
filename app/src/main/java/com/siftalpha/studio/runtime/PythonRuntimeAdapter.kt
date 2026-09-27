@@ -22,9 +22,9 @@ class PythonRuntimeAdapter(
     )
 
     override val environmentRequirements: List<RuntimeEnvironmentRequirement> = listOf(
-        RuntimeEnvironmentRequirement("/usr/bin/python3", "Ubuntu Python interpreter"),
-        RuntimeEnvironmentRequirement("/usr/bin/python3 -m pip", "Ubuntu Python package manager"),
-        RuntimeEnvironmentRequirement("/usr/bin/python3 -m venv", "Ubuntu Python virtual environment support"),
+        RuntimeEnvironmentRequirement("/usr/bin/python3.12", "Ubuntu 24.04 bootstrap Python"),
+        RuntimeEnvironmentRequirement("/usr/bin/python3.12 -m pip", "Ubuntu bootstrap package manager"),
+        RuntimeEnvironmentRequirement("managed-python", "SiftAlpha managed CPython runtime"),
     )
 
     override fun prepare(project: RuntimeProjectSpec): RuntimeCommand = RuntimeCommand(
@@ -88,62 +88,44 @@ class PythonRuntimeAdapter(
             planned_extras=${sh(plannedExtrasValue)}
             mkdir -p /root/venvs /root/siftalpha/logs "${'$'}work_root"
             : >"${'$'}log"
-            ubuntu_python='/usr/bin/python3'
-            if [ ! -x "${'$'}ubuntu_python" ]; then
+            bootstrap_python='/usr/bin/python3.12'
+            if [ ! -x "${'$'}bootstrap_python" ]; then
               echo 'SIFTALPHA_ERROR=UBUNTU_PYTHON_MISSING'
               exit 72
             fi
-            if ! "${'$'}ubuntu_python" -m venv --help >/dev/null 2>&1 || \
-               ! "${'$'}ubuntu_python" -m pip --version >/dev/null 2>&1; then
+            if ! "${'$'}bootstrap_python" -m venv --help >/dev/null 2>&1 || \
+               ! "${'$'}bootstrap_python" -m pip --version >/dev/null 2>&1; then
               echo 'SIFTALPHA_ERROR=UBUNTU_PYTHON_TOOLING_MISSING'
               exit 72
             fi
-            ubuntu_python_executable="${'$'}("${'$'}ubuntu_python" -c 'import sys; print(sys.executable)' 2>/dev/null || true)"
-            ubuntu_python_platform="${'$'}("${'$'}ubuntu_python" -c 'import sysconfig; print(sysconfig.get_platform())' 2>/dev/null || true)"
-            case "${'$'}ubuntu_python_executable" in
-              /data/data/com.termux/*)
-                echo 'SIFTALPHA_ERROR=EXTERNAL_PYTHON_IDENTITY_INVALID'
-                exit 74
-                ;;
-            esac
-            case "${'$'}ubuntu_python_platform" in
-              *android*|'')
-                echo 'SIFTALPHA_ERROR=EXTERNAL_PYTHON_IDENTITY_INVALID'
-                exit 74
-                ;;
-            esac
-            printf 'SIFTALPHA_EXTERNAL_PYTHON_EXECUTABLE=%s\n' "${'$'}ubuntu_python_executable"
-            printf 'SIFTALPHA_EXTERNAL_PYTHON_PLATFORM=%s\n' "${'$'}ubuntu_python_platform"
 
-            python_version="${'$'}("${'$'}ubuntu_python" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))')"
-            if [ -n "${'$'}required_python" ]; then
-              set +e
-              "${'$'}ubuntu_python" - "${'$'}required_python" <<'SIFTALPHA_PYTHON_REQUIRES_CHECK'
-import sys
-from pip._vendor.packaging.specifiers import SpecifierSet
-from pip._vendor.packaging.version import Version
-
-required = sys.argv[1]
-current = Version(".".join(str(v) for v in sys.version_info[:3]))
-try:
-    matches = current in SpecifierSet(required)
-except Exception:
-    raise SystemExit(2)
-raise SystemExit(0 if matches else 1)
-SIFTALPHA_PYTHON_REQUIRES_CHECK
-              requirement_code=${'$'}?
-              set -e
-              if [ "${'$'}requirement_code" -eq 2 ]; then
-                echo 'SIFTALPHA_ERROR=PYTHON_REQUIREMENT_UNSUPPORTED'
-                printf 'SIFTALPHA_PYTHON_REQUIRES=%s\n' "${'$'}required_python"
-                exit 74
-              elif [ "${'$'}requirement_code" -ne 0 ]; then
-                echo 'SIFTALPHA_ERROR=PYTHON_RUNTIME_UNAVAILABLE'
-                printf 'SIFTALPHA_PYTHON_REQUIRES=%s\n' "${'$'}required_python"
-                printf 'SIFTALPHA_PYTHON_AVAILABLE=%s\n' "${'$'}python_version"
-                exit 74
-              fi
+            ${ManagedPythonToolchainShell.toolchainShell()}
+            set +e
+            python_version="${'$'}(siftalpha_resolve_python_version "${'$'}required_python")"
+            python_resolver_code=${'$'}?
+            set -e
+            if [ "${'$'}python_resolver_code" -eq 2 ]; then
+              echo 'SIFTALPHA_ERROR=PYTHON_REQUIREMENT_UNSUPPORTED'
+              printf 'SIFTALPHA_PYTHON_REQUIRES=%s\n' "${'$'}required_python"
+              exit 74
+            elif [ "${'$'}python_resolver_code" -ne 0 ] || [ -z "${'$'}python_version" ]; then
+              echo 'SIFTALPHA_ERROR=PYTHON_RUNTIME_UNAVAILABLE'
+              printf 'SIFTALPHA_PYTHON_REQUIRES=%s\n' "${'$'}required_python"
+              printf 'SIFTALPHA_PYTHON_SUPPORTED=%s\n' '3.12.14,3.11.16,3.13.15,3.14.7'
+              exit 74
             fi
+            if ! siftalpha_ensure_managed_python "${'$'}python_version"; then
+              exit 74
+            fi
+            selected_python="${'$'}managed_python"
+            selected_python_executable="${'$'}("${'$'}selected_python" -c 'import sys; print(sys.executable)' 2>/dev/null || true)"
+            selected_python_platform="${'$'}("${'$'}selected_python" -c 'import sysconfig; print(sysconfig.get_platform())' 2>/dev/null || true)"
+            printf 'SIFTALPHA_EXTERNAL_RUNTIME_BASELINE=%s\n' 'external-runtime-v1-ubuntu-24.04'
+            printf 'SIFTALPHA_EXTERNAL_PYTHON_POLICY=%s\n' 'managed-python-v1'
+            printf 'SIFTALPHA_EXTERNAL_PYTHON_SELECTED=%s\n' "${'$'}python_version"
+            printf 'SIFTALPHA_EXTERNAL_PYTHON_EXECUTABLE=%s\n' "${'$'}selected_python_executable"
+            printf 'SIFTALPHA_EXTERNAL_PYTHON_PLATFORM=%s\n' "${'$'}selected_python_platform"
+
 
             ${pythonWorkspaceSyncShell()}
 
@@ -252,7 +234,8 @@ SIFTALPHA_PYTHON_REQUIRES_CHECK
             trap rollback_prepare EXIT
 
             rm -rf -- "${'$'}venv"
-            "${'$'}ubuntu_python" -m venv "${'$'}venv" >>"${'$'}log" 2>&1
+            "${' -m venv "${'$'}venv" >>"${'$'}log" 2>&1}selected_python" -m venv "${'$'}venv" >>"${'$'}log" 2>&1
+            "${'$'}venv/bin/python" -m pip install --upgrade "pip==${ManagedPythonToolchainShell.PIP_VERSION}" >>"${'$'}log" 2>&1
 
             if [ "${'$'}dependency_source" = 'requirements.txt' ]; then
               echo 'DEPENDENCY_SOURCE=requirements.txt'
@@ -304,7 +287,7 @@ SIFTALPHA_PYTHON_REQUIRES_CHECK
             umask 077
             ready_commit="${'$'}ready.commit-${'$'}${'$'}"
             printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nINSTALL_EXTRAS=%s\nPLAN_ID=%s\n' \
-              "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}python_version" "${'$'}required_python" "${'$'}planned_extras" "${'$'}required_plan" >"${'$'}ready_commit"
+              "${'$'}dependency_source" "${'$'}dependency_hash" "${' "${'$'}planned_extras" "${'$'}required_plan" >"${'$'}ready_commit"}python_version" "${ManagedPythonToolchainShell.POLICY_ID}" "${' "${'$'}planned_extras" "${'$'}required_plan" >"${'$'}ready_commit"}required_python" "${'$'}planned_extras" "${'$'}required_plan" >"${'$'}ready_commit"
             mv -f -- "${'$'}ready_commit" "${'$'}ready"
 
             # Commit is complete once the validated venv and READY marker are both durable.
@@ -579,7 +562,7 @@ $launchArgumentAssignments
             incoming="/root/.siftalpha-host/${id}.secrets.in"
             mkdir -p /root/siftalpha/logs "${'$'}work_root"
             : >"${'$'}log"
-            if [ ! -x /usr/bin/python3 ]; then
+            if [ ! -x /usr/bin/python3.12 ]; then
               echo 'SIFTALPHA_ERROR=UBUNTU_PYTHON_MISSING'
               exit 72
             fi
@@ -1072,7 +1055,7 @@ os.chmod(tmp, 0o600)
 os.replace(tmp, manifest_path)
 SIFTALPHA_PYTHON_SOURCE_SYNC
         chmod 600 "${'$'}source_manager"
-        if ! /usr/bin/python3 "${'$'}source_manager" "${'$'}source" "${'$'}project" "${'$'}work_root/source-manifest.json" >>"${'$'}log" 2>&1; then
+        if ! /usr/bin/python3.12 "${' "${'$'}source" "${'$'}project" "${'$'}work_root/source-manifest.json" >>"${'$'}log" 2>&1; then}source_manager" "${'$'}source" "${'$'}project" "${'$'}work_root/source-manifest.json" >>"${'$'}log" 2>&1; then
           echo 'SIFTALPHA_DIAG=PYTHON_WORKSPACE_SYNC_FAILED'
           if tail -n 120 "${'$'}log" 2>/dev/null | grep -Eqi 'Permission denied|PermissionError'; then
             echo 'SIFTALPHA_ERROR=PROJECT_SOURCE_PERMISSION_DENIED'
@@ -1113,13 +1096,26 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
         required_python=${sh(project.pythonRequiresVersion.orEmpty())}
         required_extras=${sh(plannedPythonExtrasValue(project))}
         required_plan=${sh(project.environmentPlanId.orEmpty())}
+        ${ManagedPythonToolchainShell.resolverShell()}
+        set +e
+        expected_python_version="${'$'}(siftalpha_resolve_python_version "${'$'}required_python")"
+        python_resolver_code=${'$'}?
+        set -e
+
         env_ready=0
         env_reason='VENV_MISSING'
-        if [ -x "${'$'}venv/bin/python" ]; then
+        if [ "${'$'}python_resolver_code" -eq 2 ]; then
+          env_reason='PYTHON_REQUIREMENT_UNSUPPORTED'
+        elif [ "${'$'}python_resolver_code" -ne 0 ] || [ -z "${'$'}expected_python_version" ]; then
+          env_reason='PYTHON_RUNTIME_UNAVAILABLE'
+        elif [ -x "${'$'}venv/bin/python" ]; then
           current_python_version="${'$'}("${'$'}venv/bin/python" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))' 2>/dev/null || true)"
           current_base_python="${'$'}("${'$'}venv/bin/python" -c 'import sys; print(getattr(sys, "_base_executable", ""))' 2>/dev/null || true)"
           current_python_platform="${'$'}("${'$'}venv/bin/python" -c 'import sysconfig; print(sysconfig.get_platform())' 2>/dev/null || true)"
           if [ -z "${'$'}current_python_version" ]; then
+            env_reason='PYTHON_RUNTIME_UNAVAILABLE'
+          elif [ "${'$'}current_python_version" != "${'$'}expected_python_version" ]; then
+            env_reason='PYTHON_RUNTIME_VERSION_CHANGED'
             env_reason='PYTHON_RUNTIME_UNAVAILABLE'
           elif printf '%s\n' "${'$'}current_base_python" | grep -q '^/data/data/com.termux/'; then
             env_reason='EXTERNAL_PYTHON_IDENTITY_INVALID'
@@ -1131,6 +1127,7 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
               saved_source="${'$'}(awk -F= '/^SOURCE=/{print substr(${ '$' }0,8); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_hash="${'$'}(awk -F= '/^HASH=/{print substr(${ '$' }0,6); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_python="${'$'}(awk -F= '/^PYTHON_VERSION=/{print substr(${ '$' }0,16); exit}' "${'$'}ready" 2>/dev/null || true)"
+              saved_policy="${'$'}(awk -F= '/^PYTHON_POLICY=/{print substr(${$' }0,15); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_requires="${'$'}(awk -F= '/^REQUIRES_PYTHON=/{print substr(${ '$' }0,17); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_extras="${'$'}(awk -F= '/^INSTALL_EXTRAS=/{print substr(${ '$' }0,16); exit}' "${'$'}ready" 2>/dev/null || true)"
               saved_extras_present=0
@@ -1138,6 +1135,8 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
               saved_plan="${'$'}(awk -F= '/^PLAN_ID=/{print substr(${ '$' }0,9); exit}' "${'$'}ready" 2>/dev/null || true)"
               if [ "${'$'}saved_source" != "${'$'}dependency_source" ] || [ "${'$'}saved_hash" != "${'$'}dependency_hash" ]; then
                 env_reason='DEPENDENCY_MANIFEST_CHANGED'
+              elif [ "${'$'}saved_policy" != "${ManagedPythonToolchainShell.POLICY_ID}" ]; then
+                env_reason='PYTHON_RUNTIME_POLICY_CHANGED'
               elif [ -z "${'$'}saved_python" ]; then
                 if grep -q '^PYTHON_VERSION=' "${'$'}ready" 2>/dev/null || grep -q '^REQUIRES_PYTHON=' "${'$'}ready" 2>/dev/null; then
                   env_reason='PYTHON_RUNTIME_VERSION_UNKNOWN'
@@ -1156,7 +1155,7 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
                       umask 077
                       migrated_ready="${'$'}ready.migrate-${'$'}${'$'}"
                       printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nINSTALL_EXTRAS=%s\nPLAN_ID=%s\n' \
-                        "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
+                        "${'$'}dependency_source" "${'$'}dependency_hash" "${' "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"}current_python_version" "${ManagedPythonToolchainShell.POLICY_ID}" "${' "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
                       mv -f -- "${'$'}migrated_ready" "${'$'}ready"
                       env_ready=1
                       env_reason='READY_MIGRATED'
@@ -1176,7 +1175,7 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
                   umask 077
                   migrated_ready="${'$'}ready.plan-${'$'}${'$'}"
                   printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nINSTALL_EXTRAS=%s\nPLAN_ID=%s\n' \
-                    "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
+                    "${'$'}dependency_source" "${'$'}dependency_hash" "${' "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"}current_python_version" "${ManagedPythonToolchainShell.POLICY_ID}" "${' "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
                   mv -f -- "${'$'}migrated_ready" "${'$'}ready"
                   env_ready=1
                   env_reason='READY_PLAN_MIGRATED'
@@ -1189,7 +1188,7 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
                 umask 077
                 migrated_ready="${'$'}ready.plan-${'$'}${'$'}"
                 printf 'SOURCE=%s\nHASH=%s\nPYTHON_VERSION=%s\nREQUIRES_PYTHON=%s\nINSTALL_EXTRAS=%s\nPLAN_ID=%s\n' \
-                  "${'$'}dependency_source" "${'$'}dependency_hash" "${'$'}current_python_version" "${'$'}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
+                  "${'$'}dependency_source" "${'$'}dependency_hash" "${' "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"}current_python_version" "${ManagedPythonToolchainShell.POLICY_ID}" "${' "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"}required_python" "${'$'}required_extras" "${'$'}required_plan" >"${'$'}migrated_ready"
                 mv -f -- "${'$'}migrated_ready" "${'$'}ready"
                 env_ready=1
                 env_reason='READY_PLAN_MIGRATED'
@@ -1199,6 +1198,7 @@ SIFTALPHA_PYTHON_SOURCE_SYNC
               fi
             fi
           fi
+        fi
         fi
     """.trimIndent()
 
