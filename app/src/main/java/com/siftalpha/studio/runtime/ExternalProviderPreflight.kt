@@ -48,6 +48,50 @@ enum class ExternalProviderReadiness {
     UNAVAILABLE,
 }
 
+enum class ExternalProviderRecoveryAction {
+    INSTALL_PROVIDER,
+    REQUEST_RUN_COMMAND_PERMISSION,
+    OPEN_PROVIDER,
+    RECHECK_PROVIDER,
+    WAIT_FOR_PROBE,
+    NONE,
+}
+
+data class ExternalProviderDescriptor(
+    val id: String,
+    val displayName: String,
+    val packageName: String,
+    val installUrl: String,
+)
+
+object ExternalProviderCatalog {
+    val TERMUX = ExternalProviderDescriptor(
+        id = "termux",
+        displayName = "Termux",
+        packageName = TermuxContract.PACKAGE_NAME,
+        installUrl = TermuxContract.OFFICIAL_INSTALL_URL,
+    )
+}
+
+object ExternalProviderRecoveryPolicy {
+    fun actionFor(readiness: ExternalProviderReadiness): ExternalProviderRecoveryAction = when (readiness) {
+        ExternalProviderReadiness.TERMUX_NOT_INSTALLED ->
+            ExternalProviderRecoveryAction.INSTALL_PROVIDER
+        ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED ->
+            ExternalProviderRecoveryAction.REQUEST_RUN_COMMAND_PERMISSION
+        ExternalProviderReadiness.EXTERNAL_APPS_CONFIGURATION_REQUIRED,
+        ExternalProviderReadiness.BRIDGE_UNRESPONSIVE,
+        -> ExternalProviderRecoveryAction.OPEN_PROVIDER
+        ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED ->
+            ExternalProviderRecoveryAction.RECHECK_PROVIDER
+        ExternalProviderReadiness.BRIDGE_CHECKING ->
+            ExternalProviderRecoveryAction.WAIT_FOR_PROBE
+        ExternalProviderReadiness.READY,
+        ExternalProviderReadiness.UNAVAILABLE,
+        -> ExternalProviderRecoveryAction.NONE
+    }
+}
+
 data class ExternalProviderFacts(
     val termuxInstalled: Boolean,
     val runCommandPermissionGranted: Boolean,
@@ -68,6 +112,9 @@ data class ExternalProviderPreflightResult(
     val lastProbeAtEpochMs: Long?,
     val probeExecutionId: Int? = null,
     val detail: String? = null,
+    val provider: ExternalProviderDescriptor = ExternalProviderCatalog.TERMUX,
+    val recoveryAction: ExternalProviderRecoveryAction =
+        ExternalProviderRecoveryPolicy.actionFor(readiness),
 ) {
     val ready: Boolean
         get() = readiness == ExternalProviderReadiness.READY
@@ -137,22 +184,20 @@ object ExternalProviderPreflight {
     private fun result(
         facts: ExternalProviderFacts,
         readiness: ExternalProviderReadiness,
-        allowExternalApps: Boolean? = when (facts.bridgeState) {
-            ExternalProviderBridgeState.PASS -> true
-            ExternalProviderBridgeState.FAIL -> false
-            ExternalProviderBridgeState.UNRESPONSIVE,
-            ExternalProviderBridgeState.UNKNOWN,
-            ExternalProviderBridgeState.CHECKING,
-            -> null
+        allowExternalApps: Boolean? = when {
+            readiness == ExternalProviderReadiness.TERMUX_NOT_INSTALLED ||
+                readiness == ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED -> null
+            facts.bridgeState == ExternalProviderBridgeState.PASS -> true
+            facts.bridgeState == ExternalProviderBridgeState.FAIL -> false
+            else -> null
         },
-        bridgeResponsive: Boolean? = when (facts.bridgeState) {
-            ExternalProviderBridgeState.PASS -> true
-            ExternalProviderBridgeState.FAIL,
-            ExternalProviderBridgeState.UNRESPONSIVE,
-            -> false
-            ExternalProviderBridgeState.UNKNOWN,
-            ExternalProviderBridgeState.CHECKING,
-            -> null
+        bridgeResponsive: Boolean? = when {
+            readiness == ExternalProviderReadiness.TERMUX_NOT_INSTALLED ||
+                readiness == ExternalProviderReadiness.RUN_COMMAND_PERMISSION_REQUIRED -> null
+            facts.bridgeState == ExternalProviderBridgeState.PASS -> true
+            facts.bridgeState == ExternalProviderBridgeState.FAIL ||
+                facts.bridgeState == ExternalProviderBridgeState.UNRESPONSIVE -> false
+            else -> null
         },
     ): ExternalProviderPreflightResult = ExternalProviderPreflightResult(
         readiness = readiness,
@@ -221,9 +266,20 @@ class ExternalProviderReadinessStore internal constructor(
         termuxInstalled: Boolean,
         runCommandPermissionGranted: Boolean,
     ) {
+        val effectivePermission = termuxInstalled && runCommandPermissionGranted
         prefs.edit()
             .putBoolean(FIELD_TERMUX_INSTALLED, termuxInstalled)
-            .putBoolean(FIELD_PERMISSION, runCommandPermissionGranted)
+            .putBoolean(FIELD_PERMISSION, effectivePermission)
+            .apply {
+                if (!termuxInstalled || !effectivePermission) {
+                    putString(FIELD_BRIDGE_STATE, ExternalProviderBridgeState.UNKNOWN.name)
+                    remove(FIELD_PROBE_STAGE)
+                    remove(FIELD_LAST_PROBE_AT)
+                    remove(FIELD_LAST_PROBE_ID)
+                    remove(FIELD_LAST_PROBE_RESULT)
+                    remove(FIELD_DETAIL)
+                }
+            }
             .apply()
     }
 

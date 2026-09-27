@@ -9,6 +9,7 @@ package com.siftalpha.studio.runtime
  */
 object TermuxContract {
     const val PACKAGE_NAME = "com.termux"
+    const val OFFICIAL_INSTALL_URL = "https://github.com/termux/termux-app/releases/latest"
     const val RUN_COMMAND_PERMISSION = "com.termux.permission.RUN_COMMAND"
     const val RUN_COMMAND_SERVICE = "com.termux.app.RunCommandService"
 

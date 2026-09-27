@@ -130,7 +130,35 @@ class ExternalActionGateTest {
     }
 
     @Test
-    fun terminalProbeFailureClearsDeferredRequestsWithoutStarting() {
+    fun recoverableProviderFailuresKeepDeferredRequestForInstallationRecovery() {
+        var readiness = result(ExternalProviderReadiness.TERMUX_NOT_INSTALLED)
+        val gate = ExternalActionGate(
+            currentReadiness = { readiness },
+            ensureReadiness = { readiness },
+        )
+
+        val waiting = gate.request(
+            projectId = "project-a",
+            action = ExternalActionGate.Action.RUN,
+            origin = ExternalActionGate.Origin.NORMAL_MODE,
+        ) as ExternalActionGate.Decision.Awaiting
+
+        gate.handlePreflightResult(readiness)
+        assertEquals(waiting.request.generation, gate.pending("project-a")?.generation)
+
+        readiness = result(ExternalProviderReadiness.BRIDGE_UNRESPONSIVE)
+        gate.handlePreflightResult(readiness)
+        assertEquals(waiting.request.generation, gate.pending("project-a")?.generation)
+
+        readiness = result(ExternalProviderReadiness.READY)
+        assertEquals(
+            waiting.request.generation,
+            gate.claimReady("project-a", ExternalActionGate.Origin.NORMAL_MODE)?.generation,
+        )
+    }
+
+    @Test
+    fun unavailableProviderStillClearsDeferredRequests() {
         var readiness = result(ExternalProviderReadiness.BRIDGE_CHECKING)
         val gate = ExternalActionGate(
             currentReadiness = { readiness },
@@ -142,7 +170,7 @@ class ExternalActionGateTest {
             action = ExternalActionGate.Action.RUN,
             origin = ExternalActionGate.Origin.NORMAL_MODE,
         )
-        readiness = result(ExternalProviderReadiness.BRIDGE_UNRESPONSIVE)
+        readiness = result(ExternalProviderReadiness.UNAVAILABLE)
         gate.handlePreflightResult(readiness)
 
         assertNull(gate.pending("project-a"))

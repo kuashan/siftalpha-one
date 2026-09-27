@@ -15,6 +15,32 @@ class ExternalProviderPreflightTest {
 
         assertEquals(ExternalProviderReadiness.TERMUX_NOT_INSTALLED, result.readiness)
         assertNull(result.allowExternalApps)
+        assertNull(result.bridgeResponsive)
+        assertEquals(
+            ExternalProviderRecoveryAction.INSTALL_PROVIDER,
+            result.recoveryAction,
+        )
+        assertEquals(TermuxContract.OFFICIAL_INSTALL_URL, result.provider.installUrl)
+    }
+
+    @Test
+    fun staleReadyProofIsSuppressedWhenTermuxIsNoLongerInstalled() {
+        val result = ExternalProviderPreflight.evaluate(
+            facts = facts(
+                termuxInstalled = false,
+                runCommandPermissionGranted = false,
+                bridgeState = ExternalProviderBridgeState.PASS,
+                probeStage = ExternalProviderProbeStage.RUNTIME_CAPABILITY,
+                lastProbeAtEpochMs = 950L,
+                lastProbeResult = ExternalProviderProbeResult.PASS,
+            ),
+            nowEpochMs = 1_000L,
+        )
+
+        assertEquals(ExternalProviderReadiness.TERMUX_NOT_INSTALLED, result.readiness)
+        assertNull(result.allowExternalApps)
+        assertNull(result.bridgeResponsive)
+        assertEquals(ExternalProviderRecoveryAction.INSTALL_PROVIDER, result.recoveryAction)
     }
 
     @Test
