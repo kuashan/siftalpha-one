@@ -101,6 +101,7 @@ data class ExternalProviderFacts(
     val lastProbeExecutionId: Int? = null,
     val lastProbeResult: ExternalProviderProbeResult? = null,
     val detail: String? = null,
+    val setupComplete: Boolean = false,
 )
 
 data class ExternalProviderPreflightResult(
@@ -114,6 +115,7 @@ data class ExternalProviderPreflightResult(
     val detail: String? = null,
     val probeStage: ExternalProviderProbeStage? = null,
     val lastProbeResult: ExternalProviderProbeResult? = null,
+    val setupComplete: Boolean = false,
     val provider: ExternalProviderDescriptor = ExternalProviderCatalog.TERMUX,
     val recoveryAction: ExternalProviderRecoveryAction =
         ExternalProviderRecoveryPolicy.actionFor(readiness),
@@ -156,7 +158,7 @@ object ExternalRuntimeSetupGuide {
         if (!result.runCommandPermissionGranted) {
             return status(result, ExternalRuntimeSetupStage.RUN_COMMAND_PERMISSION)
         }
-        if (result.ready) {
+        if (result.setupComplete) {
             return ExternalRuntimeSetupStatus(
                 stage = ExternalRuntimeSetupStage.READY,
                 termuxInstalled = true,
@@ -344,6 +346,7 @@ object ExternalProviderPreflight {
         detail = facts.detail,
         probeStage = facts.probeStage,
         lastProbeResult = facts.lastProbeResult,
+        setupComplete = facts.setupComplete,
     )
 }
 
@@ -396,6 +399,7 @@ class ExternalProviderReadinessStore internal constructor(
             runCatching { ExternalProviderProbeResult.valueOf(it) }.getOrNull()
         },
         detail = prefs.getString(FIELD_DETAIL, null),
+        setupComplete = prefs.getBoolean(FIELD_SETUP_COMPLETE, false),
     )
 
     override fun recordHostFacts(
@@ -414,6 +418,7 @@ class ExternalProviderReadinessStore internal constructor(
                     remove(FIELD_LAST_PROBE_ID)
                     remove(FIELD_LAST_PROBE_RESULT)
                     remove(FIELD_DETAIL)
+                    putBoolean(FIELD_SETUP_COMPLETE, false)
                 }
             }
             .apply()
@@ -437,6 +442,7 @@ class ExternalProviderReadinessStore internal constructor(
         atEpochMs: Long,
         detail: String?,
     ) {
+        val currentStage = read().probeStage
         prefs.edit()
             .putString(
                 FIELD_BRIDGE_STATE,
@@ -450,6 +456,14 @@ class ExternalProviderReadinessStore internal constructor(
             .putInt(FIELD_LAST_PROBE_ID, executionId)
             .putLong(FIELD_LAST_PROBE_AT, atEpochMs)
             .apply {
+                if (
+                    result == ExternalProviderProbeResult.PASS &&
+                    currentStage == ExternalProviderProbeStage.RUNTIME_CAPABILITY
+                ) {
+                    putBoolean(FIELD_SETUP_COMPLETE, true)
+                } else if (result == ExternalProviderProbeResult.FAIL) {
+                    putBoolean(FIELD_SETUP_COMPLETE, false)
+                }
                 if (detail.isNullOrBlank()) remove(FIELD_DETAIL)
                 else putString(FIELD_DETAIL, detail.trim().take(MAX_DETAIL_LENGTH))
             }
@@ -498,6 +512,7 @@ class ExternalProviderReadinessStore internal constructor(
             .putString(FIELD_LAST_PROBE_RESULT, ExternalProviderProbeResult.PASS.name)
             .putLong(FIELD_LAST_PROBE_AT, atEpochMs)
             .remove(FIELD_LAST_PROBE_ID)
+            .putBoolean(FIELD_SETUP_COMPLETE, true)
             .apply {
                 if (detail.isNullOrBlank()) remove(FIELD_DETAIL)
                 else putString(FIELD_DETAIL, detail.trim().take(MAX_DETAIL_LENGTH))
@@ -515,6 +530,7 @@ class ExternalProviderReadinessStore internal constructor(
         private const val FIELD_LAST_PROBE_ID = "last_probe_id"
         private const val FIELD_LAST_PROBE_RESULT = "last_probe_result"
         private const val FIELD_DETAIL = "detail"
+        private const val FIELD_SETUP_COMPLETE = "setup_complete"
         private const val MAX_DETAIL_LENGTH = 240
     }
 }
@@ -651,14 +667,20 @@ class ExternalProviderProbeCoordinator internal constructor(
      */
     override fun ensureReady(): ExternalProviderPreflightResult {
         val initial = current()
-        if (
-            initial.readiness != ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED ||
-            !initial.termuxInstalled ||
-            !initial.runCommandPermissionGranted
-        ) {
+        if (!initial.termuxInstalled || !initial.runCommandPermissionGranted) {
             return initial
         }
-        return dispatchProbeStage(ExternalProviderProbeStage.BRIDGE)
+        val shouldProbe =
+            initial.readiness == ExternalProviderReadiness.BRIDGE_CHECK_REQUIRED ||
+                (
+                    initial.setupComplete &&
+                        initial.readiness == ExternalProviderReadiness.BRIDGE_UNRESPONSIVE
+                    )
+        return if (shouldProbe) {
+            dispatchProbeStage(ExternalProviderProbeStage.BRIDGE)
+        } else {
+            initial
+        }
     }
 
     /** Explicit retry used after the UI asks the user to open Termux or finish setup. */
