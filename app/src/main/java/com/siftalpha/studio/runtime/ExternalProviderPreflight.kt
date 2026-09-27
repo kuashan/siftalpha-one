@@ -346,7 +346,11 @@ object ExternalProviderPreflight {
         detail = facts.detail,
         probeStage = facts.probeStage,
         lastProbeResult = facts.lastProbeResult,
-        setupComplete = facts.setupComplete,
+        setupComplete = facts.setupComplete ||
+            (
+                facts.probeStage == ExternalProviderProbeStage.RUNTIME_CAPABILITY &&
+                    facts.lastProbeResult == ExternalProviderProbeResult.PASS
+                ),
     )
 }
 
