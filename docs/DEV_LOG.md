@@ -5,6 +5,65 @@
 历史条目中的 W2、W3、W4、W5 仅按当时命名记录已发生的工作、构建或发布，不表示当前 Roadmap 阶段。
 
 
+## 2026-09-27 · R48d10.6 External Ubuntu Python Identity（外部 Ubuntu Python 身份）
+
+### Source boundary（源码边界）
+
+- 起点：R48d10.5 最终文档 HEAD `0db03e08f31fa1063da9d49f96585039947a13e9`。
+- 修复分支：`codex/r48d10-external-ubuntu-python-identity`。
+- APK / 功能验证 HEAD：`75ca8a05cf8684b0488c30b2a4cd3957f0a13695`。
+- 验证版本：`0.8.0-alpha43-r48d10.6` / versionCode `228`。
+
+### Real-device trigger（真机触发）
+
+- R48d10.5 真机已经输出 `SIFTALPHA_PYTHON_WORKSPACE_SYNC=PASS`，证明 Android source → External Runtime workspace 修复有效。
+- easy_tdx 随后进入真实 dependency install，但 pandas 选择：
+  - `Using cached pandas-2.3.3.tar.gz`
+  - `Installing build dependencies: still running...`
+- 前一次同阶段还曾在获取 `meson-python` 时出现 `SSLEOFError`。
+- 对比历史 External Python adapter 后确认 SiftAlpha 没有设置 `--no-binary` / `PIP_NO_BINARY`；PREPARE 一直是普通 pip 安装。
+- 当前 External capability 原先只使用 `command -v python3` / `python3 -m ...`，不能证明解释器属于 Ubuntu。现代 PRoot guest PATH 可能包含 Termux 工具目录，因此“有 python3”不足以证明 Runtime identity（运行时身份）正确。
+- 修复目标：不针对 easy_tdx/pandas 打补丁，而是把 Ubuntu-owned Python identity 提升为 External Runtime 基础契约。
+
+### Repair（修复）
+
+- 新安装 Ubuntu 基线固定为 `proot-distro install ubuntu:24.04`，避免无 tag 安装随 upstream latest 漂移。
+- External setup contract 升级到 version 3。
+- Runtime Capability Probe 现在必须在 Ubuntu 内证明：
+  - `/usr/bin/python3` 存在；
+  - `/usr/bin/python3 -m pip` 可用；
+  - `/usr/bin/python3 -m venv` 可用；
+  - `sys.executable` 不属于 `/data/data/com.termux/...`；
+  - `sysconfig.get_platform()` 不得为 Android platform。
+- 缺 Ubuntu-owned Python/tooling 时显式返回：
+  `SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON`。
+- Settings > External Runtime Setup 新增 Ubuntu Python 修复步骤。已有 Ubuntu 不会被删除；只提供在现有 rootfs 中安装 `ca-certificates python3 python3-venv python3-pip` 的修复命令。
+- External Python PREPARE：
+  - 强制使用 `/usr/bin/python3`；
+  - venv 强制由 `/usr/bin/python3 -m venv` 创建；
+  - source-sync utility 同样使用 `/usr/bin/python3`；
+  - PREPARE 输出 Ubuntu Python executable/platform/base identity。
+- 旧 External venv 在 STATUS/START readiness 中新增 identity 检查。如果 `_base_executable` 落到 Termux 路径，或 platform 为 Android，则标记 `EXTERNAL_PYTHON_IDENTITY_INVALID`，不得复用。
+- workload PATH 固定为 venv + Ubuntu native system paths，不再继承可能包含 Termux Android binaries 的 guest PATH。
+- R48d10.5 Python workspace、Launch Authority、easy_tdx console-script contract、Internal Runtime、Worker 均未改变。
+
+### Verification（验证）
+
+- Internal Alpine Probe #139 / Run ID `36300482495`：PASS。
+- W0 #985：FAIL，唯一直接原因是新增 capability shell 中几个 `$python_...` / `$ubuntu_...` 变量未按 Kotlin raw-string 规则转义，导致 Kotlin compile error；随后仅修复 shell-template escaping。
+- W0 Cloud Build #986 / Run ID `36300947324`：PASS；repository validators、unit tests、`assembleDebug`、APK evidence、stable signing 全部通过。
+- Gradle：`BUILD SUCCESSFUL in 3m 18s`。
+- Artifact：`siftalpha-w0-986` / ID `10926265054` / digest `sha256:673a7d67ce2a088148de99d203332579a8d25ba0767eefc25919a5367935195e`。
+- APK SHA-256：`51ebd8098dbcb7912fdc32790b065d4e1dd75508b7389113e69eb8f4e02c6550`。
+- APK signer SHA-256：`3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`。
+- 真机待验收：
+  1. 升级后进入 Settings > External Runtime Setup，让 setup contract v3 重新检测当前 Ubuntu；
+  2. 若出现 Ubuntu Python 待修复，复制修复命令到 Termux 执行并返回；
+  3. READY 后 External easy_tdx PREPARE 应输出 Ubuntu-native executable/platform identity；
+  4. 观察 pandas 是否使用 compatible manylinux wheel，而不是 `pandas-2.3.3.tar.gz`；
+  5. 完成 PREPARE → RUN → Web 页面打开。
+
+
 ## 2026-09-27 · R48d10.5 External Python Workspace + Shared Storage Access（外部 Python 工作区 + 共享存储访问）
 
 ### Source boundary（源码边界）
