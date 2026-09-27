@@ -34,7 +34,8 @@
     <string name="settings_external_step_storage">3. 共用儲存空間存取</string>
     <string name="settings_external_step_proot">4. PRoot-Distro</string>
     <string name="settings_external_step_ubuntu">5. Ubuntu Runtime</string>
-    <string name="settings_external_step_final">6. 最終檢測</string>
+    <string name="settings_external_step_python">6. Ubuntu Python</string>
+    <string name="settings_external_step_final">7. 最終檢測</string>
     <string name="settings_external_status_complete">已完成</string>
     <string name="settings_external_status_done">完成</string>
     <string name="settings_external_status_pending">待完成</string>
@@ -51,6 +52,7 @@
     <string name="settings_external_copy_storage">複製儲存空間設定指令</string>
     <string name="settings_external_proot_missing">未偵測到 PRoot-Distro。請複製下方安裝指令並在 Termux 中執行。</string>
     <string name="settings_external_ubuntu_missing">未偵測到 Ubuntu Runtime。請複製下方安裝指令並在 Termux 中執行。</string>
+    <string name="settings_external_python_missing">Ubuntu 已安裝，但缺少 Ubuntu 自己提供的 Python、venv 或 pip。複製下方修復命令並在 Termux 執行。</string>
     <string name="settings_external_copy_install">複製安裝指令</string>
     <string name="settings_external_wait_previous">請先完成上一步。</string>
     <string name="settings_external_ready">外部執行空間已就緒。</string>
