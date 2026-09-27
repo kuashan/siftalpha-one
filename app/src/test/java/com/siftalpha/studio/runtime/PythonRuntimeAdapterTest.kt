@@ -471,8 +471,7 @@ class PythonRuntimeAdapterTest {
 
     @Test
     fun `structured console script launch is preserved for External Provider`() {
-        host.quotedInputs.clear()
-        adapter.start(
+        val script = adapter.start(
             project.copy(
                 pythonLaunchInvocation = PythonLaunchInvocation.consoleScript(
                     name = "easy-tdx",
@@ -484,15 +483,15 @@ class PythonRuntimeAdapterTest {
                     ),
                 ),
             ),
-        )
-        val runner = host.quotedInputs.joinToString("\n---\n")
+        ).shellScript
 
-        assertTrue(runner.contains("launch_kind='console_script'"))
-        assertTrue(runner.contains("launch_display='easy-tdx'"))
-        assertTrue(runner.contains("/root/venvs/runtime-id/bin/easy-tdx"))
-        assertTrue(runner.contains("serve"))
-        assertTrue(runner.contains("--no-open-browser"))
-        assertFalse(runner.contains("launch_display='uvicorn'"))
+        assertTrue(script.contains("launch_kind='CONSOLE_SCRIPT'"))
+        assertTrue(script.contains("launch_display='easy-tdx'"))
+        assertTrue(script.contains("launch_executable='/root/venvs/runtime-id/bin/easy-tdx'"))
+        assertTrue(script.contains("launch_args+=( 'serve' )"))
+        assertTrue(script.contains("launch_args+=( '--no-open-browser' )"))
+        assertTrue(script.contains("\"\$launch_executable\" \"\${launch_args[@]}\""))
+        assertFalse(script.contains("launch_display='uvicorn'"))
     }
 
     @Test
