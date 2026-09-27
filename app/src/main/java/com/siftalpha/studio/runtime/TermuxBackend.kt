@@ -181,7 +181,9 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
                 echo '--- Ubuntu ---'
                 if proot-distro login ubuntu -- bash -lc '
                   echo UBUNTU=OK
-                  printf "PYTHON="; /usr/bin/python3 --version 2>&1 || true\n                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3 -c "import sys; print(sys.executable)" 2>&1 || true\n                  printf "PYTHON_PLATFORM="; /usr/bin/python3 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
+                  printf "PYTHON="; /usr/bin/python3 --version 2>&1 || true
+                  printf "PYTHON_EXECUTABLE="; /usr/bin/python3 -c "import sys; print(sys.executable)" 2>&1 || true
+                  printf "PYTHON_PLATFORM="; /usr/bin/python3 -c "import sysconfig; print(sysconfig.get_platform())" 2>&1 || true
                   printf "PIP="; /usr/bin/python3 -m pip --version 2>&1 || true
                   printf "GIT="; git --version 2>&1 || true
                   printf "VENV="; /usr/bin/python3 -m venv --help >/dev/null 2>&1 && echo OK || echo MISSING
