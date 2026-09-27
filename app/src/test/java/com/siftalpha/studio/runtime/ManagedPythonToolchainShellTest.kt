@@ -1,6 +1,7 @@
 package com.siftalpha.studio.runtime
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -20,7 +21,9 @@ class ManagedPythonToolchainShellTest {
         assertTrue(shell.contains("uv-0.12.18"))
         assertTrue(shell.contains(ManagedPythonToolchainShell.UV_AARCH64_LINUX_GNU_SHA256))
         assertTrue(shell.contains("python install"))
-        assertTrue(shell.contains("--managed-python"))
+        assertTrue(shell.contains("UV_PYTHON_PREFERENCE='only-managed'"))
+        assertTrue(shell.contains("--no-python-downloads"))
+        assertFalse(shell.contains("--managed-python"))
         assertTrue(shell.contains("SIFTALPHA_ERROR=MANAGED_PYTHON_INSTALL_FAILED"))
     }
 
