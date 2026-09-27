@@ -81,6 +81,7 @@ class SettingsActivity : StudioComposeActivity() {
                             externalSetupResult ?: externalPreflight.current(),
                         ),
                         externalAppsCommand = TermuxBackend.FIRST_RUN_SETUP_COMMAND,
+                        storageAccessCommand = TermuxBackend.STORAGE_ACCESS_SETUP_COMMAND,
                         prootCommand = TermuxBackend.PROOT_DISTRO_INSTALL_COMMAND,
                         ubuntuCommand = TermuxBackend.UBUNTU_INSTALL_COMMAND,
                         onBack = { onBackPressedDispatcher.onBackPressed() },
@@ -88,6 +89,9 @@ class SettingsActivity : StudioComposeActivity() {
                         onRequestPermission = { requestRunCommandPermission() },
                         onCopyExternalAppsCommand = {
                             copySetupCommand(TermuxBackend.FIRST_RUN_SETUP_COMMAND)
+                        },
+                        onCopyStorageAccessCommand = {
+                            copySetupCommand(TermuxBackend.STORAGE_ACCESS_SETUP_COMMAND)
                         },
                         onCopyProotCommand = {
                             copySetupCommand(TermuxBackend.PROOT_DISTRO_INSTALL_COMMAND)
