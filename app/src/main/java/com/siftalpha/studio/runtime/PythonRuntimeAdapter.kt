@@ -233,7 +233,7 @@ class PythonRuntimeAdapter(
             trap rollback_prepare EXIT
 
             rm -rf -- "${'$'}venv"
-            "${' -m venv "${'$'}venv" >>"${'$'}log" 2>&1}selected_python" -m venv "${'$'}venv" >>"${'$'}log" 2>&1
+            "${'$'}selected_python" -m venv "${'$'}venv" >>"${'$'}log" 2>&1
             "${'$'}venv/bin/python" -m pip install --upgrade "pip==${ManagedPythonToolchainShell.PIP_VERSION}" >>"${'$'}log" 2>&1
 
             if [ "${'$'}dependency_source" = 'requirements.txt' ]; then
