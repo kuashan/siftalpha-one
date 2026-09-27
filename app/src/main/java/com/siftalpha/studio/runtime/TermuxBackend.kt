@@ -80,6 +80,7 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
             termux-reload-settings
         """.trimIndent()
 
+        const val STORAGE_ACCESS_SETUP_COMMAND = "termux-setup-storage"
         const val PROOT_DISTRO_INSTALL_COMMAND = "pkg install -y proot-distro"
         const val UBUNTU_INSTALL_COMMAND = "proot-distro install ubuntu"
 
@@ -96,6 +97,11 @@ class TermuxBackend(private val context: Context) : RuntimeBackend, ExternalProv
                   echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=BASH' >&2
                   exit 31
                 }
+                if [ ! -d /storage/emulated/0 ] || ! ls /storage/emulated/0 >/dev/null 2>&1; then
+                  echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=SHARED_STORAGE_ACCESS' >&2
+                  exit 34
+                fi
+                echo 'SIFTALPHA_EXTERNAL_STORAGE_ACCESS=OK'
                 command -v proot-distro >/dev/null 2>&1 || {
                   echo 'SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=PROOT_DISTRO' >&2
                   exit 32
