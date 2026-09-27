@@ -212,7 +212,7 @@ class ProjectEnvironmentPlanTest {
     }
 
     @Test
-    fun webOptionalGroupWithoutViteIsDetectedButNotInstalledAutomatically() {
+    fun webCapabilityGroupWithoutViteIsInstalledForLaunchClosure() {
         val detection = detect(
             paths = listOf("pyproject.toml", "main.py"),
             pyproject = """
@@ -220,12 +220,37 @@ class ProjectEnvironmentPlanTest {
                 name = "demo"
 
                 [project.optional-dependencies]
-                web = ["fastapi"]
+                web = ["fastapi", "uvicorn"]
             """.trimIndent(),
         )
         val plan = ProjectEnvironmentPlanner.plan(detection, allCapabilities)
 
         assertEquals(listOf("web"), detection.pythonOptionalDependencyGroups)
+        assertEquals(listOf("web"), detection.pythonWebCapabilityExtras)
+        assertEquals(listOf("web"), plan.pythonInstallExtras)
+        assertTrue(
+            plan.diagnosticLines().contains(
+                "SIFTALPHA_ENV_PYTHON_WEB_CAPABILITY_EXTRAS=web",
+            ),
+        )
+    }
+
+    @Test
+    fun unrelatedDevExtraIsNotPulledIntoRunnableEnvironment() {
+        val detection = detect(
+            paths = listOf("pyproject.toml", "main.py"),
+            pyproject = """
+                [project]
+                name = "demo"
+
+                [project.optional-dependencies]
+                dev = ["fastapi", "uvicorn"]
+            """.trimIndent(),
+        )
+        val plan = ProjectEnvironmentPlanner.plan(detection, allCapabilities)
+
+        assertEquals(listOf("dev"), detection.pythonOptionalDependencyGroups)
+        assertTrue(detection.pythonWebCapabilityExtras.isEmpty())
         assertTrue(plan.pythonInstallExtras.isEmpty())
     }
 
