@@ -330,6 +330,7 @@ class ProjectRuntimeController(
         val files = internalDependencyFiles(
             projectDocumentId = projectId,
             requiresNodeVite = requiresNodeVite,
+            viteComponentDirectories = plan.detection.viteComponents.map { it.directory },
             pythonInstallExtras = plan.pythonInstallExtras,
         )
         if (plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON) && !requiresNodeVite) {
@@ -464,6 +465,7 @@ class ProjectRuntimeController(
         val files = internalDependencyFiles(
             projectDocumentId = projectId,
             requiresNodeVite = requiresNodeVite,
+            viteComponentDirectories = plan.detection.viteComponents.map { it.directory },
             pythonInstallExtras = plan.pythonInstallExtras,
         )
         if (plan.supports(EnvironmentBackend.EMBEDDED_CPYTHON) && !requiresNodeVite) {
@@ -532,6 +534,7 @@ class ProjectRuntimeController(
         val files = internalDependencyFiles(
             projectDocumentId = projectId,
             requiresNodeVite = requiresNodeVite,
+            viteComponentDirectories = plan.detection.viteComponents.map { it.directory },
             pythonInstallExtras = plan.pythonInstallExtras,
         )
         progress?.invoke(
@@ -673,6 +676,7 @@ class ProjectRuntimeController(
         val files = internalDependencyFiles(
             projectDocumentId = projectId,
             requiresNodeVite = requiresNodeVite,
+            viteComponentDirectories = plan.detection.viteComponents.map { it.directory },
             pythonInstallExtras = plan.pythonInstallExtras,
         )
         val forceAlpine =
@@ -772,6 +776,7 @@ class ProjectRuntimeController(
     private fun internalDependencyFiles(
         projectDocumentId: String,
         requiresNodeVite: Boolean = false,
+        viteComponentDirectories: List<String> = emptyList(),
         pythonInstallExtras: List<String> = emptyList(),
     ): InternalDependencyFiles {
         val requirements = gateway.readProjectRootText(projectDocumentId, "requirements.txt")
@@ -784,6 +789,7 @@ class ProjectRuntimeController(
                 requirementsText = requirements,
                 pyprojectText = pyproject,
                 requiresNodeVite = requiresNodeVite,
+                viteComponentDirectories = viteComponentDirectories,
                 pythonInstallExtras = pythonInstallExtras,
             ),
         )
