@@ -40,6 +40,7 @@ fun ExternalRuntimeSetupScreen(
     storageAccessCommand: String,
     prootCommand: String,
     ubuntuCommand: String,
+    ubuntuPythonCommand: String,
     onBack: () -> Unit,
     onDownloadTermux: () -> Unit,
     onRequestPermission: () -> Unit,
@@ -47,6 +48,7 @@ fun ExternalRuntimeSetupScreen(
     onCopyStorageAccessCommand: () -> Unit,
     onCopyProotCommand: () -> Unit,
     onCopyUbuntuCommand: () -> Unit,
+    onCopyUbuntuPythonCommand: () -> Unit,
     onOpenTermux: () -> Unit,
     onRecheck: () -> Unit,
 ) {
@@ -200,6 +202,33 @@ fun ExternalRuntimeSetupScreen(
                         command = ubuntuCommand,
                         copyLabel = stringResource(R.string.settings_external_copy_install),
                         onCopy = onCopyUbuntuCommand,
+                    )
+                    Spacer(modifier = Modifier.height(spacing.medium))
+                    OutlinedButton(
+                        onClick = onOpenTermux,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.settings_external_open_termux))
+                    }
+                }
+            }
+
+            SetupStepCard(
+                title = stringResource(R.string.settings_external_step_python),
+                complete = status.ubuntuPythonReady == true,
+                detail = when {
+                    status.ubuntuPythonReady == true ->
+                        stringResource(R.string.settings_external_status_complete)
+                    status.stage == ExternalRuntimeSetupStage.UBUNTU_PYTHON ->
+                        stringResource(R.string.settings_external_python_missing)
+                    else -> stringResource(R.string.settings_external_wait_previous)
+                },
+            ) {
+                if (status.stage == ExternalRuntimeSetupStage.UBUNTU_PYTHON) {
+                    CommandBlock(
+                        command = ubuntuPythonCommand,
+                        copyLabel = stringResource(R.string.settings_external_copy_install),
+                        onCopy = onCopyUbuntuPythonCommand,
                     )
                     Spacer(modifier = Modifier.height(spacing.medium))
                     OutlinedButton(
