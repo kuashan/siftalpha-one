@@ -31,9 +31,10 @@
     <string name="settings_external_runtime_intro">按顺序完成检测即可。每一步都可以复制命令后打开 Termux 执行；返回 SiftAlpha 后会自动重新检测。</string>
     <string name="settings_external_step_termux">1. Termux</string>
     <string name="settings_external_step_bridge">2. SiftAlpha 调用权限</string>
-    <string name="settings_external_step_proot">3. PRoot-Distro</string>
-    <string name="settings_external_step_ubuntu">4. Ubuntu Runtime</string>
-    <string name="settings_external_step_final">5. 最终检测</string>
+    <string name="settings_external_step_storage">3. 共享存储访问</string>
+    <string name="settings_external_step_proot">4. PRoot-Distro</string>
+    <string name="settings_external_step_ubuntu">5. Ubuntu Runtime</string>
+    <string name="settings_external_step_final">6. 最终检测</string>
     <string name="settings_external_status_complete">已完成</string>
     <string name="settings_external_status_done">完成</string>
     <string name="settings_external_status_pending">待完成</string>
@@ -46,6 +47,8 @@
     <string name="settings_external_download_termux">下载 Termux</string>
     <string name="settings_external_copy_setup">复制设置命令</string>
     <string name="settings_external_open_termux">打开 Termux</string>
+    <string name="settings_external_storage_missing">Termux 还没有访问 Android 共享存储的权限。复制下面的命令，在 Termux 中执行并允许存储访问。</string>
+    <string name="settings_external_copy_storage">复制存储授权命令</string>
     <string name="settings_external_proot_missing">未检测到 PRoot-Distro。复制下面的安装命令，在 Termux 中执行。</string>
     <string name="settings_external_ubuntu_missing">未检测到 Ubuntu Runtime。复制下面的安装命令，在 Termux 中执行。</string>
     <string name="settings_external_copy_install">复制安装命令</string>
