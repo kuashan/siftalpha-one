@@ -585,7 +585,7 @@ class ExternalProviderReadinessStore internal constructor(
         private const val FIELD_DETAIL = "detail"
         private const val FIELD_SETUP_COMPLETE = "setup_complete"
         private const val FIELD_SETUP_CONTRACT_VERSION = "setup_contract_version"
-        private const val CURRENT_SETUP_CONTRACT_VERSION = 3
+        private const val CURRENT_SETUP_CONTRACT_VERSION = 4
         private const val MAX_DETAIL_LENGTH = 240
     }
 }
