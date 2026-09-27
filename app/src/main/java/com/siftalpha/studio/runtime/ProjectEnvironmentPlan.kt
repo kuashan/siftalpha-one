@@ -64,13 +64,13 @@ data class ProjectEnvironmentDetection(
     val directDependencyCount: Int,
     val pythonRequiresVersion: String?,
     val pythonOptionalDependencyGroups: List<String>,
-    val pythonWebCapabilityExtras: List<String>,
     val viteComponentCount: Int,
     val declaredEntry: String?,
     val declaredRun: String?,
     val embeddedCpythonEligible: Boolean,
     val internalAlpineEligible: Boolean,
     val issues: List<EnvironmentDetectionIssue>,
+    val pythonWebCapabilityExtras: List<String> = emptyList(),
 ) {
     val blockingIssues: List<EnvironmentDetectionIssue>
         get() = issues.filter { it.blocking }
