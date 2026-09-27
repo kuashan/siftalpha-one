@@ -193,6 +193,26 @@ class ExternalProviderPreflightTest {
     }
 
     @Test
+    fun setupGuideRoutesMissingUbuntuPythonWithoutReinstallingUbuntu() {
+        val result = ExternalProviderPreflight.evaluate(
+            facts = facts(
+                bridgeState = ExternalProviderBridgeState.FAIL,
+                probeStage = ExternalProviderProbeStage.RUNTIME_CAPABILITY,
+                lastProbeAtEpochMs = 950L,
+                lastProbeResult = ExternalProviderProbeResult.FAIL,
+                detail = "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON",
+            ),
+            nowEpochMs = 1_000L,
+        )
+
+        val setup = ExternalRuntimeSetupGuide.evaluate(result)
+
+        assertEquals(ExternalRuntimeSetupStage.UBUNTU_PYTHON, setup.stage)
+        assertEquals(true, setup.ubuntuReady)
+        assertEquals(false, setup.ubuntuPythonReady)
+    }
+
+    @Test
     fun setupGuideReportsReadyOnlyAfterRuntimeCapabilityProof() {
         val result = ExternalProviderPreflight.evaluate(
             facts = facts(
@@ -229,7 +249,9 @@ class ExternalProviderPreflightTest {
         assertTrue(TermuxBackend.FIRST_RUN_SETUP_COMMAND.contains("allow-external-apps = true"))
         assertEquals("termux-setup-storage", TermuxBackend.STORAGE_ACCESS_SETUP_COMMAND)
         assertEquals("pkg install -y proot-distro", TermuxBackend.PROOT_DISTRO_INSTALL_COMMAND)
-        assertEquals("proot-distro install ubuntu", TermuxBackend.UBUNTU_INSTALL_COMMAND)
+        assertEquals("proot-distro install ubuntu:24.04", TermuxBackend.UBUNTU_INSTALL_COMMAND)
+        assertTrue(TermuxBackend.UBUNTU_PYTHON_INSTALL_COMMAND.contains("python3-venv"))
+        assertTrue(TermuxBackend.UBUNTU_PYTHON_INSTALL_COMMAND.contains("python3-pip"))
         assertTrue(
             TermuxBackend.RUNTIME_CAPABILITY_TEST.shellScript.contains(
                 "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=SHARED_STORAGE_ACCESS",
@@ -240,6 +262,12 @@ class ExternalProviderPreflightTest {
                 "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU",
             ),
         )
+        assertTrue(
+            TermuxBackend.RUNTIME_CAPABILITY_TEST.shellScript.contains(
+                "SIFTALPHA_EXTERNAL_CAPABILITY_MISSING=UBUNTU_PYTHON",
+            ),
+        )
+        assertTrue(TermuxBackend.RUNTIME_CAPABILITY_TEST.shellScript.contains("/usr/bin/python3"))
     }
 
     @Test
