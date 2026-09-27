@@ -491,12 +491,14 @@ class RuntimeStorageController(private val gateway: V04ProjectGateway) {
 
     companion object {
         const val COMPONENT_PYTHON_VENV = "PYTHON_VENV"
+        const val COMPONENT_PYTHON_WORKSPACE = "PYTHON_WORKSPACE"
         const val COMPONENT_NODE_PRIMARY = "NODE_PRIMARY_WORKSPACE"
         const val COMPONENT_NODE_SUPPLEMENTAL = "NODE_SUPPLEMENTAL_WORKSPACE"
         const val COMPONENT_RUNTIME_STATE = "RUNTIME_STATE"
 
         internal val PROJECT_DIRECTORY_COMPONENTS = listOf(
             ProjectDirectoryComponent(COMPONENT_PYTHON_VENV, "/root/venvs"),
+            ProjectDirectoryComponent(COMPONENT_PYTHON_WORKSPACE, "/root/siftalpha/python-exec-workspaces"),
             ProjectDirectoryComponent(COMPONENT_NODE_PRIMARY, "/root/siftalpha/node-exec-workspaces"),
             ProjectDirectoryComponent(COMPONENT_NODE_SUPPLEMENTAL, "/root/siftalpha/node-workspaces"),
         )
