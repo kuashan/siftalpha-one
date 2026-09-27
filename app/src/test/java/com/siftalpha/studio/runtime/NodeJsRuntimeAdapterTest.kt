@@ -50,9 +50,9 @@ class NodeJsRuntimeAdapterTest {
     fun `prepare consumes detection owned component list instead of rediscovering source tree`() {
         val shell = NodeJsRuntimeAdapter(FakeHost()).prepareDetectedWebComponents(project).shellScript
 
-        assertTrue(shell.contains("\"$project\"/'web-ui/package.json'"))
+        assertTrue(shell.contains("\"${'$'}project\"/\'web-ui/package.json\'"))
         assertFalse(shell.contains("discover_vite_components"))
-        assertFalse(shell.contains("find \"$project\" -maxdepth"))
+        assertFalse(shell.contains("find \"${'$'}project\" -maxdepth"))
     }
 
     @Test
@@ -60,8 +60,8 @@ class NodeJsRuntimeAdapterTest {
         val shell = NodeJsRuntimeAdapter(FakeHost()).prepareDetectedWebComponents(project).shellScript
 
         assertTrue(shell.contains("out_rel='dist'"))
-        assertTrue(shell.contains("find_vite_config \"$package_dir\" 2>/dev/null || true"))
-        assertFalse(shell.contains("config=\"$(find_vite_config \"$package_dir\")\" || return 1"))
+        assertTrue(shell.contains("find_vite_config \"${'$'}package_dir\" 2>/dev/null || true"))
+        assertFalse(shell.contains("config=\"${'$'}(find_vite_config \"${'$'}package_dir\")\" || return 1"))
     }
 
     @Test
