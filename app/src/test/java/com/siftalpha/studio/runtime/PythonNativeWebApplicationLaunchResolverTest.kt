@@ -97,7 +97,7 @@ class PythonNativeWebApplicationLaunchResolverTest {
     }
 
     @Test
-    fun `missing Vite component fails closed`() {
+    fun `project owned serve contract does not require Vite`() {
         val result = PythonNativeWebApplicationLaunchResolver.resolve(
             declaredRun = null,
             pyprojectToml = pyproject,
@@ -106,7 +106,33 @@ class PythonNativeWebApplicationLaunchResolverTest {
             webProjectEnabled = true,
         )
 
-        assertNull(result)
+        assertEquals("easy-tdx", result?.executableName)
+        assertEquals(listOf("serve", "--host", "127.0.0.1", "--no-open-browser"), result?.arguments)
+    }
+
+
+    @Test
+    fun `project owned serve contract wins over nested FastAPI inference`() {
+        val result = PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = null,
+            pyprojectToml = pyproject,
+            relativePaths = listOf(
+                "pyproject.toml",
+                "src/easy_tdx/cli/cmd_web.py",
+                "src/easy_tdx/web/app.py",
+            ),
+            pythonSources = linkedMapOf(
+                "src/easy_tdx/cli/cmd_web.py" to sources.getValue("src/easy_tdx/cli/cmd_web.py"),
+                "src/easy_tdx/web/app.py" to """
+                    from fastapi import FastAPI
+                    app = FastAPI()
+                """.trimIndent(),
+            ),
+            webProjectEnabled = true,
+        )
+
+        assertEquals("easy-tdx", result?.executableName)
+        assertEquals(listOf("serve", "--host", "127.0.0.1", "--no-open-browser"), result?.arguments)
     }
 
     @Test
@@ -250,6 +276,33 @@ class PythonNativeWebApplicationLaunchResolverTest {
 
         assertEquals("uvicorn", result?.executableName)
         assertEquals(listOf("demo.server:app", "--host", "127.0.0.1"), result?.arguments)
+    }
+
+
+    @Test
+    fun fastApiInferenceFailsClosedWhenUvicornIsNotPrepared() {
+        val result = PythonNativeWebApplicationLaunchResolver.resolve(
+            declaredRun = null,
+            pyprojectToml = """
+                [project]
+                dependencies = ["fastapi"]
+
+                [project.optional-dependencies]
+                dev = ["uvicorn"]
+            """.trimIndent(),
+            requirementsText = null,
+            relativePaths = listOf("src/demo/server.py"),
+            pythonSources = mapOf(
+                "src/demo/server.py" to """
+                    from fastapi import FastAPI
+                    import uvicorn
+                    app = FastAPI()
+                """.trimIndent(),
+            ),
+            webProjectEnabled = true,
+        )
+
+        assertNull(result)
     }
 
 }
