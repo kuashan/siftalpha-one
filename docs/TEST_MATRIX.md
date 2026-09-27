@@ -17,6 +17,32 @@
 本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
 
 
+## R48d10.6 — External Ubuntu Python Identity（外部 Ubuntu Python 身份）
+
+| ID | 验证项 | 期望 | 状态 |
+|---|---|---|---|
+| R48D10.6-01 | Fixed Ubuntu baseline | 新安装 External Ubuntu 使用 `ubuntu:24.04`，不再随 latest 漂移 | PASS — source/unit + W0 #986；待真机 |
+| R48D10.6-02 | Ubuntu-native Python capability | READY 前必须证明 `/usr/bin/python3`、pip、venv 可用 | PASS — unit/source + W0 #986；待真机 |
+| R48D10.6-03 | Termux Python rejection | guest Python executable/platform 不得是 Termux/Android identity | PASS — unit/source + W0 #986 |
+| R48D10.6-04 | Existing Ubuntu recovery | Ubuntu 已存在但缺 Python 时进入独立 Ubuntu Python 修复步骤，不删除 rootfs | PASS — setup guide/unit + W0 #986；待真机 |
+| R48D10.6-05 | Setup contract versioning | r48d10.5 的 setup proof 升级后必须按新 Python identity contract 重新验证 | PASS — shared store/source + W0 #986 |
+| R48D10.6-06 | PREPARE interpreter | External Python venv 强制由 `/usr/bin/python3 -m venv` 创建 | PASS — unit/source + W0 #986 |
+| R48D10.6-07 | Existing venv identity | 旧 venv 若 base interpreter 来自 Termux/Android，不得复用 | PASS — unit/source + W0 #986 |
+| R48D10.6-08 | Runtime PATH isolation | Python workload PATH 不回落到 Termux Android toolchain | PASS — unit/source + W0 #986 |
+| R48D10.6-09 | Internal boundary | Internal Runtime 未改动并保持资产验证通过 | PASS — Probe #139 |
+| R48D10.6-10 | Version | `0.8.0-alpha43-r48d10.6` / versionCode `228` | PASS — APK badging |
+| R48D10.6-11 | Cloud gate | repository validators + unit tests + assembleDebug + stable signing | PASS — W0 #986 |
+| R48D10.6-12 | Real-device pandas wheel | easy_tdx PREPARE 不再因错误 Python identity 回落到 pandas source build | 待真机 |
+| R48D10.6-13 | External easy_tdx E2E | PREPARE → RUN → Web 页面打开 | 待真机 |
+
+R48d10.6 APK evidence：
+- functional source: `75ca8a05cf8684b0488c30b2a4cd3957f0a13695`
+- artifact: `siftalpha-w0-986` / ID `10926265054`
+- artifact digest: `sha256:673a7d67ce2a088148de99d203332579a8d25ba0767eefc25919a5367935195e`
+- APK SHA-256: `51ebd8098dbcb7912fdc32790b065d4e1dd75508b7389113e69eb8f4e02c6550`
+- signer SHA-256: `3bf440487ce3f9010c5843fc1b46abc79e105886ce339c4c075e7635c5542928`
+
+
 ## R48d10.5 — External Python Workspace + Shared Storage Access（外部 Python 工作区 + 共享存储访问）
 
 | ID | 验证项 | 期望 | 状态 |
