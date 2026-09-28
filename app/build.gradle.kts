@@ -220,6 +220,16 @@ android {
         }
     }
 
+    if (cloudKeystoreInstrumentation) {
+        sourceSets {
+            getByName("androidTest") {
+                // The Cloud Keystore instrumentation variant is intentionally independent of
+                // the legacy Embedded Python/Runtime smoke tests and their native arm64 fixture.
+                java.exclude("com/siftalpha/studio/siftalphax/**")
+            }
+        }
+    }
+
     androidResources {
         noCompress += "tgzblob"
     }
