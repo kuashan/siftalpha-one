@@ -32,6 +32,11 @@ val prepareInternalAlpine = tasks.register<Exec>("prepareInternalAlpine") {
     )
 }
 
+// The hosted Android Keystore instrumentation runner is x86_64, while the product APK remains
+// arm64-v8a and keeps its native Runtime assets. This flag creates a test-only APK variant without
+// native Runtime packaging; the default product build is unchanged.
+val cloudKeystoreInstrumentation = providers.gradleProperty("siftalphaCloudKeystoreTest").orNull == "true"
+
 val trustedKeystorePayload = providers.gradleProperty("SIFTALPHA_DEBUG_KEYSTORE_B64")
     .orElse(providers.environmentVariable("SIFTALPHA_DEBUG_KEYSTORE_B64"))
     .orNull
@@ -178,7 +183,11 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            abiFilters += if (cloudKeystoreInstrumentation) {
+                listOf("x86_64")
+            } else {
+                listOf("arm64-v8a")
+            }
         }
 
         externalNativeBuild {
@@ -191,19 +200,23 @@ android {
         }
     }
 
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+    if (!cloudKeystoreInstrumentation) {
+        externalNativeBuild {
+            cmake {
+                path = file("src/main/cpp/CMakeLists.txt")
+                version = "3.22.1"
+            }
         }
     }
 
-    sourceSets {
-        getByName("main") {
-            assets.srcDir(embeddedCpythonAssets)
-            assets.srcDir(internalAlpineAssets)
-            jniLibs.srcDir(embeddedCpythonJniLibs)
-            jniLibs.srcDir(internalAlpineJniLibs)
+    if (!cloudKeystoreInstrumentation) {
+        sourceSets {
+            getByName("main") {
+                assets.srcDir(embeddedCpythonAssets)
+                assets.srcDir(internalAlpineAssets)
+                jniLibs.srcDir(embeddedCpythonJniLibs)
+                jniLibs.srcDir(internalAlpineJniLibs)
+            }
         }
     }
 
