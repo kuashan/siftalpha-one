@@ -1,5 +1,6 @@
 package com.siftalpha.cloud.agent.api
 
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 object M1Json {
