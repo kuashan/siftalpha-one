@@ -2,6 +2,7 @@
 
 最后更新：2026-09-27（R48d10.6 Real-device PASS + Baseline Closure）
 当前仓库：[kuashan/siftalpha-one](https://github.com/kuashan/siftalpha-one)  
+2026-09-28 Plan Realignment：M2.0R 已关闭；M2.1 Cloud Manager implementation 暂停，当前只维护 GitHub-first 的 design、plan、M1 contract 和 CI 路径。Cloud Manager 不接入现有 Normal/Developer 主流程，也不调用 Legacy Runtime。正式 Compile、Unit Test、Regression Test、Android Build 只接受 GitHub Actions 证据。
 当前稳定 Android 基线分支：`baseline/r48d10.6`
 验收来源分支：`codex/r48d10-external-ubuntu-python-identity`
 Current functional source HEAD：`75ca8a05cf8684b0488c30b2a4cd3957f0a13695`

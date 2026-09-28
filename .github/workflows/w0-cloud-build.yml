@@ -13,6 +13,7 @@ on:
       - codex/siftalpha-no-worker-alpha43
       - codex/r48-shared-core-realignment
       - codex/r48d11-external-runtime-baseline-python-resolver
+      - codex/cloud-manager-m2
   workflow_dispatch:
 
 permissions:
@@ -137,10 +138,28 @@ jobs:
           python3 tools/validate_localization_resources.py | tee w0-evidence/validate-localization.txt
           python3 tools/validate_localized_ui_sources.py | tee w0-evidence/validate-localized-ui.txt
 
+      - name: Verify Cloud module boundaries and tests
+        run: |
+          set -euo pipefail
+          if [[ ! -d cloud-core || ! -d cloud-agent-client ]]; then
+            echo "CLOUD_MODULE_TESTS=NOT_YET_IMPLEMENTED"
+            exit 0
+          fi
+          forbidden='ProjectRuntimeController|RuntimeBackend|TermuxBackend|RuntimeCommandHost|RuntimeWebPortDiscovery|RuntimeAgentController|Termux|PRoot'
+          if rg -n "$forbidden" cloud-core cloud-agent-client; then
+            echo "CLOUD_ARCHITECTURE_GUARD=FAIL"
+            exit 1
+          fi
+          echo "CLOUD_ARCHITECTURE_GUARD=PASS"
+          gradle --no-daemon --stacktrace --console=plain \
+            :cloud-core:test :cloud-agent-client:test | tee w0-evidence/cloud-module-tests.txt
+
       - name: Run unit tests and assemble debug APK
         run: |
           set -o pipefail
-          gradle --no-daemon --stacktrace --console=plain testDebugUnitTest assembleDebug | tee w0-evidence/gradle-build.txt
+          gradle --no-daemon --stacktrace --console=plain \
+            :app:testDebugUnitTest :app:compileDebugKotlin :app:assembleDebug \
+            | tee w0-evidence/gradle-build.txt
 
       - name: Collect APK evidence
         run: |

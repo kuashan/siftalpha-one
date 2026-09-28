@@ -10,6 +10,8 @@
 
 建立 Cloud Manager Foundation：可跨平台复用的 Cloud domain、M1 Agent API client、操作轮询、错误模型、凭据存储接口和测试基础，同时保持现有 Android 用户流程与 Legacy Runtime 完全不变。
 
+Cloud domain 的时间字段统一使用 `java.time.Instant`；M1 wire DTO 可按真实协议使用 `String?` 或 `Long?`，但 DTO mapper 必须转换为 domain `Instant?`。
+
 ## Product Boundary
 
 目标架构为：
@@ -34,7 +36,8 @@ WireGuard 不属于 SiftAlpha 管理范围。应用只访问配置中的 Cloud S
 - `CloudProjectActionPolicy`；
 - Cloud error model；
 - operation repository interface；
-- DTO-independent mapping contracts。
+- DTO-independent mapping contracts；
+- domain time values represented as `Instant`。
 
 ### `:cloud-agent-client`
 
@@ -87,8 +90,8 @@ WireGuard 不属于 SiftAlpha 管理范围。应用只访问配置中的 Cloud S
 - `runtimeState`
 - `lastOperationId: String?`
 - `result: CloudResult?`
-- `createdAt`
-- `updatedAt`
+- `createdAt: Instant?`
+- `updatedAt: Instant?`
 
 ### `CloudOperation`
 
@@ -96,7 +99,7 @@ WireGuard 不属于 SiftAlpha 管理范围。应用只访问配置中的 Cloud S
 - `projectId`
 - `action`
 - `state`
-- `startedAt`
+- `startedAt: Instant?`
 - `finishedAt: Instant?`
 - `exitCode: Int?`
 - `failureReason: String?`
@@ -115,7 +118,7 @@ Connection states: `UNKNOWN`, `CONNECTING`, `CONNECTED`, `UNREACHABLE`, `UNAUTHO
 
 只定义模型，不实现 Result Viewer。
 
-`CloudResult` 包含 `remoteProjectId`、`operationId`、`runtimeState`、`environmentState`、可选 `webEndpoint`、`artifacts`、可选 `summary`、可选 `errorCode`、可选 `errorMessage`、`updatedAt`。
+`CloudResult` 包含 `remoteProjectId`、`operationId`、`runtimeState`、`environmentState`、可选 `webEndpoint`、`artifacts`、可选 `summary`、可选 `errorCode`、可选 `errorMessage`、`updatedAt: Instant?`。
 
 `CloudArtifact` 包含 `name`、`type`、可选 `url`、可选 `size`、`metadata`。
 
@@ -134,6 +137,8 @@ Cloud result 不得携带 Android local file path、localhost URL 或 `ResultWeb
 策略不得读取 PID、`executionId`、Termux state、本地 lifecycle file 或旧 `ProjectActionPolicy`。
 
 ## M1 Agent API Contract
+
+The authoritative M1 field/status record for M2.1 is maintained in [`docs/cloud-agent/m1-api-contract.md`](../cloud-agent/m1-api-contract.md). DTO work must use that document and the reconciled M1 implementation, not memory or an inferred JSON shape.
 
 只适配已经存在的 M1 endpoint：
 
@@ -165,7 +170,7 @@ DTO 与 domain model 分离。UI 或未来 Cloud Manager 不直接消费 JSON DT
 - `logs(projectId, tail)`
 - `getOperation(operationId)`
 
-所有请求必须具备 timeout、bounded response、JSON validation、HTTP status mapping 和错误分类。请求使用 `Authorization: Bearer <token>`；日志只允许记录 serverId、endpoint path、HTTP status 和 elapsed time，不得记录完整 header 或 Token。
+所有请求必须具备 timeout、bounded response、JSON validation、HTTP status mapping 和错误分类。所有 HTTP response（成功 JSON、错误 JSON、logs 和任意未知 endpoint response）都必须有最大 body limit；超限必须安全拒绝或映射为 `INVALID_RESPONSE`，不得无限读取。请求使用 `Authorization: Bearer <token>`；日志只允许记录 serverId、endpoint path、HTTP status 和 elapsed time，不得记录完整 header 或 Token。
 
 默认 HTTP transport 通过可注入接口实现，单元测试使用 fake transport，不要求真实服务器。
 
@@ -173,7 +178,7 @@ DTO 与 domain model 分离。UI 或未来 Cloud Manager 不直接消费 JSON DT
 
 至少定义：
 
-`CLOUD_SERVER_UNREACHABLE`, `UNAUTHORIZED`, `PROJECT_NOT_FOUND`, `OPERATION_CONFLICT`, `ENVIRONMENT_NOT_READY`, `ALREADY_RUNNING`, `ALREADY_STOPPED`, `DOCKER_ERROR`, `PREPARE_FAILED`, `RUNTIME_ERROR`, `INVALID_RESPONSE`, `TIMEOUT`, `UNKNOWN`。
+`CLOUD_SERVER_UNREACHABLE`, `UNAUTHORIZED`, `PROJECT_NOT_FOUND`, `OPERATION_CONFLICT`, `ENVIRONMENT_NOT_READY`, `ALREADY_RUNNING`, `ALREADY_STOPPED`, `DOCKER_ERROR`, `PREPARE_FAILED`, `RUNTIME_ERROR`, `INVALID_REQUEST`, `INVALID_RESPONSE`, `TIMEOUT`, `UNKNOWN`。
 
 HTTP 401 映射 `UNAUTHORIZED`；连接失败映射 `CLOUD_SERVER_UNREACHABLE`；超时映射 `TIMEOUT`。网络错误不得映射为项目 stopped 或 failed。
 
@@ -186,6 +191,7 @@ HTTP 401 映射 `UNAUTHORIZED`；连接失败映射 `CLOUD_SERVER_UNREACHABLE`�
 - 最大期限；
 - 可配置间隔；
 - cancellation 支持；
+- cancellation 时抛出明确的 `CancellationException`；取消不等于 operation 已完成，不能返回最后一次状态冒充终态；
 - 明确的 terminal state 判断；
 - `OperationRepository` 接口预留持久化；
 - 不允许无限循环。
@@ -216,9 +222,10 @@ Android 具体实现位于 `:app` Cloud Android integration，使用 Android Key
 - timeout；
 - invalid JSON；
 - bounded logs；
+- bounded success JSON and error JSON；
 - terminal operation；
 - poller timeout；
-- cancellation；
+- cancellation throws `CancellationException`；
 - Authorization 脱敏。
 
 `:app` integration：
@@ -235,6 +242,7 @@ Android 具体实现位于 `:app` Cloud Android integration，使用 Android Key
 - 不改变现有 Android versionName；
 - 如 CI 强制要求 versionCode，仅按现有规则最小递增；
 - 现有 Android compile 和重要单元测试必须保持通过；
+- 正式 Compile、Unit Test、Regression Test、Android Build 只由 GitHub Actions 执行；本地 Gradle 不构成正式 PASS；
 - 新 Cloud modules 不进入现有 Android 主流程；
 - 不修改 `r48d11` 原分支历史。
 
@@ -250,7 +258,9 @@ Android 具体实现位于 `:app` Cloud Android integration，使用 Android Key
 - Cloud Manager 不依赖旧 Runtime Provider；
 - Legacy Runtime 在本轮冻结。
 
-缺失的 M1 能力记录到 `M2_PROTOCOL_GAPS.md`，不自行发明 API。
+缺失的 M1 能力记录到 `M2_PROTOCOL_GAPS.md`，不自行发明 API。M1 contract 文档必须记录 request shape、success response、error envelope、HTTP status、nullable fields 和 timestamp format。
+
+GitHub Actions 必须为 `codex/cloud-manager-m2` 提供真实触发路径，显式执行 `:cloud-core:test`、`:cloud-agent-client:test`、现有 Android unit/regression tests、Android compile 和 `assembleDebug`/W0 equivalent，并执行 Cloud-to-Legacy architecture guard。
 
 ## Out of Scope
 
@@ -270,5 +280,7 @@ M2.1 仅在以下条件全部通过后标记 `M2_1_CODE=CLOSED`：
 8. Legacy Runtime 无修改、无依赖；
 9. 现有 Android compile 与重要回归测试通过；
 10. Cloud module 单元测试通过。
+
+正式验证全部以 GitHub Actions 结果为准。若 Android Keystore instrumentation 无可用 emulator，必须记录 `ANDROID_KEYSTORE_TEST=BLOCKED`，此时不得标记 `M2_1_FULLY_CLOSED`。
 
 如果 WireGuard 不可用，真实 Agent read-only smoke 标记 `M2_1_REMOTE_SMOKE=BLOCKED`，不能伪造 PASS。实现完成后停止，不进入 M2.2。

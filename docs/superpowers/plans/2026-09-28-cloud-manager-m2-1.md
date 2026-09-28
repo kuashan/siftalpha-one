@@ -13,6 +13,8 @@
 ## Global Constraints
 
 - Source baseline remains `origin/codex/r48d11-external-runtime-baseline-python-resolver` at `b2650a957ca8ad7458ae8f911cd8fb5487d95a83`; if it changes, stop and output `SOURCE_BASELINE_CHANGED`.
+- The baseline SHA need only be an ancestor of the working branch after the design/plan commits; verify with `git merge-base --is-ancestor`, not `HEAD == baseline`.
+- Before implementation, `git diff b2650a957ca8ad7458ae8f911cd8fb5487d95a83..HEAD` may contain only the approved design, implementation plan, M1 contract, CI configuration, and realignment documentation; any source/test/module change stops the work.
 - Work only on `codex/cloud-manager-m2`; do not modify or rewrite the r48d11 branch history.
 - `:cloud-core` is pure Kotlin/JVM and must not depend on Android SDK, Activity, Compose, Termux, PRoot, Docker, or old Runtime code.
 - `:cloud-agent-client` is platform-independent Kotlin/JVM and must depend only on `:cloud-core` plus standard/Kotlin serialization libraries; it must not contain Android Keystore code.
@@ -24,6 +26,12 @@
 - Cloud endpoint is configuration data; no production hard-coded `10.77.0.1`, no public fallback, no WireGuard lifecycle/config/key management.
 - Bearer Token, WireGuard private key, SSH key, and OCI API private key must not enter source, Git, BuildConfig, fixtures, logs, or reports.
 - Existing Kotlin, AGP, Compose, dependencies, versionName, and product flow remain unchanged except the minimum module wiring required for compilation.
+- Formal Compile, Unit Test, Regression Test, Android Build, and APK evidence are GitHub Actions results only; no local Gradle or Android SDK command is a formal PASS.
+- Cloud domain timestamps use `java.time.Instant`; wire timestamp fields may be `String?`/`Long?` only inside DTOs and must be mapped to `Instant?`.
+- Every HTTP response body is bounded, including success JSON, error JSON, logs, and unknown responses.
+- Poller cancellation throws `java.util.concurrent.CancellationException`; it never returns the last observed operation as a completed result.
+- The M1 contract at `docs/cloud-agent/m1-api-contract.md` is the sole DTO field/status reference; do not infer JSON from memory.
+- GitHub Actions must trigger on `codex/cloud-manager-m2`, run the explicit Cloud module tasks, Android regression/compile/W0 tasks, architecture guard, and Android Keystore instrumentation path.
 - Real Agent smoke, if possible, is read-only `health`, `projects`, and `project status`; never invoke Prepare/Start/Stop from the new Android code.
 - Stop after M2.1; do not begin M2.2.
 
@@ -34,6 +42,8 @@
 - Protocol ambiguity: unknown or malformed M1 JSON must become `INVALID_RESPONSE`, not a guessed project state; DTO decode/mapping tests belong to Task 3.
 - Network truth: connection failure and timeout must remain `CLOUD_SERVER_UNREACHABLE` / `TIMEOUT`, never `STOPPED` or `FAILED`; transport/error tests belong to Task 3.
 - Secret persistence: stored values must be encrypted under a separate Cloud namespace and never logged or reused as project secrets; Android integration tests belong to Task 5.
+- Wire contract: response field names, nullable fields, HTTP statuses, error envelope, and UTC timestamp format are pinned by `docs/cloud-agent/m1-api-contract.md`; the test is Task 3's exact fixture set.
+- Formal verification provenance: local Gradle execution is forbidden as acceptance evidence; the test is the branch-triggered GitHub Actions run in Task 6/Task 7.
 
 ---
 
@@ -44,7 +54,7 @@
 
 **Interfaces:**
 - Consumes: `origin/codex/r48d11-external-runtime-baseline-python-resolver`.
-- Produces: a clean `codex/cloud-manager-m2` branch at the expected source SHA.
+- Produces: a clean `codex/cloud-manager-m2` branch whose HEAD is a descendant of the expected source SHA.
 
 - [ ] **Step 1: Fetch and verify the source ref**
 
@@ -67,7 +77,17 @@ git rev-parse HEAD
 git status --short
 ```
 
-Expected: `codex/cloud-manager-m2`, HEAD initially equals the expected SHA, and no unrelated changes are present.
+Expected: `codex/cloud-manager-m2`, clean worktree, and `git merge-base --is-ancestor b2650a957ca8ad7458ae8f911cd8fb5487d95a83 HEAD` exits 0. HEAD is not expected to equal the baseline after the approved design/plan commits.
+
+- [ ] **Step 3: Verify the pre-implementation diff boundary**
+
+Run:
+
+```bash
+git diff --name-only b2650a957ca8ad7458ae8f911cd8fb5487d95a83..HEAD
+```
+
+Expected before Cloud source implementation: only the approved design, implementation plan, M1 contract, CI configuration, and plan-realignment documentation are present. Any Cloud source, test, or Android integration file at this point is a stop condition.
 
 ### Task 1: Add isolated Gradle modules and dependency boundaries
 
@@ -102,13 +122,13 @@ Add only `implementation(project(":cloud-agent-client"))` to `app/build.gradle.k
 
 - [ ] **Step 5: Verify the initial module boundary**
 
-Run:
+Run in the branch-triggered GitHub Actions job, not locally:
 
 ```bash
 gradle --no-daemon --console=plain :cloud-core:test :cloud-agent-client:test :app:compileDebugKotlin
 ```
 
-Expected: all requested tasks compile; source scans find no forbidden package imports in the new modules.
+Expected: all requested tasks compile; source scans find no forbidden package imports in the new modules. This CI result, not a local result, is the formal evidence.
 
 - [ ] **Step 6: Commit the module foundation**
 
@@ -136,12 +156,12 @@ git commit -m "build: add cloud manager foundation modules"
 - Consumes: module boundary from Task 1.
 - Produces:
   - `data class CloudServer(serverId: String, displayName: String, baseUrl: String, connectionState: CloudConnectionState)`;
-  - `data class CloudProject(localProjectId: String?, displayName: String, description: String?, serverId: String, remoteProjectId: String, source: String?, runtimeKind: String?, environmentState: CloudEnvironmentState, runtimeState: CloudRuntimeState, lastOperationId: String?, result: CloudResult?, createdAt: Long?, updatedAt: Long?)`;
-  - `data class CloudProjectStatus(remoteProjectId: String, environmentState: CloudEnvironmentState, runtimeState: CloudRuntimeState, containerId: String?, image: String?, exitCode: Int?, oomKilled: Boolean?, restartCount: Int?, startedAt: Long?, finishedAt: Long?)`;
-  - `data class CloudOperation(operationId: String, projectId: String, action: CloudOperationAction, state: CloudOperationStatus, startedAt: Long?, finishedAt: Long?, exitCode: Int?, failureReason: String?)`;
-  - `data class CloudResult(remoteProjectId: String, operationId: String?, runtimeState: CloudRuntimeState, environmentState: CloudEnvironmentState, webEndpoint: String?, artifacts: List<CloudArtifact>, summary: String?, errorCode: CloudErrorCode?, errorMessage: String?, updatedAt: Long?)`;
+  - `data class CloudProject(localProjectId: String?, displayName: String, description: String?, serverId: String, remoteProjectId: String, source: String?, runtimeKind: String?, environmentState: CloudEnvironmentState, runtimeState: CloudRuntimeState, lastOperationId: String?, result: CloudResult?, createdAt: Instant?, updatedAt: Instant?)`;
+  - `data class CloudProjectStatus(remoteProjectId: String, environmentState: CloudEnvironmentState, runtimeState: CloudRuntimeState, containerId: String?, image: String?, exitCode: Int?, oomKilled: Boolean?, restartCount: Int?, startedAt: Instant?, finishedAt: Instant?)`;
+  - `data class CloudOperation(operationId: String, projectId: String, action: CloudOperationAction, state: CloudOperationStatus, startedAt: Instant?, finishedAt: Instant?, exitCode: Int?, failureReason: String?)`;
+  - `data class CloudResult(remoteProjectId: String, operationId: String?, runtimeState: CloudRuntimeState, environmentState: CloudEnvironmentState, webEndpoint: String?, artifacts: List<CloudArtifact>, summary: String?, errorCode: CloudErrorCode?, errorMessage: String?, updatedAt: Instant?)`;
   - `data class CloudArtifact(name: String, type: String, url: String?, size: Long?, metadata: Map<String, String>)`;
-  - `enum class CloudErrorCode { CLOUD_SERVER_UNREACHABLE, UNAUTHORIZED, PROJECT_NOT_FOUND, OPERATION_CONFLICT, ENVIRONMENT_NOT_READY, ALREADY_RUNNING, ALREADY_STOPPED, DOCKER_ERROR, PREPARE_FAILED, RUNTIME_ERROR, INVALID_RESPONSE, TIMEOUT, UNKNOWN }`;
+  - `enum class CloudErrorCode { CLOUD_SERVER_UNREACHABLE, UNAUTHORIZED, PROJECT_NOT_FOUND, OPERATION_CONFLICT, ENVIRONMENT_NOT_READY, ALREADY_RUNNING, ALREADY_STOPPED, DOCKER_ERROR, PREPARE_FAILED, RUNTIME_ERROR, INVALID_REQUEST, INVALID_RESPONSE, TIMEOUT, UNKNOWN }`;
   - `data class CloudError(code: CloudErrorCode, message: String, httpStatus: Int? = null)`;
   - `data class CloudActionFacts(environmentState: CloudEnvironmentState, runtimeState: CloudRuntimeState, operation: CloudOperation?)`;
   - `enum class CloudProjectAction { PREPARE, START, STOP, RETRY, REFRESH, NONE }`;
@@ -155,21 +175,21 @@ Pin enum values, data-field defaults, and the policy matrix: `NOT_READY → PREP
 
 - [ ] **Step 2: Run the focused core tests and verify failure**
 
-Run:
+Run in GitHub Actions:
 
 ```bash
 gradle --no-daemon --console=plain :cloud-core:test --tests 'com.siftalpha.cloud.core.CloudDomainTest' --tests 'com.siftalpha.cloud.core.CloudProjectActionPolicyTest'
 ```
 
-Expected: FAIL because the domain types and policy are not yet implemented.
+Expected: FAIL because the domain types and policy are not yet implemented. Do not run this Gradle command locally.
 
 - [ ] **Step 3: Implement the domain types and pure policy**
 
-Use epoch-millisecond nullable timestamps to keep the JVM library independent of Android time classes. Keep `CloudErrorCode` in core so client transport failures and domain result errors share one stable vocabulary. The policy must read only `CloudActionFacts`.
+Use `java.time.Instant` nullable timestamps in the domain; parse wire strings/longs only in the DTO mapper. Keep `CloudErrorCode` in core so client transport failures and domain result errors share one stable vocabulary. The policy must read only `CloudActionFacts`.
 
-- [ ] **Step 4: Run the focused core tests**
+- [ ] **Step 4: Run the focused core tests in GitHub Actions**
 
-Expected: PASS with zero failures and no forbidden dependency imports.
+Expected: PASS with zero failures and no forbidden dependency imports. This is formal evidence only when emitted by the branch-triggered GitHub Actions job.
 
 - [ ] **Step 5: Commit the Cloud domain foundation**
 
@@ -199,7 +219,7 @@ git commit -m "feat: add cloud domain foundation"
 - Produces:
   - `data class CloudCredential(serverId: String, baseUrl: String, bearerToken: String)`;
   - `interface CloudCredentialStore { fun get(serverId: String): CloudCredential?; fun save(credential: CloudCredential); fun delete(serverId: String) }`;
-  - `data class CloudHealth(status: String, agent: String?, docker: String?, wireguardBinding: String?, version: String?)`;
+  - `data class CloudHealth(status: String, agent: String?, docker: String?, wireguardBinding: String?)`;
   - `data class CloudLogs(remoteProjectId: String, lines: List<String>, bytes: Long, truncated: Boolean)`;
   - `data class CloudHttpRequest(method: String, url: String, headers: Map<String, String>, body: String? = null)`;
   - `data class CloudHttpResponse(statusCode: Int, headers: Map<String, String>, body: String, elapsedMillis: Long)`;
@@ -210,7 +230,7 @@ git commit -m "feat: add cloud domain foundation"
 
 - [ ] **Step 1: Write failing JSON and client mapping tests**
 
-Use the M1 field names from the server contract: health status/agent/docker/wireguardBinding/version, projectId/environment/runtime, status container fields, logs `lines`/`bytes`/`truncated`, operation fields, and the `{ "error": { "code", "message" } }` envelope. Assert DTOs never become domain objects without mapping.
+Use the exact field names and status mappings from `docs/cloud-agent/m1-api-contract.md`: health `status/agent/docker/wireguardBinding`, project `projectId/environmentState/runtimeState/image`, status container fields, logs `lines/bytes/truncated`, operation fields including nullable `result`, and the `{ "error": { "code", "message" } }` envelope. Assert DTOs never become domain objects without mapping and wire timestamp strings become domain `Instant` values.
 
 - [ ] **Step 2: Run focused client tests and verify failure**
 
@@ -218,11 +238,11 @@ Run the three focused test classes. Expected: FAIL because DTOs, mapping, and cl
 
 - [ ] **Step 3: Implement serializable M1 DTOs and strict mapping**
 
-Keep server response fields optional only where M1 marks them optional; reject missing identity/state fields and malformed enums with `INVALID_RESPONSE`. Preserve unknown JSON fields through configured tolerant decoding, but do not invent endpoints or silently infer project state.
+Keep server response fields optional only where the contract marks them optional; reject missing identity/state fields, malformed enums, and malformed non-null timestamps with `INVALID_RESPONSE`. Preserve unknown JSON fields through configured tolerant decoding, but do not invent endpoints or silently infer project state.
 
 - [ ] **Step 4: Implement HTTP transport with bounded response handling**
 
-Use `HttpURLConnection`, connect/read timeouts, bounded byte reads, URL joining that preserves the configured base URL, and no fallback URL. Do not log Authorization values. Convert connection exceptions to typed transport failures for client mapping.
+Use `HttpURLConnection`, connect/read timeouts, bounded byte reads for every response including success/error/log bodies, URL joining that preserves the configured base URL, and no fallback URL. Exceeding the limit must fail safely as `INVALID_RESPONSE` or a typed bounded-response transport error. Do not log Authorization values. Convert connection exceptions to typed transport failures for client mapping.
 
 - [ ] **Step 5: Implement `SiftAlphaCloudAgentClient`**
 
@@ -257,7 +277,7 @@ git commit -m "feat: add cloud agent client protocol foundation"
 
 - [ ] **Step 1: Write failing credential-contract and poller tests**
 
-Assert an in-memory credential store can save/read/delete by serverId without any Android type. Assert poller stops on `SUCCEEDED`, `FAILED`, and `CANCELLED`, throws typed timeout after max duration, exits on cancellation, and never loops without a deadline.
+Assert an in-memory credential store can save/read/delete by serverId without any Android type. Assert poller stops on `SUCCEEDED`, `FAILED`, and `CANCELLED`, throws typed timeout after max duration, throws `java.util.concurrent.CancellationException` when cancelled, and never loops without a deadline.
 
 - [ ] **Step 2: Run focused tests and verify failure**
 
@@ -265,7 +285,7 @@ Expected: FAIL because the interface and poller are not implemented.
 
 - [ ] **Step 3: Implement bounded, cancellable polling**
 
-Poll through the injected lookup function, inspect only terminal operation statuses, check cancellation and the max duration before every delay, and throw `CloudAgentException(TIMEOUT)` on deadline expiry. Do not persist only in memory; keep `OperationRepository` available for a later Android repository implementation.
+Poll through the injected lookup function, inspect only terminal operation statuses, check cancellation and the max duration before every delay, throw `CancellationException` on cancellation, and throw `CloudAgentException(TIMEOUT)` on deadline expiry. Do not persist only in memory; keep `OperationRepository` available for a later Android repository implementation.
 
 - [ ] **Step 4: Run focused and full client tests**
 
@@ -328,31 +348,46 @@ git commit -m "feat: add android cloud credential integration"
 ### Task 6: Add protocol-gap and architecture documentation
 
 **Files:**
+- Create: `docs/cloud-agent/m1-api-contract.md`
 - Create: `docs/M2_PROTOCOL_GAPS.md`
 - Modify: `docs/PROJECT_CONTEXT.md`
 - Modify: `docs/README.md` only if needed to link the new protocol-gap document
+- Modify: `.github/workflows/w0-cloud-build.yml`
+- Create: `.github/workflows/cloud-manager-android-keystore.yml`
 
 **Interfaces:**
 - Consumes: completed modules and the M1 API contract from the approved spec.
-- Produces: documentation recording M2.0R closed, M2.1 current phase, Cloud Manager independence, Agent-as-source-of-truth, WireGuard ownership boundary, Legacy Runtime freeze, and intentionally absent M1 capabilities.
+- Produces: an auditable M1 protocol contract, documentation recording M2.0R closed and M2.1 current phase, Cloud Manager independence, Agent-as-source-of-truth, WireGuard ownership boundary, Legacy Runtime freeze, intentionally absent M1 capabilities, and a real GitHub Actions path for the Cloud branch.
 
 - [ ] **Step 1: Document protocol gaps without inventing APIs**
 
 Record that M1 does not provide Cloud Import, Cloud Config Write, Cloud Secret Injection, Cloud Web Result, WebSocket/SSE streaming, or multi-server scheduling; mark them as future scope, not implemented behavior.
 
-- [ ] **Step 2: Update project context**
+- [ ] **Step 2: Freeze the M1 API contract**
+
+Write `docs/cloud-agent/m1-api-contract.md` from the audited M1 Agent implementation snapshot and the approved M1 specification. Record every endpoint's request shape, success response, error envelope, HTTP status, nullable fields, and timestamp format. Record the provenance limitation that the server snapshot has no Git remote in this checkout; do not treat Android Local Agent code as M1 evidence.
+
+- [ ] **Step 3: Update project context**
 
 Add a concise M2.1 entry without rewriting historical Runtime architecture or changing the current Android product baseline.
 
-- [ ] **Step 3: Verify documentation and forbidden-scope scans**
+- [ ] **Step 4: Configure the W0 Cloud branch trigger and explicit guards**
 
-Run `git diff --check` and scan new/changed code for imports or calls to `ProjectRuntimeController`, `RuntimeBackend`, `TermuxBackend`, `RuntimeCommandHost`, `RuntimeWebPortDiscovery`, `RuntimeAgentController`, and for secret-like literals. Expected: no forbidden Cloud-to-Legacy edges and no real token.
+Modify `.github/workflows/w0-cloud-build.yml` to include `codex/cloud-manager-m2` in the existing push trigger. Add explicit CI steps before the existing Android build for `:cloud-core:test` and `:cloud-agent-client:test`, and an architecture guard that fails if `cloud-core` or `cloud-agent-client` imports/mentions `ProjectRuntimeController`, `RuntimeBackend`, `TermuxBackend`, `RuntimeCommandHost`, `RuntimeWebPortDiscovery`, `RuntimeAgentController`, Termux, or PRoot. Preserve all existing branch triggers and build steps.
 
-- [ ] **Step 4: Commit documentation**
+- [ ] **Step 5: Add the Android Keystore emulator path**
+
+Create `.github/workflows/cloud-manager-android-keystore.yml` for the Cloud branch, using a GitHub-hosted Android emulator action and the existing Gradle setup. Run the future `AndroidCloudCredentialStoreTest` against a real Android Keystore when the test exists; until implementation adds that test, the workflow must report `ANDROID_KEYSTORE_TEST=NOT_YET_IMPLEMENTED` rather than claim a pass. If the emulator job cannot run after implementation, record `ANDROID_KEYSTORE_TEST=BLOCKED` and prohibit `M2_1_FULLY_CLOSED`.
+
+- [ ] **Step 6: Verify documentation, workflow syntax, and forbidden-scope scans**
+
+Run `git diff --check`, inspect changed workflow YAML, and scan Cloud module paths for imports or calls to the forbidden Runtime symbols and for secret-like literals. Since local Gradle is forbidden, this step does not run Gradle; task execution is deferred to GitHub Actions.
+
+- [ ] **Step 7: Commit the realignment documentation and CI path**
 
 ```bash
-git add docs/M2_PROTOCOL_GAPS.md docs/PROJECT_CONTEXT.md docs/README.md
-git commit -m "docs: record cloud manager m2.1 boundaries"
+git add docs/cloud-agent/m1-api-contract.md docs/M2_PROTOCOL_GAPS.md docs/PROJECT_CONTEXT.md docs/README.md .github/workflows/w0-cloud-build.yml .github/workflows/cloud-manager-android-keystore.yml
+git commit -m "docs: revise cloud manager m2.1 execution contract"
 ```
 
 ### Task 7: Full verification, read-only smoke test, and acceptance report
@@ -369,41 +404,41 @@ git commit -m "docs: record cloud manager m2.1 boundaries"
 
 Run `git fetch origin --prune` and compare the target ref to `b2650a957ca8ad7458ae8f911cd8fb5487d95a83`. If changed, stop and report `SOURCE_BASELINE_CHANGED`; do not rebase or merge.
 
-- [ ] **Step 2: Run Cloud module tests**
+- [ ] **Step 2: Verify the Cloud module test jobs in GitHub Actions**
 
 ```bash
 gradle --no-daemon --stacktrace --console=plain :cloud-core:test :cloud-agent-client:test
 ```
 
-Expected: exit 0 and zero failures.
+This command is executed by GitHub Actions only. Expected: exit 0 and zero failures.
 
-- [ ] **Step 3: Run existing Android unit tests**
+- [ ] **Step 3: Verify existing Android unit/regression tests in GitHub Actions**
 
 ```bash
 gradle --no-daemon --stacktrace --console=plain :app:testDebugUnitTest
 ```
 
-Expected: exit 0 and no regression in existing tests.
+This command is executed by GitHub Actions only. Expected: exit 0 and no regression in existing tests.
 
-- [ ] **Step 4: Run Android compile/build verification**
+- [ ] **Step 4: Verify Android compile/build in GitHub Actions**
 
 ```bash
 gradle --no-daemon --stacktrace --console=plain :app:compileDebugKotlin :app:assembleDebug
 ```
 
-Expected: exit 0. This is compile/build verification only; do not distribute the APK for user testing.
+This command is executed by GitHub Actions only. Expected: exit 0. This is compile/build verification only; do not distribute the APK for user testing.
 
 - [ ] **Step 5: Run the read-only real Agent smoke test when WireGuard is available**
 
 Use the existing local token file without printing, logging, or embedding its contents. Send only `GET /v1/health`, `GET /v1/projects`, and `GET /v1/projects/{id}/status` through the configured WireGuard address. Never send Prepare, Start, or Stop. If WireGuard is unavailable, output `REAL_AGENT_SMOKE=BLOCKED` and do not fabricate PASS.
 
-- [ ] **Step 6: Verify legacy isolation and secret hygiene**
+- [ ] **Step 6: Verify legacy isolation, secret hygiene, and baseline diff**
 
-Run source scans, `git status --short`, and `git diff origin/codex/r48d11-external-runtime-baseline-python-resolver...HEAD --` review. Expected: only Cloud modules, app credential integration, Gradle wiring, approved docs, and tests changed; no Runtime/Termux/PRoot/main-flow files changed; no token/key literals or logged Authorization header.
+Run source scans, `git status --short`, and review `git diff b2650a957ca8ad7458ae8f911cd8fb5487d95a83..HEAD --`. Before implementation, only approved design/plan/contract/CI/realignment docs are allowed; after implementation, only Cloud modules, app credential integration, Gradle wiring, approved docs, workflows, and tests may be present. Expected: no Runtime/Termux/PRoot/main-flow files changed; no token/key literals or logged Authorization header.
 
 - [ ] **Step 7: Write the complete acceptance report**
 
-Populate `docs/M2_1_ACCEPTANCE_REPORT.md` with the required fields: baseline, work branch/head, modules, domain, legacy isolation, Agent client methods, error mapping, poller, credential security, tests, Android compile, existing regression, real Agent smoke, CI status, and final `M2_1_CODE` / `M2_1_REMOTE_SMOKE`.
+Populate `docs/M2_1_ACCEPTANCE_REPORT.md` with the required fields: baseline, work branch/head, modules, domain, legacy isolation, Agent client methods, error mapping, poller, credential security, tests, Android compile, existing regression, real Agent smoke, CI status, `ANDROID_KEYSTORE_TEST`, and final `M2_1_CODE` / `M2_1_REMOTE_SMOKE`. Record `LOCAL_GRADLE_BUILD_USED=NO`.
 
 Only mark `M2_1_CODE=CLOSED` after all code, tests, compile, isolation, and secret checks are evidenced. Mark the remote smoke separately as `PASS` or `BLOCKED`; never merge the two statuses.
 

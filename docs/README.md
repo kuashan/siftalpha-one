@@ -8,6 +8,8 @@
 - [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)：项目目标、基线、架构边界、关键决策和当前状态。
 - [DEV_LOG.md](DEV_LOG.md)：按时间追加的开发、修复、构建、发布和用户验收记录。
 - [TEST_MATRIX.md](TEST_MATRIX.md)：云端验证、APK 安装和真机测试场景的状态。
+- [cloud-agent/m1-api-contract.md](cloud-agent/m1-api-contract.md)：M1 Agent endpoint、DTO 字段、状态、错误和 timestamp contract。
+- [M2_PROTOCOL_GAPS.md](M2_PROTOCOL_GAPS.md)：M2.1 尚未提供的 Agent 能力和 GitHub-first 验证边界。
 
 ## 维护规则
 
