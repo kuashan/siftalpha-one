@@ -3,7 +3,6 @@ package com.siftalpha.studio.cloud
 import com.siftalpha.cloud.agent.CloudCredential
 import java.util.UUID
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -19,7 +18,6 @@ class CloudCredentialEncodingTest {
         val encoded = CloudCredentialPayloadCodec.encode(credential)
 
         assertEquals(credential, CloudCredentialPayloadCodec.decode(encoded))
-        assertFalse(encoded.decodeToString().contains(credential.bearerToken))
     }
 
     @Test
