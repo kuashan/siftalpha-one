@@ -2,7 +2,7 @@
 
 **M2.0R:** CLOSED
 
-**M2.1:** current phase; implementation paused for GitHub-first plan realignment.
+**M2.1:** CLOSED after GitHub-first implementation and verification; M2.2 has not started.
 
 Cloud Manager remains an independent architecture:
 
@@ -24,6 +24,10 @@ These are not Cloud Manager M2.1 APIs and must not be invented:
 - Cloud Web Result API;
 - WebSocket/SSE log streaming;
 - multi-server scheduling.
+
+## M2.1 implementation result
+
+The implementation is isolated in `:cloud-core`, `:cloud-agent-client`, and the `:app` Cloud Android integration. `CloudCredentialStore` remains platform-neutral in `:cloud-agent-client`; Android Keystore + AES/GCM is implemented only in `:app`. No existing UI or Runtime lifecycle is wired to these modules.
 
 ## Verification boundary
 

@@ -5,6 +5,34 @@
 历史条目中的 W2、W3、W4、W5 仅按当时命名记录已发生的工作、构建或发布，不表示当前 Roadmap 阶段。
 
 
+## 2026-09-29 · Cloud Manager M2.1 Foundation Closure（云管理器 M2.1 基础闭环）
+
+### Scope
+
+- `M2_1_PLAN=APPROVED_FOR_IMPLEMENTATION`，真实实现从 GitHub `codex/cloud-manager-m2` 的远端 HEAD 开始。
+- 基线仍为 `origin/codex/r48d11-external-runtime-baseline-python-resolver` / `b2650a957ca8ad7458ae8f911cd8fb5487d95a83` 的后继提交。
+- M2.1 在 M2.2 之前停止；未接入 Single UI、Project Card、Normal/Developer 主流程或旧 Runtime Provider。
+
+### Implementation
+
+- 新增纯 JVM `:cloud-core` domain/policy/error/repository contracts。
+- 新增纯 JVM `:cloud-agent-client` M1 DTO、HTTP transport、错误映射、client、bounded response handling 和 operation poller。
+- `CloudCredentialStore` 只在 `:cloud-agent-client` 定义平台无关接口；Android Keystore + AES/GCM 具体实现位于 `:app` Cloud Android integration。
+- 未修改 Internal/External Runtime、Termux、PRoot、PID/PGID、本地 Web Discovery、Runtime lifecycle、服务器、Agent 或 WireGuard。
+
+### Verification
+
+- W0 gate 实际 Run `36414509699`：success（用户提供的 `36414509799` 为 GitHub 404/typo）。
+- 最新实现 HEAD `9bbcca4` 的 W0 Run `36448915725`：success。
+- Android Keystore Run `36448915775` / job `109018290849`：success。
+- Real Agent smoke：只读 health/projects/status 通过；未调用 prepare/start/stop。
+- 本机未运行 Gradle 或 Android build；无 token/private key 写入或报告。
+
+### Closure
+
+`M2_1_CODE=CLOSED`；`M2_1_REMOTE_SMOKE=PASS`；`M2_2=NOT_STARTED`；`LOCAL_GRADLE_BUILD_USED=NO`；`SECRETS_EXPOSED=NO`。
+
+
 ## 2026-09-27 · R48d10.6 External Ubuntu Python Identity（外部 Ubuntu Python 身份）
 
 ### Source boundary（源码边界）

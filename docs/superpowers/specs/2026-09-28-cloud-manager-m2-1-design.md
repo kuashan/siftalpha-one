@@ -1,10 +1,14 @@
 # SiftAlpha Cloud Manager M2.1 Design
 
-**Status:** Approved for implementation
+**Status:** Implemented and accepted for M2.1; stopped before M2.2
 
 **Baseline:** `origin/codex/r48d11-external-runtime-baseline-python-resolver` at `b2650a957ca8ad7458ae8f911cd8fb5487d95a83`
 
 **Branch:** `codex/cloud-manager-m2`
+
+**Implementation gate:** `M2_1_PLAN=APPROVED_FOR_IMPLEMENTATION` after the actual W0 gate Run `36414509699` completed successfully. The user-provided `36414509799` was a GitHub 404/typo and was not treated as evidence.
+
+**Implementation result:** Cloud domain, platform-neutral Agent client and credential contract, bounded operation polling, Android Keystore integration, CI guards, and read-only smoke evidence are complete. No Cloud Manager UI or legacy Runtime integration was started.
 
 ## Goal
 

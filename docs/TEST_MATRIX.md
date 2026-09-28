@@ -16,6 +16,20 @@
 
 本文件是 Regression / Verification Evidence（回归与验证证据）。其中旧 W2–W5 名称仅在历史工作项、测试记录、Release/tag 或 artifact 证据中保留，不再表示当前 Roadmap 阶段、完成度 checklist 或开发 gate。
 
+## Cloud Manager M2.1
+
+| ID | 验证项 | 证据 | 状态 |
+|---|---|---|---|
+| M2.1-01 | `:cloud-core` domain/policy | W0 Run `36448915725` | PASS |
+| M2.1-02 | `:cloud-agent-client` M1 DTO/client/error mapping/poller | W0 Run `36448915725` | PASS |
+| M2.1-03 | Android Keystore + AES/GCM credential integration | Android Keystore Run `36448915775`, job `109018290849` | PASS |
+| M2.1-04 | Existing Android unit test, compile and debug APK build | W0 Run `36448915725` | PASS |
+| M2.1-05 | Cloud-module forbidden Runtime/Termux/PRoot guard | W0 Run `36448915725` | PASS |
+| M2.1-06 | Real Agent read-only health/projects/status smoke | Existing WireGuard path, no mutation request | PASS |
+| M2.1-07 | Legacy Runtime and Normal/Developer main-flow isolation | baseline diff and source scan | PASS |
+
+M2.1 closure: `M2_1_CODE=CLOSED`, `M2_1_REMOTE_SMOKE=PASS`, `M2_2=NOT_STARTED`. Formal verification was GitHub Actions-only; `LOCAL_GRADLE_BUILD_USED=NO`.
+
 
 ## R48d10.6 — External Ubuntu Python Identity（外部 Ubuntu Python 身份）
 

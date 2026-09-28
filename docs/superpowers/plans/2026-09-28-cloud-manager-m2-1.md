@@ -10,6 +10,20 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-28-cloud-manager-m2-1-design.md`
 
+## Execution result
+
+`M2_1_PLAN=APPROVED_FOR_IMPLEMENTATION` and M2.1 is complete on `codex/cloud-manager-m2`. Tasks 0–7 were executed with GitHub Actions as the formal build/test authority. Implementation verification passed at code HEAD `9bbcca4`; the acceptance report was added afterward as documentation-only work. M2.2 was not started.
+
+Evidence:
+
+- W0 gate: actual Run `36414509699` — success.
+- Latest W0 for implementation HEAD: Run `36448915725` — success.
+- Android Keystore instrumentation: Run `36448915775`, job `109018290849` — success.
+- Real Agent: read-only `health`, `projects`, and project `status` smoke — pass.
+- Local Gradle/Android build: not used.
+
+Completion ledger: Task 0 complete; Tasks 1–6 complete; Task 7 complete with `docs/M2_1_ACCEPTANCE_REPORT.md`. No old Runtime, Termux, PRoot, Normal/Developer main-flow, server, Agent, or WireGuard changes were made.
+
 ## Global Constraints
 
 - Source baseline remains `origin/codex/r48d11-external-runtime-baseline-python-resolver` at `b2650a957ca8ad7458ae8f911cd8fb5487d95a83`; if it changes, stop and output `SOURCE_BASELINE_CHANGED`.
