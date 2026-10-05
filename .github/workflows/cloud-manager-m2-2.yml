@@ -168,6 +168,79 @@ jobs:
             mv "$legacy_test_dir" build/ci-excluded-android-tests/
           fi
 
+      - name: Prepare Cloud-only Gradle variant in CI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("app/build.gradle.kts")
+          text = path.read_text()
+          marker = 'val trustedKeystorePayload = providers.gradleProperty("SIFTALPHA_DEBUG_KEYSTORE_B64")'
+          property_block = (
+              '// CI-only Cloud Keystore instrumentation variant.\n'
+              'val cloudKeystoreInstrumentation = providers.gradleProperty("siftalphaCloudKeystoreTest").orNull == "true"\n\n'
+          )
+          if "val cloudKeystoreInstrumentation =" in text:
+              raise SystemExit("Cloud Keystore variant logic already exists; refusing duplicate CI patch")
+          if marker not in text:
+              raise SystemExit("Unexpected app/build.gradle.kts: Keystore property insertion point is missing")
+          text = text.replace(marker, property_block + marker, 1)
+
+          old_abi = "        ndk {\n            abiFilters += listOf(\"arm64-v8a\")\n        }"
+          new_abi = "        ndk {\n            abiFilters += if (cloudKeystoreInstrumentation) {\n                listOf(\"x86_64\")\n            } else {\n                listOf(\"arm64-v8a\")\n            }\n        }"
+          if text.count(old_abi) != 1:
+              raise SystemExit("Unexpected app/build.gradle.kts: ABI block changed")
+          text = text.replace(old_abi, new_abi, 1)
+
+          old_native = (
+              "    externalNativeBuild {\n"
+              "        cmake {\n"
+              "            path = file(\"src/main/cpp/CMakeLists.txt\")\n"
+              "            version = \"3.22.1\"\n"
+              "        }\n"
+              "    }\n\n"
+              "    sourceSets {\n"
+              "        getByName(\"main\") {\n"
+              "            assets.srcDir(embeddedCpythonAssets)\n"
+              "            assets.srcDir(internalAlpineAssets)\n"
+              "            jniLibs.srcDir(embeddedCpythonJniLibs)\n"
+              "            jniLibs.srcDir(internalAlpineJniLibs)\n"
+              "        }\n"
+              "    }"
+          )
+          new_native = (
+              "    if (!cloudKeystoreInstrumentation) {\n"
+              "        externalNativeBuild {\n"
+              "            cmake {\n"
+              "                path = file(\"src/main/cpp/CMakeLists.txt\")\n"
+              "                version = \"3.22.1\"\n"
+              "            }\n"
+              "        }\n"
+              "    }\n\n"
+              "    if (!cloudKeystoreInstrumentation) {\n"
+              "        sourceSets {\n"
+              "            getByName(\"main\") {\n"
+              "                assets.srcDir(embeddedCpythonAssets)\n"
+              "                assets.srcDir(internalAlpineAssets)\n"
+              "                jniLibs.srcDir(embeddedCpythonJniLibs)\n"
+              "                jniLibs.srcDir(internalAlpineJniLibs)\n"
+              "            }\n"
+              "        }\n"
+              "    }\n\n"
+              "    if (cloudKeystoreInstrumentation) {\n"
+              "        sourceSets {\n"
+              "            getByName(\"androidTest\") {\n"
+              "                java.setSrcDirs(listOf(\"src/androidTest/java/com/siftalpha/studio/cloud\"))\n"
+              "            }\n"
+              "        }\n"
+              "    }"
+          )
+          if text.count(old_native) != 1:
+              raise SystemExit("Unexpected app/build.gradle.kts: native/source-set blocks changed")
+          path.write_text(text.replace(old_native, new_native, 1))
+          print("Prepared guarded Cloud-only x86_64 instrumentation variant in the ephemeral CI checkout")
+          PY
+
       - name: Run Android Keystore tests on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
