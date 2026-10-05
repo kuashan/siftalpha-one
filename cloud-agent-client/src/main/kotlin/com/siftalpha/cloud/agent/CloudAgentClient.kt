@@ -13,6 +13,7 @@ import com.siftalpha.cloud.core.CloudErrorCode
 import com.siftalpha.cloud.core.CloudOperation
 import com.siftalpha.cloud.core.CloudProject
 import com.siftalpha.cloud.core.CloudProjectStatus
+import com.siftalpha.cloud.core.CloudResources
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.URLEncoder
@@ -52,6 +53,11 @@ class SiftAlphaCloudAgentClient(
     fun getStatus(projectId: String): CloudProjectStatus = executeJson(
         path = "/v1/projects/${encodeSegment(projectId)}/status",
         decode = { CloudDtoMapper.toCloudStatus(M1Json.decodeStatus(it)) },
+    )
+
+    fun resources(projectId: String): CloudResources = executeJson(
+        path = "/v1/projects/${encodeSegment(projectId)}/resources",
+        decode = { CloudDtoMapper.toCloudResources(M1Json.decodeResources(it)) },
     )
 
     fun prepare(projectId: String): CloudOperation = postOperation(projectId, "prepare")
@@ -175,4 +181,3 @@ class SiftAlphaCloudAgentClient(
         return URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20")
     }
 }
-

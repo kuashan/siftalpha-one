@@ -13,5 +13,6 @@ data class CloudProjectStatus(
     val restartCount: Int? = null,
     val startedAt: Instant? = null,
     val finishedAt: Instant? = null,
+    val health: String? = null,
+    val runtimeUnits: List<CloudRuntimeUnit> = emptyList(),
 )
-

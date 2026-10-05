@@ -18,10 +18,11 @@ object M1Json {
 
     fun decodeStatus(body: String): M1StatusDto = json.decodeFromString(body)
 
+    fun decodeResources(body: String): M1ResourcesDto = json.decodeFromString(body)
+
     fun decodeLogs(body: String): M1LogsDto = json.decodeFromString(body)
 
     fun decodeOperation(body: String): M1OperationDto = json.decodeFromString(body)
 
     fun decodeError(body: String): M1ErrorEnvelopeDto = json.decodeFromString(body)
 }
-

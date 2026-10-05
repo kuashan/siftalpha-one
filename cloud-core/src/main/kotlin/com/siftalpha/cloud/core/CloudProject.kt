@@ -16,5 +16,8 @@ data class CloudProject(
     val result: CloudResult? = null,
     val createdAt: Instant? = null,
     val updatedAt: Instant? = null,
+    val group: String? = null,
+    val architecture: String? = null,
+    val web: CloudWebEndpoint? = null,
+    val runtimeUnits: List<CloudRuntimeUnit> = emptyList(),
 )
-

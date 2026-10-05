@@ -7,7 +7,10 @@ import com.siftalpha.cloud.agent.api.M1HealthDto
 import com.siftalpha.cloud.agent.api.M1LogsDto
 import com.siftalpha.cloud.agent.api.M1OperationDto
 import com.siftalpha.cloud.agent.api.M1ProjectDto
+import com.siftalpha.cloud.agent.api.M1ResourcesDto
+import com.siftalpha.cloud.agent.api.M1RuntimeUnitDto
 import com.siftalpha.cloud.agent.api.M1StatusDto
+import com.siftalpha.cloud.agent.api.M1WebDto
 import com.siftalpha.cloud.core.CloudArtifact
 import com.siftalpha.cloud.core.CloudConnectionState
 import com.siftalpha.cloud.core.CloudEnvironmentState
@@ -18,7 +21,10 @@ import com.siftalpha.cloud.core.CloudOperationAction
 import com.siftalpha.cloud.core.CloudOperationStatus
 import com.siftalpha.cloud.core.CloudProject
 import com.siftalpha.cloud.core.CloudProjectStatus
+import com.siftalpha.cloud.core.CloudResources
+import com.siftalpha.cloud.core.CloudRuntimeUnit
 import com.siftalpha.cloud.core.CloudRuntimeState
+import com.siftalpha.cloud.core.CloudWebEndpoint
 import java.time.Instant
 
 object CloudDtoMapper {
@@ -31,12 +37,16 @@ object CloudDtoMapper {
         requireNonBlank(serverId, "serverId")
         requireNonBlank(dto.projectId, "project.projectId")
         return CloudProject(
-            displayName = dto.projectId,
+            displayName = dto.displayName ?: dto.projectId,
             serverId = serverId,
             remoteProjectId = dto.projectId,
             environmentState = environment(dto.environmentState),
             runtimeState = runtime(dto.runtimeState),
-            runtimeKind = dto.image,
+            runtimeKind = dto.runtimeKind ?: dto.image,
+            group = dto.group,
+            architecture = dto.architecture,
+            web = dto.web?.let { toCloudWebEndpoint(it) },
+            runtimeUnits = dto.runtimeUnits.map { toCloudRuntimeUnit(it) },
         )
     }
 
@@ -53,6 +63,16 @@ object CloudDtoMapper {
             restartCount = dto.restartCount,
             startedAt = instant(dto.startedAt, "status.startedAt"),
             finishedAt = instant(dto.finishedAt, "status.finishedAt"),
+            health = dto.health,
+            runtimeUnits = dto.runtimeUnits.map { toCloudRuntimeUnit(it) },
+        )
+    }
+
+    fun toCloudResources(dto: M1ResourcesDto): CloudResources {
+        requireNonBlank(dto.projectId, "resources.projectId")
+        return CloudResources(
+            remoteProjectId = dto.projectId,
+            runtimeUnits = dto.runtimeUnits.map { toCloudRuntimeUnit(it) },
         )
     }
 
@@ -109,6 +129,33 @@ object CloudDtoMapper {
         }
     }
 
+    private fun toCloudWebEndpoint(dto: M1WebDto): CloudWebEndpoint = try {
+        CloudWebEndpoint(dto.scheme, dto.host, dto.port, dto.path)
+    } catch (error: IllegalArgumentException) {
+        throw invalid("Invalid Web endpoint")
+    }
+
+    private fun toCloudRuntimeUnit(dto: M1RuntimeUnitDto): CloudRuntimeUnit {
+        requireNonBlank(dto.serviceName, "runtimeUnit.serviceName")
+        if (dto.cpuPercent != null && dto.cpuPercent < 0.0) {
+            throw invalid("runtimeUnit.cpuPercent must be non-negative")
+        }
+        return CloudRuntimeUnit(
+            serviceName = dto.serviceName,
+            containerId = dto.containerId,
+            image = dto.image,
+            state = dto.state,
+            health = dto.health,
+            restartCount = dto.restartCount,
+            exitCode = dto.exitCode,
+            oomKilled = dto.oomKilled,
+            startedAt = instant(dto.startedAt, "runtimeUnit.startedAt"),
+            cpuPercent = dto.cpuPercent,
+            memoryUsage = dto.memoryUsage,
+            memoryLimit = dto.memoryLimit,
+        )
+    }
+
     private fun requireNonBlank(value: String, field: String) {
         if (value.isBlank()) throw invalid("Missing $field")
     }
@@ -116,4 +163,3 @@ object CloudDtoMapper {
     private fun invalid(message: String): CloudAgentException =
         CloudAgentException(CloudError(CloudErrorCode.INVALID_RESPONSE, message))
 }
-
