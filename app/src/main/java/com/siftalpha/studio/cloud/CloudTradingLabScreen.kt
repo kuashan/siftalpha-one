@@ -48,14 +48,17 @@ fun CloudTradingLabScreen(
     val operationLabel = state.operation?.state?.name ?: "IDLE"
 
     if (showLogs) {
+        val logText = state.logs?.lines?.joinToString("\n").orEmpty()
         AlertDialog(
             onDismissRequest = { showLogs = false },
             title = { Text(stringResource(R.string.cloud_trading_lab_logs)) },
             text = {
                 Text(
-                    state.logs?.lines?.joinToString("\n")
-                        ?.ifBlank { stringResource(R.string.cloud_trading_lab_no_logs) }
-                        ?: stringResource(R.string.cloud_trading_lab_no_logs),
+                    if (logText.isBlank()) {
+                        stringResource(R.string.cloud_trading_lab_no_logs)
+                    } else {
+                        logText
+                    },
                 )
             },
             confirmButton = {
