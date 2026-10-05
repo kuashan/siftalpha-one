@@ -4,20 +4,26 @@ This is the current branch status. It intentionally does not claim full CI or
 any Oracle/Agent acceptance while the remote provenance gate is blocked.
 
 ```text
-M2_2_FOUNDATION=IN_PROGRESS
+M2_2_FOUNDATION=PASS
 AGENT_PROVENANCE=BLOCKED_NETWORK_ACCESS
 SERVER_MUTATION=NO
 TRADING_LAB_IMPLEMENTATION=NOT_STARTED
 SECRETS_EXPOSED=NO
+FOUNDATION_CI_RUN=37285289171
 
-CLOUD_CORE_TESTS=PENDING_CI
-CLOUD_AGENT_CLIENT_TESTS=PENDING_CI
-ANDROID_UNIT_TESTS=PENDING_CI
-ANDROID_COMPILE=PENDING_CI
-ANDROID_APK_BUILD=PENDING_CI
-ARCHITECTURE_GUARD=PENDING_CI
-ANDROID_KEYSTORE_INSTRUMENTATION=PENDING_CI
+CLOUD_CORE_TESTS=PASS
+CLOUD_AGENT_CLIENT_TESTS=PASS
+ANDROID_UNIT_TESTS=PASS
+ANDROID_COMPILE=PASS
+ANDROID_APK_BUILD=PASS
+ARCHITECTURE_GUARD=PASS
+ANDROID_KEYSTORE_TEST=PASS
 ```
+
+Foundation CI Run `37285289171` completed successfully on commit `3c1cea9`.
+The emulator job used the verified M2.1 `pixel_2` / API 34 / `x86_64`
+configuration and restored the Cloud-only test variant in the ephemeral CI
+checkout. No Cloud Credential or Keystore business code was changed.
 
 The Foundation CI is split into independent responsibilities:
 
