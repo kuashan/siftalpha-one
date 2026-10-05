@@ -124,7 +124,12 @@ jobs:
         run: tools/prepare_internal_alpine_android.sh app/build/generated/internal-alpine
 
       - name: Run Android JVM unit tests
-        run: gradle --no-daemon --stacktrace --console=plain :core:test :app:testDebugUnitTest
+        run: |
+          set +e
+          mkdir -p build/ci-logs
+          gradle --no-daemon --stacktrace --console=plain :core:test :app:testDebugUnitTest 2>&1 | tee build/ci-logs/android-jvm-tests.log
+          status=${PIPESTATUS[0]}
+          exit "$status"
 
       - name: Run Android Trading Lab JVM tests
         run: |
@@ -148,6 +153,7 @@ jobs:
             app/build/outputs/apk/debug/app-debug.apk
             app/build/test-results
             app/build/reports/tests
+            build/ci-logs/android-jvm-tests.log
           if-no-files-found: warn
           retention-days: 14
 
