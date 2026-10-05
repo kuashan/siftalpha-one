@@ -17,8 +17,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  cloud-core:
-    name: Cloud core tests
+  architecture-guard:
+    name: Cloud architecture guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Verify Cloud module boundaries
+        run: bash tools/verify_cloud_manager_architecture.sh
+
+  cloud-modules:
+    name: Cloud core and Agent client tests
+    needs: architecture-guard
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -37,5 +49,118 @@ jobs:
           gradle-version: '9.3.1'
           cache-provider: basic
 
-      - name: Run Cloud core tests
-        run: gradle --no-daemon --stacktrace --console=plain :cloud-core:test
+      - name: Run Cloud core and Agent client tests
+        run: gradle --no-daemon --stacktrace --console=plain :cloud-core:test :cloud-agent-client:test
+
+  android-foundation:
+    name: Android Foundation tests and APK
+    needs: architecture-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+
+      - name: Install Android build prerequisites
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.3.13750724" "cmake;3.22.1"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.3.1'
+          cache-provider: basic
+
+      - name: Prepare official CPython Android component
+        run: tools/prepare_embedded_cpython_android.sh app/build/generated/cpython/arm64-v8a
+
+      - name: Prepare Internal Alpine Android runtime
+        run: tools/prepare_internal_alpine_android.sh app/build/generated/internal-alpine
+
+      - name: Run Android JVM unit tests
+        run: gradle --no-daemon --stacktrace --console=plain :core:test :app:testDebugUnitTest
+
+      - name: Compile Android app
+        run: gradle --no-daemon --stacktrace --console=plain :app:compileDebugKotlin
+
+      - name: Assemble Debug APK
+        run: gradle --no-daemon --stacktrace --console=plain :app:assembleDebug
+
+      - name: Upload Android Foundation evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-manager-m2-2-android-foundation-${{ github.run_number }}
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/test-results
+            app/build/reports/tests
+          if-no-files-found: warn
+          retention-days: 14
+
+  android-keystore-instrumentation:
+    name: Android Keystore instrumentation
+    needs: architecture-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+
+      - name: Install Android build prerequisites
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.3.13750724" "cmake;3.22.1"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.3.1'
+          cache-provider: basic
+
+      - name: Prepare official CPython Android component
+        run: tools/prepare_embedded_cpython_android.sh app/build/generated/cpython/arm64-v8a
+
+      - name: Prepare Internal Alpine Android runtime
+        run: tools/prepare_internal_alpine_android.sh app/build/generated/internal-alpine
+
+      - name: Run Android Keystore tests on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: Pixel_2
+          force-avd-creation: true
+          disable-animations: true
+          script: gradle --no-daemon --stacktrace --console=plain :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.siftalpha.studio.cloud.AndroidCloudCredentialStoreTest
+
+      - name: Upload Android instrumentation evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-manager-m2-2-android-instrumentation-${{ github.run_number }}
+          path: |
+            app/build/outputs/androidTest-results
+            app/build/reports/androidTests
+          if-no-files-found: warn
+          retention-days: 14
