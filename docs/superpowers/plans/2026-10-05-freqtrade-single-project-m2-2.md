@@ -19,6 +19,7 @@
 - Freqtrade is dry-run only: no real orders, real money, exchange private keys, or withdrawal permission.
 - Freqtrade resource limits are CPU `1.0`, memory `2GiB`, and PIDs `256`; unlimited resources are forbidden.
 - Freqtrade source, registry entry, Compose file, dry-run config, minimal strategy/config, Web metadata, and limits must be committed artifacts; Oracle must not receive hand-edited server-only configuration.
+- FreqUI/Freqtrade API authentication values (`username`, `password`, `jwt_secret_key`, `ws_token`, and equivalent auth secrets) must never be committed. Git contains only non-secret configuration/templates; the server uses a root-owned, restricted, server-local secret overlay/environment source that is excluded from Git and Android, has no credential-sync or App-management path, and is checked only for existence/ownership/mode during deployment without reading, printing, logging, or reporting its contents.
 - `daily-stock-analysis` must parse and operate unchanged without requiring the new optional metadata.
 - The helper gains only `resources`; generic shell, exec, Docker admin, arbitrary paths, arbitrary containers, and arbitrary commands remain forbidden.
 - When no container exists, Status returns an initial state, Logs returns a bounded empty result, and Resources returns no running instance. Ownership validation is required once a container exists; an existing container with mismatched ownership labels or Compose identity is rejected.
@@ -53,19 +54,25 @@
 
   Expected: clean `feature/cloud-manager-trading-lab-m2.2` at the approved Design Spec baseline.
 
-- [ ] **Step 2: Create the Agent linked worktree from the helper baseline.**
+- [ ] **Step 2: Read-only preflight the fixed private FreqUI port.**
+
+  Through the existing Oracle/WireGuard management path, inspect listening sockets on `10.77.0.1` and select one currently unused non-management TCP port for FreqUI. Record the selected `FREQTRADE_PRIVATE_PORT` in the plan ledger before Task 1. Do not bind the port, change firewall/security-list rules, edit the server, or probe through a new public path. If no safe port is available, stop before Task 1.
+
+  Expected: one unused private port is recorded; no server state changes.
+
+- [ ] **Step 3: Create the Agent linked worktree from the helper baseline.**
 
   Run: `git worktree add /Users/dlqs/Documents/Codex/2026-09-28/agent-m2-2-freqtrade -b feature/trading-lab-freqtrade-m2.2 baseline/runtime-helper-m0`.
 
   Expected: the new worktree starts at `0220516cc605e669bde9dc54631935f9239dd265`, with the existing helper source and provenance docs present.
 
-- [ ] **Step 3: Run baseline checks before implementation.**
+- [ ] **Step 4: Run baseline checks before implementation.**
 
   Run: `python -m compileall -q src runtime-helper` in the Agent worktree; run `gradle --no-daemon --stacktrace --console=plain :cloud-core:test :cloud-agent-client:test` in the Android worktree.
 
   Expected: both baselines pass; any pre-existing failure is recorded before Task 1.
 
-- [ ] **Step 4: Commit.**
+- [ ] **Step 5: Commit.**
 
   No product commit is created for this setup task; the branch/worktree SHAs are recorded in the plan ledger.
 
@@ -77,8 +84,8 @@
 - Modify: `src/siftalpha_agent/registry.py` — add optional metadata models and preserve the current required-key validation for legacy entries.
 - Create: `projects.d/freqtrade.json` — the sole new project entry with stable UUID, Freqtrade metadata, source/runtime/Compose paths, Web metadata, limits, and the exact upstream `sourceSha`.
 - Create: `deploy/freqtrade/SOURCE_PIN.json` — official repository, release, commit, ARM64, and artifact schema identity.
-- Create: `deploy/freqtrade/compose.yaml` — versioned Compose source with fixed service, private Web port binding, labels, and CPU/memory/PID limits.
-- Create: `deploy/freqtrade/user_data/config.json` — dry-run-only Freqtrade configuration, private API binding, FreqUI authentication retained, and no exchange keys/secrets.
+- Create: `deploy/freqtrade/compose.yaml` — versioned Compose source with the Task 0 fixed service/private Web port binding, labels, CPU/memory/PID limits, and a reference to the server-local restricted auth environment source without embedding its values.
+- Create: `deploy/freqtrade/user_data/config.json` — versioned non-secret dry-run-only Freqtrade configuration/template, private API binding, and no exchange or FreqUI/API authentication values.
 - Create: `deploy/freqtrade/user_data/strategies/SiftAlphaDryRunStrategy.py` — the smallest committed strategy required to boot the dry-run service.
 - Create: `deploy/freqtrade/MANIFEST.sha256` — hashes for every deployment artifact above.
 - Create: `tests/test_registry.py` and `tests/test_freqtrade_artifacts.py`.
@@ -93,7 +100,7 @@
 
 - [ ] **Step 2: Write failing artifact tests.**
 
-  Add `test_source_pin_is_exact`, `test_manifest_covers_all_deployment_artifacts`, `test_compose_contains_required_ownership_and_limits`, and `test_config_is_dry_run_without_exchange_credentials`. Assert the exact release/commit, one service, labels, private binding, CPU `1.0`, memory `2GiB`, PIDs `256`, `dry_run=true`, and absence of exchange key/secret/withdrawal permission fields.
+  Add `test_source_pin_is_exact`, `test_manifest_covers_all_deployment_artifacts`, `test_compose_contains_required_ownership_and_limits`, `test_config_is_dry_run_without_exchange_credentials`, and `test_versioned_artifacts_contain_no_freq_ui_auth_values`. Assert the exact release/commit, the Task 0 fixed port, one service, labels, private binding, CPU `1.0`, memory `2GiB`, PIDs `256`, `dry_run=true`, and absence of exchange keys, withdrawal permission fields, `username`, `password`, `jwt_secret_key`, `ws_token`, or other literal API-auth secret values.
 
 - [ ] **Step 3: Run the focused tests to verify RED.**
 
@@ -103,13 +110,13 @@
 
 - [ ] **Step 4: Implement the minimal Registry model and artifacts.**
 
-  Keep the existing required field set intact. Parse optional fields with safe legacy defaults; reject invalid schemes, ports, UUIDs, architectures, limits, and non-Freqtrade source identities. Make the Compose file consume only fixed artifact paths and fixed values. FreqUI auth values, if required by the pinned Freqtrade release, are lab-only runtime credentials in the private versioned artifact, never Agent/App credentials and never exchange credentials.
+  Keep the existing required field set intact. Parse optional fields with safe legacy defaults; reject invalid schemes, ports, UUIDs, architectures, limits, and non-Freqtrade source identities. Write the Task 0 fixed port into the Registry, Compose, and Web metadata. Make the Compose file consume only fixed artifact paths and fixed non-secret values, with FreqUI/API auth supplied only by the server-local restricted overlay/environment source. No `username`, `password`, `jwt_secret_key`, `ws_token`, or equivalent auth value may exist in Git, Android, Agent responses, logs, or reports. Deployment checks that source only for existence, owner, and mode; it never reads or prints values. This is a server-local runtime prerequisite, not Secret Injection or credential synchronization.
 
 - [ ] **Step 5: Run focused and full Agent tests.**
 
   Run: `python -m unittest -v tests.test_registry tests.test_freqtrade_artifacts`, then `python -m unittest discover -s tests -v`.
 
-  Expected: PASS; legacy daily-stock parsing remains green and the manifest matches all committed artifacts.
+  Expected: PASS; legacy daily-stock parsing remains green, the manifest matches all committed artifacts, the Task 0 port is consistent, and the Git artifact secret audit is negative.
 
 - [ ] **Step 6: Commit.**
 
@@ -322,7 +329,7 @@
 
 - [ ] **Step 1: Write failing CI guard tests/checks.**
 
-  Add assertions that the Agent workflow runs all Agent tests, the App workflow keeps `architecture-guard`, `cloud-modules`, `android-foundation`, and `android-keystore-instrumentation`, and no Cloud module imports legacy Runtime/Termux/PRoot symbols.
+  Add assertions that the Agent workflow runs all Agent tests, the App workflow keeps `architecture-guard`, `cloud-modules`, `android-foundation`, and `android-keystore-instrumentation`, no Cloud module imports legacy Runtime/Termux/PRoot symbols, and tracked Freqtrade artifacts contain no FreqUI/API auth values.
 
 - [ ] **Step 2: Run the guard checks to verify RED.**
 
@@ -363,15 +370,15 @@
 
 - [ ] **Step 1: Record pre-deployment state read-only.**
 
-  Record `PRE_DEPLOY_AGENT_SHA`, `PRE_DEPLOY_HELPER_SHA256`, service state/PID, `daily-stock-analysis` status, Docker workload inventory, and a private FreqUI port availability check. Do not read or print tokens.
+  Record `PRE_DEPLOY_AGENT_SHA`, `PRE_DEPLOY_HELPER_SHA256`, service state/PID, `daily-stock-analysis` status, Docker workload inventory, and a read-only check that the same Task 0 `FREQTRADE_PRIVATE_PORT` is still available on `10.77.0.1`. If it is occupied, stop; do not select another port or edit the server. Do not read or print tokens.
 
 - [ ] **Step 2: Validate the artifact bundle before transfer.**
 
-  Verify the Git commit, `MANIFEST.sha256`, Freqtrade source pin, and all config/Compose/strategy hashes locally. Refuse deployment if any artifact is uncommitted or drifted.
+  Verify the Git commit, `MANIFEST.sha256`, Freqtrade source pin, all config/Compose/strategy hashes, and the no-auth-secret artifact audit locally. Refuse deployment if any artifact is uncommitted, drifted, or contains an auth secret.
 
 - [ ] **Step 3: Install the exact source/artifacts without manual editing.**
 
-  Clone or verify `freqtrade/freqtrade` at the exact commit under `/srv/siftalpha/projects/freqtrade/source`; copy the committed runtime artifact bundle to `/srv/siftalpha/runtime-data/freqtrade`; install the committed Registry entry; verify clean source tree, file hashes, ownership labels, private binding, and resource limits. Do not alter `/etc/siftalpha-agent/token`, WireGuard, SSH, OCI rules, or existing project files.
+  Clone or verify `freqtrade/freqtrade` at the exact commit under `/srv/siftalpha/projects/freqtrade/source`; copy the committed non-secret runtime artifact bundle to `/srv/siftalpha/runtime-data/freqtrade`; install the committed Registry entry; verify clean source tree, file hashes, ownership labels, fixed private binding, and resource limits. Separately verify that the pre-provisioned server-local FreqUI/API auth overlay/environment source exists with restricted owner/mode; do not create a Git-tracked copy, sync it to Android, or read/print/log/report its contents. If it is absent or too permissive, stop without hand-editing the versioned config or choosing a fallback. Do not alter `/etc/siftalpha-agent/token`, WireGuard, SSH, OCI rules, or existing project files.
 
 - [ ] **Step 4: Install committed Agent/helper and restart once.**
 
@@ -421,10 +428,10 @@
 
 1. **Spec coverage:** Tasks 1–3 cover Registry/artifact versioning, helper ownership/resources, missing-container semantics, M1 compatibility, Web metadata, and Agent API. Tasks 4–5 cover Cloud DTO/client, poller lifecycle, one-card UI, bounded logs/resources, and validated Web open. Tasks 6–8 cover CI, controlled deployment, server acceptance, APK, and device gating.
 2. **Boundary coverage:** The plan adds exactly one helper action, one Freqtrade project, one RuntimeUnit, one resources route, and one Android card. It does not add generic command execution, Docker administration, WireGuard management, or future-bot abstractions.
-3. **Artifact integrity:** Registry, Compose source, dry-run config, minimal strategy, Web metadata, resource limits, source pin, and hashes are committed before deployment; Oracle receives only the committed bundle.
+3. **Artifact integrity:** Registry, Compose source, non-secret dry-run config/template, minimal strategy, Web metadata, resource limits, source pin, and hashes are committed before deployment; FreqUI/API auth values remain in a restricted server-local overlay/environment source checked only for existence/ownership/mode, and Oracle receives no hand-edited Git artifact.
 4. **Missing-container rule:** Status/logs/resources explicitly have separate no-container tests; ownership is enforced only after a container is found, and any existing identity mismatch rejects the operation.
 5. **Placeholder and ambiguity scan:** No task contains an unresolved placeholder. The private FreqUI port is selected once by read-only preflight and then persisted in the committed Registry/artifact bundle; a conflict requires a new reviewed artifact commit rather than a server edit.
-6. **Stop conditions:** ARM64/build failure, deployment rollback, regression, missing WireGuard route, or failed real-device acceptance each has an explicit stop state. No issue found in this plan blocks the confirmed single-project closure.
+6. **Stop conditions:** ARM64/build failure, deployment rollback, regression, missing WireGuard route, occupied fixed FreqUI port, missing/permissive server-local auth source, or failed real-device acceptance each has an explicit stop state. No issue found in this plan blocks the confirmed single-project closure.
 
 ```ini
 IMPLEMENTATION_PLAN=READY
