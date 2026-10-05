@@ -28,6 +28,36 @@ jobs:
       - name: Verify Cloud module boundaries
         run: bash tools/verify_cloud_manager_architecture.sh
 
+      - name: Verify Trading Lab CI contract
+        run: bash tools/verify_cloud_manager_trading_lab_ci.sh
+
+      - name: Verify Trading Lab domain
+        run: |
+          set -eu
+          test -s app/src/main/java/com/siftalpha/studio/cloud/CloudTradingLabController.kt
+          test -s app/src/test/java/com/siftalpha/studio/cloud/CloudTradingLabControllerTest.kt
+          grep -Fq 'FREQTRADE_PROJECT_ID = "freqtrade"' app/src/main/java/com/siftalpha/studio/cloud/CloudTradingLabController.kt
+          echo "TRADING_LAB_DOMAIN=PASS"
+
+      - name: Verify ownership boundary
+        run: |
+          set -eu
+          grep -Fq 'resources(projectId: String)' app/src/main/java/com/siftalpha/studio/cloud/CloudTradingLabController.kt
+          if rg -n -i 'docker|docker-compose|generic[[:space:]_-]+command|(^|[^a-z])exec([^a-z]|$)' app/src/main/java/com/siftalpha/studio/cloud; then
+            echo "Ownership boundary check found forbidden client-side administration surface" >&2
+            exit 1
+          fi
+          echo "OWNERSHIP_BOUNDARY=PASS"
+
+      - name: Verify Web endpoint validation
+        run: |
+          set -eu
+          grep -Fq 'validateRemoteWebUrl' app/src/main/java/com/siftalpha/studio/cloud/CloudTradingLabPolicy.kt
+          grep -Fq 'EXTRA_REMOTE_WEB_URL' app/src/main/java/com/siftalpha/studio/ResultWebActivity.kt
+          grep -Fq 'target.host == allowedUri.host' app/src/main/java/com/siftalpha/studio/ResultWebActivity.kt
+          test -s app/src/test/java/com/siftalpha/studio/cloud/CloudRemoteWebPolicyTest.kt
+          echo "WEB_ENDPOINT_VALIDATION=PASS"
+
   cloud-modules:
     name: Cloud core and Agent client tests
     needs: architecture-guard
@@ -51,6 +81,12 @@ jobs:
 
       - name: Run Cloud core and Agent client tests
         run: gradle --no-daemon --stacktrace --console=plain :cloud-core:test :cloud-agent-client:test
+
+      - name: Run Cloud Trading Lab domain tests
+        run: |
+          gradle --no-daemon --stacktrace --console=plain \
+            :cloud-core:test --tests '*CloudWebEndpointPolicyTest' \
+            :cloud-agent-client:test --tests '*TradingLabDtoTest'
 
   android-foundation:
     name: Android Foundation tests and APK
@@ -89,6 +125,13 @@ jobs:
 
       - name: Run Android JVM unit tests
         run: gradle --no-daemon --stacktrace --console=plain :core:test :app:testDebugUnitTest
+
+      - name: Run Android Trading Lab JVM tests
+        run: |
+          gradle --no-daemon --stacktrace --console=plain \
+            :app:testDebugUnitTest \
+            --tests 'com.siftalpha.studio.cloud.CloudTradingLab*' \
+            --tests 'com.siftalpha.studio.cloud.CloudRemoteWebPolicyTest'
 
       - name: Compile Android app
         run: gradle --no-daemon --stacktrace --console=plain :app:compileDebugKotlin
