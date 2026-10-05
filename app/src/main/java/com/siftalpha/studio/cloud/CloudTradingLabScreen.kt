@@ -134,17 +134,17 @@ fun CloudTradingLabScreen(
                         ) {
                             Button(
                                 onClick = onPrepare,
-                                enabled = !state.loading && decision?.enabled == true && decision.action == CloudProjectAction.PREPARE,
+                                enabled = !state.loading && decision?.enabled == true && decision?.action == CloudProjectAction.PREPARE,
                                 modifier = Modifier.weight(1f),
                             ) { Text(stringResource(R.string.cloud_trading_lab_prepare)) }
                             Button(
                                 onClick = onStart,
-                                enabled = !state.loading && decision?.enabled == true && decision.action == CloudProjectAction.START,
+                                enabled = !state.loading && decision?.enabled == true && decision?.action == CloudProjectAction.START,
                                 modifier = Modifier.weight(1f),
                             ) { Text(stringResource(R.string.cloud_trading_lab_start)) }
                             Button(
                                 onClick = onStop,
-                                enabled = !state.loading && decision?.enabled == true && decision.action == CloudProjectAction.STOP,
+                                enabled = !state.loading && decision?.enabled == true && decision?.action == CloudProjectAction.STOP,
                                 modifier = Modifier.weight(1f),
                             ) { Text(stringResource(R.string.cloud_trading_lab_stop)) }
                         }
