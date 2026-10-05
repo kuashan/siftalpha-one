@@ -26,14 +26,14 @@ class ResultWebActivity : StudioActivity() {
         super.onCreate(savedInstanceState)
         val remoteUrl = intent.getStringExtra(EXTRA_REMOTE_WEB_URL)
         val url = if (!remoteUrl.isNullOrBlank()) {
-            val uri = CloudTradingLabPolicy.validateRemoteWebUrl(remoteUrl)
-            if (uri == null) {
+            val endpoint = CloudTradingLabPolicy.validateRemoteWebUrl(remoteUrl)
+            if (endpoint == null) {
                 Toast.makeText(this, R.string.cloud_trading_lab_web_unavailable, Toast.LENGTH_LONG).show()
                 finish()
                 return
             }
-            allowedUri = uri
-            remoteUrl
+            allowedUri = Uri.parse(endpoint.url())
+            endpoint.url()
         } else {
             val resultId = intent.getStringExtra(EXTRA_RESULT_ID).orEmpty()
             if (resultId.isBlank()) {
