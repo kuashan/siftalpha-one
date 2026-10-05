@@ -115,6 +115,7 @@ fun HomeScreen(
     onEmbeddedPython: () -> Unit,
     onEnvironment: () -> Unit,
     onTerminal: () -> Unit,
+    onTradingLab: () -> Unit,
     onProbeEnvironment: () -> Unit,
     onTestTermux: () -> Unit,
     onRequestPermission: () -> Unit,
@@ -415,6 +416,10 @@ fun HomeScreen(
                     moreOpen = false
                     onSettings()
                 },
+                onTradingLab = {
+                    moreOpen = false
+                    onTradingLab()
+                },
             )
         }
 
@@ -619,6 +624,12 @@ fun HomeScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(text = stringResource(R.string.home_terminal))
+                        }
+                        OutlinedButton(
+                            onClick = onTradingLab,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = stringResource(R.string.cloud_trading_lab))
                         }
                         OutlinedButton(
                             onClick = onEmbeddedPython,

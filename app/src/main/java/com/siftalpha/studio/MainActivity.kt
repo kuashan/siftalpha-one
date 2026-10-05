@@ -163,6 +163,9 @@ class MainActivity : StudioComposeActivity() {
                     onTerminal = {
                         startActivity(Intent(this, V05Activity::class.java))
                     },
+                    onTradingLab = {
+                        startActivity(Intent(this, com.siftalpha.studio.cloud.CloudTradingLabActivity::class.java))
+                    },
                     onProbeEnvironment = {
                         runCommand(TermuxBackend.ENVIRONMENT_PROBE)
                     },

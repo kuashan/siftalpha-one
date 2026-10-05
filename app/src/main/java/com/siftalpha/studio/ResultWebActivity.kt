@@ -14,27 +14,38 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.siftalpha.studio.cloud.CloudTradingLabPolicy
 import com.siftalpha.studio.runtime.ResultWebHost
 
 class ResultWebActivity : StudioActivity() {
 
     private lateinit var webView: WebView
-    private lateinit var localUri: Uri
+    private lateinit var allowedUri: Uri
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val resultId = intent.getStringExtra(EXTRA_RESULT_ID).orEmpty()
-        if (resultId.isBlank()) {
-            finish()
-            return
+        val remoteUrl = intent.getStringExtra(EXTRA_REMOTE_WEB_URL)
+        val url = if (!remoteUrl.isNullOrBlank()) {
+            val uri = CloudTradingLabPolicy.validateRemoteWebUrl(remoteUrl)
+            if (uri == null) {
+                Toast.makeText(this, R.string.cloud_trading_lab_web_unavailable, Toast.LENGTH_LONG).show()
+                finish()
+                return
+            }
+            allowedUri = uri
+            remoteUrl
+        } else {
+            val resultId = intent.getStringExtra(EXTRA_RESULT_ID).orEmpty()
+            if (resultId.isBlank()) {
+                finish()
+                return
+            }
+            runCatching { ResultWebHost.urlFor(this, resultId) }.getOrElse {
+                Toast.makeText(this, R.string.runtime_result_web_load_failed, Toast.LENGTH_LONG).show()
+                finish()
+                return
+            }.also { allowedUri = Uri.parse(it) }
         }
-
-        val url = runCatching { ResultWebHost.urlFor(this, resultId) }.getOrElse {
-            Toast.makeText(this, R.string.runtime_result_web_load_failed, Toast.LENGTH_LONG).show()
-            finish()
-            return
-        }
-        localUri = Uri.parse(url)
         setContentView(buildUi(url))
         webView.loadUrl(url)
     }
@@ -55,7 +66,7 @@ class ResultWebActivity : StudioActivity() {
             weight().apply { marginStart = dp(6) },
         )
         actions.addView(
-            button(getString(R.string.runtime_result_web_external)) { openExternal(localUri) },
+            button(getString(R.string.runtime_result_web_external)) { openExternal(allowedUri) },
             weight().apply { marginStart = dp(6) },
         )
         root.addView(
@@ -89,11 +100,7 @@ class ResultWebActivity : StudioActivity() {
                     request: WebResourceRequest?,
                 ): Boolean {
                     val target = request?.url ?: return true
-                    if (
-                        target.scheme == "http" &&
-                        target.host == localUri.host &&
-                        target.port == localUri.port
-                    ) {
+                    if (isAllowedInWebView(target)) {
                         return false
                     }
                     if (target.scheme == "http" || target.scheme == "https") {
@@ -112,6 +119,17 @@ class ResultWebActivity : StudioActivity() {
             ),
         )
         return root
+    }
+
+    private fun isAllowedInWebView(target: Uri): Boolean =
+        target.scheme == allowedUri.scheme &&
+            target.host == allowedUri.host &&
+            effectivePort(target) == effectivePort(allowedUri)
+
+    private fun effectivePort(uri: Uri): Int = uri.port.takeIf { it >= 0 } ?: when (uri.scheme) {
+        "http" -> 80
+        "https" -> 443
+        else -> -1
     }
 
     private fun copyLink(url: String) {
@@ -173,5 +191,6 @@ class ResultWebActivity : StudioActivity() {
     companion object {
         const val EXTRA_RESULT_ID = "result_web_id"
         const val EXTRA_PROJECT_NAME = "result_web_project_name"
+        const val EXTRA_REMOTE_WEB_URL = "remote_web_url"
     }
 }

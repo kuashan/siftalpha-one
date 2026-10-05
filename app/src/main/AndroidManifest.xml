@@ -80,6 +80,11 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".cloud.CloudTradingLabActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".RuntimeStorageActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />

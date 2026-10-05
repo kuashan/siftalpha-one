@@ -293,6 +293,7 @@ internal fun SiftAlphaNormalMoreDialog(
     onNewProject: () -> Unit,
     onUserStorage: () -> Unit,
     onSettings: () -> Unit,
+    onTradingLab: () -> Unit,
 ) {
     NormalSecondaryDialog(
         title = stringResource(R.string.home_more_title),
@@ -316,6 +317,12 @@ internal fun SiftAlphaNormalMoreDialog(
             subtitle = stringResource(R.string.user_storage_summary),
             accent = SecondaryBlue,
             onClick = onUserStorage,
+        )
+        SecondaryActionCard(
+            title = stringResource(R.string.cloud_trading_lab),
+            subtitle = stringResource(R.string.cloud_trading_lab_subtitle),
+            accent = SecondaryCyan,
+            onClick = onTradingLab,
         )
         SecondaryActionCard(
             title = stringResource(R.string.home_action_settings),

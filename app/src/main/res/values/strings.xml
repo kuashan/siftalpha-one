@@ -10,4 +10,20 @@
     <string name="crash_title">SiftAlpha X · 上次崩溃报告</string>
     <string name="crash_privacy">这份报告只保存在本机 App 私有存储，没有上传。请把下面完整内容发给支持人员即可定位。</string>
     <string name="crash_back">我已记录，返回 SiftAlpha X</string>
+    <string name="cloud_trading_lab">Trading Lab</string>
+    <string name="cloud_trading_lab_subtitle">Freqtrade · dry-run</string>
+    <string name="cloud_trading_lab_back">返回</string>
+    <string name="cloud_trading_lab_refresh">刷新</string>
+    <string name="cloud_trading_lab_prepare">Prepare</string>
+    <string name="cloud_trading_lab_start">Start</string>
+    <string name="cloud_trading_lab_stop">Stop</string>
+    <string name="cloud_trading_lab_logs">Logs</string>
+    <string name="cloud_trading_lab_open_web">打开 FreqUI</string>
+    <string name="cloud_trading_lab_no_agent">Cloud Agent 不可用</string>
+    <string name="cloud_trading_lab_no_project">Freqtrade 项目未注册</string>
+    <string name="cloud_trading_lab_no_runtime">无运行实例</string>
+    <string name="cloud_trading_lab_no_logs">暂无日志</string>
+    <string name="cloud_trading_lab_operation">操作状态：%1$s</string>
+    <string name="cloud_trading_lab_resources">资源：%1$s · %2$s</string>
+    <string name="cloud_trading_lab_web_unavailable">FreqUI 地址不可用</string>
 </resources>
