@@ -268,6 +268,7 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":cloud-agent-client"))
 
     val composeBom = platform("androidx.compose:compose-bom:2026.03.01")
     implementation(composeBom)
