@@ -15,6 +15,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "SiftAlphaStudio"
-include(":app")
+include(":app", ":cloud-core")
 include(":core")
 include(":macosApp")
